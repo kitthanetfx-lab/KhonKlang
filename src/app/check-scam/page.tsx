@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Search, ExternalLink, ArrowLeft, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 const SITES = [
@@ -11,10 +12,9 @@ const SITES = [
     slogan: 'ฐานข้อมูลผู้ขายที่ถูกแบล็คลิสต์จากผู้ซื้อทั่วประเทศไทย',
     url: 'https://www.blacklistseller.com/',
     searchUrl: (q: string) => `https://www.blacklistseller.com/search?s=${encodeURIComponent(q)}`,
-    gradient: 'from-red-900 via-red-800 to-rose-900',
+    banner: '/black.jpg',
     border: 'border-red-500/40',
     badge: 'bg-red-500/20 text-red-300 border-red-500/30',
-    icon: '🚫',
     tag: 'ผู้ขายออนไลน์',
   },
   {
@@ -23,22 +23,20 @@ const SITES = [
     slogan: 'ตรวจสอบเลขบัญชีและเบอร์โทรก่อนโอนเงิน ลดความเสี่ยงการโดนโกง',
     url: 'https://www.chaladohn.com/',
     searchUrl: (q: string) => `https://www.chaladohn.com/?q=${encodeURIComponent(q)}`,
-    gradient: 'from-blue-900 via-blue-800 to-indigo-900',
-    border: 'border-blue-500/40',
-    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    icon: '💳',
+    banner: '/896218_0.jpg',
+    border: 'border-red-500/40',
+    badge: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
     tag: 'เลขบัญชี / เบอร์โทร',
   },
   {
     id: 'checkgon',
-    name: 'Check ก่อน',
+    name: 'เช็คก่อน (CheckGon)',
     slogan: 'ระบบตรวจสอบการโกงออนไลน์โดยภาครัฐ เชื่อถือได้ 100%',
     url: 'https://checkgon.go.th/',
     searchUrl: (q: string) => `https://checkgon.go.th/?search=${encodeURIComponent(q)}`,
-    gradient: 'from-emerald-900 via-green-800 to-teal-900',
-    border: 'border-emerald-500/40',
-    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    icon: '🏛️',
+    banner: '/images.png',
+    border: 'border-blue-500/40',
+    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
     tag: 'ภาครัฐ',
   },
 ];
@@ -104,22 +102,30 @@ export default function CheckScam() {
           {SITES.map((site) => (
             <div
               key={site.id}
-              className={`bg-gradient-to-r ${site.gradient} border ${site.border} rounded-2xl overflow-hidden`}
+              className={`border ${site.border} rounded-2xl overflow-hidden bg-slate-800/60`}
             >
-              {/* Banner */}
-              <div className="px-6 pt-5 pb-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-2xl">{site.icon}</span>
-                      <h2 className="text-xl font-bold">{site.name}</h2>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${site.badge} font-medium`}>
-                        {site.tag}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-300 leading-relaxed">{site.slogan}</p>
-                  </div>
+              {/* Banner image */}
+              <div className="relative w-full h-36 sm:h-44 overflow-hidden">
+                <Image
+                  src={site.banner}
+                  alt={site.name}
+                  fill
+                  className="object-cover object-center"
+                  sizes="(max-width: 768px) 100vw, 700px"
+                />
+                {/* overlay */}
+                <div className="absolute inset-0 bg-black/30" />
+                <div className="absolute bottom-3 left-4 flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-white drop-shadow-lg">{site.name}</h2>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${site.badge} font-medium backdrop-blur-sm`}>
+                    {site.tag}
+                  </span>
                 </div>
+              </div>
+
+              {/* Info */}
+              <div className="px-5 pt-3 pb-2">
+                <p className="text-sm text-gray-300 leading-relaxed">{site.slogan}</p>
               </div>
 
               {/* Divider */}
