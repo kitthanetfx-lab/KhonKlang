@@ -2,68 +2,62 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Search, CheckCircle2, Loader2, ExternalLink, ArrowLeft, AlertTriangle } from 'lucide-react';
-
-type CheckStatus = 'idle' | 'checking' | 'done';
-type SiteStatus = 'waiting' | 'checking' | 'opened';
+import { Search, ExternalLink, ArrowLeft, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 const SITES = [
   {
-    id: 'chalodon',
-    name: 'ฉลาดโอน',
-    desc: 'ตรวจสอบประวัติการโกงจากฐานข้อมูลผู้เสียหาย',
-    url: (q: string) => `https://www.chalodohn.com/search?q=${encodeURIComponent(q)}`,
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10 border-blue-500/30',
-  },
-  {
     id: 'blacklist',
     name: 'Blacklist Seller',
-    desc: 'ฐานข้อมูลผู้ขายที่ถูกแบล็คลิสต์จากผู้ซื้อทั่วไทย',
-    url: (q: string) => `https://www.blacklistseller.com/search?s=${encodeURIComponent(q)}`,
-    color: 'text-red-400',
-    bg: 'bg-red-500/10 border-red-500/30',
+    slogan: 'ฐานข้อมูลผู้ขายที่ถูกแบล็คลิสต์จากผู้ซื้อทั่วประเทศไทย',
+    url: 'https://www.blacklistseller.com/',
+    searchUrl: (q: string) => `https://www.blacklistseller.com/search?s=${encodeURIComponent(q)}`,
+    gradient: 'from-red-900 via-red-800 to-rose-900',
+    border: 'border-red-500/40',
+    badge: 'bg-red-500/20 text-red-300 border-red-500/30',
+    icon: '🚫',
+    tag: 'ผู้ขายออนไลน์',
+  },
+  {
+    id: 'chaladohn',
+    name: 'ฉลาดโอน',
+    slogan: 'ตรวจสอบเลขบัญชีและเบอร์โทรก่อนโอนเงิน ลดความเสี่ยงการโดนโกง',
+    url: 'https://www.chaladohn.com/',
+    searchUrl: (q: string) => `https://www.chaladohn.com/?q=${encodeURIComponent(q)}`,
+    gradient: 'from-blue-900 via-blue-800 to-indigo-900',
+    border: 'border-blue-500/40',
+    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    icon: '💳',
+    tag: 'เลขบัญชี / เบอร์โทร',
+  },
+  {
+    id: 'checkgon',
+    name: 'Check ก่อน',
+    slogan: 'ระบบตรวจสอบการโกงออนไลน์โดยภาครัฐ เชื่อถือได้ 100%',
+    url: 'https://checkgon.go.th/',
+    searchUrl: (q: string) => `https://checkgon.go.th/?search=${encodeURIComponent(q)}`,
+    gradient: 'from-emerald-900 via-green-800 to-teal-900',
+    border: 'border-emerald-500/40',
+    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    icon: '🏛️',
+    tag: 'ภาครัฐ',
   },
 ];
 
 export default function CheckScam() {
-  const [form, setForm] = useState({ name: '', account: '', phone: '' });
-  const [status, setStatus] = useState<CheckStatus>('idle');
-  const [siteStatuses, setSiteStatuses] = useState<Record<string, SiteStatus>>({});
+  const [query, setQuery] = useState('');
 
-  const query = [form.name, form.account, form.phone].filter(Boolean).join(' ');
-  const hasInput = query.trim().length > 0;
-
-  const handleCheck = async () => {
-    if (!hasInput) return;
-    setStatus('checking');
-    setSiteStatuses({ chalodon: 'waiting', blacklist: 'waiting' });
-
-    for (let i = 0; i < SITES.length; i++) {
-      const site = SITES[i];
-
-      // Mark as checking
-      setSiteStatuses((prev) => ({ ...prev, [site.id]: 'checking' }));
-      await delay(1200);
-
-      // Open in new tab
-      window.open(site.url(query), '_blank', 'noopener,noreferrer');
-      setSiteStatuses((prev) => ({ ...prev, [site.id]: 'opened' }));
-      await delay(600);
-    }
-
-    setStatus('done');
+  const open = (site: typeof SITES[0]) => {
+    const url = query.trim() ? site.searchUrl(query.trim()) : site.url;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const reset = () => {
-    setForm({ name: '', account: '', phone: '' });
-    setStatus('idle');
-    setSiteStatuses({});
+  const openAll = () => {
+    SITES.forEach((site) => open(site));
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white px-4 py-12">
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-3xl mx-auto">
 
         {/* Back */}
         <Link href="/" className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-white mb-8 transition-colors">
@@ -71,128 +65,91 @@ export default function CheckScam() {
         </Link>
 
         {/* Header */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-4">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-yellow-500/20 border border-yellow-500/30 rounded-2xl mb-4">
-            <Search className="w-7 h-7 text-yellow-400" />
+            <ShieldCheck className="w-7 h-7 text-yellow-400" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">เช็คคนโกง</h1>
-          <p className="text-gray-400 text-sm">ตรวจสอบชื่อ เลขบัญชี หรือเบอร์โทรก่อนโอนเงิน</p>
+          <h1 className="text-3xl font-bold mb-3">เช็คคนโกง</h1>
+
+          {/* Slogan */}
+          <div className="inline-block bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-2xl px-6 py-3 mb-6">
+            <p className="text-yellow-300 font-semibold text-base sm:text-lg">
+              ⏱ เสียเวลาสักนิด &nbsp;•&nbsp; 🛡 ปลอดภัยมั่นใจ &nbsp;•&nbsp; 📉 ความเสี่ยงน้อยลง
+            </p>
+          </div>
         </div>
 
-        {status === 'idle' && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">ชื่อ-นามสกุล</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="เช่น สมชาย ใจดี"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500/50 transition-all placeholder-gray-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">เลขบัญชีธนาคาร</label>
-              <input
-                type="text"
-                value={form.account}
-                onChange={(e) => setForm({ ...form, account: e.target.value })}
-                placeholder="เช่น 012-3-45678-9"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500/50 transition-all placeholder-gray-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">เบอร์โทรศัพท์</label>
-              <input
-                type="text"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="เช่น 0812345678"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500/50 transition-all placeholder-gray-500"
-              />
-            </div>
-
-            <p className="text-xs text-gray-500">กรอกอย่างน้อย 1 อย่าง</p>
-
-            <button
-              onClick={handleCheck}
-              disabled={!hasInput}
-              className="w-full flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold py-3 rounded-xl transition-all"
-            >
-              <Search className="w-4 h-4" /> ตรวจสอบเลย
-            </button>
+        {/* Search bar */}
+        <div className="flex gap-2 mb-8">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="ชื่อ-สกุล, เลขบัญชี หรือเบอร์โทรศัพท์..."
+              className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500/50 transition-all placeholder-gray-500"
+            />
           </div>
-        )}
+          <button
+            onClick={openAll}
+            className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-semibold px-5 py-3 rounded-xl text-sm transition-all whitespace-nowrap"
+          >
+            เช็คทุกเว็บ
+          </button>
+        </div>
 
-        {(status === 'checking' || status === 'done') && (
-          <div className="space-y-4">
-            {/* Query summary */}
-            <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300">
-              <span className="text-gray-500">กำลังตรวจสอบ: </span>
-              <span className="font-medium text-white">{query}</span>
-            </div>
-
-            {/* Site checks */}
-            {SITES.map((site) => {
-              const s = siteStatuses[site.id];
-              return (
-                <div key={site.id} className={`border rounded-2xl p-5 transition-all ${site.bg} ${s === 'opened' ? 'opacity-100' : 'opacity-60'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <p className={`font-semibold ${site.color}`}>{site.name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{site.desc}</p>
+        {/* Site cards */}
+        <div className="space-y-4">
+          {SITES.map((site) => (
+            <div
+              key={site.id}
+              className={`bg-gradient-to-r ${site.gradient} border ${site.border} rounded-2xl overflow-hidden`}
+            >
+              {/* Banner */}
+              <div className="px-6 pt-5 pb-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-2xl">{site.icon}</span>
+                      <h2 className="text-xl font-bold">{site.name}</h2>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${site.badge} font-medium`}>
+                        {site.tag}
+                      </span>
                     </div>
-                    <div className="flex-shrink-0 mt-0.5">
-                      {s === 'waiting' && <div className="w-5 h-5 rounded-full border-2 border-gray-600" />}
-                      {s === 'checking' && <Loader2 className="w-5 h-5 text-yellow-400 animate-spin" />}
-                      {s === 'opened' && (
-                        <div className="flex items-center gap-1.5">
-                          <CheckCircle2 className="w-5 h-5 text-green-400" />
-                          <a href={site.url(query)} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-white flex items-center gap-0.5 transition-colors">
-                            เปิดอีกครั้ง <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {s === 'checking' && (
-                    <p className="text-xs text-yellow-400 mt-2 animate-pulse">กำลังเปิดเว็บไซต์...</p>
-                  )}
-                  {s === 'opened' && (
-                    <p className="text-xs text-green-400 mt-2">เปิดแท็บใหม่แล้ว — กรุณาตรวจสอบผลลัพธ์ในแท็บนั้น</p>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Done */}
-            {status === 'done' && (
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-5">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-sm mb-1">ตรวจสอบผลลัพธ์ด้วยตนเอง</p>
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                      ระบบได้เปิดเว็บไซต์ตรวจสอบทั้ง {SITES.length} แห่งในแท็บใหม่แล้ว
-                      กรุณาดูผลลัพธ์ในแต่ละแท็บ หากพบประวัติน่าสงสัย <strong className="text-white">ไม่ควรโอนเงิน</strong>
-                    </p>
+                    <p className="text-sm text-gray-300 leading-relaxed">{site.slogan}</p>
                   </div>
                 </div>
               </div>
-            )}
 
-            {status === 'done' && (
-              <button onClick={reset} className="w-full border border-white/20 hover:bg-white/10 text-white py-3 rounded-xl text-sm font-medium transition-all">
-                ตรวจสอบรายการใหม่
-              </button>
-            )}
-          </div>
-        )}
+              {/* Divider */}
+              <div className="border-t border-white/10 mx-6" />
+
+              {/* Action */}
+              <div className="px-6 py-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
+                  {query.trim()
+                    ? <span>จะเปิดค้นหา <strong className="text-white">"{query}"</strong></span>
+                    : <span>กรอกข้อมูลด้านบนเพื่อค้นหาตรงจุด</span>
+                  }
+                </div>
+                <button
+                  onClick={() => open(site)}
+                  className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap"
+                >
+                  เปิดเว็บไซต์ <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer note */}
+        <p className="text-center text-xs text-gray-500 mt-8">
+          ระบบเปิดเว็บไซต์ภายนอกในแท็บใหม่ • หากพบประวัติน่าสงสัย <span className="text-yellow-400">ไม่ควรโอนเงิน</span>
+        </p>
       </div>
     </div>
   );
-}
-
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }
