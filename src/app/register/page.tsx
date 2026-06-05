@@ -24,7 +24,8 @@ function RegisterForm() {
 
 
   const [form, setForm] = useState({
-    firstName: '', lastName: '', phone: '', houseNo: '',
+    firstName: '', lastName: '', phone: '',
+    houseNo: '', moo: '', road: '',
     provinceName: '', amphoreName: '', tambonName: '', postalCode: '',
   });
 
@@ -78,9 +79,11 @@ function RegisterForm() {
 
     const address = [
       form.houseNo,
-      form.tambonName   ? `ตำบล${form.tambonName}`   : '',
-      form.amphoreName  ? `อำเภอ${form.amphoreName}`  : '',
-      form.provinceName ? `จังหวัด${form.provinceName}` : '',
+      form.moo          ? `หมู่ ${form.moo}`           : '',
+      form.road         ? `ถ.${form.road}`              : '',
+      form.tambonName   ? `ต.${form.tambonName}`        : '',
+      form.amphoreName  ? `อ.${form.amphoreName}`       : '',
+      form.provinceName ? `จ.${form.provinceName}`      : '',
       form.postalCode,
     ].filter(Boolean).join(' ');
 
@@ -140,9 +143,19 @@ function RegisterForm() {
           </div>
 
           {/* ─── ที่อยู่ ─── */}
-          <div>
-            <label className="block text-sm font-medium mb-1.5 opacity-75">บ้านเลขที่ / ถนน</label>
-            <input type="text" name="houseNo" value={form.houseNo} onChange={onText} className={ic} placeholder="207/2 ม.1" />
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1.5 opacity-75">บ้านเลขที่</label>
+              <input type="text" name="houseNo" value={form.houseNo} onChange={onText} className={ic} placeholder="207/2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 opacity-75">หมู่ที่</label>
+              <input type="text" name="moo" value={form.moo} onChange={onText} className={ic} placeholder="1" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 opacity-75">ถนน</label>
+              <input type="text" name="road" value={form.road} onChange={onText} className={ic} placeholder="พหลโยธิน" />
+            </div>
           </div>
 
           {/* จังหวัด */}
@@ -199,3 +212,4 @@ export default function Register() {
     </Suspense>
   );
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                            
