@@ -1,0 +1,101 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { Client, Account, Users, Databases, ID, Permission, Role } from 'node-appwrite';
+
+const DB_ID  = 'khonklang_db';
+const COL_ID = 'middleman_applications';
+
+function getAdminClient() {
+  const client = new Client()
+    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+    .setKey(process.env.APPWRITE_API_KEY!);
+  return { users: new Users(client), databases: new Databases(client) };
+}
+
+async function ensureCollection(databases: Databases) {
+  try { await databases.get(DB_ID); }
+  catch { await databases.create(DB_ID, 'Khonklang Database'); }
+
+  try {
+    await databases.getCollection(DB_ID, COL_ID);
+  } catch {
+    await databases.createCollection(DB_ID, COL_ID, 'Middleman Applications', [
+      Permission.read(Role.users()),
+      Permission.write(Role.users()),
+    ]);
+    await Promise.all([
+      databases.createStringAttribute(DB_ID, COL_ID, 'userId',          255, true),
+      databases.createStringAttribute(DB_ID, COL_ID, 'fullNameId',      200, true),
+      databases.createStringAttribute(DB_ID, COL_ID, 'idNumber',         13, true),
+      databases.createIntegerAttribute(DB_ID, COL_ID, 'depositIntent',  false, 0, 99_999_999, 0),
+      databases.createStringAttribute(DB_ID, COL_ID, 'tier',             20, false, 'Bronze'),
+      databases.createStringAttribute(DB_ID, COL_ID, 'categories',      500, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'workProvince',    100, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'terms',          1000, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'bankAcct',        50, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'bankName',       100, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'bankOwner',      200, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'idCardFileName', 255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'status',          50, false, 'pending_review'),
+    ]);
+    await new Promise(r => setTimeout(r, 3000));
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const jwt = req.headers.get('x-session-jwt');
+    if (!jwt) return NextResponse.json({ error: 'ไม่ได้เข้าสู่ระบบ' }, { status: 401 });
+
+    const sessionClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setJWT(jwt);
+    const currentUser = await new Account(sessionClient).get();
+    const userId = currentUser.$id;
+
+    const body = await req.json();
+    const {
+      fullNameId, idNumber,
+      depositIntent, tier,
+      categories, workProvince, terms,
+      bankAcct, bankName, bankOwner,
+      idCardFileName,
+    } = body;
+
+    if (!fullNameId || !idNumber) {
+      return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
+    }
+
+    const { databases, users } = getAdminClient();
+    await ensureCollection(databases);
+
+    await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
+      userId,
+      fullNameId, idNumber,
+      depositIntent: depositIntent || 0,
+      tier:          tier          || 'Bronze',
+      categories:    Array.isArray(categories) ? categories.join(',') : '',
+      workProvince:  workProvince  || '',
+      terms:         terms         || '',
+      bankAcct:      bankAcct      || '',
+      bankName:      bankName      || '',
+      bankOwner:     bankOwner     || '',
+      idCardFileName:idCardFileName|| '',
+      status: 'pending_review',
+    });
+
+    // Mark in user prefs
+    await users.updatePrefs(userId, {
+      ...((await users.get(userId)).prefs as Record<string, string>),
+      middlemanStatus: 'pending_review',
+      middlemanTierIntent: tier || 'Bronze',
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Middleman register error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
