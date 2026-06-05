@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Users, Databases, Query, ID, IndexType } from 'node-appwrite';
+import { Client, Account, Users, Databases, Query, ID } from 'node-appwrite';
 
 const DB_ID = 'khonklang_db';
 const COL_ID = 'profiles';
@@ -41,7 +41,8 @@ async function ensureCollection(databases: Databases) {
     // รอให้ attributes พร้อม
     await new Promise((r) => setTimeout(r, 3000));
     // สร้าง index บน phone เพื่อ query ได้เร็ว
-    await databases.createIndex(DB_ID, COL_ID, 'phone_idx', IndexType.Key, ['phone']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await databases.createIndex(DB_ID, COL_ID, 'phone_idx', 'key' as any, ['phone']);
   }
 }
 
