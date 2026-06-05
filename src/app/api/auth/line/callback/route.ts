@@ -60,25 +60,18 @@ export async function GET(request: NextRequest) {
     // 6. Create session
     const session = await users.createSession(userId);
 
-    // 7. Set Appwrite session cookie and redirect
+    // 7. Set Appwrite session cookie and redirect to bridge page
     const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
-    const response = NextResponse.redirect(`${appUrl}/register`);
+    const response = NextResponse.redirect(`${appUrl}/auth/line/complete`);
 
-    // httpOnly ต้องเป็น false เพื่อให้ Appwrite Web SDK อ่าน cookie ได้ด้วย document.cookie
-    response.cookies.set(`a_session_${projectId}`, session.secret, {
-      httpOnly: false,
-      secure: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 365, // 1 year
-    });
+    // Session cookies สำหรับ Appwrite SDK
+    const cookieOpts = { httpOnly: false, secure: true, sameSite: 'lax' as const, path: '/', maxAge: 60 * 60 * 24 * 365 };
+    response.cookies.set(`a_session_${projectId}`, session.secret, cookieOpts);
+    response.cookies.set(`a_session_${projectId}_legacy`, session.secret, { ...cookieOpts, secure: false });
 
-    response.cookies.set(`a_session_${projectId}_legacy`, session.secret, {
-      httpOnly: false,
-      secure: false,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 365,
+    // Cookie พิเศษสำหรับ bridge page เรียก client.setSession() โดยตรง (5 นาที)
+    response.cookies.set('line_session_pending', session.secret, {
+      httpOnly: false, secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 5,
     });
 
     return response;
