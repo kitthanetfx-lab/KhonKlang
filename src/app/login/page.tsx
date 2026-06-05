@@ -3,7 +3,7 @@
 import { account } from '@/lib/appwrite';
 import { OAuthProvider } from 'appwrite';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { Suspense } from 'react';
 
 function LoginForm() {
@@ -91,14 +91,6 @@ function LoginForm() {
             </a>
           </div>
 
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => router.push('/register')}
-              className="text-sm text-blue-500 hover:text-blue-400 font-medium inline-flex items-center gap-1 transition-colors"
-            >
-              ทดสอบข้ามไปหน้าฟอร์ม (Dev) <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
         </div>
       </div>
     </main>
