@@ -2,11 +2,20 @@
 
 import { account } from '@/lib/appwrite';
 import { OAuthProvider } from 'appwrite';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, ShieldCheck } from 'lucide-react';
+import { Suspense } from 'react';
 
-export default function Login() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const error = searchParams.get('error');
+  const msg = searchParams.get('msg');
+
+  const errorMessages: Record<string, string> = {
+    line_cancelled: 'ยกเลิกการเข้าสู่ระบบด้วย LINE',
+    line_failed: `LINE login ล้มเหลว${msg ? ': ' + decodeURIComponent(msg) : ''}`,
+  };
 
   const handleLogin = async (provider: 'google' | 'facebook') => {
     try {
@@ -28,6 +37,12 @@ export default function Login() {
         <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-purple-500 rounded-full mix-blend-multiply filter blur-2xl opacity-20"></div>
 
         <div className="relative z-10">
+          {error && (
+            <div className="mb-4 px-4 py-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-xl text-red-700 dark:text-red-300 text-sm">
+              ⚠️ {errorMessages[error] || error}
+            </div>
+          )}
+
           <div className="flex justify-center mb-6">
             <div className="bg-blue-600 p-3 rounded-xl shadow-lg">
               <ShieldCheck className="w-8 h-8 text-white" />
@@ -87,5 +102,13 @@ export default function Login() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

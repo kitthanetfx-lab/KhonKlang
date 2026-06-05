@@ -83,8 +83,9 @@ export async function GET(request: NextRequest) {
 
     return response;
 
-  } catch (error) {
+  } catch (error: any) {
+    const msg = encodeURIComponent(error?.message || 'unknown');
     console.error('LINE login error:', error);
-    return NextResponse.redirect(`${appUrl}/login?error=line_failed`);
+    return NextResponse.redirect(`${appUrl}/login?error=line_failed&msg=${msg}`);
   }
 }
