@@ -34,8 +34,17 @@ export async function GET(request: NextRequest) {
     const profile = await profileRes.json();
     // profile: { userId, displayName, pictureUrl }
 
-    // 3. Derive synthetic credentials
-    const email = `line_${profile.userId}@line.khonklang.app`;
+    // 3. ดึง email จาก LINE ID token (ถ้ามี) หรือใช้ synthetic
+    let lineEmail = `line_${profile.userId}@line.khonklang.app`;
+    if (tokenData.id_token) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(tokenData.id_token.split('.')[1], 'base64url').toString()
+        );
+        if (payload.email) lineEmail = payload.email;
+      } catch { /* ใช้ synthetic แทน */ }
+    }
+    const email = lineEmail;
     const password = crypto
       .createHmac('sha256', process.env.LINE_CHANNEL_SECRET!)
       .update(profile.userId)
@@ -50,11 +59,15 @@ export async function GET(request: NextRequest) {
     const users = new Users(client);
     const userId = `line${profile.userId.slice(0, 28)}`; // Appwrite userId max 36 chars
 
-    // 5. Create user if not exists
+    // 5. Create user if not exists, อัปเดต email ถ้า login ซ้ำ
     try {
       await users.create(userId, email, undefined, password, profile.displayName);
     } catch (e: any) {
-      if (e?.code !== 409) throw e; // 409 = already exists, fine
+      if (e?.code !== 409) throw e;
+      // user มีแล้ว — อัปเดต email ถ้าได้ email จริงจาก LINE
+      if (!email.includes('@line.khonklang.app')) {
+        try { await users.updateEmail(userId, email); } catch { /* ignore */ }
+      }
     }
 
     // 6. Create session

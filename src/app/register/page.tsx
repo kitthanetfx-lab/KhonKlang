@@ -13,18 +13,48 @@ function RegisterForm() {
   const role = searchParams.get('role') || 'user';
 
   useEffect(() => {
-    account.get()
-      .then((u) => { if ((u.prefs as Record<string, string>)?.firstName) router.replace('/'); })
-      .catch(() => router.replace('/login'));
+    account.get().then(async (u) => {
+      // ถ้ามีโปรไฟล์แล้ว → ไปหน้าหลัก
+      if ((u.prefs as Record<string, string>)?.firstName) {
+        router.replace('/');
+        return;
+      }
+
+      // pre-fill ชื่อ + email จาก OAuth
+      const full  = u.name || '';
+      const parts = full.trim().split(' ');
+      const first = parts[0] || '';
+      const last  = parts.slice(1).join(' ') || '';
+      const email = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
+      setForm(p => ({ ...p, firstName: first, lastName: last, email }));
+
+      // ตรวจ auto-match กับโปรไฟล์ในระบบ (ชื่อหรืออีเมลตรงกัน)
+      try {
+        const jwt = await account.createJWT().then(r => r.jwt);
+        const res = await fetch('/api/register', {
+          headers: { 'x-session-jwt': jwt },
+        });
+        const data = await res.json();
+        if (data.matched) {
+          // พบโปรไฟล์ตรงกัน → ข้ามฟอร์ม
+          setLinked(true);
+          setTimeout(() => router.replace('/'), 2000);
+          return;
+        }
+      } catch { /* ไม่ match → แสดงฟอร์มตามปกติ */ }
+
+      setChecking(false);
+    }).catch(() => router.replace('/login'));
   }, [router]);
 
-  const [saving, setSaving] = useState(false);
-  const [linked, setLinked] = useState(false);
-  const [error, setError]   = useState('');
+  const [checking, setChecking] = useState(true);  // ตรวจ auto-match ก่อน
+  const [saving, setSaving]     = useState(false);
+  const [linked, setLinked]     = useState(false);
+  const [error, setError]       = useState('');
 
 
   const [form, setForm] = useState({
-    firstName: '', lastName: '', phone: '',
+    firstName: '', lastName: '', email: '', phone: '',
     houseNo: '', moo: '', road: '',
     provinceName: '', amphoreName: '', tambonName: '', postalCode: '',
   });
@@ -94,7 +124,7 @@ function RegisterForm() {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
-        body: JSON.stringify({ firstName: form.firstName, lastName: form.lastName, phone: form.phone, address, role }),
+        body: JSON.stringify({ firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, address, role }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'เกิดข้อผิดพลาด'); return; }
@@ -106,6 +136,14 @@ function RegisterForm() {
 
   const ic = 'w-full bg-white/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-40';
 
+  if (checking && !linked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500 animate-pulse">กำลังตรวจสอบข้อมูล...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6">
       {linked && (
@@ -114,8 +152,8 @@ function RegisterForm() {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Link2 className="w-8 h-8 text-green-600" />
             </div>
-            <h3 className="text-xl font-bold mb-2">เชื่อมบัญชีสำเร็จ!</h3>
-            <p className="text-gray-600 text-sm">กำลังพาไปหน้าหลัก...</p>
+            <h3 className="text-xl font-bold mb-2">พบข้อมูลของคุณในระบบแล้ว!</h3>
+            <p className="text-gray-600 text-sm">เชื่อมบัญชีสำเร็จ กำลังพาไปหน้าหลัก...</p>
           </div>
         </div>
       )}
@@ -126,14 +164,16 @@ function RegisterForm() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1.5 opacity-75">ชื่อจริง</label>
-              <input required type="text" name="firstName" value={form.firstName} onChange={onText} className={ic} placeholder="สมชาย" />
+          {/* ชื่อ + อีเมล: ดึงจาก OAuth อ่านอย่างเดียว */}
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-4 py-3 space-y-2">
+            <p className="text-xs text-gray-400 mb-1">ข้อมูลจากบัญชีที่ใช้ล็อกอิน</p>
+            <div className="flex items-center gap-3">
+              <span className="text-sm opacity-60 w-16 shrink-0">ชื่อ</span>
+              <span className="font-medium">{form.firstName} {form.lastName}</span>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5 opacity-75">นามสกุล</label>
-              <input required type="text" name="lastName" value={form.lastName} onChange={onText} className={ic} placeholder="ใจดี" />
+            <div className="flex items-center gap-3">
+              <span className="text-sm opacity-60 w-16 shrink-0">อีเมล</span>
+              <span className="font-medium">{form.email || <span className="text-gray-400 text-sm">ไม่มีข้อมูล</span>}</span>
             </div>
           </div>
 
@@ -215,4 +255,3 @@ export default function Register() {
     </Suspense>
   );
 }
-                                                                                                                                                                          
