@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/fetch-thai-geo.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -14,7 +15,8 @@
     "next": "16.2.7",
     "node-appwrite": "^26.0.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "thai-address-database": "^0.0.30"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

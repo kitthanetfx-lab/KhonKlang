@@ -1,47 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
-// Data bundled with npm package — no external fetch needed
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { searchAddressByProvince, searchAddressByDistrict } = require('thai-address-database');
+type Amphure = { id: number; n: string; p: number };
+type Tambon  = { id: number; n: string; a: number; z: number };
 
-type Entry = { district: string; amphoe: string; province: string; zipcode: string };
+let _amph: Amphure[] | null = null;
+let _tamb: Tambon[]  | null = null;
+
+function loadData() {
+  if (_amph) return;
+  const file = join(process.cwd(), 'public', 'thai-geo.json');
+  if (!existsSync(file)) return;
+  const raw = JSON.parse(readFileSync(file, 'utf-8'));
+  _amph = raw.amphures;
+  _tamb = raw.tambons;
+}
 
 export async function GET(req: NextRequest) {
+  loadData();
+
   const { searchParams } = req.nextUrl;
-  const type     = searchParams.get('type');
-  const province = searchParams.get('province') || '';
-  const amphoe   = searchParams.get('amphoe') || '';
+  const type       = searchParams.get('type');
+  const provinceId = parseInt(searchParams.get('pid') || '0');
+  const amphureId  = parseInt(searchParams.get('aid') || '0');
 
-  const headers = { 'Cache-Control': 'public, s-maxage=86400' };
+  const h = { 'Cache-Control': 'public, s-maxage=86400' };
 
-  if (type === 'amphures') {
-    // ดึง อำเภอ ทั้งหมดของจังหวัด
-    const entries: Entry[] = searchAddressByProvince(province) || [];
-    const unique = [...new Set(
-      entries
-        .filter((e: Entry) => e.province === province)
-        .map((e: Entry) => e.amphoe)
-    )].sort();
-    return NextResponse.json(unique, { headers });
+  if (type === 'amphures' && _amph) {
+    return NextResponse.json(_amph.filter(a => a.p === provinceId), { headers: h });
+  }
+  if (type === 'tambons' && _tamb) {
+    return NextResponse.json(_tamb.filter(t => t.a === amphureId), { headers: h });
   }
 
-  if (type === 'tambons') {
-    // ดึง ตำบล + รหัสไปรษณีย์ ของ อำเภอ นั้น
-    const entries: Entry[] = searchAddressByProvince(province) || [];
-    const filtered = entries.filter(
-      (e: Entry) => e.province === province && e.amphoe === amphoe
-    );
-    // unique tambons with zipcode
-    const seen = new Set<string>();
-    const result: { name: string; zip: string }[] = [];
-    for (const e of filtered) {
-      if (!seen.has(e.district)) {
-        seen.add(e.district);
-        result.push({ name: e.district, zip: e.zipcode });
-      }
-    }
-    return NextResponse.json(result.sort((a, b) => a.name.localeCompare(b.name, 'th')), { headers });
-  }
-
-  return NextResponse.json({ error: 'invalid type' }, { status: 400 });
+  return NextResponse.json({ error: 'not ready' }, { status: 503 });
 }
