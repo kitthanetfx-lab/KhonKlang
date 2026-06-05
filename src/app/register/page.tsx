@@ -88,9 +88,12 @@ function RegisterForm() {
     ].filter(Boolean).join(' ');
 
     try {
+      // สร้าง JWT สั้น ๆ เพื่อให้ server verify ตัวตนได้ (รองรับทั้ง Google/LINE/Facebook OAuth)
+      const { jwt } = await account.createJWT();
+
       const res = await fetch('/api/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
         body: JSON.stringify({ firstName: form.firstName, lastName: form.lastName, phone: form.phone, address, role }),
       });
       const data = await res.json();
@@ -212,3 +215,4 @@ export default function Register() {
     </Suspense>
   );
 }
+                                                                                                                                                                          
