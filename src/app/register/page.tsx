@@ -5,25 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Link2 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
 
-// id ตรงกับ kongvut thai-province-data
-const PROVINCES = [
-  {id:1,n:'กระบี่'},{id:2,n:'กรุงเทพมหานคร'},{id:3,n:'กาญจนบุรี'},{id:4,n:'กาฬสินธุ์'},{id:5,n:'กำแพงเพชร'},
-  {id:6,n:'ขอนแก่น'},{id:7,n:'จันทบุรี'},{id:8,n:'ฉะเชิงเทรา'},{id:9,n:'ชลบุรี'},{id:10,n:'ชัยนาท'},
-  {id:11,n:'ชัยภูมิ'},{id:12,n:'ชุมพร'},{id:13,n:'เชียงราย'},{id:14,n:'เชียงใหม่'},{id:15,n:'ตรัง'},
-  {id:16,n:'ตราด'},{id:17,n:'ตาก'},{id:18,n:'นครนายก'},{id:19,n:'นครปฐม'},{id:20,n:'นครพนม'},
-  {id:21,n:'นครราชสีมา'},{id:22,n:'นครศรีธรรมราช'},{id:23,n:'นครสวรรค์'},{id:24,n:'นนทบุรี'},{id:25,n:'นราธิวาส'},
-  {id:26,n:'น่าน'},{id:27,n:'บึงกาฬ'},{id:28,n:'บุรีรัมย์'},{id:29,n:'ปทุมธานี'},{id:30,n:'ประจวบคีรีขันธ์'},
-  {id:31,n:'ปราจีนบุรี'},{id:32,n:'ปัตตานี'},{id:33,n:'พระนครศรีอยุธยา'},{id:34,n:'พะเยา'},{id:35,n:'พังงา'},
-  {id:36,n:'พัทลุง'},{id:37,n:'พิจิตร'},{id:38,n:'พิษณุโลก'},{id:39,n:'เพชรบุรี'},{id:40,n:'เพชรบูรณ์'},
-  {id:41,n:'แพร่'},{id:42,n:'ภูเก็ต'},{id:43,n:'มหาสารคาม'},{id:44,n:'มุกดาหาร'},{id:45,n:'แม่ฮ่องสอน'},
-  {id:46,n:'ยโสธร'},{id:47,n:'ยะลา'},{id:48,n:'ร้อยเอ็ด'},{id:49,n:'ระนอง'},{id:50,n:'ระยอง'},
-  {id:51,n:'ราชบุรี'},{id:52,n:'ลพบุรี'},{id:53,n:'ลำปาง'},{id:54,n:'ลำพูน'},{id:55,n:'เลย'},
-  {id:56,n:'ศรีสะเกษ'},{id:57,n:'สกลนคร'},{id:58,n:'สงขลา'},{id:59,n:'สตูล'},{id:60,n:'สมุทรปราการ'},
-  {id:61,n:'สมุทรสงคราม'},{id:62,n:'สมุทรสาคร'},{id:63,n:'สระแก้ว'},{id:64,n:'สระบุรี'},{id:65,n:'สิงห์บุรี'},
-  {id:66,n:'สุโขทัย'},{id:67,n:'สุพรรณบุรี'},{id:68,n:'สุราษฎร์ธานี'},{id:69,n:'สุรินทร์'},{id:70,n:'หนองคาย'},
-  {id:71,n:'หนองบัวลำภู'},{id:72,n:'อ่างทอง'},{id:73,n:'อำนาจเจริญ'},{id:74,n:'อุดรธานี'},{id:75,n:'อุตรดิตถ์'},
-  {id:76,n:'อุทัยธานี'},{id:77,n:'อุบลราชธานี'},
-];
+const PROVINCES = ['กระบี่','กรุงเทพมหานคร','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
 function RegisterForm() {
   const router = useRouter();
@@ -40,18 +22,14 @@ function RegisterForm() {
   const [linked, setLinked] = useState(false);
   const [error, setError]   = useState('');
 
-  type Amph = { id: number; n: string };
-  type Tamb = { id: number; n: string; z: number };
 
   const [form, setForm] = useState({
     firstName: '', lastName: '', phone: '', houseNo: '',
-    provinceId: 0, provinceName: '',
-    amphureId: 0,  amphoreName: '',
-    tambonId: 0,   tambonName: '',  postalCode: '',
+    provinceName: '', amphoreName: '', tambonName: '', postalCode: '',
   });
 
-  const [amphoes, setAmphoes]         = useState<Amph[]>([]);
-  const [tambons, setTambons]         = useState<Tamb[]>([]);
+  const [amphoes, setAmphoes]         = useState<string[]>([]);
+  const [tambons, setTambons]         = useState<[string,string][]>([]);
   const [loadingAmph, setLoadingAmph] = useState(false);
   const [loadingTamb, setLoadingTamb] = useState(false);
 
@@ -61,36 +39,37 @@ function RegisterForm() {
   };
 
   const onProvince = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const [id, name] = e.target.value.split('|');
-    setForm(p => ({ ...p, provinceId: +id, provinceName: name, amphureId: 0, amphoreName: '', tambonId: 0, tambonName: '', postalCode: '' }));
+    const name = e.target.value;
+    setForm(p => ({ ...p, provinceName: name, amphoreName: '', tambonName: '', postalCode: '' }));
     setAmphoes([]); setTambons([]);
-    if (!id) return;
+    if (!name) return;
     setLoadingAmph(true);
     try {
-      const res = await fetch(`/api/thai-address?type=amphures&pid=${id}`);
-      const data = await res.json();
-      setAmphoes(Array.isArray(data) ? data : []);
+      const res = await fetch(`/api/thai-address?type=amphures&province=${encodeURIComponent(name)}`);
+      const d = await res.json();
+      setAmphoes(Array.isArray(d) ? d : []);
     } catch { setAmphoes([]); }
     setLoadingAmph(false);
   };
 
   const onAmphoe = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const [id, name] = e.target.value.split('|');
-    setForm(p => ({ ...p, amphureId: +id, amphoreName: name, tambonId: 0, tambonName: '', postalCode: '' }));
+    const name = e.target.value;
+    setForm(p => ({ ...p, amphoreName: name, tambonName: '', postalCode: '' }));
     setTambons([]);
-    if (!id) return;
+    if (!name) return;
     setLoadingTamb(true);
     try {
-      const res = await fetch(`/api/thai-address?type=tambons&aid=${id}`);
-      const data = await res.json();
-      setTambons(Array.isArray(data) ? data : []);
+      const res = await fetch(`/api/thai-address?type=tambons&province=${encodeURIComponent(form.provinceName)}&amphoe=${encodeURIComponent(name)}`);
+      const d = await res.json();
+      setTambons(Array.isArray(d) ? d : []);
     } catch { setTambons([]); }
     setLoadingTamb(false);
   };
 
   const onTambon = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const [id, name, zip] = e.target.value.split('|');
-    setForm(p => ({ ...p, tambonId: +id, tambonName: name, postalCode: zip }));
+    const val = e.target.value; // "name|zip"
+    const [name, zip] = val.split('|');
+    setForm(p => ({ ...p, tambonName: name, postalCode: zip }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,9 +78,9 @@ function RegisterForm() {
 
     const address = [
       form.houseNo,
-      form.tambonName  && `ตำบล${form.tambonName}`,
-      form.amphoreName && `อำเภอ${form.amphoreName}`,
-      form.provinceName && `จังหวัด${form.provinceName}`,
+      form.tambonName   ? `ตำบล${form.tambonName}`   : '',
+      form.amphoreName  ? `อำเภอ${form.amphoreName}`  : '',
+      form.provinceName ? `จังหวัด${form.provinceName}` : '',
       form.postalCode,
     ].filter(Boolean).join(' ');
 
@@ -169,29 +148,29 @@ function RegisterForm() {
           {/* จังหวัด */}
           <div>
             <label className="block text-sm font-medium mb-1.5 opacity-75">จังหวัด</label>
-            <select required value={form.provinceId ? `${form.provinceId}|${form.provinceName}` : ''} onChange={onProvince} className={ic}>
+            <select required value={form.provinceName} onChange={onProvince} className={ic}>
               <option value="">เลือกจังหวัด</option>
-              {PROVINCES.map(p => <option key={p.id} value={`${p.id}|${p.n}`}>{p.n}</option>)}
+              {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
 
           {/* อำเภอ */}
           <div>
             <label className="block text-sm font-medium mb-1.5 opacity-75">อำเภอ / เขต</label>
-            <select required value={form.amphureId ? `${form.amphureId}|${form.amphoreName}` : ''} onChange={onAmphoe}
-              disabled={!form.provinceId || loadingAmph} className={ic}>
-              <option value="">{loadingAmph ? 'กำลังโหลด...' : form.provinceId ? 'เลือกอำเภอ' : '— เลือกจังหวัดก่อน —'}</option>
-              {amphoes.map(a => <option key={a.id} value={`${a.id}|${a.n}`}>{a.n}</option>)}
+            <select required value={form.amphoreName} onChange={onAmphoe}
+              disabled={!form.provinceName || loadingAmph} className={ic}>
+              <option value="">{loadingAmph ? 'กำลังโหลด...' : form.provinceName ? 'เลือกอำเภอ' : '— เลือกจังหวัดก่อน —'}</option>
+              {amphoes.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1.5 opacity-75">ตำบล / แขวง</label>
-              <select required value={form.tambonId ? `${form.tambonId}|${form.tambonName}|${form.postalCode}` : ''} onChange={onTambon}
-                disabled={!form.amphureId || loadingTamb} className={ic}>
-                <option value="">{loadingTamb ? 'กำลังโหลด...' : form.amphureId ? 'เลือกตำบล' : '— เลือกอำเภอก่อน —'}</option>
-                {tambons.map(t => <option key={t.id} value={`${t.id}|${t.n}|${t.z}`}>{t.n}</option>)}
+              <select required value={form.tambonName ? `${form.tambonName}|${form.postalCode}` : ''} onChange={onTambon}
+                disabled={!form.amphoreName || loadingTamb} className={ic}>
+                <option value="">{loadingTamb ? 'กำลังโหลด...' : form.amphoreName ? 'เลือกตำบล' : '— เลือกอำเภอก่อน —'}</option>
+                {tambons.map(([n, z]) => <option key={n} value={`${n}|${z}`}>{n}</option>)}
               </select>
             </div>
             <div>
