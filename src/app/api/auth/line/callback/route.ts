@@ -64,8 +64,9 @@ export async function GET(request: NextRequest) {
     const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
     const response = NextResponse.redirect(`${appUrl}/register`);
 
+    // httpOnly ต้องเป็น false เพื่อให้ Appwrite Web SDK อ่าน cookie ได้ด้วย document.cookie
     response.cookies.set(`a_session_${projectId}`, session.secret, {
-      httpOnly: true,
+      httpOnly: false,
       secure: true,
       sameSite: 'lax',
       path: '/',
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
     });
 
     response.cookies.set(`a_session_${projectId}_legacy`, session.secret, {
-      httpOnly: true,
+      httpOnly: false,
       secure: false,
       sameSite: 'lax',
       path: '/',
