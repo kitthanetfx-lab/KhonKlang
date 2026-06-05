@@ -88,10 +88,10 @@ export default function Home() {
                 </button>
                 {registerOpen && (
                   <div className="absolute top-full left-0 mt-1 w-56 bg-slate-800 border border-white/10 rounded-xl shadow-xl overflow-hidden">
-                    <Link href="/register" className="flex items-center gap-2 px-4 py-3 hover:bg-white/10 transition-colors text-sm">
+                    <Link href="/register/seller" className="flex items-center gap-2 px-4 py-3 hover:bg-white/10 transition-colors text-sm">
                       <Users className="w-4 h-4 text-blue-400" /> สมัครเป็นผู้ขายกลุ่มในเครือ
                     </Link>
-                    <Link href="/register-middleman" className="flex items-center gap-2 px-4 py-3 hover:bg-white/10 transition-colors text-sm">
+                    <Link href="/register/middleman" className="flex items-center gap-2 px-4 py-3 hover:bg-white/10 transition-colors text-sm">
                       <HandshakeIcon className="w-4 h-4 text-green-400" /> สมัครเป็นคนกลาง
                     </Link>
                   </div>
@@ -142,10 +142,10 @@ export default function Home() {
                   </button>
                   {profileOpen && (
                     <div className="absolute right-0 top-full mt-2 w-44 bg-slate-800 border border-white/10 rounded-xl shadow-xl overflow-hidden">
-                      <Link href="/register?role=seller" className="block px-4 py-2.5 text-sm hover:bg-white/10 transition-colors" onClick={() => setProfileOpen(false)}>
+                      <Link href="/register/seller" className="block px-4 py-2.5 text-sm hover:bg-white/10 transition-colors" onClick={() => setProfileOpen(false)}>
                         สมัครเป็นผู้ขาย
                       </Link>
-                      <Link href="/register?role=middleman" className="block px-4 py-2.5 text-sm hover:bg-white/10 transition-colors" onClick={() => setProfileOpen(false)}>
+                      <Link href="/register/middleman" className="block px-4 py-2.5 text-sm hover:bg-white/10 transition-colors" onClick={() => setProfileOpen(false)}>
                         สมัครเป็นคนกลาง
                       </Link>
                       <hr className="border-white/10" />
@@ -173,10 +173,10 @@ export default function Home() {
         {mobileOpen && (
           <div className="md:hidden bg-slate-900 border-t border-white/10 px-4 py-4 space-y-1">
             <p className="text-xs text-gray-400 uppercase px-3 mb-2">สมัคร</p>
-            <Link href="/register" className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm" onClick={() => setMobileOpen(false)}>
+            <Link href="/register/seller" className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm" onClick={() => setMobileOpen(false)}>
               <Users className="w-4 h-4 text-blue-400" /> สมัครเป็นผู้ขายกลุ่มในเครือ
             </Link>
-            <Link href="/register-middleman" className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm" onClick={() => setMobileOpen(false)}>
+            <Link href="/register/middleman" className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm" onClick={() => setMobileOpen(false)}>
               <HandshakeIcon className="w-4 h-4 text-green-400" /> สมัครเป็นคนกลาง
             </Link>
             <hr className="border-white/10 my-2" />
