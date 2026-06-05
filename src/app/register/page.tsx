@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Upload, AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
 
-export default function Register() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams.get('role') || 'seller'; // 'seller' | 'middleman'
@@ -219,5 +219,13 @@ export default function Register() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function Register() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }
