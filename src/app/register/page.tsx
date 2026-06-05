@@ -1,11 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Upload, AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { account } from '@/lib/appwrite';
 
 export default function Register() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const role = searchParams.get('role') || 'seller'; // 'seller' | 'middleman'
+
   const [type, setType] = useState<'individual' | 'corporate'>('individual');
   const [formData, setFormData] = useState({
     firstName: '',
@@ -14,21 +18,18 @@ export default function Register() {
     bankName: '',
     accountNumber: '',
   });
-  
   const [validationError, setValidationError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    
-    // Clear validation error when user types
     if (validationError) setValidationError('');
   };
 
   const validateNames = () => {
     const fullName = `${formData.firstName} ${formData.lastName}`.trim().toLowerCase();
     const bankName = formData.bankAccountName.trim().toLowerCase();
-    
     if (fullName && bankName && fullName !== bankName) {
       setValidationError('ชื่อ-นามสกุล และชื่อบัญชีธนาคารไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง');
       return false;
@@ -36,18 +37,46 @@ export default function Register() {
     return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateNames()) return;
-    
-    // In a real app, we would upload files to Appwrite Storage and insert data to the database here
-    router.push('/payment');
+
+    setSaving(true);
+    try {
+      // Save user info and role to Appwrite preferences
+      await account.updatePrefs({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        role: role,
+        displayName: `${formData.firstName} ${formData.lastName}`.trim(),
+      });
+
+      // Update account name
+      await account.updateName(`${formData.firstName} ${formData.lastName}`.trim());
+    } catch (e) {
+      // If not logged in, just continue (dev mode)
+    } finally {
+      setSaving(false);
+    }
+
+    router.push('/');
   };
+
+  const roleLabel = role === 'middleman' ? 'คนกลาง' : 'ผู้ขาย';
 
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto glass-panel rounded-2xl p-6 sm:p-10 animate-fade-in shadow-xl">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-gray-900 dark:text-white">ข้อมูลผู้ขาย</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">ข้อมูลผู้ใช้งาน</h1>
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+            role === 'middleman'
+              ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+          }`}>
+            สมัครเป็น{roleLabel}
+          </span>
+        </div>
         <p className="text-gray-600 dark:text-gray-300 mb-8">กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้องเพื่อประโยชน์ของท่าน</p>
 
         <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl mb-8">
@@ -110,7 +139,6 @@ export default function Register() {
           )}
 
           <hr className="border-gray-200 dark:border-gray-700 my-8" />
-          
           <h2 className="text-xl font-semibold mb-4">ข้อมูลบัญชีธนาคาร (สำหรับรับเงิน)</h2>
 
           <div>
@@ -140,7 +168,7 @@ export default function Register() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium mb-2 opacity-80">ธนาคาร</label>
-              <select 
+              <select
                 required
                 className="w-full bg-white/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               >
@@ -164,9 +192,8 @@ export default function Register() {
           </div>
 
           <hr className="border-gray-200 dark:border-gray-700 my-8" />
-
           <h2 className="text-xl font-semibold mb-4">เอกสารแนบ</h2>
-          
+
           <div className="space-y-6">
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
               <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
@@ -174,7 +201,6 @@ export default function Register() {
               <p className="text-xs text-gray-500 mb-4">รองรับ JPG, PNG ขนาดไม่เกิน 5MB</p>
               <input type="file" required accept="image/*" className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
             </div>
-
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
               <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
               <p className="text-sm font-medium mb-1">อัปโหลดรูปหน้าสมุดบัญชีธนาคาร</p>
@@ -185,9 +211,10 @@ export default function Register() {
 
           <button
             type="submit"
-            className="w-full mt-8 bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            disabled={saving}
+            className="w-full mt-8 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-4 rounded-xl font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           >
-            ดำเนินการต่อ <ArrowRight className="w-5 h-5" />
+            {saving ? 'กำลังบันทึก...' : <>บันทึกและไปหน้าหลัก <ArrowRight className="w-5 h-5" /></>}
           </button>
         </form>
       </div>

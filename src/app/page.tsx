@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useUser } from '@/lib/useUser';
 import {
   ShieldCheck,
   Users,
@@ -44,10 +45,23 @@ const stats = [
   { value: '99%', label: 'ความพึงพอใจ' },
 ];
 
+const ROLE_LABEL: Record<string, { label: string; color: string }> = {
+  seller:     { label: 'ผู้ขาย',     color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
+  middleman:  { label: 'คนกลาง',    color: 'bg-green-500/20 text-green-300 border-green-500/40' },
+  user:       { label: 'ผู้ใช้งาน', color: 'bg-gray-500/20 text-gray-300 border-gray-500/40' },
+};
+
 export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const { user, loading, logout } = useUser();
+
+  const role = user?.prefs?.role || 'user';
+  const roleInfo = ROLE_LABEL[role] ?? ROLE_LABEL.user;
+  const displayName = user?.prefs?.displayName || user?.name || 'ผู้ใช้งาน';
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white">
@@ -105,11 +119,47 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Login button */}
+            {/* Login / Profile button */}
             <div className="hidden md:block">
-              <Link href="/login" className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all shadow-lg hover:shadow-blue-500/30">
-                เข้าสู่ระบบ
-              </Link>
+              {loading ? (
+                <div className="w-20 h-8 bg-white/10 rounded-xl animate-pulse" />
+              ) : user ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setProfileOpen(!profileOpen)}
+                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-xl transition-all"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">
+                      {initials}
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-medium leading-none">{displayName}</p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${roleInfo.color}`}>
+                        {roleInfo.label}
+                      </span>
+                    </div>
+                    <ChevronDown className="w-3 h-3 text-gray-400" />
+                  </button>
+                  {profileOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-44 bg-slate-800 border border-white/10 rounded-xl shadow-xl overflow-hidden">
+                      <Link href="/register?role=seller" className="block px-4 py-2.5 text-sm hover:bg-white/10 transition-colors" onClick={() => setProfileOpen(false)}>
+                        สมัครเป็นผู้ขาย
+                      </Link>
+                      <Link href="/register?role=middleman" className="block px-4 py-2.5 text-sm hover:bg-white/10 transition-colors" onClick={() => setProfileOpen(false)}>
+                        สมัครเป็นคนกลาง
+                      </Link>
+                      <hr className="border-white/10" />
+                      <button onClick={logout} className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-white/10 transition-colors">
+                        ออกจากระบบ
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link href="/login" className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all shadow-lg hover:shadow-blue-500/30">
+                  เข้าสู่ระบบ
+                </Link>
+              )}
             </div>
 
             {/* Mobile hamburger */}
