@@ -12,6 +12,7 @@ export interface AppUser {
     firstName?: string;
     lastName?: string;
     role?: UserRole;
+    displayName?: string;
   };
 }
 
