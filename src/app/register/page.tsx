@@ -66,8 +66,11 @@ function RegisterForm() {
     setAmphoes([]); setTambons([]);
     if (!id) return;
     setLoadingAmph(true);
-    const res = await fetch(`/api/thai-address?type=amphures&pid=${id}`);
-    setAmphoes(await res.json());
+    try {
+      const res = await fetch(`/api/thai-address?type=amphures&pid=${id}`);
+      const data = await res.json();
+      setAmphoes(Array.isArray(data) ? data : []);
+    } catch { setAmphoes([]); }
     setLoadingAmph(false);
   };
 
@@ -77,8 +80,11 @@ function RegisterForm() {
     setTambons([]);
     if (!id) return;
     setLoadingTamb(true);
-    const res = await fetch(`/api/thai-address?type=tambons&aid=${id}`);
-    setTambons(await res.json());
+    try {
+      const res = await fetch(`/api/thai-address?type=tambons&aid=${id}`);
+      const data = await res.json();
+      setTambons(Array.isArray(data) ? data : []);
+    } catch { setTambons([]); }
     setLoadingTamb(false);
   };
 
