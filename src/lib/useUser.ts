@@ -13,6 +13,12 @@ export interface AppUser {
     lastName?: string;
     role?: UserRole;
     displayName?: string;
+    phone?: string;
+    address?: string;
+    bankAccountName?: string;
+    bankName?: string;
+    accountNumber?: string;
+    linkedTo?: string;
   };
 }
 
