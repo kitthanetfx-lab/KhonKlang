@@ -10,18 +10,18 @@ interface Province { id: number; name_th: string; }
 interface Amphure  { id: number; name_th: string; province_id: number; }
 interface Tambon   { id: number; name_th: string; amphure_id: number; zip_code: number; }
 
-const BASE = 'https://raw.githubusercontent.com/kongvut/thai-province-data/master';
 let _prov: Province[] | null = null;
 let _amph: Amphure[] | null = null;
 let _tamb: Tambon[]  | null = null;
 
 async function loadGeo() {
   if (_prov) return;
-  [_prov, _amph, _tamb] = await Promise.all([
-    fetch(`${BASE}/api_province.json`).then(r => r.json()),
-    fetch(`${BASE}/api_amphure.json`).then(r => r.json()),
-    fetch(`${BASE}/api_tambon.json`).then(r => r.json()),
-  ]);
+  const res = await fetch('/api/thai-address');
+  if (!res.ok) throw new Error('โหลดข้อมูลที่อยู่ไม่สำเร็จ');
+  const data = await res.json();
+  _prov = data.provinces;
+  _amph = data.amphures;
+  _tamb = data.tambons;
 }
 
 /* ─────────── Main Form ─────────── */
@@ -59,17 +59,28 @@ function RegisterForm() {
   const [amphures, setAmphures]   = useState<Amphure[]>([]);
   const [tambons, setTambons]     = useState<Tambon[]>([]);
   const [geoLoading, setGeoLoading] = useState(true);
+  const [geoError, setGeoError] = useState(false);
   const allAmphRef = useRef<Amphure[]>([]);
   const allTambRef = useRef<Tambon[]>([]);
 
-  useEffect(() => {
-    loadGeo().then(() => {
-      setProvinces(_prov!);
-      allAmphRef.current = _amph!;
-      allTambRef.current = _tamb!;
-      setGeoLoading(false);
-    });
-  }, []);
+  const fetchGeo = () => {
+    setGeoLoading(true);
+    setGeoError(false);
+    loadGeo()
+      .then(() => {
+        setProvinces(_prov!);
+        allAmphRef.current = _amph!;
+        allTambRef.current = _tamb!;
+        setGeoLoading(false);
+      })
+      .catch(() => {
+        _prov = null; // reset cache so retry works
+        setGeoLoading(false);
+        setGeoError(true);
+      });
+  };
+
+  useEffect(() => { fetchGeo(); }, []);
 
   /* ── input handlers ── */
   const set = (field: string, value: string | number) =>
@@ -262,6 +273,12 @@ function RegisterForm() {
             <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
               <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
               กำลังโหลดข้อมูลที่อยู่...
+            </div>
+          ) : geoError ? (
+            <div className="flex items-center gap-3 text-sm py-2">
+              <span className="text-red-500">โหลดข้อมูลที่อยู่ไม่สำเร็จ</span>
+              <button type="button" onClick={fetchGeo}
+                className="text-blue-500 underline hover:text-blue-700">ลองใหม่</button>
             </div>
           ) : (
             <>
