@@ -255,39 +255,3 @@ export default function Register() {
     </Suspense>
   );
 }
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1.5 opacity-75">ตำบล / แขวง</label>
-              <select required value={form.tambonName ? `${form.tambonName}|${form.postalCode}` : ''} onChange={onTambon}
-                disabled={!form.amphoreName || loadingTamb} className={ic}>
-                <option value="">{loadingTamb ? 'กำลังโหลด...' : form.amphoreName ? 'เลือกตำบล' : '— เลือกอำเภอก่อน —'}</option>
-                {tambons.map(([n, z]) => <option key={n} value={`${n}|${z}`}>{n}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5 opacity-75">รหัสไปรษณีย์</label>
-              <input readOnly value={form.postalCode}
-                className={ic + ' bg-gray-50 dark:bg-gray-800/80 cursor-default text-gray-500'} placeholder="ออโต้" />
-            </div>
-          </div>
-
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-
-          <button type="submit" disabled={saving}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-medium transition-all shadow flex items-center justify-center gap-2">
-            {saving ? 'กำลังบันทึก...' : <> บันทึกและไปหน้าหลัก <ArrowRight className="w-4 h-4" /> </>}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-export default function Register() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>}>
-      <RegisterForm />
-    </Suspense>
-  );
-}
