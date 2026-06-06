@@ -181,7 +181,7 @@ function ProfilePage() {
     </div>
   );
 
-  const role      = prefs.role || 'user';
+  const role      = (prefs.role || 'user') as string;
   const roleInfo  = ROLE_INFO[role] ?? ROLE_INFO.user;
   const firstName = prefs.firstName || '';
   const lastName  = prefs.lastName  || '';
