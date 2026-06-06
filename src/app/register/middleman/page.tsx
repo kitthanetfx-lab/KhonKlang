@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowRight, ArrowLeft, Upload, CheckCircle2,
-  AlertTriangle, Copy, Check, Shield,
+  AlertTriangle, Copy, Check, Shield, ClipboardList,
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
 
@@ -30,6 +30,16 @@ const CATEGORIES = [
   { id: 'jewelry',  label: 'อัญมณี / ทองคำ',               icon: '💍' },
   { id: 'general',  label: 'สินค้าทั่วไป',                  icon: '📦' },
 ];
+
+// ดึงจังหวัดออกจาก address string
+function extractProvince(addr: string): string {
+  const m = addr.match(/จ\.(\S+)/);
+  if (m) {
+    const hit = PROVINCES.find(p => p === m[1] || p.includes(m[1]) || m[1].includes(p));
+    if (hit) return hit;
+  }
+  return PROVINCES.find(p => addr.includes(p)) || '';
+}
 
 function getTier(amount: number): { label: string; color: string; icon: string; maxDeal: string } {
   if (amount >= 100_000) return { label: 'Platinum', color: 'text-purple-600 bg-purple-50 border-purple-200', icon: '💎', maxDeal: 'ไม่จำกัด' };
@@ -116,8 +126,10 @@ function MiddlemanForm() {
   const [done, setDone]       = useState(false);
   const [copied, setCopied]   = useState<'acct' | 'pp' | null>(null);
 
-  const [displayName, setDisplayName] = useState('');
-  const [oauthEmail, setOauthEmail]   = useState('');
+  const [displayName, setDisplayName]         = useState('');
+  const [oauthEmail, setOauthEmail]           = useState('');
+  const [profileAddress, setProfileAddress]   = useState('');
+  const [profileProvince, setProfileProvince] = useState('');
 
   // Step 1 – Basic Identity
   const [fullNameId, setFullNameId] = useState('');
@@ -147,6 +159,11 @@ function MiddlemanForm() {
         const em = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
         setOauthEmail(em);
         setFullNameId(u.name || '');
+        const prefs = (u.prefs as Record<string, string>) || {};
+        if (prefs.address) {
+          setProfileAddress(prefs.address);
+          setProfileProvince(extractProvince(prefs.address));
+        }
       })
       .catch(() => router.replace('/login'))
       .finally(() => setLoading(false));
@@ -366,7 +383,16 @@ function MiddlemanForm() {
 
               {/* Work province */}
               <div>
-                <label className="block text-sm font-medium mb-1.5 opacity-75">จังหวัดหลักที่สะดวกรับงาน <span className="text-red-500">*</span></label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium opacity-75">จังหวัดหลักที่สะดวกรับงาน <span className="text-red-500">*</span></label>
+                  {profileProvince && (
+                    <button type="button"
+                      onClick={() => setWorkProvince(profileProvince)}
+                      className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2.5 py-1 rounded-lg transition-all">
+                      <ClipboardList size={12} /> ใช้จากโปรไฟล์ ({profileProvince})
+                    </button>
+                  )}
+                </div>
                 <select className={ic} value={workProvince} onChange={e => setWorkProvince(e.target.value)}>
                   <option value="">เลือกจังหวัด</option>
                   {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}

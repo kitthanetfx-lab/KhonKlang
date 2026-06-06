@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowRight, ArrowLeft, Upload, CheckCircle2,
-  AlertTriangle, Copy, Check, Store,
+  AlertTriangle, Copy, Check, Store, ClipboardList,
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
 
@@ -28,6 +28,16 @@ const SELLER_TYPES = [
 ];
 
 const MEMBERSHIP_FEE = 199;
+
+// ดึงจังหวัดออกจาก address string เช่น "...จ.ลพบุรี 15000"
+function extractProvince(addr: string): string {
+  const m = addr.match(/จ\.(\S+)/);
+  if (m) {
+    const hit = PROVINCES.find(p => p === m[1] || p.includes(m[1]) || m[1].includes(p));
+    if (hit) return hit;
+  }
+  return PROVINCES.find(p => addr.includes(p)) || '';
+}
 const BANK_NAME   = 'ธนาคารกสิกรไทย (KBANK)';
 const BANK_ACCT   = '123-4-56789-0';
 const BANK_OWNER  = 'บริษัท คนกลาง จำกัด';
@@ -105,9 +115,11 @@ function SellerForm() {
   const [done, setDone]       = useState(false);
   const [copied, setCopied]   = useState<'acct' | 'pp' | null>(null);
 
-  // Pre-filled from OAuth
-  const [displayName, setDisplayName] = useState('');
-  const [oauthEmail, setOauthEmail]   = useState('');
+  // Pre-filled from OAuth / profile
+  const [displayName, setDisplayName]       = useState('');
+  const [oauthEmail, setOauthEmail]         = useState('');
+  const [profileAddress, setProfileAddress] = useState('');   // เก็บ address จาก prefs
+  const [profileProvince, setProfileProvince] = useState(''); // เก็บจังหวัดจาก prefs
 
   // Step 1 – Basic Identity
   const [sellerType, setSellerType] = useState('');
@@ -141,8 +153,13 @@ function SellerForm() {
         setDisplayName(u.name || '');
         const em = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
         setOauthEmail(em);
-        // Pre-fill full name from OAuth name
         setFullNameId(u.name || '');
+        // โหลด address จาก prefs ไว้ให้ autofill
+        const prefs = (u.prefs as Record<string, string>) || {};
+        if (prefs.address) {
+          setProfileAddress(prefs.address);
+          setProfileProvince(extractProvince(prefs.address));
+        }
       })
       .catch(() => router.replace('/login'))
       .finally(() => setLoading(false));
@@ -334,6 +351,17 @@ function SellerForm() {
                 </>
               )}
 
+              {/* ปุ่ม autofill จากโปรไฟล์ */}
+              {profileAddress && (
+                <button type="button"
+                  onClick={() => { setProvince(profileProvince); setAddress(profileAddress); }}
+                  className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-3 py-2 rounded-xl transition-all w-fit">
+                  <ClipboardList size={13} />
+                  ใช้ที่อยู่เดียวกับโปรไฟล์
+                  <span className="opacity-60 ml-1 truncate max-w-[160px]">({profileAddress.slice(0, 30)}...)</span>
+                </button>
+              )}
+
               <div>
                 <label className="block text-sm font-medium mb-1.5 opacity-75">จังหวัดที่ตั้งร้าน / ขายจริง <span className="text-red-500">*</span></label>
                 <select className={ic} value={province} onChange={e => setProvince(e.target.value)}>
@@ -344,7 +372,9 @@ function SellerForm() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5 opacity-75">ที่อยู่ปัจจุบัน / พิกัดหน้าร้าน <span className="text-red-500">*</span></label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium opacity-75">ที่อยู่ปัจจุบัน / พิกัดหน้าร้าน <span className="text-red-500">*</span></label>
+                </div>
                 <textarea className={ic + ' resize-none'} rows={3} value={address}
                   onChange={e => setAddress(e.target.value)}
                   placeholder="บ้านเลขที่, ถนน, แขวง/ตำบล, เขต/อำเภอ" />
