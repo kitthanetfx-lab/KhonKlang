@@ -392,13 +392,13 @@ function ProfilePage() {
         )}
 
         {/* ── Upgrade buttons (if not yet applied) ── */}
-        {(role === 'user' || role === 'seller') && (
+        {role !== 'middleman' && (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
               <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">ขยายสิทธิ์การใช้งาน</h2>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {role !== 'seller' && !sellerStatus && (
+              {role !== 'seller' && role !== 'middleman' && !sellerStatus && (
                 <Link href="/register/seller"
                   className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
                   <div className="flex items-center gap-3">
@@ -413,7 +413,7 @@ function ProfilePage() {
                   <ChevronRight size={16} className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
                 </Link>
               )}
-              {role !== 'middleman' && !middlemanStatus && (
+              {!middlemanStatus && (
                 <Link href="/register/middleman"
                   className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
                   <div className="flex items-center gap-3">
