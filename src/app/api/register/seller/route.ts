@@ -41,6 +41,7 @@ async function ensureCollection(databases: Databases) {
       databases.createStringAttribute(DB_ID, COL_ID, 'idCardFileName',      255, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'companyCertFileName', 255, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'bookbankFileName',    255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'slipFileName',        255, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'status',               50, false, 'pending_review'),
     ]);
     await new Promise(r => setTimeout(r, 3000));
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
       companyName, companyRegNum,
       bankAcct, bankName, bankOwner,
       companyBankAcct, companyBankName,
-      idCardFileName, companyCertFileName, bookbankFileName,
+      idCardFileName, companyCertFileName, bookbankFileName, slipFileName,
     } = body;
 
     if (!sellerType || !fullNameId || !idNumber) {
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
       idCardFileName:     idCardFileName      || '',
       companyCertFileName:companyCertFileName || '',
       bookbankFileName:   bookbankFileName    || '',
+      slipFileName:       slipFileName        || '',
       status: 'pending_review',
     });
 

@@ -148,6 +148,9 @@ function MiddlemanForm() {
   const [bankName, setBankName]   = useState('');
   const [bankOwner, setBankOwner] = useState('');
 
+  // Step 4 – Payment slip
+  const [slipFile, setSlipFile] = useState<File | null>(null);
+
   const depositNum = parseInt(depositIntent.replace(/,/g, ''), 10) || 0;
   const tier = getTier(depositNum);
 
@@ -190,6 +193,9 @@ function MiddlemanForm() {
       if (!bankName) return setError('กรุณาเลือกธนาคาร'), false;
       if (!bankOwner.trim()) return setError('กรุณากรอกชื่อบัญชีธนาคาร'), false;
     }
+    if (step === 4) {
+      if (!slipFile) return setError('กรุณาอัปโหลดสลิปการโอนเงิน'), false;
+    }
     return true;
   };
 
@@ -215,6 +221,7 @@ function MiddlemanForm() {
         bankAcct, bankName, bankOwner,
         idCardFileName: idCardFile?.name ?? '',
         bookbankFileName: bookbankFile?.name ?? '',
+        slipFileName: slipFile?.name ?? '',
       };
       const res  = await fetch('/api/register/middleman', {
         method: 'POST',
@@ -556,15 +563,23 @@ function MiddlemanForm() {
                 </div>
               </div>
 
-              <p className="text-xs text-center text-gray-400">
-                หลังจากโอนเงินแล้ว กรุณาแนบหลักฐานการโอนส่งให้ Admin ผ่านช่องทาง LINE Official
-              </p>
+              {/* Slip upload */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
+                <FileUpload
+                  label="แนบสลิปการโอนเงิน"
+                  accept="image/*,.pdf"
+                  file={slipFile}
+                  onChange={setSlipFile}
+                  hint="JPG / PNG / PDF — ภาพหน้าจอหรือสลิปโอนเงินจากแอปธนาคาร"
+                  required
+                />
+              </div>
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-              <button onClick={handleSubmit} disabled={submitting}
+              <button onClick={handleSubmit} disabled={submitting || !slipFile}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2">
-                {submitting ? 'กำลังส่งใบสมัคร...' : <>ยืนยันการสมัครและโอนเงินแล้ว <CheckCircle2 className="w-5 h-5" /></>}
+                {submitting ? 'กำลังส่งใบสมัคร...' : <>ยืนยันการสมัครและแนบสลิปแล้ว <CheckCircle2 className="w-5 h-5" /></>}
               </button>
             </div>
           )}
