@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Storage, ID, Permission, Role } from 'node-appwrite';
+import { InputFile } from 'node-appwrite/dist/inputFile';
 
 const ENDPOINT   = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!;
 const PROJECT_ID = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
@@ -25,17 +26,12 @@ async function ensureBucket(storage: Storage) {
         Permission.read(Role.users()),
         Permission.create(Role.users()),
       ],
-      false,    // fileSecurity
-      true,     // enabled
-      50 * 1024 * 1024, // 50 MB max size
-      ['jpg', 'jpeg', 'png', 'pdf', 'heic', 'webp'],
     );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify caller is logged in via JWT
     const jwt = req.headers.get('x-session-jwt');
     if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -46,8 +42,6 @@ export async function POST(req: NextRequest) {
     const storage = getStorage();
     await ensureBucket(storage);
 
-    // Convert File → Buffer → Blob (node-appwrite expects InputFile)
-    const { InputFile } = await import('node-appwrite/file');
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const inputFile = InputFile.fromBuffer(buffer, file.name);
@@ -56,7 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ fileId: result.$id });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('upload-kyc error:', msg);
+    console.error('[upload-kyc]', msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
