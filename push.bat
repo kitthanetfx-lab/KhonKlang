@@ -1,8 +1,10 @@
 @echo off
-cd /d "%~dp0"
-echo Removing git lock if exists...
-if exist .git\index.lock del .git\index.lock
-echo Pushing to GitHub...
+echo Clearing git locks...
+del /f ".git\index.lock" 2>nul
+del /f ".git\HEAD.lock" 2>nul
+echo Committing...
+git add -A
+git commit -m "feat: deals API + middleman & seller dashboards"
 git push
 echo Done!
 pause

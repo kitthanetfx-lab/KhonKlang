@@ -142,10 +142,25 @@ export default function Home() {
                     <ChevronDown className="w-3 h-3 text-gray-400" />
                   </button>
                   {profileOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-white/10 rounded-xl shadow-xl overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 w-52 bg-slate-800 border border-white/10 rounded-xl shadow-xl overflow-hidden">
                       <Link href="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-white/10 transition-colors font-medium text-blue-300" onClick={() => setProfileOpen(false)}>
                         <User className="w-4 h-4" /> ดูโปรไฟล์
                       </Link>
+                      {(user?.prefs?.sellerStatus === 'approved' || user?.prefs?.middlemanStatus === 'approved') && (
+                        <>
+                          <hr className="border-white/10" />
+                          {user?.prefs?.sellerStatus === 'approved' && (
+                            <Link href="/dashboard/seller" className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-white/10 transition-colors text-green-300 font-medium" onClick={() => setProfileOpen(false)}>
+                              🛒 บอร์ดผู้ขาย
+                            </Link>
+                          )}
+                          {user?.prefs?.middlemanStatus === 'approved' && (
+                            <Link href="/dashboard/middleman" className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-white/10 transition-colors text-yellow-300 font-medium" onClick={() => setProfileOpen(false)}>
+                              🤝 บอร์ดคนกลาง
+                            </Link>
+                          )}
+                        </>
+                      )}
                       <hr className="border-white/10" />
                       <Link href="/register/seller" className="block px-4 py-2.5 text-sm hover:bg-white/10 transition-colors" onClick={() => setProfileOpen(false)}>
                         สมัครเป็นผู้ขาย
@@ -182,6 +197,16 @@ export default function Home() {
                 <Link href="/profile" className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm font-medium text-blue-300" onClick={() => setMobileOpen(false)}>
                   <User className="w-4 h-4" /> โปรไฟล์ของฉัน
                 </Link>
+                {user?.prefs?.sellerStatus === 'approved' && (
+                  <Link href="/dashboard/seller" className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm font-medium text-green-300" onClick={() => setMobileOpen(false)}>
+                    🛒 บอร์ดผู้ขาย
+                  </Link>
+                )}
+                {user?.prefs?.middlemanStatus === 'approved' && (
+                  <Link href="/dashboard/middleman" className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm font-medium text-yellow-300" onClick={() => setMobileOpen(false)}>
+                    🤝 บอร์ดคนกลาง
+                  </Link>
+                )}
                 <hr className="border-white/10 my-2" />
               </>
             )}
