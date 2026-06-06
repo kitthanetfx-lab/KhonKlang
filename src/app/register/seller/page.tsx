@@ -312,6 +312,8 @@ function SellerForm() {
   const [companyBankAcct, setCompanyBankAcct] = useState('');
   const [companyBankName, setCompanyBankName] = useState('');
 
+  const [existingStatus, setExistingStatus] = useState('');
+
   const isCorporate = sellerType === 'corporate';
   const ic = 'w-full bg-white/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-40';
 
@@ -324,6 +326,12 @@ function SellerForm() {
         setFullNameId(u.name || '');
         const prefs = (u.prefs as Record<string, string>) || {};
         if (prefs.address) setProfileAddress(prefs.address);
+        // Pre-fill bank info
+        if (prefs.bankAcct)  setBankAcct(prefs.bankAcct);
+        if (prefs.bankName)  setBankName(prefs.bankName);
+        if (prefs.bankOwner) setBankOwner(prefs.bankOwner);
+        // Check if already applied
+        if (prefs.sellerStatus) setExistingStatus(prefs.sellerStatus);
       })
       .catch(() => router.replace('/login'))
       .finally(() => setLoading(false));
@@ -424,6 +432,37 @@ function SellerForm() {
       <p className="text-gray-500 animate-pulse">กำลังโหลด...</p>
     </div>
   );
+
+  if (existingStatus && !done) {
+    const cfg: Record<string, { icon: string; title: string; desc: string; cls: string }> = {
+      pending_review: { icon: '⏳', title: 'ใบสมัครอยู่ระหว่างตรวจสอบ', desc: 'ทีมงานกำลังตรวจสอบเอกสาร KYC ของคุณ จะแจ้งผลภายใน 1-3 วันทำการ', cls: 'bg-amber-50 border-amber-200 text-amber-700' },
+      approved:       { icon: '✅', title: 'ได้รับการอนุมัติแล้ว!', desc: 'ยินดีด้วย! คุณเป็นผู้ขายในเครือของเราแล้ว', cls: 'bg-green-50 border-green-200 text-green-700' },
+      rejected:       { icon: '❌', title: 'ใบสมัครถูกปฏิเสธ', desc: 'ขออภัย ใบสมัครของคุณไม่ผ่านการตรวจสอบ กรุณาติดต่อทีมงานเพื่อสอบถาม', cls: 'bg-red-50 border-red-200 text-red-700' },
+    };
+    const s = cfg[existingStatus] ?? cfg.pending_review;
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center glass-panel rounded-2xl p-10 shadow-xl">
+          <div className="text-5xl mb-4">{s.icon}</div>
+          <h2 className="text-xl font-bold mb-2">{s.title}</h2>
+          <p className="text-gray-500 text-sm mb-6">{s.desc}</p>
+          <div className={`rounded-xl border px-4 py-3 text-sm mb-6 ${s.cls}`}>
+            สถานะ: <strong>{existingStatus === 'pending_review' ? 'รอตรวจสอบ' : existingStatus === 'approved' ? 'อนุมัติแล้ว' : 'ปฏิเสธ'}</strong>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => router.push('/profile')}
+              className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-all">
+              ดูโปรไฟล์
+            </button>
+            <button onClick={() => router.push('/')}
+              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-all">
+              หน้าหลัก
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (done) return (
     <div className="min-h-screen flex items-center justify-center px-4">

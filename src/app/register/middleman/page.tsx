@@ -152,6 +152,8 @@ function MiddlemanForm() {
   // Step 4 – Payment slip
   const [slipFile, setSlipFile] = useState<File | null>(null);
 
+  const [existingStatus, setExistingStatus] = useState('');
+
   const depositNum = parseInt(depositIntent.replace(/,/g, ''), 10) || 0;
   const tier = getTier(depositNum);
 
@@ -168,7 +170,14 @@ function MiddlemanForm() {
         if (prefs.address) {
           setProfileAddress(prefs.address);
           setProfileProvince(extractProvince(prefs.address));
+          setWorkProvince(extractProvince(prefs.address));
         }
+        // Pre-fill bank info from profile
+        if (prefs.bankAcct)  setBankAcct(prefs.bankAcct);
+        if (prefs.bankName)  setBankName(prefs.bankName);
+        if (prefs.bankOwner) setBankOwner(prefs.bankOwner);
+        // Check if already applied
+        if (prefs.middlemanStatus) setExistingStatus(prefs.middlemanStatus);
       })
       .catch(() => router.replace('/login'))
       .finally(() => setLoading(false));
@@ -254,6 +263,38 @@ function MiddlemanForm() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500 animate-pulse">กำลังโหลด...</p>
+      </div>
+    );
+  }
+
+  // ── Already applied screen ──
+  if (existingStatus && !done) {
+    const cfg: Record<string, { icon: string; title: string; desc: string; cls: string }> = {
+      pending_review: { icon: '⏳', title: 'ใบสมัครอยู่ระหว่างตรวจสอบ', desc: 'ทีมงานกำลังตรวจสอบเอกสาร KYC ของคุณ จะแจ้งผลภายใน 1-3 วันทำการ', cls: 'bg-amber-50 border-amber-200 text-amber-700' },
+      approved:       { icon: '✅', title: 'ได้รับการอนุมัติแล้ว!', desc: 'ยินดีด้วย! คุณเป็นคนกลางของเราแล้ว ไปที่โปรไฟล์เพื่อวางเงินประกัน', cls: 'bg-green-50 border-green-200 text-green-700' },
+      rejected:       { icon: '❌', title: 'ใบสมัครถูกปฏิเสธ', desc: 'ขออภัย ใบสมัครของคุณไม่ผ่านการตรวจสอบ กรุณาติดต่อทีมงานเพื่อสอบถาม', cls: 'bg-red-50 border-red-200 text-red-700' },
+    };
+    const s = cfg[existingStatus] ?? cfg.pending_review;
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center glass-panel rounded-2xl p-10 shadow-xl">
+          <div className="text-5xl mb-4">{s.icon}</div>
+          <h2 className="text-xl font-bold mb-2">{s.title}</h2>
+          <p className="text-gray-500 text-sm mb-6">{s.desc}</p>
+          <div className={`rounded-xl border px-4 py-3 text-sm mb-6 ${s.cls}`}>
+            สถานะ: <strong>{existingStatus === 'pending_review' ? 'รอตรวจสอบ' : existingStatus === 'approved' ? 'อนุมัติแล้ว' : 'ปฏิเสธ'}</strong>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => router.push('/profile')}
+              className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-all">
+              ดูโปรไฟล์
+            </button>
+            <button onClick={() => router.push('/')}
+              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-all">
+              หน้าหลัก
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
