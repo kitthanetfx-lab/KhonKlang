@@ -259,13 +259,3 @@ function UsersContent() {
 export default function UsersPage() {
   return <Suspense><UsersContent /></Suspense>;
 }
-ดในระบบ {total})
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function UsersPage() {
-  return <Suspense><UsersContent /></Suspense>;
-}

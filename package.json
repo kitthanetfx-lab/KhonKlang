@@ -29,3 +29,9 @@
     "typescript": "^5"
   }
 }
+
+    "eslint-config-next": "16.2.7",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
