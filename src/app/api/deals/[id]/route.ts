@@ -63,10 +63,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     switch (action) {
       case 'join_as_buyer': {
-        if (deal.status !== 'posted') return NextResponse.json({ error: 'Deal not available' }, { status: 400 });
+        if (!['posted','waiting_buyer'].includes(deal.status)) return NextResponse.json({ error: 'Deal not available' }, { status: 400 });
         if (isSeller || isMiddleman) return NextResponse.json({ error: 'ไม่สามารถเป็นผู้ซื้อได้' }, { status: 400 });
-        updates = { buyerId: uid, buyerName: currentUser.name || '', status: 'buyer_joined' };
+        if (deal.buyerId) return NextResponse.json({ error: 'มีผู้ซื้อแล้ว' }, { status: 400 });
+        const newStatus = deal.sellerId ? 'buyer_joined' : 'waiting_seller';
+        updates = { buyerId: uid, buyerName: currentUser.name || '', status: newStatus };
         systemMsg = `${currentUser.name} เข้าร่วมเป็นผู้ซื้อ`;
+        break;
+      }
+      case 'join_as_seller': {
+        if (!['posted','waiting_seller'].includes(deal.status)) return NextResponse.json({ error: 'Deal not available' }, { status: 400 });
+        if (isBuyer || isMiddleman) return NextResponse.json({ error: 'ไม่สามารถเป็นผู้ขายได้' }, { status: 400 });
+        if (deal.sellerId) return NextResponse.json({ error: 'มีผู้ขายแล้ว' }, { status: 400 });
+        const newSt = deal.buyerId ? 'buyer_joined' : 'waiting_buyer';
+        updates = { sellerId: uid, sellerName: currentUser.name || '', status: newSt };
+        systemMsg = `${currentUser.name} เข้าร่วมเป็นผู้ขาย`;
+        break;
+      }
+      case 'select_middleman': {
+        if (!isBuyer) return NextResponse.json({ error: 'ผู้ซื้อเท่านั้นที่เลือกคนกลางได้' }, { status: 403 });
+        if (!body.middlemanId || !body.middlemanName) return NextResponse.json({ error: 'Missing middlemanId' }, { status: 400 });
+        updates = { middlemanId: body.middlemanId, middlemanName: body.middlemanName, status: 'terms_pending' };
+        systemMsg = `ผู้ซื้อเลือก ${body.middlemanName} เป็นคนกลาง`;
         break;
       }
       case 'accept_terms': {

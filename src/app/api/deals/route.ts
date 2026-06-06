@@ -102,25 +102,29 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/deals — seller creates deal
+// POST /api/deals — seller OR buyer creates deal
+// body: { title, description, price, category, creatorRole: 'seller'|'buyer' }
 export async function POST(req: NextRequest) {
   try {
     const jwt = req.headers.get('x-session-jwt');
     if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const currentUser = await getUser(jwt);
     const body = await req.json();
-    const { title, description, price, category } = body;
+    const { title, description, price, category, creatorRole } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
 
+    const isBuyerCreator = creatorRole === 'buyer';
     const databases = getAdminClient();
     await ensureCollection(databases);
     const roomId = `khonklang-${Date.now().toString(36)}`;
     const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
-      sellerId: currentUser.$id, sellerName: currentUser.name || '',
+      sellerId:    isBuyerCreator ? '' : currentUser.$id,
+      sellerName:  isBuyerCreator ? '' : (currentUser.name || ''),
+      buyerId:     isBuyerCreator ? currentUser.$id : '',
+      buyerName:   isBuyerCreator ? (currentUser.name || '') : '',
       middlemanId: '', middlemanName: '',
-      buyerId: '', buyerName: '',
       title, description: description || '', price: Number(price), category: category || '',
-      status: 'posted',
+      status: isBuyerCreator ? 'waiting_seller' : 'posted',
       sellerAcceptedTerms: false, middlemanAcceptedTerms: false, buyerAcceptedTerms: false,
       middlemanConfirmedPayment: false, buyerConfirmedCheck: false,
       paymentSlipFileId: '', packingEvidence: '[]', testingEvidence: '[]',
