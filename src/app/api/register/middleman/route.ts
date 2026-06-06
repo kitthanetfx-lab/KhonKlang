@@ -35,8 +35,9 @@ async function ensureCollection(databases: Databases) {
       databases.createStringAttribute(DB_ID, COL_ID, 'bankAcct',        50, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'bankName',       100, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'bankOwner',      200, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'idCardFileName', 255, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'status',          50, false, 'pending_review'),
+      databases.createStringAttribute(DB_ID, COL_ID, 'idCardFileName',   255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'bookbankFileName', 255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'status',            50, false, 'pending_review'),
     ]);
     await new Promise(r => setTimeout(r, 3000));
   }
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
       depositIntent, tier,
       categories, workProvince, terms,
       bankAcct, bankName, bankOwner,
-      idCardFileName,
+      idCardFileName, bookbankFileName,
     } = body;
 
     if (!fullNameId || !idNumber) {
@@ -81,15 +82,22 @@ export async function POST(req: NextRequest) {
       bankAcct:      bankAcct      || '',
       bankName:      bankName      || '',
       bankOwner:     bankOwner     || '',
-      idCardFileName:idCardFileName|| '',
+      idCardFileName:  idCardFileName   || '',
+      bookbankFileName:bookbankFileName || '',
       status: 'pending_review',
     });
 
-    // Mark in user prefs
+    // Save bank info + doc names + status to prefs (visible in profile)
+    const existingPrefs = (await users.get(userId)).prefs as Record<string, string>;
     await users.updatePrefs(userId, {
-      ...((await users.get(userId)).prefs as Record<string, string>),
-      middlemanStatus: 'pending_review',
+      ...existingPrefs,
+      middlemanStatus:     'pending_review',
       middlemanTierIntent: tier || 'Bronze',
+      bankAcct:            bankAcct    || '',
+      bankName:            bankName    || '',
+      bankOwner:           bankOwner   || '',
+      idCardFileName:      idCardFileName   || '',
+      bookbankFileName:    bookbankFileName || '',
     });
 
     return NextResponse.json({ success: true });

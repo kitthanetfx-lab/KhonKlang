@@ -142,7 +142,8 @@ function MiddlemanForm() {
   const [terms, setTerms]           = useState('');
 
   // Step 3 – Docs & Bank
-  const [idCardFile, setIdCardFile] = useState<File | null>(null);
+  const [idCardFile, setIdCardFile]       = useState<File | null>(null);
+  const [bookbankFile, setBookbankFile]   = useState<File | null>(null);
   const [bankAcct, setBankAcct]   = useState('');
   const [bankName, setBankName]   = useState('');
   const [bankOwner, setBankOwner] = useState('');
@@ -184,6 +185,7 @@ function MiddlemanForm() {
     }
     if (step === 3) {
       if (!idCardFile) return setError('กรุณาอัปโหลดภาพบัตรประชาชน'), false;
+      if (!bookbankFile) return setError('กรุณาอัปโหลดหน้าสมุดบัญชีธนาคาร (Bookbank)'), false;
       if (!bankAcct.trim()) return setError('กรุณากรอกเลขที่บัญชีธนาคาร'), false;
       if (!bankName) return setError('กรุณาเลือกธนาคาร'), false;
       if (!bankOwner.trim()) return setError('กรุณากรอกชื่อบัญชีธนาคาร'), false;
@@ -212,6 +214,7 @@ function MiddlemanForm() {
         workProvince, terms,
         bankAcct, bankName, bankOwner,
         idCardFileName: idCardFile?.name ?? '',
+        bookbankFileName: bookbankFile?.name ?? '',
       };
       const res  = await fetch('/api/register/middleman', {
         method: 'POST',
@@ -427,6 +430,14 @@ function MiddlemanForm() {
                 file={idCardFile}
                 onChange={setIdCardFile}
                 hint="JPG / PNG / HEIC ขนาดไม่เกิน 10 MB"
+                required
+              />
+              <FileUpload
+                label="หน้าสมุดบัญชีธนาคาร (Bookbank)"
+                accept="image/*,.pdf"
+                file={bookbankFile}
+                onChange={setBookbankFile}
+                hint="JPG / PNG / PDF ขนาดไม่เกิน 10 MB"
                 required
               />
 

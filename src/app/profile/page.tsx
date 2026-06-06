@@ -7,6 +7,7 @@ import {
   User, Mail, Phone, MapPin, ShieldCheck, Pencil, Check, X,
   Store, HandshakeIcon, ChevronRight, Clock, CheckCircle2,
   XCircle, AlertTriangle, LogOut, ArrowLeft, Camera,
+  Landmark, FileText,
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
 import type { ReactNode } from 'react';
@@ -427,6 +428,53 @@ function ProfilePage() {
                   </div>
                   <ChevronRight size={16} className="text-gray-400 group-hover:text-green-600 group-hover:translate-x-0.5 transition-all" />
                 </Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Bank info (from seller/middleman registration) ── */}
+        {(prefs.bankAcct || prefs.bankName) && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+              <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">บัญชีธนาคาร</h2>
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {prefs.bankName  && <InfoRow icon={<Landmark size={15} />} label="ธนาคาร"      value={prefs.bankName} />}
+              {prefs.bankAcct  && <InfoRow icon={<Landmark size={15} />} label="เลขที่บัญชี" value={prefs.bankAcct} mono />}
+              {prefs.bankOwner && <InfoRow icon={<User size={15} />}     label="ชื่อบัญชี"   value={prefs.bankOwner} />}
+            </div>
+          </div>
+        )}
+
+        {/* ── Uploaded docs ── */}
+        {(prefs.idCardFileName || prefs.bookbankFileName) && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+              <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">เอกสารที่อัปโหลด</h2>
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {prefs.idCardFileName && (
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <FileText size={15} className="text-gray-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-400 mb-0.5">บัตรประชาชน</p>
+                    <p className="text-sm font-medium text-green-600 dark:text-green-400 flex items-center gap-1.5">
+                      <CheckCircle2 size={13} /> {prefs.idCardFileName}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {prefs.bookbankFileName && (
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <FileText size={15} className="text-gray-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-400 mb-0.5">สมุดบัญชี (Bookbank)</p>
+                    <p className="text-sm font-medium text-green-600 dark:text-green-400 flex items-center gap-1.5">
+                      <CheckCircle2 size={13} /> {prefs.bookbankFileName}
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
           </div>

@@ -95,10 +95,16 @@ export async function POST(req: NextRequest) {
       status: 'pending_review',
     });
 
-    // Mark in user prefs so they can see pending status
+    // Save bank info + doc names + status to prefs (visible in profile)
+    const existingPrefs = (await users.get(userId)).prefs as Record<string, string>;
     await users.updatePrefs(userId, {
-      ...((await users.get(userId)).prefs as Record<string, string>),
-      sellerStatus: 'pending_review',
+      ...existingPrefs,
+      sellerStatus:     'pending_review',
+      bankAcct:         bankAcct    || '',
+      bankName:         bankName    || '',
+      bankOwner:        bankOwner   || '',
+      idCardFileName:   idCardFileName   || '',
+      bookbankFileName: bookbankFileName || '',
     });
 
     return NextResponse.json({ success: true });

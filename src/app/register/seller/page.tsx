@@ -353,10 +353,10 @@ function SellerForm() {
       if (!bankAcct.trim()) return setError('กรุณากรอกเลขที่บัญชีธนาคาร'), false;
       if (!bankName) return setError('กรุณาเลือกธนาคาร'), false;
       if (!bankOwner.trim()) return setError('กรุณากรอกชื่อบัญชีธนาคาร'), false;
+      if (!bookbankFile) return setError('กรุณาอัปโหลดหน้าสมุดบัญชีธนาคาร (Bookbank)'), false;
       if (isCorporate && !companyCertFile) return setError('กรุณาอัปโหลดหนังสือรับรองบริษัท'), false;
       if (isCorporate && !companyBankAcct.trim()) return setError('กรุณากรอกเลขที่บัญชีบริษัท'), false;
       if (isCorporate && !companyBankName) return setError('กรุณาเลือกธนาคารบริษัท'), false;
-      if (isCorporate && !bookbankFile) return setError('กรุณาอัปโหลดหน้าสมุดบัญชี'), false;
     }
     return true;
   };
@@ -538,10 +538,10 @@ function SellerForm() {
                 <p className="text-sm text-gray-500">อัปโหลดเอกสารและข้อมูลบัญชีธนาคาร</p>
               </div>
               <FileUpload label="ภาพถ่ายบัตรประชาชน (หรือถ่ายคู่กับบัตร)" accept="image/*" file={idCardFile} onChange={setIdCardFile} hint="JPG / PNG / HEIC ขนาดไม่เกิน 10 MB" required />
-              {isCorporate && <>
+              <FileUpload label="หน้าสมุดบัญชีธนาคาร (Bookbank)" accept="image/*,.pdf" file={bookbankFile} onChange={setBookbankFile} hint="JPG / PNG / PDF ขนาดไม่เกิน 10 MB" required />
+              {isCorporate && (
                 <FileUpload label="หนังสือรับรองบริษัท (อายุไม่เกิน 6 เดือน)" accept="image/*,.pdf" file={companyCertFile} onChange={setCompanyCertFile} hint="JPG / PNG / PDF" required />
-                <FileUpload label="หน้าสมุดบัญชีธนาคาร (Bookbank) ของบริษัท" accept="image/*,.pdf" file={bookbankFile} onChange={setBookbankFile} hint="JPG / PNG / PDF" required />
-              </>}
+              )}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
                 <p className="text-sm font-semibold">บัญชีธนาคาร — สำหรับรับเงินค่าสินค้า</p>
                 <div className="grid grid-cols-2 gap-4">
