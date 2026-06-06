@@ -115,6 +115,9 @@ export default function Home() {
                 )}
               </div>
 
+              <Link href="/marketplace" className="flex items-center gap-1 px-4 py-2 rounded-lg hover:bg-white/10 transition-colors text-sm font-medium">
+                🛍️ ตลาด
+              </Link>
               <Link href="/check-scam" className="flex items-center gap-1 px-4 py-2 rounded-lg hover:bg-white/10 transition-colors text-sm font-medium">
                 <Search className="w-4 h-4" /> เช็คคนโกง
               </Link>

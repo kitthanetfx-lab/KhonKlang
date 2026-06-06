@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { account } from '@/lib/appwrite';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface Deal {
   $id: string;
@@ -122,8 +123,10 @@ export default function SellerDashboard() {
     }
   }
 
-  const activeDeals  = deals.filter(d => d.sellerId === myId && ['posted', 'active', 'confirming'].includes(d.status));
-  const historyDeals = deals.filter(d => d.sellerId === myId && ['completed', 'cancelled', 'disputed'].includes(d.status));
+  const ACTIVE_STATUSES = ['posted','buyer_joined','terms_pending','payment_pending','payment_uploaded','packing','shipped_to_middleman','middleman_received','middleman_checking','shipped_to_buyer','delivered','active','confirming'];
+  const DONE_STATUSES   = ['completed','cancelled','disputed'];
+  const activeDeals  = deals.filter(d => d.sellerId === myId && ACTIVE_STATUSES.includes(d.status));
+  const historyDeals = deals.filter(d => d.sellerId === myId && DONE_STATUSES.includes(d.status));
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center">
@@ -149,6 +152,9 @@ export default function SellerDashboard() {
           {deal.category && <span>📦 {deal.category}</span>}
           {deal.middlemanName && <span>🤝 คนกลาง: {deal.middlemanName}</span>}
         </div>
+        <Link href={`/deal/${deal.$id}`}
+          className="block w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-center transition text-sm"
+        >💬 เข้าห้อง Deal</Link>
         {deal.status === 'active' && (
           <div className="flex gap-2">
             <button

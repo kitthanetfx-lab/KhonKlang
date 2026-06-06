@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { account } from '@/lib/appwrite';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface Deal {
   $id: string;
@@ -101,9 +102,10 @@ export default function MiddlemanDashboard() {
     }
   }
 
+  const IN_PROGRESS = ['buyer_joined','terms_pending','payment_pending','payment_uploaded','packing','shipped_to_middleman','middleman_received','middleman_checking','shipped_to_buyer','delivered','active','confirming'];
   const available = deals.filter(d => d.status === 'posted');
-  const active    = deals.filter(d => d.middlemanId === myId && ['active', 'confirming'].includes(d.status));
-  const history   = deals.filter(d => d.middlemanId === myId && ['completed', 'cancelled', 'disputed'].includes(d.status));
+  const active    = deals.filter(d => d.middlemanId === myId && IN_PROGRESS.includes(d.status));
+  const history   = deals.filter(d => d.middlemanId === myId && ['completed','cancelled','disputed'].includes(d.status));
 
   const tierInfo = TIER_INFO[tier] || TIER_INFO.Bronze;
 
@@ -132,6 +134,11 @@ export default function MiddlemanDashboard() {
           {deal.category && <span>📦 {deal.category}</span>}
           <span>👤 {deal.sellerName || 'ผู้ขาย'}</span>
         </div>
+        {isMine && (
+          <Link href={`/deal/${deal.$id}`}
+            className="block w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-center transition text-sm"
+          >💬 เข้าห้อง Deal</Link>
+        )}
         {deal.status === 'posted' && !isMine && (
           <button
             onClick={() => handleAction(deal.$id, 'accept')}
