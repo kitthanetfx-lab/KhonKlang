@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Users, Databases, ID, Permission, Role } from 'node-appwrite';
+import { Client, Account, Users, Databases, ID, Permission, Role, Query } from 'node-appwrite';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'middleman_applications';
@@ -41,6 +41,40 @@ async function ensureCollection(databases: Databases) {
       databases.createStringAttribute(DB_ID, COL_ID, 'status',            50, false, 'pending_review'),
     ]);
     await new Promise(r => setTimeout(r, 3000));
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const jwt = req.headers.get('x-session-jwt');
+    if (!jwt) return NextResponse.json({ status: null });
+
+    const sessionClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setJWT(jwt);
+    const currentUser = await new Account(sessionClient).get();
+    const userId = currentUser.$id;
+
+    const { databases } = getAdminClient();
+    // Check by userId first, then by name (covers multi-account: LINE vs Google)
+    let docs = await databases.listDocuments(DB_ID, COL_ID, [
+      Query.equal('userId', userId),
+    ]).then(r => r.documents).catch(() => []);
+
+    if (docs.length === 0 && currentUser.name) {
+      docs = await databases.listDocuments(DB_ID, COL_ID, [
+        Query.equal('fullNameId', currentUser.name),
+      ]).then(r => r.documents).catch(() => []);
+    }
+
+    if (docs.length > 0) {
+      const doc = docs[0] as { status?: string };
+      return NextResponse.json({ status: doc.status || 'pending_review' });
+    }
+    return NextResponse.json({ status: null });
+  } catch {
+    return NextResponse.json({ status: null });
   }
 }
 

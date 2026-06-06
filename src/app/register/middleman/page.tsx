@@ -161,7 +161,7 @@ function MiddlemanForm() {
 
   useEffect(() => {
     account.get()
-      .then(u => {
+      .then(async u => {
         setDisplayName(u.name || '');
         const em = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
         setOauthEmail(em);
@@ -172,12 +172,22 @@ function MiddlemanForm() {
           setProfileProvince(extractProvince(prefs.address));
           setWorkProvince(extractProvince(prefs.address));
         }
-        // Pre-fill bank info from profile
         if (prefs.bankAcct)  setBankAcct(prefs.bankAcct);
         if (prefs.bankName)  setBankName(prefs.bankName);
         if (prefs.bankOwner) setBankOwner(prefs.bankOwner);
-        // Check if already applied
-        if (prefs.middlemanStatus) setExistingStatus(prefs.middlemanStatus);
+        // Check prefs first, then query DB (covers multi-account logins)
+        if (prefs.middlemanStatus) {
+          setExistingStatus(prefs.middlemanStatus);
+        } else {
+          const jwt = (await account.createJWT()).jwt;
+          const res = await fetch('/api/register/middleman', {
+            headers: { 'x-session-jwt': jwt },
+          }).catch(() => null);
+          if (res?.ok) {
+            const data = await res.json();
+            if (data.status) setExistingStatus(data.status);
+          }
+        }
       })
       .catch(() => router.replace('/login'))
       .finally(() => setLoading(false));
