@@ -9,19 +9,20 @@ import {
   XCircle, AlertTriangle, LogOut, ArrowLeft, Camera,
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
+import type { ReactNode } from 'react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PROVINCES = ['กระบี่','กรุงเทพมหานคร','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
-const ROLE_INFO: Record<string, { label: string; icon: JSX.Element; color: string; bg: string }> = {
+const ROLE_INFO: Record<string, { label: string; icon: ReactNode; color: string; bg: string }> = {
   admin:     { label: 'ผู้ดูแลระบบ', icon: <ShieldCheck size={14} />, color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700' },
   middleman: { label: 'คนกลาง',     icon: <HandshakeIcon size={14} />, color: 'text-green-700 dark:text-green-300',  bg: 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700' },
   seller:    { label: 'ผู้ขาย',     icon: <Store size={14} />,        color: 'text-blue-700 dark:text-blue-300',    bg: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700' },
   user:      { label: 'ผู้ใช้งาน', icon: <User size={14} />,         color: 'text-gray-600 dark:text-gray-300',    bg: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600' },
 };
 
-const APP_STATUS: Record<string, { label: string; icon: JSX.Element; color: string }> = {
+const APP_STATUS: Record<string, { label: string; icon: ReactNode; color: string }> = {
   pending_review: { label: 'รอตรวจสอบ',    icon: <Clock size={14} />,        color: 'text-amber-600 dark:text-amber-400' },
   approved:       { label: 'อนุมัติแล้ว',  icon: <CheckCircle2 size={14} />, color: 'text-green-600 dark:text-green-400' },
   rejected:       { label: 'ไม่อนุมัติ',  icon: <XCircle size={14} />,      color: 'text-red-600 dark:text-red-400' },
@@ -457,7 +458,7 @@ function ProfilePage() {
 // ─── Helper components ─────────────────────────────────────────────────────────
 
 function InfoRow({ icon, label, value, multiline, mono }: {
-  icon: JSX.Element; label: string; value: string; multiline?: boolean; mono?: boolean;
+  icon: ReactNode; label: string; value: string; multiline?: boolean; mono?: boolean;
 }) {
   return (
     <div className="flex items-start gap-3 px-6 py-4">
@@ -473,7 +474,7 @@ function InfoRow({ icon, label, value, multiline, mono }: {
 }
 
 function ApplicationStatusRow({ icon, label, status, bgColor }: {
-  icon: JSX.Element; label: string; status: string; bgColor: string;
+  icon: ReactNode; label: string; status: string; bgColor: string;
 }) {
   const info = APP_STATUS[status] || { label: status, icon: <Clock size={14} />, color: 'text-gray-500' };
   return (
