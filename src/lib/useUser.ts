@@ -18,6 +18,10 @@ export interface AppUser {
     bankAccountName?: string;
     bankName?: string;
     accountNumber?: string;
+    bankAcct?: string;
+    bankOwner?: string;
+    sellerStatus?: string;
+    middlemanStatus?: string;
     linkedTo?: string;
   };
 }
