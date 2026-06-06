@@ -4,11 +4,11 @@ import { Suspense, useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowRight, ArrowLeft, Upload, CheckCircle2,
-  AlertTriangle, Copy, Check, Store, ClipboardList,
+  AlertTriangle, Copy, Check, Store, ClipboardList, Plus, Trash2, MapPin,
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
 
-// ─── Constants ─────────────────────────────────────────────────────────────
+// ─── Constants ──────────────────────────────────────────────────────────────
 
 const PROVINCES = ['กระบี่','กรุงเทพมหานคร','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
@@ -28,32 +28,204 @@ const SELLER_TYPES = [
 ];
 
 const MEMBERSHIP_FEE = 199;
-
-// ดึงจังหวัดออกจาก address string เช่น "...จ.ลพบุรี 15000"
-function extractProvince(addr: string): string {
-  const m = addr.match(/จ\.(\S+)/);
-  if (m) {
-    const hit = PROVINCES.find(p => p === m[1] || p.includes(m[1]) || m[1].includes(p));
-    if (hit) return hit;
-  }
-  return PROVINCES.find(p => addr.includes(p)) || '';
-}
-const BANK_NAME   = 'ธนาคารกสิกรไทย (KBANK)';
-const BANK_ACCT   = '123-4-56789-0';
-const BANK_OWNER  = 'บริษัท คนกลาง จำกัด';
-const PROMPTPAY   = '0000000000'; // TODO: ใส่หมายเลข PromptPay จริง
+const BANK_NAME  = 'ธนาคารกสิกรไทย (KBANK)';
+const BANK_ACCT  = '123-4-56789-0';
+const BANK_OWNER = 'บริษัท คนกลาง จำกัด';
+const PROMPTPAY  = '0000000000';
 
 const STEPS = ['ข้อมูลพื้นฐาน', 'ข้อมูลผู้ขาย', 'ยืนยันตัวตน', 'ชำระค่าสมาชิก'];
 
-// ─── Small reusable components ──────────────────────────────────────────────
+// ─── Branch address types & helpers ─────────────────────────────────────────
+
+interface BranchData {
+  id: string;
+  label: string;       // e.g. "สาขาหลัก", "สาขา 2"
+  houseNo: string;
+  moo: string;
+  road: string;
+  provinceName: string;
+  amphoreName: string;
+  tambonName: string;
+  postalCode: string;
+}
+
+let branchCounter = 1;
+function newBranch(label = 'สาขาหลัก'): BranchData {
+  return { id: String(branchCounter++), label, houseNo: '', moo: '', road: '', provinceName: '', amphoreName: '', tambonName: '', postalCode: '' };
+}
+
+/** พยายามดึงข้อมูลจาก address string เช่น "207/2 หมู่ 1 ถ.พหลโยธิน ต.บ้านเช่า อ.เมือง จ.ลพบุรี 15000" */
+function parseProfileAddress(addr: string): Partial<BranchData> {
+  const postalM  = addr.match(/\b(\d{5})\b/);
+  const roadM    = addr.match(/ถ\.(\S+)/);
+  const mooM     = addr.match(/หมู่(?:ที่)?\s*(\d+)/);
+  const amphoeM  = addr.match(/อ\.(\S+)/);
+  const tambonM  = addr.match(/ต\.(\S+)/);
+  const firstTok = addr.trim().split(/\s+/)[0];
+  return {
+    houseNo:      (firstTok && /^[\d\/]/.test(firstTok)) ? firstTok : '',
+    moo:          mooM  ? mooM[1]  : '',
+    road:         roadM ? roadM[1] : '',
+    provinceName: PROVINCES.find(p => addr.includes(p)) || '',
+    amphoreName:  amphoeM ? amphoeM[1] : '',
+    tambonName:   tambonM ? tambonM[1] : '',
+    postalCode:   postalM ? postalM[1] : '',
+  };
+}
+
+function branchToString(b: BranchData): string {
+  return [
+    b.houseNo,
+    b.moo          ? `หมู่ ${b.moo}`       : '',
+    b.road         ? `ถ.${b.road}`          : '',
+    b.tambonName   ? `ต.${b.tambonName}`    : '',
+    b.amphoreName  ? `อ.${b.amphoreName}`   : '',
+    b.provinceName ? `จ.${b.provinceName}`  : '',
+    b.postalCode,
+  ].filter(Boolean).join(' ');
+}
+
+// ─── BranchAddressForm component ─────────────────────────────────────────────
+
+const IC = 'w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-40 text-sm';
+
+function BranchAddressForm({ branch, onChange, onRemove, showRemove, profileAddress }: {
+  branch: BranchData;
+  onChange: (b: BranchData) => void;
+  onRemove?: () => void;
+  showRemove?: boolean;
+  profileAddress?: string;
+}) {
+  const [amphoes, setAmphoes]         = useState<string[]>([]);
+  const [tambons, setTambons]         = useState<[string, string][]>([]);
+  const [loadingAmph, setLoadingAmph] = useState(false);
+  const [loadingTamb, setLoadingTamb] = useState(false);
+
+  // Load amphoes when province changes
+  useEffect(() => {
+    if (!branch.provinceName) { setAmphoes([]); setTambons([]); return; }
+    setLoadingAmph(true);
+    fetch(`/api/thai-address?type=amphures&province=${encodeURIComponent(branch.provinceName)}`)
+      .then(r => r.json()).then(d => setAmphoes(Array.isArray(d) ? d : []))
+      .catch(() => setAmphoes([]))
+      .finally(() => setLoadingAmph(false));
+  }, [branch.provinceName]);
+
+  // Load tambons when amphoe changes
+  useEffect(() => {
+    if (!branch.amphoreName || !branch.provinceName) { setTambons([]); return; }
+    setLoadingTamb(true);
+    fetch(`/api/thai-address?type=tambons&province=${encodeURIComponent(branch.provinceName)}&amphoe=${encodeURIComponent(branch.amphoreName)}`)
+      .then(r => r.json()).then(d => setTambons(Array.isArray(d) ? d : []))
+      .catch(() => setTambons([]))
+      .finally(() => setLoadingTamb(false));
+  }, [branch.provinceName, branch.amphoreName]);
+
+  const upd = (key: keyof BranchData, val: string) => onChange({ ...branch, [key]: val });
+  const onProvince = (name: string) => { onChange({ ...branch, provinceName: name, amphoreName: '', tambonName: '', postalCode: '' }); setAmphoes([]); setTambons([]); };
+  const onAmphoe   = (name: string) => { onChange({ ...branch, amphoreName: name, tambonName: '', postalCode: '' }); setTambons([]); };
+  const onTambon   = (val: string)  => { const [n, z] = val.split('|'); onChange({ ...branch, tambonName: n, postalCode: z }); };
+
+  const fillFromProfile = () => {
+    if (!profileAddress) return;
+    const parsed = parseProfileAddress(profileAddress);
+    onChange({ ...branch, ...parsed });
+  };
+
+  return (
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      {/* Branch header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2">
+          <MapPin size={15} className="text-blue-500 shrink-0" />
+          <input
+            className="text-sm font-medium bg-transparent outline-none border-none focus:ring-0 w-32"
+            value={branch.label}
+            onChange={e => upd('label', e.target.value)}
+            placeholder="ชื่อสาขา"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          {profileAddress && (
+            <button type="button" onClick={fillFromProfile}
+              className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-800/40 border border-blue-200 dark:border-blue-700 px-2.5 py-1 rounded-lg transition-all">
+              <ClipboardList size={12} /> ดึงจากโปรไฟล์
+            </button>
+          )}
+          {showRemove && onRemove && (
+            <button type="button" onClick={onRemove}
+              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800 px-2.5 py-1 rounded-lg transition-all">
+              <Trash2 size={12} /> ลบ
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Form fields */}
+      <div className="p-4 space-y-3">
+        {/* House no / Moo / Road */}
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">บ้านเลขที่</label>
+            <input type="text" value={branch.houseNo} onChange={e => upd('houseNo', e.target.value)} className={IC} placeholder="207/2" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">หมู่ที่</label>
+            <input type="text" value={branch.moo} onChange={e => upd('moo', e.target.value)} className={IC} placeholder="1" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">ถนน</label>
+            <input type="text" value={branch.road} onChange={e => upd('road', e.target.value)} className={IC} placeholder="พหลโยธิน" />
+          </div>
+        </div>
+
+        {/* Province */}
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">จังหวัด <span className="text-red-500">*</span></label>
+          <select value={branch.provinceName} onChange={e => onProvince(e.target.value)} className={IC}>
+            <option value="">เลือกจังหวัด</option>
+            {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+
+        {/* Amphoe */}
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">อำเภอ / เขต <span className="text-red-500">*</span></label>
+          <select value={branch.amphoreName} onChange={e => onAmphoe(e.target.value)}
+            disabled={!branch.provinceName || loadingAmph} className={IC}>
+            <option value="">{loadingAmph ? 'กำลังโหลด...' : branch.provinceName ? 'เลือกอำเภอ' : '— เลือกจังหวัดก่อน —'}</option>
+            {amphoes.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+
+        {/* Tambon + Postal */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">ตำบล / แขวง <span className="text-red-500">*</span></label>
+            <select value={branch.tambonName ? `${branch.tambonName}|${branch.postalCode}` : ''}
+              onChange={e => onTambon(e.target.value)}
+              disabled={!branch.amphoreName || loadingTamb} className={IC}>
+              <option value="">{loadingTamb ? 'กำลังโหลด...' : branch.amphoreName ? 'เลือกตำบล' : '— เลือกอำเภอก่อน —'}</option>
+              {tambons.map(([n, z]) => <option key={n} value={`${n}|${z}`}>{n}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">รหัสไปรษณีย์</label>
+            <input readOnly value={branch.postalCode} className={IC + ' bg-gray-50 dark:bg-gray-800/80 cursor-default text-gray-500'} placeholder="ออโต้" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shared sub-components ───────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: number }) {
   return (
     <div className="flex items-start justify-between mb-8 px-1">
       {STEPS.map((label, i) => {
-        const num  = i + 1;
-        const done = num < current;
-        const act  = num === current;
+        const num = i + 1; const done = num < current; const act = num === current;
         return (
           <Fragment key={num}>
             <div className="flex flex-col items-center gap-1.5 w-16">
@@ -61,9 +233,7 @@ function StepIndicator({ current }: { current: number }) {
                 ${done ? 'bg-green-500 text-white' : act ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
                 {done ? '✓' : num}
               </div>
-              <span className={`text-[11px] text-center leading-tight ${act ? 'text-blue-600 font-semibold' : done ? 'text-green-600' : 'text-gray-400'}`}>
-                {label}
-              </span>
+              <span className={`text-[11px] text-center leading-tight ${act ? 'text-blue-600 font-semibold' : done ? 'text-green-600' : 'text-gray-400'}`}>{label}</span>
             </div>
             {i < STEPS.length - 1 && (
               <div className={`flex-1 h-0.5 mt-4 mx-0.5 transition-all duration-300 ${done ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
@@ -81,15 +251,12 @@ function FileUpload({ label, accept, file, onChange, hint, required }: {
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1.5 opacity-75">
-        {label}{required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      <label className="block text-sm font-medium mb-1.5 opacity-75">{label}{required && <span className="text-red-500 ml-1">*</span>}</label>
       <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-all">
         <input type="file" accept={accept} className="hidden" onChange={e => onChange(e.target.files?.[0] ?? null)} />
         {file ? (
           <div className="flex items-center gap-2 text-green-600">
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
-            <span className="text-sm font-medium truncate max-w-[220px]">{file.name}</span>
+            <CheckCircle2 className="w-5 h-5 shrink-0" /><span className="text-sm font-medium truncate max-w-[220px]">{file.name}</span>
           </div>
         ) : (
           <div className="text-center text-gray-400">
@@ -108,32 +275,30 @@ function FileUpload({ label, accept, file, onChange, hint, required }: {
 function SellerForm() {
   const router = useRouter();
 
-  const [step, setStep]       = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [step, setStep]           = useState(1);
+  const [loading, setLoading]     = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]     = useState('');
-  const [done, setDone]       = useState(false);
-  const [copied, setCopied]   = useState<'acct' | 'pp' | null>(null);
+  const [error, setError]         = useState('');
+  const [done, setDone]           = useState(false);
+  const [copied, setCopied]       = useState<'acct' | 'pp' | null>(null);
 
-  // Pre-filled from OAuth / profile
-  const [displayName, setDisplayName]       = useState('');
-  const [oauthEmail, setOauthEmail]         = useState('');
-  const [profileAddress, setProfileAddress] = useState('');   // เก็บ address จาก prefs
-  const [profileProvince, setProfileProvince] = useState(''); // เก็บจังหวัดจาก prefs
+  // OAuth / profile
+  const [displayName, setDisplayName]     = useState('');
+  const [oauthEmail, setOauthEmail]       = useState('');
+  const [profileAddress, setProfileAddress] = useState('');
 
-  // Step 1 – Basic Identity
+  // Step 1
   const [sellerType, setSellerType] = useState('');
   const [fullNameId, setFullNameId] = useState('');
   const [idNumber, setIdNumber]     = useState('');
 
-  // Step 2 – Location / Corporate
-  const [province, setProvince]             = useState('');
-  const [address, setAddress]               = useState('');
-  const [onlineLink, setOnlineLink]         = useState('');
-  const [companyName, setCompanyName]       = useState('');
-  const [companyRegNum, setCompanyRegNum]   = useState('');
+  // Step 2 — branches
+  const [branches, setBranches] = useState<BranchData[]>([newBranch('สาขาหลัก')]);
+  const [onlineLink, setOnlineLink]       = useState('');
+  const [companyName, setCompanyName]     = useState('');
+  const [companyRegNum, setCompanyRegNum] = useState('');
 
-  // Step 3 – Docs & Bank
+  // Step 3
   const [idCardFile, setIdCardFile]           = useState<File | null>(null);
   const [companyCertFile, setCompanyCertFile] = useState<File | null>(null);
   const [bookbankFile, setBookbankFile]       = useState<File | null>(null);
@@ -144,7 +309,6 @@ function SellerForm() {
   const [companyBankName, setCompanyBankName] = useState('');
 
   const isCorporate = sellerType === 'corporate';
-
   const ic = 'w-full bg-white/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-40';
 
   useEffect(() => {
@@ -154,28 +318,33 @@ function SellerForm() {
         const em = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
         setOauthEmail(em);
         setFullNameId(u.name || '');
-        // โหลด address จาก prefs ไว้ให้ autofill
         const prefs = (u.prefs as Record<string, string>) || {};
-        if (prefs.address) {
-          setProfileAddress(prefs.address);
-          setProfileProvince(extractProvince(prefs.address));
-        }
+        if (prefs.address) setProfileAddress(prefs.address);
       })
       .catch(() => router.replace('/login'))
       .finally(() => setLoading(false));
   }, [router]);
 
-  // ── Validation per step ──
+  // Branch helpers
+  const updateBranch = (id: string, b: BranchData) =>
+    setBranches(prev => prev.map(x => x.id === id ? b : x));
+  const removeBranch = (id: string) =>
+    setBranches(prev => prev.filter(x => x.id !== id));
+  const addBranch = () =>
+    setBranches(prev => [...prev, newBranch(`สาขา ${prev.length + 1}`)]);
+
+  // Validation
   const validate = () => {
     setError('');
     if (step === 1) {
-      if (!sellerType)   return setError('กรุณาเลือกประเภทผู้ขาย'), false;
+      if (!sellerType) return setError('กรุณาเลือกประเภทผู้ขาย'), false;
       if (!fullNameId.trim()) return setError('กรุณากรอกชื่อ-นามสกุลตามบัตรประชาชน'), false;
       if (!/^\d{13}$/.test(idNumber)) return setError('เลขประจำตัวประชาชนต้องเป็นตัวเลข 13 หลัก'), false;
     }
     if (step === 2) {
-      if (!province) return setError('กรุณาเลือกจังหวัด'), false;
-      if (!address.trim()) return setError('กรุณากรอกที่อยู่'), false;
+      if (!branches[0].provinceName) return setError('กรุณาเลือกจังหวัดของสาขาหลัก'), false;
+      if (!branches[0].amphoreName)  return setError('กรุณาเลือกอำเภอของสาขาหลัก'), false;
+      if (!branches[0].tambonName)   return setError('กรุณาเลือกตำบลของสาขาหลัก'), false;
       if (isCorporate && !companyName.trim()) return setError('กรุณากรอกชื่อบริษัท'), false;
       if (isCorporate && !/^\d{13}$/.test(companyRegNum)) return setError('เลขทะเบียนนิติบุคคลต้องเป็นตัวเลข 13 หลัก'), false;
     }
@@ -196,15 +365,16 @@ function SellerForm() {
   const back = () => { setError(''); setStep(s => s - 1); window.scrollTo(0, 0); };
 
   const copyText = (text: string, key: 'acct' | 'pp') => {
-    navigator.clipboard.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(null), 2000);
+    navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(null), 2000);
   };
 
   const handleSubmit = async () => {
     setSubmitting(true); setError('');
     try {
       const jwt = (await account.createJWT()).jwt;
+      // Build address string from branches
+      const address  = branches.map(b => `[${b.label}] ${branchToString(b)}`).filter(s => s.length > 10).join(' / ');
+      const province = branches[0].provinceName;
       const body = {
         type: 'seller', sellerType, fullNameId, idNumber,
         province, address, onlineLink,
@@ -217,16 +387,12 @@ function SellerForm() {
         companyCertFileName: companyCertFile?.name ?? '',
         bookbankFileName: bookbankFile?.name ?? '',
       };
-      const res  = await fetch('/api/register/seller', {
+      const res = await fetch('/api/register/seller', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
         body: JSON.stringify(body),
       });
-      if (!res.ok) {
-        const d = await res.json();
-        setError(d.error || 'เกิดข้อผิดพลาด');
-        return;
-      }
+      if (!res.ok) { const d = await res.json(); setError(d.error || 'เกิดข้อผิดพลาด'); return; }
       setDone(true);
     } catch {
       setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
@@ -235,38 +401,31 @@ function SellerForm() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500 animate-pulse">กำลังโหลด...</p>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="text-gray-500 animate-pulse">กำลังโหลด...</p>
+    </div>
+  );
 
-  // ── Success screen ──
-  if (done) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-md w-full text-center glass-panel rounded-2xl p-10 shadow-xl animate-fade-in">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 className="w-10 h-10 text-green-600" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">ส่งใบสมัครแล้ว!</h2>
-          <p className="text-gray-500 mb-6">ทีมงานจะตรวจสอบข้อมูลและติดต่อกลับภายใน 1-3 วันทำการ<br />คุณสามารถเช็คสถานะได้ในหน้าโปรไฟล์</p>
-          <button onClick={() => router.push('/')}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-medium transition-all">
-            กลับหน้าหลัก
-          </button>
+  if (done) return (
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="max-w-md w-full text-center glass-panel rounded-2xl p-10 shadow-xl animate-fade-in">
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
+          <CheckCircle2 className="w-10 h-10 text-green-600" />
         </div>
+        <h2 className="text-2xl font-bold mb-2">ส่งใบสมัครแล้ว!</h2>
+        <p className="text-gray-500 mb-6">ทีมงานจะตรวจสอบข้อมูลและติดต่อกลับภายใน 1-3 วันทำการ</p>
+        <button onClick={() => router.push('/')}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-medium transition-all">
+          กลับหน้าหลัก
+        </button>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6">
       <div className="max-w-xl mx-auto">
-
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-1.5 rounded-full text-sm font-medium mb-3">
             <Store className="w-4 h-4" /> สมัครเป็นผู้ขายในเครือคนกลาง
@@ -277,7 +436,7 @@ function SellerForm() {
         <div className="glass-panel rounded-2xl p-6 sm:p-8 shadow-xl animate-fade-in">
           <StepIndicator current={step} />
 
-          {/* ─────────── STEP 1: Basic Identity ─────────── */}
+          {/* ───── STEP 1: Basic Identity ───── */}
           {step === 1 && (
             <div className="space-y-6">
               <div>
@@ -285,7 +444,6 @@ function SellerForm() {
                 <p className="text-sm text-gray-500">เลือกประเภทผู้ขายและกรอกข้อมูลส่วนตัวตามบัตรประชาชน</p>
               </div>
 
-              {/* OAuth name + email display */}
               {(displayName || oauthEmail) && (
                 <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-4 py-3 text-sm space-y-1">
                   <p className="text-xs text-gray-400 mb-1">บัญชีที่ใช้ล็อกอิน</p>
@@ -294,13 +452,11 @@ function SellerForm() {
                 </div>
               )}
 
-              {/* Seller type cards */}
               <div>
                 <label className="block text-sm font-medium mb-2 opacity-75">ประเภทผู้ขาย <span className="text-red-500">*</span></label>
                 <div className="grid grid-cols-2 gap-3">
                   {SELLER_TYPES.map(t => (
-                    <button key={t.value} type="button"
-                      onClick={() => setSellerType(t.value)}
+                    <button key={t.value} type="button" onClick={() => setSellerType(t.value)}
                       className={`rounded-xl border-2 p-3 text-left transition-all
                         ${sellerType === t.value
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
@@ -315,124 +471,83 @@ function SellerForm() {
 
               <div>
                 <label className="block text-sm font-medium mb-1.5 opacity-75">ชื่อ-นามสกุล (ตรงตามบัตรประชาชน) <span className="text-red-500">*</span></label>
-                <input className={ic} value={fullNameId} onChange={e => setFullNameId(e.target.value)}
-                  placeholder="ชื่อ นามสกุล" />
+                <input className={ic} value={fullNameId} onChange={e => setFullNameId(e.target.value)} placeholder="ชื่อ นามสกุล" />
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1.5 opacity-75">เลขประจำตัวประชาชน <span className="text-red-500">*</span></label>
-                <input className={ic} value={idNumber} onChange={e => setIdNumber(e.target.value.replace(/\D/g, '').slice(0, 13))}
-                  placeholder="1234567890123" maxLength={13} inputMode="numeric" />
+                <input className={ic} value={idNumber} onChange={e => setIdNumber(e.target.value.replace(/\D/g,'').slice(0,13))} placeholder="1234567890123" maxLength={13} inputMode="numeric" />
                 <p className="text-xs text-gray-400 mt-1">ตัวเลข 13 หลัก ไม่ต้องใส่ขีด</p>
               </div>
             </div>
           )}
 
-          {/* ─────────── STEP 2: Role Specific ─────────── */}
+          {/* ───── STEP 2: ข้อมูลผู้ขาย (cascading address + branches) ───── */}
           {step === 2 && (
             <div className="space-y-5">
               <div>
                 <h2 className="text-lg font-semibold mb-1">ข้อมูลผู้ขาย</h2>
-                <p className="text-sm text-gray-500">ระบุพื้นที่ขายและช่องทางการขายของคุณ</p>
+                <p className="text-sm text-gray-500">ระบุที่ตั้งร้านหรือพื้นที่ขายสินค้า</p>
               </div>
 
               {isCorporate && (
-                <>
+                <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 opacity-75">ชื่อบริษัท / ชื่อนิติบุคคล <span className="text-red-500">*</span></label>
-                    <input className={ic} value={companyName} onChange={e => setCompanyName(e.target.value)}
-                      placeholder="บริษัท ตัวอย่าง จำกัด" />
+                    <input className={ic} value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="บริษัท ตัวอย่าง จำกัด" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 opacity-75">เลขทะเบียนนิติบุคคล <span className="text-red-500">*</span></label>
-                    <input className={ic} value={companyRegNum} onChange={e => setCompanyRegNum(e.target.value.replace(/\D/g, '').slice(0, 13))}
-                      placeholder="1234567890123" maxLength={13} inputMode="numeric" />
+                    <input className={ic} value={companyRegNum} onChange={e => setCompanyRegNum(e.target.value.replace(/\D/g,'').slice(0,13))} placeholder="1234567890123" maxLength={13} inputMode="numeric" />
                   </div>
-                </>
-              )}
-
-              {/* ปุ่ม autofill จากโปรไฟล์ */}
-              {profileAddress && (
-                <button type="button"
-                  onClick={() => { setProvince(profileProvince); setAddress(profileAddress); }}
-                  className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-3 py-2 rounded-xl transition-all w-fit">
-                  <ClipboardList size={13} />
-                  ใช้ที่อยู่เดียวกับโปรไฟล์
-                  <span className="opacity-60 ml-1 truncate max-w-[160px]">({profileAddress.slice(0, 30)}...)</span>
-                </button>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5 opacity-75">จังหวัดที่ตั้งร้าน / ขายจริง <span className="text-red-500">*</span></label>
-                <select className={ic} value={province} onChange={e => setProvince(e.target.value)}>
-                  <option value="">เลือกจังหวัด</option>
-                  {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-                <p className="text-xs text-gray-400 mt-1">ไม่จำเป็นต้องตรงกับทะเบียนบ้าน — ใช้ระบุพื้นที่ขายจริง</p>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium opacity-75">ที่อยู่ปัจจุบัน / พิกัดหน้าร้าน <span className="text-red-500">*</span></label>
                 </div>
-                <textarea className={ic + ' resize-none'} rows={3} value={address}
-                  onChange={e => setAddress(e.target.value)}
-                  placeholder="บ้านเลขที่, ถนน, แขวง/ตำบล, เขต/อำเภอ" />
+              )}
+
+              {/* Branch forms */}
+              <div className="space-y-4">
+                {branches.map((b, i) => (
+                  <BranchAddressForm
+                    key={b.id}
+                    branch={b}
+                    onChange={updated => updateBranch(b.id, updated)}
+                    onRemove={() => removeBranch(b.id)}
+                    showRemove={branches.length > 1 && i > 0}
+                    profileAddress={profileAddress}
+                  />
+                ))}
               </div>
 
+              {/* Add branch button */}
+              <button type="button" onClick={addBranch}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/30 dark:hover:border-blue-600 dark:hover:text-blue-400 transition-all">
+                <Plus size={16} /> เพิ่มสาขา / ที่อยู่อื่น
+              </button>
+
               <div>
-                <label className="block text-sm font-medium mb-1.5 opacity-75">ลิงก์หน้าร้านออนไลน์ <span className="text-xs text-gray-400">(ถ้ามี)</span></label>
+                <label className="block text-sm font-medium mb-1.5 opacity-75">ลิงก์หน้าร้านออนไลน์ <span className="text-xs text-gray-400 font-normal">(ถ้ามี)</span></label>
                 <input className={ic} value={onlineLink} onChange={e => setOnlineLink(e.target.value)}
                   placeholder="https://facebook.com/yourpage หรือ Shopee/TikTok" type="url" />
               </div>
             </div>
           )}
 
-          {/* ─────────── STEP 3: Trust Verification ─────────── */}
+          {/* ───── STEP 3: Trust Verification ───── */}
           {step === 3 && (
             <div className="space-y-5">
               <div>
                 <h2 className="text-lg font-semibold mb-1">ยืนยันตัวตน</h2>
                 <p className="text-sm text-gray-500">อัปโหลดเอกสารและข้อมูลบัญชีธนาคาร</p>
               </div>
-
-              <FileUpload
-                label="ภาพถ่ายบัตรประชาชน (หรือถ่ายคู่กับบัตร)"
-                accept="image/*"
-                file={idCardFile}
-                onChange={setIdCardFile}
-                hint="JPG / PNG / HEIC ขนาดไม่เกิน 10 MB"
-                required
-              />
-
-              {isCorporate && (
-                <>
-                  <FileUpload
-                    label="หนังสือรับรองบริษัท (อายุไม่เกิน 6 เดือน)"
-                    accept="image/*,.pdf"
-                    file={companyCertFile}
-                    onChange={setCompanyCertFile}
-                    hint="JPG / PNG / PDF"
-                    required
-                  />
-                  <FileUpload
-                    label="หน้าสมุดบัญชีธนาคาร (Bookbank) ของบริษัท"
-                    accept="image/*,.pdf"
-                    file={bookbankFile}
-                    onChange={setBookbankFile}
-                    hint="JPG / PNG / PDF"
-                    required
-                  />
-                </>
-              )}
-
+              <FileUpload label="ภาพถ่ายบัตรประชาชน (หรือถ่ายคู่กับบัตร)" accept="image/*" file={idCardFile} onChange={setIdCardFile} hint="JPG / PNG / HEIC ขนาดไม่เกิน 10 MB" required />
+              {isCorporate && <>
+                <FileUpload label="หนังสือรับรองบริษัท (อายุไม่เกิน 6 เดือน)" accept="image/*,.pdf" file={companyCertFile} onChange={setCompanyCertFile} hint="JPG / PNG / PDF" required />
+                <FileUpload label="หน้าสมุดบัญชีธนาคาร (Bookbank) ของบริษัท" accept="image/*,.pdf" file={bookbankFile} onChange={setBookbankFile} hint="JPG / PNG / PDF" required />
+              </>}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
-                <p className="text-sm font-semibold">บัญชีธนาคาร{isCorporate ? ' (ส่วนตัว)' : ''} — สำหรับรับเงินค่าสินค้า</p>
+                <p className="text-sm font-semibold">บัญชีธนาคาร — สำหรับรับเงินค่าสินค้า</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 opacity-75">เลขที่บัญชี <span className="text-red-500">*</span></label>
-                    <input className={ic} value={bankAcct} onChange={e => setBankAcct(e.target.value)}
-                      placeholder="xxx-x-xxxxx-x" />
+                    <input className={ic} value={bankAcct} onChange={e => setBankAcct(e.target.value)} placeholder="xxx-x-xxxxx-x" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 opacity-75">ธนาคาร <span className="text-red-500">*</span></label>
@@ -444,19 +559,16 @@ function SellerForm() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 opacity-75">ชื่อบัญชี (ต้องตรงกับบัตรประชาชน) <span className="text-red-500">*</span></label>
-                  <input className={ic} value={bankOwner} onChange={e => setBankOwner(e.target.value)}
-                    placeholder="ชื่อ นามสกุล" />
+                  <input className={ic} value={bankOwner} onChange={e => setBankOwner(e.target.value)} placeholder="ชื่อ นามสกุล" />
                 </div>
               </div>
-
               {isCorporate && (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
                   <p className="text-sm font-semibold">บัญชีธนาคารบริษัท</p>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1.5 opacity-75">เลขที่บัญชีบริษัท <span className="text-red-500">*</span></label>
-                      <input className={ic} value={companyBankAcct} onChange={e => setCompanyBankAcct(e.target.value)}
-                        placeholder="xxx-x-xxxxx-x" />
+                      <input className={ic} value={companyBankAcct} onChange={e => setCompanyBankAcct(e.target.value)} placeholder="xxx-x-xxxxx-x" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1.5 opacity-75">ธนาคาร <span className="text-red-500">*</span></label>
@@ -471,15 +583,13 @@ function SellerForm() {
             </div>
           )}
 
-          {/* ─────────── STEP 4: Payment ─────────── */}
+          {/* ───── STEP 4: Payment ───── */}
           {step === 4 && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-lg font-semibold mb-1">ชำระค่าสมาชิก</h2>
                 <p className="text-sm text-gray-500">ชำระค่าสมัครเพื่อเปิดใช้งานสิทธิ์ผู้ขาย</p>
               </div>
-
-              {/* Warning box */}
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-4 flex gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                 <div className="text-sm text-amber-800 dark:text-amber-200 space-y-1">
@@ -488,81 +598,50 @@ function SellerForm() {
                   <p>หากมีปัญหาหรือต้องการยื่นหลักฐานชี้แจง กรุณาติดต่อ Admin โดยตรงผ่านช่องทางที่กำหนด</p>
                 </div>
               </div>
-
-              {/* Fee display */}
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 text-center">
                 <p className="text-sm text-gray-500 mb-1">ค่าสมัครผู้ขาย</p>
                 <p className="text-4xl font-bold text-blue-600">฿{MEMBERSHIP_FEE.toLocaleString()}</p>
                 <p className="text-xs text-gray-400 mt-1">ชำระครั้งเดียว (ต่ออายุรายปี)</p>
               </div>
-
-              {/* QR Code */}
               <div className="text-center space-y-3">
                 <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">สแกน QR PromptPay</p>
                 <div className="inline-block bg-white p-3 rounded-2xl shadow-lg border border-gray-200">
-                  {/* QR from qrserver.com – replace with actual PromptPay QR in production */}
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${PROMPTPAY}&bgcolor=ffffff`}
-                    alt="PromptPay QR Code"
-                    width={200} height={200}
-                    className="rounded-lg"
-                  />
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${PROMPTPAY}&bgcolor=ffffff`} alt="QR" width={200} height={200} className="rounded-lg" />
                 </div>
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-                  <span>หมายเลข PromptPay:</span>
+                  <span>PromptPay:</span>
                   <code className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{PROMPTPAY}</code>
-                  <button type="button" onClick={() => copyText(PROMPTPAY, 'pp')}
-                    className="p-1 hover:text-blue-600 transition-colors">
+                  <button type="button" onClick={() => copyText(PROMPTPAY, 'pp')} className="p-1 hover:text-blue-600 transition-colors">
                     {copied === 'pp' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
-
-              {/* Bank transfer */}
               <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2 text-sm">
                 <p className="font-semibold mb-2">หรือโอนผ่านธนาคาร</p>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">ธนาคาร</span>
-                  <span className="font-medium">{BANK_NAME}</span>
-                </div>
+                <div className="flex justify-between"><span className="text-gray-500">ธนาคาร</span><span className="font-medium">{BANK_NAME}</span></div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500">เลขบัญชี</span>
                   <div className="flex items-center gap-2">
                     <code className="font-mono font-medium">{BANK_ACCT}</code>
-                    <button type="button" onClick={() => copyText(BANK_ACCT, 'acct')}
-                      className="p-1 hover:text-blue-600 transition-colors">
+                    <button type="button" onClick={() => copyText(BANK_ACCT, 'acct')} className="p-1 hover:text-blue-600 transition-colors">
                       {copied === 'acct' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">ชื่อบัญชี</span>
-                  <span className="font-medium">{BANK_OWNER}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">จำนวนเงิน</span>
-                  <span className="font-bold text-blue-600">฿{MEMBERSHIP_FEE}</span>
-                </div>
+                <div className="flex justify-between"><span className="text-gray-500">ชื่อบัญชี</span><span className="font-medium">{BANK_OWNER}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">จำนวนเงิน</span><span className="font-bold text-blue-600">฿{MEMBERSHIP_FEE}</span></div>
               </div>
-
-              <p className="text-xs text-center text-gray-400">
-                หลังจากโอนเงินแล้ว กรุณาแนบหลักฐานการโอนส่งให้ Admin ผ่านช่องทาง LINE Official
-              </p>
-
+              <p className="text-xs text-center text-gray-400">หลังโอนเงินแล้ว กรุณาแนบหลักฐานส่งให้ Admin ผ่าน LINE Official</p>
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
               <button onClick={handleSubmit} disabled={submitting}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2">
-                {submitting ? 'กำลังส่งใบสมัคร...' : <>ยืนยันการสมัครและโอนเงินแล้ว <CheckCircle2 className="w-5 h-5" /></>}
+                {submitting ? 'กำลังส่งใบสมัคร...' : <><CheckCircle2 className="w-5 h-5" /> ยืนยันการสมัครและโอนเงินแล้ว</>}
               </button>
             </div>
           )}
 
-          {/* ─── Navigation ─── */}
-          {error && step < 4 && (
-            <p className="mt-4 text-red-500 text-sm text-center">{error}</p>
-          )}
-
+          {/* Navigation */}
+          {error && step < 4 && <p className="mt-4 text-red-500 text-sm text-center">{error}</p>}
           {step < 4 && (
             <div className={`flex mt-8 gap-3 ${step > 1 ? 'justify-between' : 'justify-end'}`}>
               {step > 1 && (

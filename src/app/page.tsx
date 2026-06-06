@@ -6,6 +6,7 @@ import { useUser } from '@/lib/useUser';
 import {
   ShieldCheck,
   Users,
+  User,
   Search,
   Menu,
   X,
@@ -141,7 +142,11 @@ export default function Home() {
                     <ChevronDown className="w-3 h-3 text-gray-400" />
                   </button>
                   {profileOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-44 bg-slate-800 border border-white/10 rounded-xl shadow-xl overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-white/10 rounded-xl shadow-xl overflow-hidden">
+                      <Link href="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-white/10 transition-colors font-medium text-blue-300" onClick={() => setProfileOpen(false)}>
+                        <User className="w-4 h-4" /> ดูโปรไฟล์
+                      </Link>
+                      <hr className="border-white/10" />
                       <Link href="/register/seller" className="block px-4 py-2.5 text-sm hover:bg-white/10 transition-colors" onClick={() => setProfileOpen(false)}>
                         สมัครเป็นผู้ขาย
                       </Link>
@@ -172,6 +177,14 @@ export default function Home() {
         {/* Mobile menu */}
         {mobileOpen && (
           <div className="md:hidden bg-slate-900 border-t border-white/10 px-4 py-4 space-y-1">
+            {user && (
+              <>
+                <Link href="/profile" className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm font-medium text-blue-300" onClick={() => setMobileOpen(false)}>
+                  <User className="w-4 h-4" /> โปรไฟล์ของฉัน
+                </Link>
+                <hr className="border-white/10 my-2" />
+              </>
+            )}
             <p className="text-xs text-gray-400 uppercase px-3 mb-2">สมัคร</p>
             <Link href="/register/seller" className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm" onClick={() => setMobileOpen(false)}>
               <Users className="w-4 h-4 text-blue-400" /> สมัครเป็นผู้ขายกลุ่มในเครือ
@@ -191,9 +204,11 @@ export default function Home() {
               <Search className="w-4 h-4 text-yellow-400" /> เช็คคนโกง
             </Link>
             <hr className="border-white/10 my-2" />
-            <Link href="/login" className="block w-full text-center bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all" onClick={() => setMobileOpen(false)}>
-              เข้าสู่ระบบ
-            </Link>
+            {!user && (
+              <Link href="/login" className="block w-full text-center bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all" onClick={() => setMobileOpen(false)}>
+                เข้าสู่ระบบ
+              </Link>
+            )}
           </div>
         )}
       </nav>
