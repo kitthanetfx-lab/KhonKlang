@@ -60,20 +60,39 @@ export async function GET(req: NextRequest) {
     const currentUser = await new Account(sessionClient).get();
     const userId = currentUser.$id;
 
-    const { databases } = getAdminClient();
+    const { databases, users } = getAdminClient();
     let docs = await databases.listDocuments(DB_ID, COL_ID, [
       Query.equal('userId', userId),
     ]).then(r => r.documents).catch(() => []);
 
+    let viaNameFallback = false;
     if (docs.length === 0 && currentUser.name) {
       docs = await databases.listDocuments(DB_ID, COL_ID, [
         Query.equal('fullNameId', currentUser.name),
       ]).then(r => r.documents).catch(() => []);
+      if (docs.length > 0) viaNameFallback = true;
     }
 
     if (docs.length > 0) {
-      const doc = docs[0] as { status?: string };
-      return NextResponse.json({ status: doc.status || 'pending_review' });
+      const doc = docs[0] as { status?: string; userId?: string };
+      const foundStatus = doc.status || 'pending_review';
+
+      // Sync prefs to current account (multi-account: LINE approved → Google account not updated)
+      if (viaNameFallback || (doc.userId && doc.userId !== userId)) {
+        try {
+          const userRecord = await users.get(userId);
+          const prefs = (userRecord.prefs || {}) as Record<string, string>;
+          if (prefs.sellerStatus !== foundStatus) {
+            prefs.sellerStatus = foundStatus;
+            if (foundStatus === 'approved' && (!prefs.role || prefs.role === 'user')) {
+              prefs.role = 'seller';
+            }
+            await users.updatePrefs(userId, prefs);
+          }
+        } catch { /* best-effort */ }
+      }
+
+      return NextResponse.json({ status: foundStatus });
     }
     return NextResponse.json({ status: null });
   } catch {

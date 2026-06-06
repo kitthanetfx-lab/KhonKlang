@@ -93,16 +93,37 @@ function ProfilePage() {
 
   const ic = 'w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-40 text-sm';
 
-  // Load user
+  // Load user + sync approval status across accounts
   useEffect(() => {
     account.get()
-      .then(u => {
+      .then(async u => {
         setUserId(u.$id);
         setDisplayName(u.name || '');
         const em = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
         setEmail(em);
-        const p = (u.prefs || {}) as Record<string, string>;
+        let p = (u.prefs || {}) as Record<string, string>;
         setPrefs(p);
+
+        // Sync approval prefs for multi-account users (LINE vs Google)
+        try {
+          const jwt = (await account.createJWT()).jwt;
+          const [sellerRes, middlemanRes] = await Promise.all([
+            fetch('/api/register/seller', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
+            fetch('/api/register/middleman', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
+          ]);
+          const sellerData     = sellerRes?.ok     ? await sellerRes.json()     : null;
+          const middlemanData  = middlemanRes?.ok  ? await middlemanRes.json()  : null;
+          let synced = false;
+          if (sellerData?.status && sellerData.status !== p.sellerStatus) {
+            p = { ...p, sellerStatus: sellerData.status };
+            synced = true;
+          }
+          if (middlemanData?.status && middlemanData.status !== p.middlemanStatus) {
+            p = { ...p, middlemanStatus: middlemanData.status };
+            synced = true;
+          }
+          if (synced) setPrefs(p);
+        } catch { /* best-effort */ }
       })
       .catch(() => router.replace('/login'))
       .finally(() => setLoading(false));
@@ -198,8 +219,8 @@ function ProfilePage() {
       <div className="max-w-2xl mx-auto space-y-5">
 
         {/* Back */}
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
-          <ArrowLeft size={15} /> กลับหน้าหลัก
+        <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-sm transition-colors">
+          <ArrowLeft size={16} /> กลับหน้าแรก
         </Link>
 
         {/* ── Header card ── */}
