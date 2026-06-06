@@ -8,7 +8,7 @@ interface AppUser {
   $id: string;
   name: string;
   email: string;
-  status: number; // 0 = active, 1 = blocked
+  status: boolean; // true = active, false = blocked
   $createdAt: string;
   prefs: {
     role?: string;
@@ -39,35 +39,40 @@ function formatDate(iso: string) {
 
 // Action menu component
 function ActionMenu({ user, jwt, onRefresh }: { user: AppUser; jwt: string; onRefresh: () => void }) {
-  const [open, setOpen]     = useState(false);
+  const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
+  const [err, setErr]         = useState('');
 
-  const setRole = async (role: string) => {
-    setLoading(true); setOpen(false);
-    await fetch('/api/admin/users', {
+  const call = async (body: object) => {
+    setLoading(true); setOpen(false); setErr('');
+    const res = await fetch('/api/admin/users', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
-      body: JSON.stringify({ userId: user.$id, action: 'set_role', role }),
+      body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setErr(d.error || `Error ${res.status}`);
+    }
     setLoading(false);
     onRefresh();
   };
 
-  const toggleBlock = async () => {
-    setLoading(true); setOpen(false);
-    await fetch('/api/admin/users', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
-      body: JSON.stringify({ userId: user.$id, action: user.status === 0 ? 'block' : 'unblock' }),
-    });
-    setLoading(false);
-    onRefresh();
-  };
+  const setRole = (role: string) =>
+    call({ userId: user.$id, action: 'set_role', role });
+
+  const toggleBlock = () =>
+    call({ userId: user.$id, action: user.status ? 'block' : 'unblock' });
 
   const currentRole = user.prefs?.role || 'user';
 
   return (
     <div className="relative">
+      {err && (
+        <p className="absolute right-8 top-0 text-xs text-red-500 whitespace-nowrap bg-white dark:bg-gray-900 px-2 py-1 rounded shadow z-30">
+          {err}
+        </p>
+      )}
       <button onClick={() => setOpen(o => !o)} disabled={loading}
         className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
         {loading ? (
@@ -95,10 +100,10 @@ function ActionMenu({ user, jwt, onRefresh }: { user: AppUser; jwt: string; onRe
             <div className="border-t border-gray-100 dark:border-gray-700">
               <button onClick={toggleBlock}
                 className={`w-full text-left px-4 py-2.5 text-sm transition-colors
-                  ${user.status === 0
+                  ${user.status
                     ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
                     : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'}`}>
-                {user.status === 0 ? '🚫 ระงับบัญชี' : '✅ ยกเลิกการระงับ'}
+                {user.status ? '🚫 ระงับบัญชี' : '✅ ยกเลิกการระงับ'}
               </button>
             </div>
           </div>
@@ -228,10 +233,10 @@ function UsersContent() {
                   <td className="px-4 py-3.5"><RoleBadge role={u.prefs?.role} /></td>
                   <td className="px-4 py-3.5">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
-                      ${u.status === 0
+                      ${u.status
                         ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                         : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-                      {u.status === 0 ? '● ใช้งานได้' : '● ระงับ'}
+                      {u.status ? '● ใช้งานได้' : '● ระงับ'}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(u.$createdAt)}</td>
@@ -245,6 +250,16 @@ function UsersContent() {
         </div>
         <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400">
           แสดง {filtered.length} จาก {users.length} รายการ (ทั้งหมดในระบบ {total})
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function UsersPage() {
+  return <Suspense><UsersContent /></Suspense>;
+}
+ดในระบบ {total})
         </div>
       </div>
     </div>

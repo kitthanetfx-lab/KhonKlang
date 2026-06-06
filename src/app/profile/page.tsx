@@ -448,30 +448,30 @@ function ProfilePage() {
         )}
 
         {/* ── Uploaded docs ── */}
-        {(prefs.idCardFileName || prefs.bookbankFileName) && (
+        {(prefs.idCardFileId || prefs.bookbankFileId) && (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
               <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">เอกสารที่อัปโหลด</h2>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {prefs.idCardFileName && (
+              {prefs.idCardFileId && (
                 <div className="flex items-center gap-3 px-6 py-4">
                   <FileText size={15} className="text-gray-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-400 mb-0.5">บัตรประชาชน</p>
                     <p className="text-sm font-medium text-green-600 dark:text-green-400 flex items-center gap-1.5">
-                      <CheckCircle2 size={13} /> {prefs.idCardFileName}
+                      <CheckCircle2 size={13} /> อัปโหลดแล้ว
                     </p>
                   </div>
                 </div>
               )}
-              {prefs.bookbankFileName && (
+              {prefs.bookbankFileId && (
                 <div className="flex items-center gap-3 px-6 py-4">
                   <FileText size={15} className="text-gray-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-400 mb-0.5">สมุดบัญชี (Bookbank)</p>
                     <p className="text-sm font-medium text-green-600 dark:text-green-400 flex items-center gap-1.5">
-                      <CheckCircle2 size={13} /> {prefs.bookbankFileName}
+                      <CheckCircle2 size={13} /> อัปโหลดแล้ว
                     </p>
                   </div>
                 </div>

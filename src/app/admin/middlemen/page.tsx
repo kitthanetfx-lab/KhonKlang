@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { account } from '@/lib/appwrite';
+import { account, fileViewUrl } from '@/lib/appwrite';
 import {
-  Search, CheckCircle2, XCircle, Eye, Shield, RefreshCw, FileText,
+  Search, CheckCircle2, XCircle, Eye, Shield, RefreshCw, FileText, Download,
 } from 'lucide-react';
 
 interface MiddlemanApp {
@@ -20,7 +20,9 @@ interface MiddlemanApp {
   bankAcct: string;
   bankName: string;
   bankOwner: string;
-  idCardFileName: string;
+  idCardFileId: string;
+  bookbankFileId: string;
+  slipFileId: string;
   status: string;
   rejectReason?: string;
   $createdAt: string;
@@ -62,12 +64,18 @@ function maskId(id: string) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleDateString('th-TH', {
+    day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit',
+  });
 }
 
 function StatusBadge({ status }: { status: string }) {
   const s = STATUS_CFG[status] ?? { label: status, cls: 'bg-gray-100 text-gray-600' };
-  return <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${s.cls}`}>{s.label}</span>;
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${s.cls}`}>
+      {s.label}
+    </span>
+  );
 }
 
 function TierBadge({ tier }: { tier: string }) {
@@ -79,14 +87,77 @@ function TierBadge({ tier }: { tier: string }) {
   );
 }
 
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
+      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl divide-y divide-gray-100 dark:divide-gray-700/50">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v, multiline }: { k: string; v: string; multiline?: boolean }) {
+  if (!v) return null;
+  return (
+    <div className={`flex gap-3 px-4 py-2.5 ${multiline ? 'flex-col' : ''}`}>
+      <span className="text-xs text-gray-400 shrink-0 w-32">{k}</span>
+      <span className={`text-sm font-medium break-all ${multiline ? '' : 'text-right ml-auto'}`}>{v}</span>
+    </div>
+  );
+}
+
+function FileCard({ label, fileId }: { label: string; fileId: string }) {
+  const [imgOk, setImgOk] = useState(true);
+  if (!fileId) return null;
+  const url   = fileViewUrl(fileId);
+  const dlUrl = fileViewUrl(fileId) + '&output=attachment';
+  return (
+    <div className="px-4 py-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <FileText size={13} className="text-gray-400" />
+          {label}
+        </div>
+        <div className="flex gap-2">
+          <a href={url} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+            <Eye size={12} /> ดูเต็มจอ
+          </a>
+          <a href={dlUrl} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1">
+            <Download size={12} /> ดาวน์โหลด
+          </a>
+        </div>
+      </div>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+        {imgOk ? (
+          <img
+            src={url}
+            alt={label}
+            className="w-full max-h-52 object-contain rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-zoom-in hover:opacity-90 transition-opacity"
+            onError={() => setImgOk(false)}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-20 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-400 text-sm gap-2">
+            <FileText size={18} /> คลิกเพื่อเปิดไฟล์
+          </div>
+        )}
+      </a>
+    </div>
+  );
+}
+
 // ── Detail panel ──
 function DetailPanel({ app, onClose, onAction }: {
-  app: MiddlemanApp; onClose: () => void;
+  app: MiddlemanApp;
+  onClose: () => void;
   onAction: (id: string, action: 'approve' | 'reject', reason?: string) => Promise<void>;
 }) {
-  const [acting, setActing]     = useState(false);
+  const [acting, setActing]         = useState(false);
   const [showReject, setShowReject] = useState(false);
-  const [reason, setReason]     = useState('');
+  const [reason, setReason]         = useState('');
 
   const handle = async (action: 'approve' | 'reject') => {
     setActing(true);
@@ -95,7 +166,9 @@ function DetailPanel({ app, onClose, onAction }: {
     setShowReject(false);
   };
 
-  const cats = app.categories ? app.categories.split(',').map(c => CAT_LABEL[c] ?? c).join(', ') : '—';
+  const cats = app.categories
+    ? app.categories.split(',').map(c => CAT_LABEL[c] ?? c).join(', ')
+    : '—';
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -114,8 +187,8 @@ function DetailPanel({ app, onClose, onAction }: {
           </div>
 
           <Section label="ข้อมูลส่วนตัว">
-            <Row k="ชื่อ-นามสกุล"    v={app.fullNameId} />
-            <Row k="เลขบัตรประชาชน"  v={maskId(app.idNumber)} />
+            <Row k="ชื่อ-นามสกุล"   v={app.fullNameId} />
+            <Row k="เลขบัตรประชาชน" v={maskId(app.idNumber)} />
           </Section>
 
           <Section label="ข้อมูลคนกลาง">
@@ -133,7 +206,9 @@ function DetailPanel({ app, onClose, onAction }: {
           </Section>
 
           <Section label="เอกสารแนบ">
-            <FileRow label="บัตรประชาชน" name={app.idCardFileName} />
+            <FileCard label="บัตรประชาชน"     fileId={app.idCardFileId} />
+            <FileCard label="สมุดบัญชีธนาคาร" fileId={app.bookbankFileId} />
+            <FileCard label="สลิปโอนค่าสมัคร" fileId={app.slipFileId} />
           </Section>
 
           {app.rejectReason && (
@@ -158,7 +233,8 @@ function DetailPanel({ app, onClose, onAction }: {
                 <textarea
                   className="w-full border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-400 bg-white dark:bg-gray-800 resize-none"
                   rows={3} placeholder="เหตุผลการปฏิเสธ (ไม่บังคับ)"
-                  value={reason} onChange={e => setReason(e.target.value)} />
+                  value={reason} onChange={e => setReason(e.target.value)}
+                />
                 <div className="flex gap-2">
                   <button onClick={() => setShowReject(false)}
                     className="flex-1 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
@@ -189,34 +265,6 @@ function DetailPanel({ app, onClose, onAction }: {
   );
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
-      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl divide-y divide-gray-100 dark:divide-gray-700/50">{children}</div>
-    </div>
-  );
-}
-function Row({ k, v, multiline }: { k: string; v: string; multiline?: boolean }) {
-  if (!v) return null;
-  return (
-    <div className={`flex gap-3 px-4 py-2.5 ${multiline ? 'flex-col' : ''}`}>
-      <span className="text-xs text-gray-400 shrink-0 w-32">{k}</span>
-      <span className={`text-sm font-medium break-all ${multiline ? '' : 'text-right ml-auto'}`}>{v}</span>
-    </div>
-  );
-}
-function FileRow({ label, name }: { label: string; name: string }) {
-  if (!name) return null;
-  return (
-    <div className="flex items-center gap-3 px-4 py-2.5">
-      <FileText size={14} className="text-gray-400 shrink-0" />
-      <span className="text-xs text-gray-400 w-32 shrink-0">{label}</span>
-      <span className="text-sm truncate">{name}</span>
-    </div>
-  );
-}
-
 // ── Main ──
 function MiddlemenContent() {
   const searchParams = useSearchParams();
@@ -243,7 +291,9 @@ function MiddlemenContent() {
     setLoading(false);
   }, [jwt, statusFilter]);
 
-  useEffect(() => { account.createJWT().then(({ jwt: j }) => { setJwt(j); load(j); }); }, []);
+  useEffect(() => {
+    account.createJWT().then(({ jwt: j }) => { setJwt(j); load(j); });
+  }, []);
   useEffect(() => { if (jwt) load(); }, [statusFilter, jwt]);
 
   const handleAction = async (docId: string, action: 'approve' | 'reject', reason?: string) => {
@@ -257,7 +307,8 @@ function MiddlemenContent() {
   };
 
   const filtered = apps.filter(a =>
-    !search || a.fullNameId.toLowerCase().includes(search.toLowerCase()) ||
+    !search ||
+    a.fullNameId.toLowerCase().includes(search.toLowerCase()) ||
     a.workProvince?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -286,10 +337,7 @@ function MiddlemenContent() {
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
         {STATUS_TABS.map(t => (
           <button key={t.key} onClick={() => setStatus(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
-              ${statusFilter === t.key
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${statusFilter === t.key ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
             {t.label}
             {t.key === 'pending_review' && apps.filter(a => a.status === 'pending_review').length > 0 && (
               <span className="ml-1.5 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full">
@@ -302,8 +350,10 @@ function MiddlemenContent() {
 
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input className="w-full max-w-sm pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900"
-          placeholder="ค้นหาชื่อหรือจังหวัด..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input
+          className="w-full max-w-sm pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900"
+          placeholder="ค้นหาชื่อหรือจังหวัด..." value={search} onChange={e => setSearch(e.target.value)}
+        />
       </div>
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
@@ -322,11 +372,15 @@ function MiddlemenContent() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-12 text-gray-400">
-                  <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                </td></tr>
+                <tr>
+                  <td colSpan={7} className="text-center py-12 text-gray-400">
+                    <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                  </td>
+                </tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-gray-400 text-sm">ไม่มีข้อมูล</td></tr>
+                <tr>
+                  <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">ไม่มีข้อมูล</td>
+                </tr>
               ) : filtered.map(app => (
                 <tr key={app.$id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                   <td className="px-5 py-3.5 font-medium">{app.fullNameId}</td>
@@ -336,6 +390,44 @@ function MiddlemenContent() {
                   <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(app.$createdAt)}</td>
                   <td className="px-4 py-3.5"><StatusBadge status={app.status} /></td>
                   <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => setDetail(app)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
+                        <Eye size={13} /> ดูข้อมูล
+                      </button>
+                      {app.status === 'pending_review' && (
+                        <>
+                          <button onClick={() => handleAction(app.$id, 'reject')}
+                            className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all">
+                            ปฏิเสธ
+                          </button>
+                          <button onClick={() => handleAction(app.$id, 'approve')}
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all">
+                            อนุมัติ
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length > 0 && (
+          <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400">
+            แสดง {filtered.length} จาก {apps.length} รายการ
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function MiddlemenPage() {
+  return <Suspense><MiddlemenContent /></Suspense>;
+}
+ame="px-4 py-3.5">
                     <div className="flex items-center gap-2 justify-end">
                       <button onClick={() => setDetail(app)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">

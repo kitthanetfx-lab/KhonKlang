@@ -7,6 +7,7 @@ import {
   AlertTriangle, Copy, Check, Shield, ClipboardList,
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
+import { uploadKycFiles } from '@/lib/uploadKyc';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -211,6 +212,14 @@ function MiddlemanForm() {
   const handleSubmit = async () => {
     setSubmitting(true); setError('');
     try {
+      setError('กำลังอัปโหลดเอกสาร...');
+      const fileIds = await uploadKycFiles({
+        idCard:   idCardFile,
+        bookbank: bookbankFile,
+        slip:     slipFile,
+      });
+      setError('');
+
       const jwt = (await account.createJWT()).jwt;
       const body = {
         type: 'middleman', fullNameId, idNumber,
@@ -219,9 +228,9 @@ function MiddlemanForm() {
         categories,
         workProvince, terms,
         bankAcct, bankName, bankOwner,
-        idCardFileName: idCardFile?.name ?? '',
-        bookbankFileName: bookbankFile?.name ?? '',
-        slipFileName: slipFile?.name ?? '',
+        idCardFileId:   fileIds.idCard,
+        bookbankFileId: fileIds.bookbank,
+        slipFileId:     fileIds.slip,
       };
       const res  = await fetch('/api/register/middleman', {
         method: 'POST',

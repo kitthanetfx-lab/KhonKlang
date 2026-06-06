@@ -35,9 +35,9 @@ async function ensureCollection(databases: Databases) {
       databases.createStringAttribute(DB_ID, COL_ID, 'bankAcct',        50, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'bankName',       100, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'bankOwner',      200, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'idCardFileName',   255, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'bookbankFileName', 255, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'slipFileName',     255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'idCardFileId',   255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'bookbankFileId', 255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'slipFileId',     255, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'status',            50, false, 'pending_review'),
     ]);
     await new Promise(r => setTimeout(r, 3000));
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       depositIntent, tier,
       categories, workProvince, terms,
       bankAcct, bankName, bankOwner,
-      idCardFileName, bookbankFileName, slipFileName,
+      idCardFileId, bookbankFileId, slipFileId,
     } = body;
 
     if (!fullNameId || !idNumber) {
@@ -83,9 +83,9 @@ export async function POST(req: NextRequest) {
       bankAcct:      bankAcct      || '',
       bankName:      bankName      || '',
       bankOwner:     bankOwner     || '',
-      idCardFileName:  idCardFileName   || '',
-      bookbankFileName:bookbankFileName || '',
-      slipFileName:    slipFileName     || '',
+      idCardFileId:   idCardFileId   || '',
+      bookbankFileId: bookbankFileId || '',
+      slipFileId:     slipFileId     || '',
       status: 'pending_review',
     });
 
@@ -98,8 +98,8 @@ export async function POST(req: NextRequest) {
       bankAcct:            bankAcct    || '',
       bankName:            bankName    || '',
       bankOwner:           bankOwner   || '',
-      idCardFileName:      idCardFileName   || '',
-      bookbankFileName:    bookbankFileName || '',
+      idCardFileId:        idCardFileId   || '',
+      bookbankFileId:      bookbankFileId || '',
     });
 
     return NextResponse.json({ success: true });

@@ -38,10 +38,10 @@ async function ensureCollection(databases: Databases) {
       databases.createStringAttribute(DB_ID, COL_ID, 'bankOwner',           200, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'companyBankAcct',      50, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'companyBankName',     100, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'idCardFileName',      255, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'companyCertFileName', 255, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'bookbankFileName',    255, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'slipFileName',        255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'idCardFileId',      255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'companyCertFileId', 255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'bookbankFileId',    255, false),
+      databases.createStringAttribute(DB_ID, COL_ID, 'slipFileId',        255, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'status',               50, false, 'pending_review'),
     ]);
     await new Promise(r => setTimeout(r, 3000));
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       companyName, companyRegNum,
       bankAcct, bankName, bankOwner,
       companyBankAcct, companyBankName,
-      idCardFileName, companyCertFileName, bookbankFileName, slipFileName,
+      idCardFileId, companyCertFileId, bookbankFileId, slipFileId,
     } = body;
 
     if (!sellerType || !fullNameId || !idNumber) {
@@ -90,10 +90,10 @@ export async function POST(req: NextRequest) {
       bankOwner:          bankOwner           || '',
       companyBankAcct:    companyBankAcct     || '',
       companyBankName:    companyBankName     || '',
-      idCardFileName:     idCardFileName      || '',
-      companyCertFileName:companyCertFileName || '',
-      bookbankFileName:   bookbankFileName    || '',
-      slipFileName:       slipFileName        || '',
+      idCardFileId:      idCardFileId      || '',
+      companyCertFileId: companyCertFileId || '',
+      bookbankFileId:    bookbankFileId    || '',
+      slipFileId:        slipFileId        || '',
       status: 'pending_review',
     });
 
@@ -105,8 +105,8 @@ export async function POST(req: NextRequest) {
       bankAcct:         bankAcct    || '',
       bankName:         bankName    || '',
       bankOwner:        bankOwner   || '',
-      idCardFileName:   idCardFileName   || '',
-      bookbankFileName: bookbankFileName || '',
+      idCardFileId:   idCardFileId   || '',
+      bookbankFileId: bookbankFileId || '',
     });
 
     return NextResponse.json({ success: true });

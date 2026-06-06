@@ -7,6 +7,7 @@ import {
   AlertTriangle, Copy, Check, Store, ClipboardList, Plus, Trash2, MapPin,
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
+import { uploadKycFiles } from '@/lib/uploadKyc';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -377,6 +378,16 @@ function SellerForm() {
   const handleSubmit = async () => {
     setSubmitting(true); setError('');
     try {
+      // Upload ไฟล์ทั้งหมดไปที่ Appwrite Storage ก่อน
+      setError('กำลังอัปโหลดเอกสาร...');
+      const fileIds = await uploadKycFiles({
+        idCard:      idCardFile,
+        bookbank:    bookbankFile,
+        companyCert: companyCertFile,
+        slip:        slipFile,
+      });
+      setError('');
+
       const jwt = (await account.createJWT()).jwt;
       // Build address string from branches
       const address  = branches.map(b => `[${b.label}] ${branchToString(b)}`).filter(s => s.length > 10).join(' / ');
@@ -389,10 +400,10 @@ function SellerForm() {
         bankAcct, bankName, bankOwner,
         companyBankAcct: isCorporate ? companyBankAcct : '',
         companyBankName: isCorporate ? companyBankName : '',
-        idCardFileName: idCardFile?.name ?? '',
-        companyCertFileName: companyCertFile?.name ?? '',
-        bookbankFileName: bookbankFile?.name ?? '',
-        slipFileName: slipFile?.name ?? '',
+        idCardFileId:      fileIds.idCard,
+        bookbankFileId:    fileIds.bookbank,
+        companyCertFileId: fileIds.companyCert,
+        slipFileId:        fileIds.slip,
       };
       const res = await fetch('/api/register/seller', {
         method: 'POST',
