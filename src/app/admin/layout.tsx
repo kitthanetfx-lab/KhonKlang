@@ -25,15 +25,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
+    // หน้า setup ไม่ต้องผ่าน guard
+    if (pathname === '/admin/setup') { setChecking(false); return; }
     account.get()
       .then(u => {
         const prefs = (u.prefs as Record<string, string>) || {};
-        if (prefs.role !== 'admin') { router.replace('/'); return; }
+        if (prefs.role !== 'admin') { router.replace('/admin/setup'); return; }
         setAdminName(u.name || 'Admin');
         setChecking(false);
       })
       .catch(() => router.replace('/login'));
-  }, [router]);
+  }, [router, pathname]);
 
   if (checking) {
     return (
