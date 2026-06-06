@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Storage, ID, Permission, Role } from 'node-appwrite';
-import { InputFile } from 'node-appwrite/dist/inputFile';
+import { InputFile } from 'node-appwrite/file';
 
 const ENDPOINT   = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!;
 const PROJECT_ID = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
