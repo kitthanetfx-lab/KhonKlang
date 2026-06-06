@@ -1,48 +1,47 @@
-import { ID } from 'appwrite';
-import { storage, KYC_BUCKET } from './appwrite';
+import { account } from './appwrite';
 
-let bucketReady = false;
+export interface KycFiles {
+  idCard?:      File | null;
+  bookbank?:    File | null;
+  companyCert?: File | null;
+  slip?:        File | null;
+}
 
-/** ตรวจสอบ / สร้าง bucket ก่อน upload (เรียกครั้งเดียว) */
-async function ensureBucket() {
-  if (bucketReady) return;
-  try {
-    await fetch('/api/storage/ensure-bucket', { method: 'POST' });
-    bucketReady = true;
-  } catch {
-    // ถ้า API ล้มเหลว ลอง upload ต่อเลย
-    bucketReady = true;
+export interface KycFileIds {
+  idCard:      string;
+  bookbank:    string;
+  companyCert: string;
+  slip:        string;
+}
+
+async function uploadOne(file: File | null | undefined, jwt: string): Promise<string> {
+  if (!file) return '';
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/api/upload-kyc', {
+    method: 'POST',
+    headers: { 'x-session-jwt': jwt },
+    body: form,
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error || `Upload failed (${res.status})`);
   }
+  const { fileId } = await res.json();
+  return fileId as string;
 }
 
 /**
- * Upload ไฟล์ไปที่ Appwrite Storage bucket "kyc_docs"
- * @returns Appwrite file ID
+ * อัปโหลดไฟล์ KYC ทั้งหมดผ่าน /api/upload-kyc
+ * คืนค่า object ที่มี fileId ของแต่ละไฟล์
  */
-export async function uploadKycFile(file: File): Promise<string> {
-  await ensureBucket();
-  const result = await storage.createFile(KYC_BUCKET, ID.unique(), file);
-  return result.$id;
-}
-
-/**
- * Upload หลายไฟล์พร้อมกัน
- * @param files Record ของ label → File | null
- * @returns Record ของ label → fileId (หรือ '' ถ้าไม่มีไฟล์)
- */
-export async function uploadKycFiles(
-  files: Record<string, File | null>
-): Promise<Record<string, string>> {
-  await ensureBucket();
-  const result: Record<string, string> = {};
-  await Promise.all(
-    Object.entries(files).map(async ([key, file]) => {
-      if (file) {
-        result[key] = await storage.createFile(KYC_BUCKET, ID.unique(), file).then(r => r.$id);
-      } else {
-        result[key] = '';
-      }
-    })
-  );
-  return result;
+export async function uploadKycFiles(files: KycFiles): Promise<KycFileIds> {
+  const jwt = (await account.createJWT()).jwt;
+  const [idCard, bookbank, companyCert, slip] = await Promise.all([
+    uploadOne(files.idCard,      jwt),
+    uploadOne(files.bookbank,    jwt),
+    uploadOne(files.companyCert, jwt),
+    uploadOne(files.slip,        jwt),
+  ]);
+  return { idCard, bookbank, companyCert, slip };
 }
