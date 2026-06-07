@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Databases, ID, Permission, Role, Query } from 'node-appwrite';
+import { Client, Account, Databases, DatabasesIndexType, ID, OrderBy, Permission, Role, Query } from 'node-appwrite';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'deals';
@@ -52,28 +52,28 @@ async function ensureCollection(databases: Databases) {
   await new Promise(r => setTimeout(r, 10000));
   // Create indexes for queryable fields
   const indexDefs = [
-    { key: 'idx_seller',    attrs: ['sellerId'],    orders: ['ASC']  },
-    { key: 'idx_buyer',     attrs: ['buyerId'],     orders: ['ASC']  },
-    { key: 'idx_middleman', attrs: ['middlemanId'], orders: ['ASC']  },
-    { key: 'idx_status',    attrs: ['status'],      orders: ['ASC']  },
-    { key: 'idx_created',   attrs: ['createdAt'],   orders: ['DESC'] },
+    { key: 'idx_seller',    attrs: ['sellerId'],    orders: [OrderBy.Asc]  },
+    { key: 'idx_buyer',     attrs: ['buyerId'],     orders: [OrderBy.Asc]  },
+    { key: 'idx_middleman', attrs: ['middlemanId'], orders: [OrderBy.Asc]  },
+    { key: 'idx_status',    attrs: ['status'],      orders: [OrderBy.Asc]  },
+    { key: 'idx_created',   attrs: ['createdAt'],   orders: [OrderBy.Desc] },
   ];
   await Promise.all(indexDefs.map(i =>
-    databases.createIndex(DB_ID, COL_ID, i.key, 'key', i.attrs, i.orders).catch(() => {})
+    databases.createIndex(DB_ID, COL_ID, i.key, DatabasesIndexType.Key, i.attrs, i.orders).catch(() => {})
   ));
 }
 
 // Ensure indexes exist on already-created collection (called on every query)
 async function ensureIndexes(databases: Databases) {
   const indexDefs = [
-    { key: 'idx_seller',    attrs: ['sellerId'],    orders: ['ASC']  },
-    { key: 'idx_buyer',     attrs: ['buyerId'],     orders: ['ASC']  },
-    { key: 'idx_middleman', attrs: ['middlemanId'], orders: ['ASC']  },
-    { key: 'idx_status',    attrs: ['status'],      orders: ['ASC']  },
-    { key: 'idx_created',   attrs: ['createdAt'],   orders: ['DESC'] },
+    { key: 'idx_seller',    attrs: ['sellerId'],    orders: [OrderBy.Asc]  },
+    { key: 'idx_buyer',     attrs: ['buyerId'],     orders: [OrderBy.Asc]  },
+    { key: 'idx_middleman', attrs: ['middlemanId'], orders: [OrderBy.Asc]  },
+    { key: 'idx_status',    attrs: ['status'],      orders: [OrderBy.Asc]  },
+    { key: 'idx_created',   attrs: ['createdAt'],   orders: [OrderBy.Desc] },
   ];
   await Promise.all(indexDefs.map(i =>
-    databases.createIndex(DB_ID, COL_ID, i.key, 'key', i.attrs, i.orders).catch(() => {})
+    databases.createIndex(DB_ID, COL_ID, i.key, DatabasesIndexType.Key, i.attrs, i.orders).catch(() => {})
   ));
 }
 
