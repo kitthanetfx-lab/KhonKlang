@@ -15,24 +15,25 @@ function JitsiMeet({ roomName, displayName }: { roomName: string; displayName: s
 
     function initJitsi() {
       if (!containerRef.current) return;
+      const h = Math.max(window.innerHeight - 120, 400);
       // @ts-ignore
       api = new window.JitsiMeetExternalAPI('meet.jit.si', {
         roomName,
         parentNode: containerRef.current,
         width: '100%',
-        height: 300,
+        height: h,
         userInfo: { displayName },
         configOverwrite: {
           startWithAudioMuted: false,
           startWithVideoMuted: false,
-          disableDeepLinking: true,       // ไม่เปิด app ภายนอก
-          prejoinPageEnabled: false,       // ข้ามหน้า pre-join
+          disableDeepLinking: true,
+          prejoinPageEnabled: false,
         },
         interfaceConfigOverwrite: {
           SHOW_JITSI_WATERMARK: false,
           SHOW_BRAND_WATERMARK: false,
-          MOBILE_APP_PROMO: false,         // ไม่โชว์ปุ่ม "เปิดใน app"
-          TOOLBAR_BUTTONS: ['microphone','camera','hangup','chat','tileview'],
+          MOBILE_APP_PROMO: false,
+          TOOLBAR_BUTTONS: ['microphone','camera','hangup','tileview','raisehand'],
         },
       });
       apiRef.current = api;
@@ -501,17 +502,23 @@ export default function DealRoom() {
         >📹 Video</button>
       </div>
 
-      {/* Video call panel */}
-      {showJitsi&&(
-        <div className="bg-[#0d1117] border-b border-white/10">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-            <span className="text-xs text-gray-400 font-medium">📹 วิดีโอคอล — ห้อง {jitsiRoom}</span>
-            <button onClick={()=>setShowJitsi(false)} className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded bg-white/10">✕ ปิด</button>
+      {/* ═══ VIDEO MODE: แทนที่ทุกอย่างด้วย Jitsi ═══ */}
+      {showJitsi ? (
+        <div className="flex-1 flex flex-col bg-[#0d1117]" style={{minHeight:0}}>
+          {/* Video toolbar */}
+          <div className="flex items-center justify-between px-3 py-2 bg-black/40 border-b border-white/10 flex-shrink-0">
+            <span className="text-xs text-gray-400">📹 วิดีโอคอล กำลังดำเนินการ...</span>
+            <button onClick={()=>setShowJitsi(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition"
+            >✕ วางสาย</button>
           </div>
-          <JitsiMeet roomName={jitsiRoom} displayName={myName || 'ผู้ใช้'} />
+          {/* Jitsi fills remaining space */}
+          <div className="flex-1" style={{minHeight:'60vh'}}>
+            <JitsiMeet roomName={jitsiRoom} displayName={myName || 'ผู้ใช้'} />
+          </div>
         </div>
-      )}
-
+      ) : (
+        <>
       {/* Progress */}
       <div className="px-4 pt-3 pb-1">
         <div className="flex justify-between text-xs text-gray-400 mb-1">
@@ -578,94 +585,4 @@ export default function DealRoom() {
               </div>
             )}
             {deal.trackingToBuyer&&(
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-sm">
-                <p className="text-gray-400 text-xs mb-1">เลขพัสดุ คนกลาง→ผู้ซื้อ</p>
-                <p className="font-mono text-white">{deal.trackingToBuyer}</p>
-              </div>
-            )}
-
-            {/* Completed */}
-            {deal.status==='completed'&&(
-              <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-6 text-center">
-                <p className="text-3xl mb-2">🎉</p>
-                <p className="text-green-300 font-bold text-lg">ดีลเสร็จสมบูรณ์!</p>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">การกระทำ</p>
-              <ActionPanel/>
-            </div>
-          </div>
-        )}
-
-        {/* Chat tab */}
-        {tab==='chat'&&(
-          <div className="flex flex-col" style={{minHeight:'60vh'}}>
-            <div className="flex-1 space-y-2 pb-4">
-              {msgs.length===0&&<p className="text-center text-gray-500 py-8 text-sm">ยังไม่มีข้อความ</p>}
-              {msgs.map(m=>{
-                if(m.role==='system') return(
-                  <div key={m.$id} className="text-center">
-                    <span className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full">{m.content}</span>
-                  </div>
-                );
-                const isMe=m.senderId===myId;
-                return(
-                  <div key={m.$id} className={`flex ${isMe?'justify-end':'justify-start'}`}>
-                    <div className={`max-w-[75%] flex flex-col ${isMe?'items-end':'items-start'}`}>
-                      {!isMe&&<span className="text-xs text-gray-500 px-1 mb-0.5">{m.senderName}</span>}
-                      <div className={`rounded-2xl px-4 py-2.5 ${isMe?'bg-blue-600 rounded-br-sm':'bg-white/10 rounded-bl-sm'}`}>
-                        {m.type==='image'?(
-                          <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer">
-                            <img src={fileUrl(m.fileId)} alt={m.fileName} className="max-w-[200px] rounded-lg object-contain"/>
-                          </a>
-                        ):m.type==='file'?(
-                          <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer" className="underline text-sm">📎 {m.fileName}</a>
-                        ):(<p className="text-sm">{m.content}</p>)}
-                      </div>
-                      <span className="text-[10px] text-gray-600 px-1 mt-0.5">{new Date(m.createdAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</span>
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={chatBottomRef}/>
-            </div>
-            <div className="sticky bottom-0 bg-[#0a0f1e] pt-2 pb-4">
-              {sending&&<p className="text-xs text-gray-500 text-center mb-1">กำลังส่ง...</p>}
-              <div className="flex gap-2 items-end">
-                {/* Image picker */}
-                <button onClick={()=>fileInputRef.current?.click()} disabled={sending}
-                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40 text-gray-300 flex-shrink-0 text-lg leading-none"
-                  title="แนบรูป/ไฟล์"
-                >🖼️</button>
-                <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden"
-                  onChange={async e=>{
-                    const f=e.target.files?.[0];
-                    e.target.value='';
-                    if(!f) return;
-                    if(f.size > 10*1024*1024){alert('ไฟล์ใหญ่เกิน 10MB'); return;}
-                    await uploadFile(f);
-                  }}
-                />
-                <textarea value={chatInput} onChange={e=>setChatInput(e.target.value)}
-                  onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(chatInput.trim())sendMsg(chatInput);}}}
-                  placeholder="พิมพ์ข้อความ..."
-                  rows={1}
-                  className="flex-1 bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none text-sm"
-                />
-                <button onClick={()=>{if(chatInput.trim())sendMsg(chatInput);}} disabled={!chatInput.trim()||sending}
-                  className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 flex-shrink-0"
-                >➤</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Evidence tab */}
-        {tab==='evidence'&&<EvidencePanel/>}
-      </div>
-    </div>
-  );
-}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-sm"

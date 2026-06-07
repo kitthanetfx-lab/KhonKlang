@@ -50,6 +50,31 @@ async function ensureCollection(databases: Databases) {
     databases.createStringAttribute(DB_ID, COL_ID, 'createdAt',           30, false, ''),
   ]);
   await new Promise(r => setTimeout(r, 10000));
+  // Create indexes for queryable fields
+  const indexDefs = [
+    { key: 'idx_seller',    attrs: ['sellerId'],    orders: ['ASC']  },
+    { key: 'idx_buyer',     attrs: ['buyerId'],     orders: ['ASC']  },
+    { key: 'idx_middleman', attrs: ['middlemanId'], orders: ['ASC']  },
+    { key: 'idx_status',    attrs: ['status'],      orders: ['ASC']  },
+    { key: 'idx_created',   attrs: ['createdAt'],   orders: ['DESC'] },
+  ];
+  await Promise.all(indexDefs.map(i =>
+    databases.createIndex(DB_ID, COL_ID, i.key, 'key', i.attrs, i.orders).catch(() => {})
+  ));
+}
+
+// Ensure indexes exist on already-created collection (called on every query)
+async function ensureIndexes(databases: Databases) {
+  const indexDefs = [
+    { key: 'idx_seller',    attrs: ['sellerId'],    orders: ['ASC']  },
+    { key: 'idx_buyer',     attrs: ['buyerId'],     orders: ['ASC']  },
+    { key: 'idx_middleman', attrs: ['middlemanId'], orders: ['ASC']  },
+    { key: 'idx_status',    attrs: ['status'],      orders: ['ASC']  },
+    { key: 'idx_created',   attrs: ['createdAt'],   orders: ['DESC'] },
+  ];
+  await Promise.all(indexDefs.map(i =>
+    databases.createIndex(DB_ID, COL_ID, i.key, 'key', i.attrs, i.orders).catch(() => {})
+  ));
 }
 
 function getUser(jwt: string) {
@@ -67,6 +92,8 @@ export async function GET(req: NextRequest) {
     const currentUser = await getUser(jwt);
     const role = req.nextUrl.searchParams.get('role') || 'seller';
     const databases = getAdminClient();
+    // Ensure indexes exist (fast no-op if already created)
+    await ensureIndexes(databases);
 
     if (role === 'middleman') {
       // New flow: buyers assign middlemen — middleman sees only their assigned deals
@@ -103,24 +130,4 @@ export async function POST(req: NextRequest) {
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
 
     const isBuyerCreator = creatorRole === 'buyer';
-    const databases = getAdminClient();
-    await ensureCollection(databases);
-    const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
-      sellerId:    isBuyerCreator ? '' : currentUser.$id,
-      sellerName:  isBuyerCreator ? '' : (currentUser.name || ''),
-      buyerId:     isBuyerCreator ? currentUser.$id : '',
-      buyerName:   isBuyerCreator ? (currentUser.name || '') : '',
-      middlemanId: '', middlemanName: '',
-      title, description: description || '', price: Number(price), category: category || '',
-      status: isBuyerCreator ? 'waiting_seller' : 'posted',
-      sellerAcceptedTerms: false, middlemanAcceptedTerms: false, buyerAcceptedTerms: false,
-      middlemanConfirmedPayment: false, buyerConfirmedCheck: false,
-      paymentSlipFileId: '', evidenceData: '[]',
-      trackingToMiddleman: '', trackingToBuyer: '', rejectReason: '',
-      createdAt: new Date().toISOString(),
-    });
-    return NextResponse.json({ deal: doc });
-  } catch (err: unknown) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-}
+    const databases
