@@ -77,6 +77,7 @@ interface Msg {
 interface Middleman {
   userId: string; name: string; tier: string;
   workProvince: string; phone: string;
+  categories?: string;
   reviewScore: number; reviewCount: number;
 }
 
