@@ -46,4 +46,38 @@ function LineCompleteInner() {
       setStatus('กำลังโหลดข้อมูล...');
 
       try {
-        const u = await account.get(
+        const u = await account.get();
+        setStatus('เข้าสู่ระบบสำเร็จ...');
+        const prefs = u.prefs as Record<string, string>;
+        const dest = prefs?.firstName
+          ? (returnTo.startsWith('/') ? returnTo : '/')
+          : '/register';
+        router.replace(dest);
+      } catch (err: any) {
+        console.error('LINE complete error:', err);
+        router.replace(`/login?error=line_failed&msg=${encodeURIComponent(err?.message || 'session_invalid')}`);
+      }
+    }
+
+    finish();
+  }, [router, returnTo]);
+
+  return (
+    <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center gap-4 text-white">
+      <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+      <p className="text-gray-300 text-sm">{status}</p>
+    </div>
+  );
+}
+
+export default function LineComplete() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <LineCompleteInner />
+    </Suspense>
+  );
+}
