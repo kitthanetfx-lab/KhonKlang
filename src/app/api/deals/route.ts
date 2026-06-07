@@ -39,6 +39,10 @@ async function ensureCollection(databases: Databases) {
     databases.createStringAttribute(DB_ID, COL_ID, 'description',   1000, false, ''),
     databases.createIntegerAttribute(DB_ID, COL_ID, 'price', true, 0, 999999999),
     databases.createStringAttribute(DB_ID, COL_ID, 'category',      100, false, ''),
+    databases.createStringAttribute(DB_ID, COL_ID, 'condition',      50, false, ''),
+    databases.createStringAttribute(DB_ID, COL_ID, 'location',      100, false, ''),
+    databases.createStringAttribute(DB_ID, COL_ID, 'sellingMode',    50, false, 'normal'),
+    databases.createStringAttribute(DB_ID, COL_ID, 'imageFileIds',  2000, false, '[]'),
     databases.createStringAttribute(DB_ID, COL_ID, 'status',         50, false, 'posted'),
     databases.createBooleanAttribute(DB_ID, COL_ID, 'sellerAcceptedTerms',       false, false),
     databases.createBooleanAttribute(DB_ID, COL_ID, 'middlemanAcceptedTerms',    false, false),
@@ -60,6 +64,17 @@ async function ensureCollection(databases: Databases) {
     { key: 'idx_status',    attrs: ['status'],      orders: [OrderBy.Asc]  },
     { key: 'idx_created',   attrs: ['createdAt'],   orders: [OrderBy.Desc] },
   ].map(i => databases.createIndex(DB_ID, COL_ID, i.key, DatabasesIndexType.Key, i.attrs, i.orders).catch(() => {})));
+}
+
+/** Add new attributes to existing collection (idempotent — ignores errors if attr already exists) */
+async function ensureExtraAttributes(databases: Databases) {
+  const extras: Promise<unknown>[] = [
+    databases.createStringAttribute(DB_ID, COL_ID, 'condition',    50,   false, '').catch(() => {}),
+    databases.createStringAttribute(DB_ID, COL_ID, 'location',     100,  false, '').catch(() => {}),
+    databases.createStringAttribute(DB_ID, COL_ID, 'sellingMode',  50,   false, 'normal').catch(() => {}),
+    databases.createStringAttribute(DB_ID, COL_ID, 'imageFileIds', 2000, false, '[]').catch(() => {}),
+  ];
+  await Promise.all(extras);
 }
 
 async function ensureIndexes(databases: Databases) {
@@ -135,18 +150,25 @@ export async function POST(req: NextRequest) {
     if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const currentUser = await getUser(jwt);
     const body = await req.json();
-    const { title, description, price, category, creatorRole } = body;
+    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isBuyer = creatorRole === 'buyer';
     const databases = getAdminClient();
     await ensureCollection(databases);
+    // Ensure new attributes exist on already-created collections
+    await ensureExtraAttributes(databases);
     const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
       sellerId: isBuyer ? '' : currentUser.$id,
       sellerName: isBuyer ? '' : (currentUser.name || ''),
       buyerId: isBuyer ? currentUser.$id : '',
       buyerName: isBuyer ? (currentUser.name || '') : '',
       middlemanId: '', middlemanName: '',
-      title, description: description || '', price: Number(price), category: category || '',
+      title, description: description || '', price: Number(price),
+      category: category || '',
+      condition: condition || '',
+      location: location || '',
+      sellingMode: sellingMode || 'normal',
+      imageFileIds: JSON.stringify(imageFileIds || []),
       status: isBuyer ? 'waiting_seller' : 'posted',
       sellerAcceptedTerms: false, middlemanAcceptedTerms: false, buyerAcceptedTerms: false,
       middlemanConfirmedPayment: false, buyerConfirmedCheck: false,
