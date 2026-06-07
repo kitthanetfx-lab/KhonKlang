@@ -13,10 +13,16 @@ function getStorage() {
 }
 
 async function ensureBucket(storage: Storage) {
-  try { await storage.getBucket(BUCKET_ID); }
-  catch {
+  try {
+    await storage.getBucket(BUCKET_ID);
+    // Update to public read so browser can display images without auth
+    await storage.updateBucket(BUCKET_ID, 'Deal Files', [
+      Permission.read(Role.any()),      // public read — needed for <img src> in browser
+      Permission.create(Role.users()),
+    ]).catch(() => {}); // ignore if already correct
+  } catch {
     await storage.createBucket(BUCKET_ID, 'Deal Files', [
-      Permission.read(Role.users()),
+      Permission.read(Role.any()),
       Permission.create(Role.users()),
     ], false, undefined, undefined, ['jpg','jpeg','png','gif','webp','mp4','mov','avi','pdf']);
   }
@@ -39,11 +45,4 @@ export async function POST(req: NextRequest) {
 
     const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!;
     const project  = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
-    const viewUrl  = `${endpoint}/storage/buckets/${BUCKET_ID}/files/${result.$id}/view?project=${project}`;
-
-    return NextResponse.json({ fileId: result.$id, fileName: file.name, url: viewUrl, mimeType: file.type });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-}
+    const viewUrl  = `${endpoint}/storage/buckets/${BUCKET_ID}/file

@@ -4,6 +4,59 @@ import { account } from '@/lib/appwrite';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 
+// ─── Jitsi Meet component using External API (no app redirect) ──────────────
+function JitsiMeet({ roomName, displayName }: { roomName: string; displayName: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const apiRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || apiRef.current) return;
+    let api: any;
+
+    function initJitsi() {
+      if (!containerRef.current) return;
+      // @ts-ignore
+      api = new window.JitsiMeetExternalAPI('meet.jit.si', {
+        roomName,
+        parentNode: containerRef.current,
+        width: '100%',
+        height: 300,
+        userInfo: { displayName },
+        configOverwrite: {
+          startWithAudioMuted: false,
+          startWithVideoMuted: false,
+          disableDeepLinking: true,       // ไม่เปิด app ภายนอก
+          prejoinPageEnabled: false,       // ข้ามหน้า pre-join
+        },
+        interfaceConfigOverwrite: {
+          SHOW_JITSI_WATERMARK: false,
+          SHOW_BRAND_WATERMARK: false,
+          MOBILE_APP_PROMO: false,         // ไม่โชว์ปุ่ม "เปิดใน app"
+          TOOLBAR_BUTTONS: ['microphone','camera','hangup','chat','tileview'],
+        },
+      });
+      apiRef.current = api;
+    }
+
+    if ((window as any).JitsiMeetExternalAPI) {
+      initJitsi();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://meet.jit.si/external_api.js';
+      script.async = true;
+      script.onload = initJitsi;
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      try { apiRef.current?.dispose(); } catch {}
+      apiRef.current = null;
+    };
+  }, [roomName, displayName]);
+
+  return <div ref={containerRef} className="w-full rounded-b-xl overflow-hidden" />;
+}
+
 interface Deal {
   $id: string; sellerId: string; sellerName: string;
   middlemanId: string; middlemanName: string;
@@ -448,16 +501,14 @@ export default function DealRoom() {
         >📹 Video</button>
       </div>
 
-      {/* Jitsi */}
+      {/* Video call panel */}
       {showJitsi&&(
-        <div className="bg-black border-b border-white/10">
-          <div className="flex justify-end px-3 py-1">
-            <button onClick={()=>setShowJitsi(false)} className="text-gray-400 text-sm">✕</button>
+        <div className="bg-[#0d1117] border-b border-white/10">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
+            <span className="text-xs text-gray-400 font-medium">📹 วิดีโอคอล — ห้อง {jitsiRoom}</span>
+            <button onClick={()=>setShowJitsi(false)} className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded bg-white/10">✕ ปิด</button>
           </div>
-          <iframe src={`https://meet.jit.si/${jitsiRoom}`}
-            allow="camera; microphone; fullscreen; display-capture"
-            className="w-full" style={{height:'320px',border:'none'}}
-          />
+          <JitsiMeet roomName={jitsiRoom} displayName={myName || 'ผู้ใช้'} />
         </div>
       )}
 
@@ -534,78 +585,3 @@ export default function DealRoom() {
             )}
 
             {/* Completed */}
-            {deal.status==='completed'&&(
-              <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-6 text-center">
-                <p className="text-3xl mb-2">🎉</p>
-                <p className="text-green-300 font-bold text-lg">ดีลเสร็จสมบูรณ์!</p>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">การกระทำ</p>
-              <ActionPanel/>
-            </div>
-          </div>
-        )}
-
-        {/* Chat tab */}
-        {tab==='chat'&&(
-          <div className="flex flex-col" style={{minHeight:'60vh'}}>
-            <div className="flex-1 space-y-2 pb-4">
-              {msgs.length===0&&<p className="text-center text-gray-500 py-8 text-sm">ยังไม่มีข้อความ</p>}
-              {msgs.map(m=>{
-                if(m.role==='system') return(
-                  <div key={m.$id} className="text-center">
-                    <span className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full">{m.content}</span>
-                  </div>
-                );
-                const isMe=m.senderId===myId;
-                return(
-                  <div key={m.$id} className={`flex ${isMe?'justify-end':'justify-start'}`}>
-                    <div className={`max-w-[75%] flex flex-col ${isMe?'items-end':'items-start'}`}>
-                      {!isMe&&<span className="text-xs text-gray-500 px-1 mb-0.5">{m.senderName}</span>}
-                      <div className={`rounded-2xl px-4 py-2.5 ${isMe?'bg-blue-600 rounded-br-sm':'bg-white/10 rounded-bl-sm'}`}>
-                        {m.type==='image'?(
-                          <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer">
-                            <img src={fileUrl(m.fileId)} alt={m.fileName} className="max-w-[200px] rounded-lg object-contain"/>
-                          </a>
-                        ):m.type==='file'?(
-                          <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer" className="underline text-sm">📎 {m.fileName}</a>
-                        ):(<p className="text-sm">{m.content}</p>)}
-                      </div>
-                      <span className="text-[10px] text-gray-600 px-1 mt-0.5">{new Date(m.createdAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</span>
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={chatBottomRef}/>
-            </div>
-            <div className="sticky bottom-0 bg-[#0a0f1e] pt-2 pb-4">
-              <div className="flex gap-2 items-end">
-                <button onClick={()=>fileInputRef.current?.click()}
-                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 flex-shrink-0"
-                >📎</button>
-                <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf" className="hidden"
-                  onChange={e=>{const f=e.target.files?.[0];if(f)uploadFile(f);e.target.value='';}}
-                />
-                <textarea value={chatInput} onChange={e=>setChatInput(e.target.value)}
-                  onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg(chatInput);}}}
-                  placeholder="พิมพ์ข้อความ... (Enter ส่ง)"
-                  rows={1}
-                  className="flex-1 bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none text-sm"
-                />
-                <button onClick={()=>sendMsg(chatInput)} disabled={!chatInput.trim()||sending}
-                  className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 flex-shrink-0"
-                >➤</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Evidence tab */}
-        {tab==='evidence'&&<EvidencePanel/>}
-      </div>
-    </div>
-  );
-}
