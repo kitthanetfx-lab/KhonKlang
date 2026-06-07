@@ -135,4 +135,77 @@ export async function POST(req: NextRequest) {
 
     const { firstName, lastName, email, phone, address, role } = await req.json();
     if (!firstName || !lastName || !phone) {
-      re
+      return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, { status: 400 });
+    }
+
+    const { users, databases } = getAdminClient();
+    await ensureCollection(databases);
+
+    const displayName = `${firstName} ${lastName}`.trim();
+    const prefs: Record<string, string> = {
+      firstName, lastName,
+      email:   email   || '',
+      phone,
+      address: address || '',
+      role:    role    || 'user',
+      displayName,
+    };
+
+    let linked = false;
+    try {
+      // เช็ค phone ก่อน (เดิม)
+      const byPhone = await databases.listDocuments(DB_ID, COL_ID, [Query.equal('phone', phone)]);
+      let existingDoc = byPhone.documents.find(d => d.userId !== userId) || null;
+
+      // เช็ค email ถ้าไม่เจอ phone
+      if (!existingDoc && email && !email.includes('@line.khonklang.app')) {
+        const byEmail = await databases.listDocuments(DB_ID, COL_ID, [Query.equal('email', email)]);
+        existingDoc = byEmail.documents.find(d => d.userId !== userId) || null;
+      }
+
+      // เช็ค displayName ถ้ายังไม่เจอ
+      if (!existingDoc) {
+        const byName = await databases.listDocuments(DB_ID, COL_ID, [Query.equal('displayName', displayName)]);
+        existingDoc = byName.documents.find(d => d.userId !== userId) || null;
+      }
+
+      if (existingDoc) {
+        prefs.firstName   = existingDoc.firstName   || firstName;
+        prefs.lastName    = existingDoc.lastName    || lastName;
+        prefs.email       = existingDoc.email       || email || '';
+        prefs.address     = existingDoc.address     || address || '';
+        prefs.role        = existingDoc.role        || role || 'user';
+        prefs.displayName = existingDoc.displayName || displayName;
+        prefs.linkedTo    = existingDoc.userId;
+
+        const linkedAccounts: string[] = existingDoc.linkedAccounts
+          ? JSON.parse(existingDoc.linkedAccounts) : [existingDoc.userId];
+        if (!linkedAccounts.includes(userId)) linkedAccounts.push(userId);
+        await databases.updateDocument(DB_ID, COL_ID, existingDoc.$id, {
+          linkedAccounts: JSON.stringify(linkedAccounts),
+        });
+        linked = true;
+      } else {
+        await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
+          userId, phone,
+          email:   email   || '',
+          firstName, lastName,
+          address: address || '',
+          role:    role    || 'user',
+          displayName,
+        });
+      }
+    } catch (dbErr) {
+      console.error('DB error (non-fatal):', dbErr);
+    }
+
+    await users.updatePrefs(userId, prefs);
+    await users.updateName(userId, displayName);
+
+    return NextResponse.json({ success: true, linked });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Register POST error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}

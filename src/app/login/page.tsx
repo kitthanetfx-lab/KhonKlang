@@ -94,4 +94,15 @@ function LoginForm() {
           </div>
 
         </div>
- 
+      </div>
+    </main>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}

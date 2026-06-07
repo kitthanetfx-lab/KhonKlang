@@ -90,4 +90,6 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('LINE login error:', error);
     const msg = encodeURIComponent(error?.message || 'unknown');
-  
+    return NextResponse.redirect(`${appUrl}/login?error=line_failed&msg=${msg}`);
+  }
+}

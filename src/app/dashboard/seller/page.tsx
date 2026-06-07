@@ -295,4 +295,18 @@ export default function SellerDashboard() {
               <button
                 onClick={handlePost}
                 disabled={posting || postDone}
-                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold transition"
+              >
+                {posting ? 'กำลังลงประกาศ...' : 'ลงประกาศ'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {tab === 'history' && (historyDeals.length === 0 ? (
+          <p className="text-center text-gray-500 py-16">ยังไม่มีประวัติการขาย</p>
+        ) : historyDeals.map(d => <DealCard key={d.$id} deal={d} />))}
+      </div>
+    </div>
+  );
+}

@@ -39,3 +39,9 @@ export function useUser() {
 
   const logout = async () => {
     await account.deleteSession('current');
+    setUser(null);
+    window.location.href = '/';
+  };
+
+  return { user, loading, setUser, logout };
+}

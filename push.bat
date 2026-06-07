@@ -6,9 +6,16 @@ del /f ".git\refs\heads\main.lock" 2>nul
 echo Fixing git config...
 git config user.name "kitthanet"
 git config user.email "kitthanetfx@gmail.com"
-echo Pushing existing commits...
-git push
+echo Current commit:
+git log --oneline -3
+echo.
+echo Pushing to GitHub...
+git push origin main
 if errorlevel 1 (
-  echo Push failed - trying add+commit first...
-  git add -A
-  git commit -m "fix: login flow + public 
+  echo.
+  echo Push failed. Trying force push...
+  git push origin main --force-with-lease
+)
+echo.
+echo Done!
+pause
