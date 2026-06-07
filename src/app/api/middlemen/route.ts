@@ -11,7 +11,6 @@ function getAdmin() {
   return { db: new Databases(c), users: new Users(c) };
 }
 
-// GET /api/middlemen — list approved middlemen for buyer to select
 export async function GET(req: NextRequest) {
   try {
     const jwt = req.headers.get('x-session-jwt');
@@ -22,29 +21,36 @@ export async function GET(req: NextRequest) {
       .setJWT(jwt);
     await new Account(c).get();
 
-    const { db, users } = getAdmin();
-    const docs = await db.listDocuments(DB_ID, 'middleman_applications', [
-      Query.equal('status', 'approved'),
-      Query.limit(100),
-    ]).then(r => r.documents).catch(() => []);
+    const { searchParams } = req.nextUrl;
+    const filterProvince = searchParams.get('province') || '';
+    const filterTier     = searchParams.get('tier')     || '';
 
-    // For each approved application, fetch the user's public info
+    const { db, users } = getAdmin();
+    const queries: string[] = [Query.equal('status', 'approved'), Query.limit(200)];
+    if (filterProvince) queries.push(Query.equal('workProvince', filterProvince));
+    if (filterTier)     queries.push(Query.equal('tier', filterTier));
+
+    const docs = await db.listDocuments(DB_ID, 'middleman_applications', queries)
+      .then(r => r.documents).catch(() => []);
+
     const middlemen = await Promise.all(docs.map(async doc => {
-      let phone = '';
-      let displayName = doc.fullNameId || '';
+      let phone = '', displayName = (doc.fullNameId as string) || '';
+      let reviewScore = 0, reviewCount = 0;
       try {
-        const u = await users.get(doc.userId);
-        const prefs = (u.prefs || {}) as Record<string, string>;
-        phone = prefs.phone || '';
-        displayName = prefs.displayName || u.name || displayName;
-      } catch { /* ignore */ }
+        const u = await users.get(doc.userId as string);
+        const p = ((u.prefs || {}) as Record<string, string>);
+        phone       = p.phone       || '';
+        displayName = p.displayName || u.name || displayName;
+        reviewScore = parseFloat(p.reviewScore || '0') || 0;
+        reviewCount = parseInt(p.reviewCount   || '0') || 0;
+      } catch {}
       return {
-        userId:      doc.userId,
-        name:        displayName,
-        tier:        doc.tier        || 'Bronze',
-        categories:  doc.categories  || '',
-        workProvince: doc.workProvince || '',
-        phone,
+        userId:       doc.userId       as string,
+        name:         displayName,
+        tier:         (doc.tier        as string) || 'Bronze',
+        categories:   (doc.categories  as string) || '',
+        workProvince: (doc.workProvince as string) || '',
+        phone, reviewScore, reviewCount,
       };
     }));
 

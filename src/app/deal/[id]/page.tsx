@@ -74,7 +74,11 @@ interface Msg {
   role: string; type: string; content: string;
   fileId: string; fileName: string; createdAt: string;
 }
-interface Middleman { userId: string; name: string; tier: string; workProvince: string; phone: string; }
+interface Middleman {
+  userId: string; name: string; tier: string;
+  workProvince: string; phone: string;
+  reviewScore: number; reviewCount: number;
+}
 
 const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
 const PROJECT  = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
@@ -111,9 +115,12 @@ export default function DealRoom() {
   const [showJitsi, setShowJitsi] = useState(false);
   const [tab, setTab]             = useState<'steps'|'chat'|'evidence'>('steps');
   const [evidenceType, setEvidenceType] = useState('packing');
-  const [copied, setCopied]       = useState(false);
-  const [jwt, setJwt]             = useState('');
-  const [dealError, setDealError] = useState('');
+  const [copied, setCopied]           = useState(false);
+  const [jwt, setJwt]                 = useState('');
+  const [dealError, setDealError]     = useState('');
+  const [showSelectMM, setShowSelectMM] = useState(false);
+  const [mmFilter, setMmFilter]       = useState({ province: '', tier: '', minRating: 0 });
+  const [mmLoading, setMmLoading]     = useState(false);
   const chatBottomRef  = useRef<HTMLDivElement>(null);
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const evidInputRef   = useRef<HTMLInputElement>(null);
@@ -165,13 +172,26 @@ export default function DealRoom() {
     else                                setMyRole('guest');
   }, [deal, myId]);
 
-  // Load middlemen list when buyer needs to select
+  // Load middlemen list when buyer needs to select (or change)
+  const loadMiddlemen = useCallback(async (j: string, f = mmFilter) => {
+    setMmLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (f.province) params.set('province', f.province);
+      if (f.tier)     params.set('tier', f.tier);
+      const r = await fetch(`/api/middlemen?${params}`, { headers: { 'x-session-jwt': j } });
+      const d = await r.json();
+      setMiddlemen(d.middlemen || []);
+    } catch {}
+    finally { setMmLoading(false); }
+  }, [mmFilter]);
+
   useEffect(() => {
-    if (myRole === 'buyer' && deal?.status === 'buyer_joined' && !deal.middlemanId && jwt) {
-      fetch('/api/middlemen', { headers: { 'x-session-jwt': jwt } })
-        .then(r => r.json()).then(d => setMiddlemen(d.middlemen || [])).catch(() => {});
-    }
-  }, [myRole, deal, jwt]);
+    const needsSelect = myRole === 'buyer' && (
+      (deal?.status === 'buyer_joined' && !deal.middlemanId) || showSelectMM
+    );
+    if (needsSelect && jwt) loadMiddlemen(jwt);
+  }, [myRole, deal?.status, deal?.middlemanId, jwt, showSelectMM]); // eslint-disable-line
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
 
@@ -351,31 +371,146 @@ export default function DealRoom() {
   }
 
   // ─── Middleman selection (buyer only, after buyer_joined) ─────────────────
-  if (myRole === 'buyer' && deal.status === 'buyer_joined' && !deal.middlemanId) {
+  const needsFirstSelect = myRole === 'buyer' && deal.status === 'buyer_joined' && !deal.middlemanId;
+  if (needsFirstSelect || showSelectMM) {
+    const TIERS = ['', 'Bronze', 'Silver', 'Gold', 'Platinum'];
+    const RATINGS = [0, 3, 4, 4.5];
+    const filtered = middlemen.filter(m =>
+      (mmFilter.minRating === 0 || m.reviewScore >= mmFilter.minRating)
+    );
+
+    function StarRating({ score, count }: { score: number; count: number }) {
+      if (count === 0) return <span className="text-xs text-gray-500">ยังไม่มีรีวิว</span>;
+      const full = Math.floor(score); const half = score - full >= 0.5;
+      return (
+        <span className="flex items-center gap-0.5 text-xs">
+          {[1,2,3,4,5].map(i => (
+            <span key={i} className={i <= full ? 'text-yellow-400' : (i === full+1 && half ? 'text-yellow-300' : 'text-gray-600')}>★</span>
+          ))}
+          <span className="ml-1 text-gray-400">{score.toFixed(1)} ({count})</span>
+        </span>
+      );
+    }
+
+    const TIER_BADGE: Record<string,string> = {
+      Bronze:   'bg-orange-500/20 text-orange-300 border-orange-400/30',
+      Silver:   'bg-slate-500/20 text-slate-200 border-slate-400/30',
+      Gold:     'bg-yellow-500/20 text-yellow-300 border-yellow-400/30',
+      Platinum: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30',
+    };
+
     return (
       <div className="min-h-screen bg-[#0a0f1e] text-white flex flex-col">
-        <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
-          <button onClick={() => router.back()} className="text-gray-400 hover:text-white">←</button>
-          <h1 className="text-xl font-bold">เลือกคนกลาง</h1>
+        {/* Header */}
+        <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
+          <button onClick={() => {
+            if (showSelectMM) setShowSelectMM(false);
+            else router.back();
+          }} className="text-gray-400 hover:text-white">←</button>
+          <div className="flex-1">
+            <h1 className="text-lg font-bold">{showSelectMM ? 'เลือกคนกลางใหม่' : 'เลือกคนกลาง'}</h1>
+            <p className="text-xs text-gray-400">{deal.title} • {deal.price.toLocaleString()} ฿</p>
+          </div>
+          <button onClick={() => { const j = jwt; if(j) loadMiddlemen(j, mmFilter); }}
+            disabled={mmLoading}
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs transition"
+          >{mmLoading ? '...' : '🔄'}</button>
         </div>
-        <div className="max-w-xl mx-auto px-4 py-6 space-y-4 w-full">
-          <p className="text-gray-400 text-sm">เลือกคนกลางที่คุณไว้วางใจเพื่อดูแลธุรกรรมนี้</p>
-          {middlemen.length === 0 ? (
-            <div className="text-center py-16 text-gray-500">
-              <p>กำลังโหลดรายชื่อคนกลาง...</p>
+
+        {/* Filters */}
+        <div className="px-4 pt-4 pb-3 max-w-xl mx-auto w-full space-y-3">
+          <p className="text-sm text-gray-400">เลือกคนกลางที่คุณไว้วางใจเพื่อดูแลธุรกรรมนี้</p>
+          <div className="grid grid-cols-3 gap-2">
+            {/* Province */}
+            <input
+              type="text"
+              value={mmFilter.province}
+              onChange={e => setMmFilter(f => ({ ...f, province: e.target.value }))}
+              placeholder="จังหวัด"
+              className="col-span-1 bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
+            {/* Tier */}
+            <select
+              value={mmFilter.tier}
+              onChange={e => setMmFilter(f => ({ ...f, tier: e.target.value }))}
+              className="col-span-1 bg-[#1a2035] border border-white/15 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+            >
+              {TIERS.map(t => <option key={t} value={t}>{t || 'ทุกเทียร์'}</option>)}
+            </select>
+            {/* Min rating */}
+            <select
+              value={mmFilter.minRating}
+              onChange={e => setMmFilter(f => ({ ...f, minRating: parseFloat(e.target.value) }))}
+              className="col-span-1 bg-[#1a2035] border border-white/15 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+            >
+              <option value={0}>ทุกคะแนน</option>
+              <option value={3}>★★★ ขึ้นไป</option>
+              <option value={4}>★★★★ ขึ้นไป</option>
+              <option value={4.5}>★★★★½ ขึ้นไป</option>
+            </select>
+          </div>
+          <button
+            onClick={() => { if(jwt) loadMiddlemen(jwt, mmFilter); }}
+            disabled={mmLoading}
+            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white text-sm font-medium transition"
+          >{mmLoading ? 'กำลังค้นหา...' : '🔍 ค้นหาคนกลาง'}</button>
+        </div>
+
+        {/* Results */}
+        <div className="flex-1 overflow-y-auto px-4 pb-8 max-w-xl mx-auto w-full space-y-4">
+          {mmLoading && (
+            <div className="flex justify-center py-12">
+              <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/>
             </div>
-          ) : middlemen.map(m => (
-            <div key={m.userId} className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
-              <div className="flex justify-between">
-                <div>
-                  <p className="font-semibold text-white">{m.name}</p>
-                  <p className="text-sm text-gray-400">Tier: {m.tier} {m.workProvince ? `• ${m.workProvince}` : ''}</p>
+          )}
+          {!mmLoading && filtered.length === 0 && (
+            <div className="text-center py-16 text-gray-500">
+              <p>ไม่พบคนกลางที่ตรงกับเงื่อนไข</p>
+              <p className="text-xs mt-2">ลองปรับตัวกรอง</p>
+            </div>
+          )}
+          {!mmLoading && filtered.map(m => (
+            <div key={m.userId} className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+              {/* Top row: name + tier badge */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="font-semibold text-white text-base">{m.name}</p>
+                  {m.workProvince && (
+                    <p className="text-xs text-gray-400">📍 {m.workProvince}</p>
+                  )}
+                  {m.categories && (
+                    <p className="text-xs text-gray-500">📦 {m.categories}</p>
+                  )}
                 </div>
+                <span className={`text-xs px-2.5 py-1 rounded-full border flex-shrink-0 font-medium ${TIER_BADGE[m.tier] || 'bg-gray-500/20 text-gray-300 border-gray-500/30'}`}>
+                  {m.tier}
+                </span>
               </div>
-              <button onClick={() => doAction('select_middleman', { middlemanId: m.userId, middlemanName: m.name })}
+
+              {/* Rating */}
+              <StarRating score={m.reviewScore} count={m.reviewCount} />
+
+              {/* Phone */}
+              {m.phone ? (
+                <div className="flex items-center justify-between bg-green-900/20 border border-green-500/20 rounded-xl px-4 py-3">
+                  <span className="text-sm text-gray-300">📞 เบอร์โทร</span>
+                  <a href={`tel:${m.phone}`}
+                    className="text-sm font-semibold text-green-400 hover:text-green-300 transition"
+                  >{m.phone}</a>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-600 text-center">ไม่ได้ระบุเบอร์โทร</p>
+              )}
+
+              {/* Select button */}
+              <button
+                onClick={() => {
+                  doAction('select_middleman', { middlemanId: m.userId, middlemanName: m.name });
+                  setShowSelectMM(false);
+                }}
                 disabled={acting}
-                className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-medium transition"
-              >{acting ? '...' : 'เลือกคนกลางนี้'}</button>
+                className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-semibold transition"
+              >{acting ? '...' : '✅ เลือกคนกลางนี้'}</button>
             </div>
           ))}
         </div>
@@ -414,6 +549,10 @@ export default function DealRoom() {
       btns.push({ label:'🚚 จัดส่งให้ผู้ซื้อแล้ว', cls:BLU, fn:() => { if(trackingInput) doAction('middleman_ship_to_buyer',{trackingNumber:trackingInput}); else alert('กรอกเลขพัสดุ'); }});
     if (s==='shipped_to_buyer' && myRole==='buyer')
       btns.push({ label:'🎉 ได้รับสินค้าแล้ว — ดีลเสร็จสมบูรณ์', cls:GRN, fn:() => doAction('buyer_received') });
+    // Buyer can change middleman before payment is uploaded
+    if (myRole==='buyer' && deal!.middlemanId && ['terms_pending','payment_pending'].includes(s))
+      btns.push({ label:'🔄 เลือกคนกลางใหม่', cls:'bg-yellow-600 hover:bg-yellow-500', fn:() => setShowSelectMM(true) });
+
     if (!isFinished && myRole!=='guest')
       btns.push({ label:'❌ ยกเลิก', cls:RED, fn:() => { const r=prompt('เหตุผล'); doAction('cancel',{reason:r||''}); }});
 
@@ -502,17 +641,15 @@ export default function DealRoom() {
         >📹 Video</button>
       </div>
 
-      {/* ═══ VIDEO MODE: แทนที่ทุกอย่างด้วย Jitsi ═══ */}
+      {/* ═══ VIDEO MODE ═══ */}
       {showJitsi ? (
         <div className="flex-1 flex flex-col bg-[#0d1117]" style={{minHeight:0}}>
-          {/* Video toolbar */}
           <div className="flex items-center justify-between px-3 py-2 bg-black/40 border-b border-white/10 flex-shrink-0">
             <span className="text-xs text-gray-400">📹 วิดีโอคอล กำลังดำเนินการ...</span>
             <button onClick={()=>setShowJitsi(false)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition"
             >✕ วางสาย</button>
           </div>
-          {/* Jitsi fills remaining space */}
           <div className="flex-1" style={{minHeight:'60vh'}}>
             <JitsiMeet roomName={jitsiRoom} displayName={myName || 'ผู้ใช้'} />
           </div>
@@ -577,7 +714,7 @@ export default function DealRoom() {
               </div>
             )}
 
-            {/* Tracking numbers */}
+            {/* Tracking */}
             {deal.trackingToMiddleman&&(
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-sm">
                 <p className="text-gray-400 text-xs mb-1">เลขพัสดุ ผู้ขาย→คนกลาง</p>
@@ -642,17 +779,14 @@ export default function DealRoom() {
             <div className="sticky bottom-0 bg-[#0a0f1e] pt-2 pb-4">
               {sending&&<p className="text-xs text-gray-500 text-center mb-1">กำลังส่ง...</p>}
               <div className="flex gap-2 items-end">
-                {/* Image picker */}
                 <button onClick={()=>fileInputRef.current?.click()} disabled={sending}
                   className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40 text-gray-300 flex-shrink-0 text-lg leading-none"
-                  title="แนบรูป/ไฟล์"
                 >🖼️</button>
                 <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden"
                   onChange={async e=>{
-                    const f=e.target.files?.[0];
-                    e.target.value='';
+                    const f=e.target.files?.[0]; e.target.value='';
                     if(!f) return;
-                    if(f.size > 10*1024*1024){alert('ไฟล์ใหญ่เกิน 10MB'); return;}
+                    if(f.size>10*1024*1024){alert('ไฟล์ใหญ่เกิน 10MB'); return;}
                     await uploadFile(f);
                   }}
                 />
