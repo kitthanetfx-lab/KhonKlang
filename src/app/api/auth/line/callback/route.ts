@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Users, Account } from 'node-appwrite';
+import { Client, Users } from 'node-appwrite';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
   const code    = request.nextUrl.searchParams.get('code');
   const state   = request.nextUrl.searchParams.get('state') || '';
-  const returnTo = (state && state !== 'line_login') ? decodeURIComponent(state) : '/register';
+  const returnTo = (state && state !== 'line_login') ? decodeURIComponent(state) : '/';
   const appUrl  = process.env.NEXT_PUBLIC_APP_URL!;
 
   if (!code) {
@@ -61,23 +61,24 @@ export async function GET(request: NextRequest) {
       await users.create(userId, email, undefined, password, profile.displayName);
     } catch (e: any) {
       if (e?.code !== 409) throw new Error(`Create user: ${e?.message}`);
-      if (!email.includes('@line.khonklang.app')) {
-        try { await users.updateEmail(userId, email); } catch { /* ignore */ }
-      }
     }
 
-    // 6. Create session via admin, then create a JWT for client-side use
+    // 6. Create session
     const session = await users.createSession(userId);
-
-    // 7. Build response — redirect directly to register (register page redirects to / if already registered)
     const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
-    const dest = returnTo.startsWith('/deal')
-      ? returnTo
-      : `/register?returnTo=${encodeURIComponent(returnTo === '/register' ? '/' : returnTo)}`;
-    const response = NextResponse.redirect(`${appUrl}${dest}`);
+
+    // 7. Redirect to bridge page — bridge page calls client.setSession() which the SDK needs
+    const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
+    const response = NextResponse.redirect(
+      `${appUrl}/auth/line/complete?returnTo=${encodeURIComponent(safeReturn)}`
+    );
 
     const yr = 60 * 60 * 24 * 365;
-    // Standard Appwrite session cookies — SDK reads these automatically
+    // line_session_pending: httpOnly=false so bridge page JS can read it
+    response.cookies.set('line_session_pending', session.secret, {
+      httpOnly: false, secure: true, sameSite: 'lax', path: '/', maxAge: 300, // 5 min TTL
+    });
+    // Also set standard Appwrite cookies for any server-side use
     response.cookies.set(`a_session_${projectId}`, session.secret, {
       httpOnly: false, secure: true, sameSite: 'lax', path: '/', maxAge: yr,
     });
@@ -90,6 +91,4 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('LINE login error:', error);
     const msg = encodeURIComponent(error?.message || 'unknown');
-    return NextResponse.redirect(`${appUrl}/login?error=line_failed&msg=${msg}`);
-  }
-}
+    return NextRe

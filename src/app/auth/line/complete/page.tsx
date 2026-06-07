@@ -1,60 +1,49 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { client, account } from '@/lib/appwrite';
+import { Suspense } from 'react';
 
 function LineCompleteInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo') || '/';
+  const [status, setStatus] = useState('กำลังเข้าสู่ระบบด้วย LINE...');
 
   useEffect(() => {
-    // อ่าน session secret จาก cookie ที่ callback ตั้งไว้
-    const cookies = Object.fromEntries(
-      document.cookie.split(';').map((c) => {
-        const [k, ...v] = c.trim().split('=');
-        return [k, v.join('=')];
-      })
-    );
+    async function finish() {
+      // อ่าน session secret จาก cookie (httpOnly=false)
+      const cookieMap = Object.fromEntries(
+        document.cookie.split(';').map(c => {
+          const [k, ...v] = c.trim().split('=');
+          return [k.trim(), v.join('=')];
+        })
+      );
+      const secret = cookieMap['line_session_pending'];
 
-    const secret = cookies['line_session_pending'];
-
-    if (!secret) {
-      router.replace('/login?error=line_failed&msg=no_session');
-      return;
-    }
-
-    // บอก Appwrite SDK ให้ใช้ session นี้โดยตรง
-    client.setSession(secret);
-
-    // ลบ pending cookie
-    document.cookie = 'line_session_pending=; max-age=0; path=/';
-
-    // ตรวจสอบ user แล้ว redirect ตามสถานะ
-    account.get()
-      .then((u) => {
-        const prefs = u.prefs as Record<string, string>;
-        if (prefs?.firstName) {
-          router.replace(returnTo.startsWith('/') ? returnTo : '/');
-        } else {
-          router.replace('/register');
+      if (!secret) {
+        // ไม่มี pending cookie — ลอง account.get() โดยตรง
+        try {
+          const u = await account.get();
+          setStatus('เข้าสู่ระบบสำเร็จ...');
+          const prefs = u.prefs as Record<string, string>;
+          const dest = prefs?.firstName
+            ? (returnTo.startsWith('/') ? returnTo : '/')
+            : '/register';
+          router.replace(dest);
+        } catch {
+          router.replace('/login?error=line_failed&msg=no_session');
         }
-      })
-      .catch(() => {
-        router.replace('/login?error=line_failed&msg=session_invalid');
-      });
-  }, [router]);
+        return;
+      }
 
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
-      <p className="text-gray-600 dark:text-gray-300">กำลังเข้าสู่ระบบด้วย LINE...</p>
-    </div>
-  );
-}
+      // ลบ pending cookie
+      document.cookie = 'line_session_pending=; max-age=0; path=/';
 
-import { Suspense } from 'react';
-export default function LineComplete() {
-  return <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"/></div>}><LineCompleteInner/></Suspense>;
-}
+      // บอก Appwrite SDK ให้ใช้ session นี้ (สำคัญมาก — SDK ไม่ auto-read server cookies)
+      client.setSession(secret);
+      setStatus('กำลังโหลดข้อมูล...');
+
+      try {
+        const u = await account.get(
