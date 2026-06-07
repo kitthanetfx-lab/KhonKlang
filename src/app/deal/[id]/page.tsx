@@ -59,6 +59,7 @@ export default function DealRoom() {
   const [evidenceType, setEvidenceType] = useState('packing');
   const [copied, setCopied]       = useState(false);
   const [jwt, setJwt]             = useState('');
+  const [dealError, setDealError] = useState('');
   const chatBottomRef  = useRef<HTMLDivElement>(null);
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const evidInputRef   = useRef<HTMLInputElement>(null);
@@ -66,8 +67,14 @@ export default function DealRoom() {
   const fetchDeal = useCallback(async (j?: string) => {
     const headers: Record<string,string> = {};
     if (j) headers['x-session-jwt'] = j;
-    const r = await fetch(`/api/deals/${dealId}`, { headers }).catch(() => null);
-    if (r?.ok) { const d = await r.json(); setDeal(d.deal); }
+    try {
+      const r = await fetch(`/api/deals/${dealId}`, { headers });
+      const d = await r.json();
+      if (r.ok) { setDeal(d.deal); setDealError(''); }
+      else setDealError(d.error || `Error ${r.status}`);
+    } catch (e: any) {
+      setDealError(e?.message || 'Network error');
+    }
   }, [dealId]);
 
   const fetchMsgs = useCallback(async (j: string) => {
@@ -167,7 +174,14 @@ export default function DealRoom() {
       <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
-  if (!deal) return <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center text-white"><p>ไม่พบ Deal</p></div>;
+  if (!deal) return (
+    <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center text-white gap-4 p-6 text-center">
+      <p className="text-2xl">❌ ไม่พบ Deal</p>
+      {dealError && <p className="text-sm text-red-400 bg-red-900/30 border border-red-700 rounded-xl px-4 py-2 max-w-sm break-all">{dealError}</p>}
+      <p className="text-gray-400 text-sm">Deal อาจถูกลบหรือลิงก์ไม่ถูกต้อง</p>
+      <a href="/deal/create" className="mt-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-medium transition">สร้าง Deal ใหม่</a>
+    </div>
+  );
 
   const jitsiRoom = `khonklang-${dealId.slice(0,10)}`;
   const stepIdx   = STEP_ORDER.indexOf(deal.status);
@@ -554,44 +568,4 @@ export default function DealRoom() {
                       <div className={`rounded-2xl px-4 py-2.5 ${isMe?'bg-blue-600 rounded-br-sm':'bg-white/10 rounded-bl-sm'}`}>
                         {m.type==='image'?(
                           <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer">
-                            <img src={fileUrl(m.fileId)} alt={m.fileName} className="max-w-[200px] rounded-lg object-contain"/>
-                          </a>
-                        ):m.type==='file'?(
-                          <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer" className="underline text-sm">📎 {m.fileName}</a>
-                        ):(<p className="text-sm">{m.content}</p>)}
-                      </div>
-                      <span className="text-[10px] text-gray-600 px-1 mt-0.5">{new Date(m.createdAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</span>
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={chatBottomRef}/>
-            </div>
-            <div className="sticky bottom-0 bg-[#0a0f1e] pt-2 pb-4">
-              <div className="flex gap-2 items-end">
-                <button onClick={()=>fileInputRef.current?.click()}
-                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 flex-shrink-0"
-                >📎</button>
-                <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf" className="hidden"
-                  onChange={e=>{const f=e.target.files?.[0];if(f)uploadFile(f);e.target.value='';}}
-                />
-                <textarea value={chatInput} onChange={e=>setChatInput(e.target.value)}
-                  onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg(chatInput);}}}
-                  placeholder="พิมพ์ข้อความ... (Enter ส่ง)"
-                  rows={1}
-                  className="flex-1 bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none text-sm"
-                />
-                <button onClick={()=>sendMsg(chatInput)} disabled={!chatInput.trim()||sending}
-                  className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 flex-shrink-0"
-                >➤</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Evidence tab */}
-        {tab==='evidence'&&<EvidencePanel/>}
-      </div>
-    </div>
-  );
-}
+                            <img src={fileUrl(m.fileId)} alt={m.fileName} className="max-w-[20
