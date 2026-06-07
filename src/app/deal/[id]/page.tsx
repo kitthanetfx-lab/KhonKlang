@@ -12,10 +12,8 @@ interface Deal {
   status: string; rejectReason: string;
   sellerAcceptedTerms: boolean; middlemanAcceptedTerms: boolean; buyerAcceptedTerms: boolean;
   middlemanConfirmedPayment: boolean; buyerConfirmedCheck: boolean;
-  paymentSlipFileId: string; packingEvidence: string; testingEvidence: string;
-  receiveEvidence: string; checkEvidence: string;
-  trackingToMiddleman: string; trackingToBuyer: string; jitsiRoomId: string;
-  completedAt: string;
+  paymentSlipFileId: string; evidenceData: string;
+  trackingToMiddleman: string; trackingToBuyer: string;
 }
 interface Msg {
   $id: string; senderId: string; senderName: string;
@@ -167,7 +165,7 @@ export default function DealRoom() {
   );
   if (!deal) return <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center text-white"><p>ไม่พบ Deal</p></div>;
 
-  const jitsiRoom = deal.jitsiRoomId || `khonklang-${dealId.slice(0,10)}`;
+  const jitsiRoom = `khonklang-${dealId.slice(0,10)}`;
   const stepIdx   = STEP_ORDER.indexOf(deal.status);
   const pct       = stepIdx >= 0 ? Math.round((stepIdx / (STEP_ORDER.length - 1)) * 100) : 0;
   const isFinished = ['completed','cancelled','disputed'].includes(deal.status);
@@ -337,13 +335,13 @@ export default function DealRoom() {
   function EvidencePanel() {
     const canUp = (myRole==='seller'&&['packing','shipped_to_middleman'].includes(deal!.status)) ||
       (myRole==='middleman'&&['middleman_received','middleman_checking'].includes(deal!.status));
-    const parse = (s:string) => { try{return JSON.parse(s||'[]');}catch{return[];} };
-    const sections = [
-      {key:'packingEvidence',label:'📦 แพ็คของ'},
-      {key:'testingEvidence',label:'🔧 ทดสอบ'},
-      {key:'receiveEvidence',label:'📬 รับสินค้า (คนกลาง)'},
-      {key:'checkEvidence',  label:'🔍 ตรวจสินค้า (คนกลาง)'},
-    ] as const;
+    const typeLabel: Record<string,string> = {
+      packing:'📦 แพ็คของ', testing:'🔧 ทดสอบ',
+      receive:'📬 รับสินค้า (คนกลาง)', check:'🔍 ตรวจสินค้า (คนกลาง)',
+    };
+    const items: {type:string;fileId:string;fileName:string}[] = (() => {
+      try { return JSON.parse(deal!.evidenceData || '[]'); } catch { return []; }
+    })();
     return (
       <div className="space-y-4">
         {canUp && (
@@ -363,24 +361,24 @@ export default function DealRoom() {
             />
           </div>
         )}
-        {sections.map(({key,label})=>{
-          const items=parse(deal![key as keyof Deal] as string);
-          if(!items.length) return null;
-          return (<div key={key} className="space-y-2">
-            <p className="text-sm font-medium text-gray-300">{label}</p>
-            {items.map((item:{fileId:string;fileName:string},i:number)=>{
-              const url=fileUrl(item.fileId);
-              const isVid=item.fileName?.match(/\.(mp4|mov|avi|webm)$/i);
-              return (<div key={i} className="bg-white/5 rounded-xl overflow-hidden">
-                {isVid?<video src={url} controls className="w-full max-h-52 object-contain"/>:
-                <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.fileName} className="w-full max-h-52 object-contain"/></a>}
-              </div>);
-            })}
-          </div>);
-        })}
-        {!canUp&&sections.every(({key})=>!parse(deal![key as keyof Deal] as string).length)&&(
+        {items.length === 0 && !canUp && (
           <p className="text-center text-gray-500 py-8">ยังไม่มีหลักฐาน</p>
         )}
+        {items.map((item, i) => {
+          const url = fileUrl(item.fileId);
+          const isVid = item.fileName?.match(/\.(mp4|mov|avi|webm)$/i);
+          return (
+            <div key={i} className="space-y-1">
+              <p className="text-xs text-gray-400">{typeLabel[item.type] || item.type}</p>
+              <div className="bg-white/5 rounded-xl overflow-hidden">
+                {isVid
+                  ? <video src={url} controls className="w-full max-h-52 object-contain"/>
+                  : <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.fileName} className="w-full max-h-52 object-contain"/></a>
+                }
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   }
