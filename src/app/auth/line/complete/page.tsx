@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { client, account } from '@/lib/appwrite';
 
-export default function LineComplete() {
+function LineCompleteInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo') || '/';
 
   useEffect(() => {
     // อ่าน session secret จาก cookie ที่ callback ตั้งไว้
@@ -34,9 +36,9 @@ export default function LineComplete() {
       .then((u) => {
         const prefs = u.prefs as Record<string, string>;
         if (prefs?.firstName) {
-          router.replace('/'); // ลงทะเบียนแล้ว → หน้าหลัก
+          router.replace(returnTo.startsWith('/') ? returnTo : '/');
         } else {
-          router.replace('/register'); // ยังไม่ได้ลงทะเบียน → กรอกฟอร์ม
+          router.replace('/register');
         }
       })
       .catch(() => {
@@ -51,3 +53,5 @@ export default function LineComplete() {
     </div>
   );
 }
+
+import { Suspense 

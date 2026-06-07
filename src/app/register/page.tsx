@@ -10,13 +10,14 @@ const PROVINCES = ['กระบี่','กรุงเทพมหานคร
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const role = searchParams.get('role') || 'user';
+  const role     = searchParams.get('role') || 'user';
+  const returnTo = searchParams.get('returnTo') || '/';
 
   useEffect(() => {
     account.get().then(async (u) => {
-      // ถ้ามีโปรไฟล์แล้ว → ไปหน้าหลัก
+      // ถ้ามีโปรไฟล์แล้ว → ไปหน้าเดิม (หรือหน้าหลัก)
       if ((u.prefs as Record<string, string>)?.firstName) {
-        router.replace('/');
+        router.replace(returnTo.startsWith('/') ? returnTo : '/');
         return;
       }
 
@@ -128,8 +129,9 @@ function RegisterForm() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'เกิดข้อผิดพลาด'); return; }
-      if (data.linked) { setLinked(true); setTimeout(() => router.push('/'), 2500); }
-      else router.push('/');
+      const dest = returnTo.startsWith('/') ? returnTo : '/';
+      if (data.linked) { setLinked(true); setTimeout(() => router.push(dest), 2500); }
+      else router.push(dest);
     } catch { setError('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
     finally { setSaving(false); }
   };
@@ -248,10 +250,4 @@ function RegisterForm() {
   );
 }
 
-export default function Register() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>}>
-      <RegisterForm />
-    </Suspense>
-  );
-}
+export default func

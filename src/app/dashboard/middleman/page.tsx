@@ -228,14 +228,4 @@ export default function MiddlemanDashboard() {
           <p className="text-center text-gray-500 py-16">ยังไม่มีงานที่รอคนกลาง</p>
         ) : available.map(d => <DealCard key={d.$id} deal={d} />))}
 
-        {tab === 'active' && (active.length === 0 ? (
-          <p className="text-center text-gray-500 py-16">ยังไม่มีงานที่กำลังดำเนินการ</p>
-        ) : active.map(d => <DealCard key={d.$id} deal={d} />))}
-
-        {tab === 'history' && (history.length === 0 ? (
-          <p className="text-center text-gray-500 py-16">ยังไม่มีประวัติการทำงาน</p>
-        ) : history.map(d => <DealCard key={d.$id} deal={d} />))}
-      </div>
-    </div>
-  );
-}
+        {tab === 'active' && (active.length ===

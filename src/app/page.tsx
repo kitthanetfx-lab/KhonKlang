@@ -311,43 +311,4 @@ export default function Home() {
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-400 rounded-full opacity-20 blur-2xl" />
             <Users className="w-8 h-8 mb-4 text-blue-200" />
             <h3 className="text-xl font-bold mb-2">สมัครเป็นผู้ขาย</h3>
-            <p className="text-blue-200 text-sm mb-5">เข้าร่วมเครือข่ายผู้ขายที่ได้รับการรับรอง เพิ่มความน่าเชื่อถือให้สินค้าของคุณ</p>
-            <Link href="/register" className="inline-flex items-center gap-2 bg-white text-blue-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors">
-              สมัครเลย <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-          <div className="bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl p-8 relative overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-green-400 rounded-full opacity-20 blur-2xl" />
-            <HandshakeIcon className="w-8 h-8 mb-4 text-green-200" />
-            <h3 className="text-xl font-bold mb-2">สมัครเป็นคนกลาง</h3>
-            <p className="text-green-200 text-sm mb-5">สร้างรายได้จากการเป็นคนกลางที่ได้รับความไว้วางใจจากผู้ซื้อและผู้ขาย</p>
-            <Link href="/register-middleman" className="inline-flex items-center gap-2 bg-white text-green-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-50 transition-colors">
-              สมัครเลย <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Check Scam */}
-      <section className="py-16 px-4 bg-yellow-500/10 border-y border-yellow-500/20">
-        <div className="max-w-2xl mx-auto text-center">
-          <Search className="w-10 h-10 text-yellow-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-3">เช็คคนโกง</h2>
-          <p className="text-gray-300 mb-6">ตรวจสอบประวัติและความน่าเชื่อถือของผู้ขายก่อนทำธุรกรรม ด้วยระบบ blacklist ของเรา</p>
-          <Link href="/check-scam" className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-semibold transition-all">
-            ตรวจสอบเลย <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 px-4 border-t border-white/10 text-center text-sm text-gray-500">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Lock className="w-4 h-4 text-blue-400" />
-          <span className="text-gray-300 font-medium">คนกลาง — ซื้อขายมั่นใจ ไร้กังวล</span>
-        </div>
-        <p>© 2568 Khonklang. All rights reserved.</p>
-      </footer>
-    </div>
-  );
-}
+            <p className="text-blue-200 text

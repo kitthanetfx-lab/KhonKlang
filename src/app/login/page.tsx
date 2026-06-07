@@ -17,12 +17,14 @@ function LoginForm() {
     line_failed: `LINE login ล้มเหลว${msg ? ': ' + decodeURIComponent(msg) : ''}`,
   };
 
+  const returnTo = searchParams.get('returnTo') || '/register';
+
   const handleLogin = async (provider: 'google' | 'facebook') => {
     try {
       const authProvider = provider === 'google' ? OAuthProvider.Google : OAuthProvider.Facebook;
       account.createOAuth2Session(
         authProvider,
-        `${window.location.origin}/register`,
+        `${window.location.origin}${returnTo.startsWith('/') ? returnTo : '/register'}`,
         `${window.location.origin}/`
       );
     } catch (error: any) {
@@ -81,7 +83,7 @@ function LoginForm() {
             </button>
 
             <a
-              href="/api/auth/line"
+              href={`/api/auth/line?returnTo=${encodeURIComponent(returnTo)}`}
               className="w-full flex items-center justify-center gap-3 bg-[#06C755] hover:bg-[#05B34C] text-white py-3 px-4 rounded-xl font-medium transition-all shadow-md hover:shadow-lg active:scale-[0.98]"
             >
               <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -92,15 +94,4 @@ function LoginForm() {
           </div>
 
         </div>
-      </div>
-    </main>
-  );
-}
-
-export default function Login() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
-  );
-}
+ 

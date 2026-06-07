@@ -49,7 +49,7 @@ async function ensureCollection(databases: Databases) {
     databases.createStringAttribute(DB_ID, COL_ID, 'rejectReason',       500, false, ''),
     databases.createStringAttribute(DB_ID, COL_ID, 'createdAt',           30, false, ''),
   ]);
-  await new Promise(r => setTimeout(r, 3000));
+  await new Promise(r => setTimeout(r, 10000));
 }
 
 function getUser(jwt: string) {

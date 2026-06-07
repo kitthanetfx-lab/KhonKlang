@@ -63,8 +63,10 @@ export default function DealRoom() {
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const evidInputRef   = useRef<HTMLInputElement>(null);
 
-  const fetchDeal = useCallback(async (j: string) => {
-    const r = await fetch(`/api/deals/${dealId}`, { headers: { 'x-session-jwt': j } }).catch(() => null);
+  const fetchDeal = useCallback(async (j?: string) => {
+    const headers: Record<string,string> = {};
+    if (j) headers['x-session-jwt'] = j;
+    const r = await fetch(`/api/deals/${dealId}`, { headers }).catch(() => null);
     if (r?.ok) { const d = await r.json(); setDeal(d.deal); }
   }, [dealId]);
 
@@ -76,21 +78,23 @@ export default function DealRoom() {
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     (async () => {
+      // Always load deal (public) — no login required to view
+      await fetchDeal();
       try {
         const user = await account.get();
         setMyId(user.$id); setMyName(user.name || '');
         const j = (await account.createJWT()).jwt;
         setJwt(j);
-        await Promise.all([fetchDeal(j), fetchMsgs(j)]);
-      } catch { router.replace('/login'); return; }
+        fetchMsgs(j);
+        timer = setInterval(async () => {
+          const j2 = (await account.createJWT().catch(() => ({ jwt: '' }))).jwt;
+          if (j2) { setJwt(j2); fetchMsgs(j2); fetchDeal(j2); }
+        }, 4000);
+      } catch { /* not logged in — guest view only */ }
       finally { setLoading(false); }
-      timer = setInterval(async () => {
-        const j2 = (await account.createJWT().catch(() => ({ jwt: '' }))).jwt;
-        if (j2) { setJwt(j2); fetchMsgs(j2); fetchDeal(j2); }
-      }, 4000);
     })();
     return () => clearInterval(timer);
-  }, [dealId, router, fetchDeal, fetchMsgs]);
+  }, [dealId, fetchDeal, fetchMsgs]);
 
   useEffect(() => {
     if (!deal || !myId) return;
@@ -214,10 +218,22 @@ export default function DealRoom() {
     );
   }
 
-  // ─── Guest join panel ──────────────────────────────────────────────────────
-  if (myRole === 'guest') {
+  // ─── Guest / not-logged-in join panel ────────────────────────────────────
+  if (myRole === 'guest' || myRole === '') {
     const canBeBuyer  = !deal.buyerId;
     const canBeSeller = !deal.sellerId;
+    const notLoggedIn = !myId;
+    const dealUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+    function handleJoin(role: 'buyer' | 'seller') {
+      if (notLoggedIn) {
+        // Redirect to login, then come back here
+        router.push(`/login?returnTo=${encodeURIComponent(dealUrl || `/deal/${dealId}`)}`);
+      } else {
+        doAction(role === 'buyer' ? 'join_as_buyer' : 'join_as_seller');
+      }
+    }
+
     return (
       <div className="min-h-screen bg-[#0a0f1e] text-white flex flex-col">
         <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
@@ -229,22 +245,38 @@ export default function DealRoom() {
             <p className="text-xl font-bold">{deal.title}</p>
             {deal.description && <p className="text-gray-400 text-sm">{deal.description}</p>}
             <p className="text-2xl font-bold text-green-400">{deal.price.toLocaleString()} ฿</p>
+            <div className="flex flex-wrap gap-3 text-sm text-gray-400 pt-1">
+              {deal.sellerName && <span>ผู้ขาย: {deal.sellerName}</span>}
+              {deal.buyerName  && <span>ผู้ซื้อ: {deal.buyerName}</span>}
+            </div>
           </div>
+
+          {notLoggedIn && (
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-300 text-center">
+              ⚠️ กรุณาเข้าสู่ระบบก่อนเข้าร่วมดีล<br/>
+              <span className="text-xs text-yellow-400/70">แนะนำให้เปิดลิงก์ใน Chrome หรือ Safari</span>
+            </div>
+          )}
+
           <div className="space-y-3">
             {canBeBuyer && (
-              <button onClick={() => doAction('join_as_buyer')} disabled={acting}
+              <button onClick={() => handleJoin('buyer')} disabled={acting}
                 className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-lg transition"
-              >{acting ? '...' : '🛍️ เข้าร่วมเป็นผู้ซื้อ'}</button>
+              >{acting ? '...' : notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ซื้อ' : '🛍️ เข้าร่วมเป็นผู้ซื้อ'}</button>
             )}
             {canBeSeller && (
-              <button onClick={() => doAction('join_as_seller')} disabled={acting}
+              <button onClick={() => handleJoin('seller')} disabled={acting}
                 className="w-full py-4 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-lg transition"
-              >{acting ? '...' : '🛒 เข้าร่วมเป็นผู้ขาย'}</button>
+              >{acting ? '...' : notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ขาย' : '🛒 เข้าร่วมเป็นผู้ขาย'}</button>
             )}
             {!canBeBuyer && !canBeSeller && (
               <p className="text-center text-gray-500">ดีลนี้มีผู้ซื้อและผู้ขายครบแล้ว</p>
             )}
           </div>
+
+          <button onClick={copyLink}
+            className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition text-sm"
+          >{copied ? '✅ คัดลอกลิงก์แล้ว' : '🔗 คัดลอกลิงก์แชร์'}</button>
         </div>
       </div>
     );
@@ -535,31 +567,4 @@ export default function DealRoom() {
               })}
               <div ref={chatBottomRef}/>
             </div>
-            <div className="sticky bottom-0 bg-[#0a0f1e] pt-2 pb-4">
-              <div className="flex gap-2 items-end">
-                <button onClick={()=>fileInputRef.current?.click()}
-                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 flex-shrink-0"
-                >📎</button>
-                <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf" className="hidden"
-                  onChange={e=>{const f=e.target.files?.[0];if(f)uploadFile(f);e.target.value='';}}
-                />
-                <textarea value={chatInput} onChange={e=>setChatInput(e.target.value)}
-                  onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg(chatInput);}}}
-                  placeholder="พิมพ์ข้อความ... (Enter ส่ง)"
-                  rows={1}
-                  className="flex-1 bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none text-sm"
-                />
-                <button onClick={()=>sendMsg(chatInput)} disabled={!chatInput.trim()||sending}
-                  className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 flex-shrink-0"
-                >➤</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Evidence tab */}
-        {tab==='evidence'&&<EvidencePanel/>}
-      </div>
-    </div>
-  );
-}
+            <div className="sticky bottom-0 bg-[#0a0f1e] pt-

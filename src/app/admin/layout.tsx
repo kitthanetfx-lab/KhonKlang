@@ -139,13 +139,4 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Bell size={18} className="text-gray-400" />
             </button>
           </div>
-        </header>
-
-        {/* Page content */}
-        <main className="flex-1 overflow-auto p-5">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
-}
+        </he

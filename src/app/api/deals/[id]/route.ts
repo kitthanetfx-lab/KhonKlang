@@ -24,9 +24,7 @@ function getUserFromJwt(jwt: string) {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    await getUserFromJwt(jwt);
+    // Public GET — no auth required so anyone with the link can view
     const databases = getAdminClient();
     const deal = await databases.getDocument(DB_ID, COL_DEALS, id);
     return NextResponse.json({ deal });
@@ -194,3 +192,4 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
+                                                                                             

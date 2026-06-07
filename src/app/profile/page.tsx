@@ -559,31 +559,4 @@ function ApplicationStatusRow({ icon, label, status, bgColor }: {
           </div>
         </div>
       </div>
-      {status === 'pending_review' && (
-        <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-full">
-          รอ 1-3 วัน
-        </span>
-      )}
-      {status === 'approved' && (
-        <span className="text-xs text-green-600 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-2.5 py-1 rounded-full">
-          ✓ อนุมัติ
-        </span>
-      )}
-      {status === 'rejected' && (
-        <span className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-2.5 py-1 rounded-full">
-          ✕ ไม่ผ่าน
-        </span>
-      )}
-    </div>
-  );
-}
-
-// ─── Export ───────────────────────────────────────────────────────────────────
-
-export default function ProfilePageWrapper() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-400 animate-pulse">กำลังโหลด...</p></div>}>
-      <ProfilePage />
-    </Suspense>
-  );
-}
+      {status === 'pendi
