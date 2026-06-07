@@ -130,4 +130,24 @@ export async function POST(req: NextRequest) {
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
 
     const isBuyerCreator = creatorRole === 'buyer';
-    const databases
+    const databases = getAdminClient();
+    await ensureCollection(databases);
+    const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
+      sellerId:    isBuyerCreator ? '' : currentUser.$id,
+      sellerName:  isBuyerCreator ? '' : (currentUser.name || ''),
+      buyerId:     isBuyerCreator ? currentUser.$id : '',
+      buyerName:   isBuyerCreator ? (currentUser.name || '') : '',
+      middlemanId: '', middlemanName: '',
+      title, description: description || '', price: Number(price), category: category || '',
+      status: isBuyerCreator ? 'waiting_seller' : 'posted',
+      sellerAcceptedTerms: false, middlemanAcceptedTerms: false, buyerAcceptedTerms: false,
+      middlemanConfirmedPayment: false, buyerConfirmedCheck: false,
+      paymentSlipFileId: '', evidenceData: '[]',
+      trackingToMiddleman: '', trackingToBuyer: '', rejectReason: '',
+      createdAt: new Date().toISOString(),
+    });
+    return NextResponse.json({ deal: doc });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
