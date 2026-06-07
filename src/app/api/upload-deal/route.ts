@@ -45,4 +45,11 @@ export async function POST(req: NextRequest) {
 
     const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!;
     const project  = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
-    const viewUrl  = `${endpoint}/storage/buckets/${BUCKET_ID}/file
+    const viewUrl  = `${endpoint}/storage/buckets/${BUCKET_ID}/files/${result.$id}/view?project=${project}`;
+
+    return NextResponse.json({ fileId: result.$id, fileName: file.name, url: viewUrl, mimeType: file.type });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
