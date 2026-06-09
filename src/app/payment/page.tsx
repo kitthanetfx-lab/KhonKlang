@@ -1,80 +1,69 @@
 'use client';
-
-import { useRouter } from 'next/navigation';
-import { AlertOctagon, QrCode, Upload, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
 import Link from 'next/link';
 
-export default function Payment() {
-  const router = useRouter();
+const PAYMENT = { label: 'ค่าสมาชิกผู้ขาย', amount: 199, period: '1 ปี', features: ['ลงประกาศไม่จำกัด', 'Dashboard จัดการดีล', 'Badge ผู้ขายรับรอง', 'สิทธิ์ขาย Certified'] };
+const BANK = { name: 'ธนาคารกสิกรไทย (KBANK)', acct: '123-4-56789-0', owner: 'บริษัท คนกลาง จำกัด', pp: '0800000000' };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate upload and status update
-    router.push('/status');
-  };
+export default function PaymentPage() {
+  const [slipUploaded, setSlipUploaded] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  if (submitted) return (
+    <div className="sub-page">
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '60px 20px', textAlign: 'center' }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
+        <h2 style={{ marginBottom: 8 }}>ส่งสลิปแล้ว!</h2>
+        <p style={{ color: 'var(--muted)', marginBottom: 24, lineHeight: 1.6 }}>ทีมงานจะตรวจสอบและเปิดใช้งานบัญชีของคุณภายใน 1–3 วันทำการ</p>
+        <Link href="/profile" className="btn btn-primary btn-block" style={{ textDecoration: 'none', display: 'flex', justifyContent: 'center' }}>ดูสถานะใบสมัคร</Link>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 flex items-center justify-center">
-      <div className="max-w-xl w-full">
-        
-        {/* Warning Alert */}
-        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-6 rounded-r-xl shadow-md mb-8 animate-fade-in">
-          <div className="flex gap-4">
-            <AlertOctagon className="w-8 h-8 text-red-600 dark:text-red-400 flex-shrink-0" />
-            <div>
-              <h3 className="text-red-800 dark:text-red-300 font-bold text-lg mb-2">คำเตือนสำคัญ</h3>
-              <p className="text-red-700 dark:text-red-200 text-sm leading-relaxed">
-                หากตรวจพบประวัติการฉ้อโกงหรือมีชื่อติดแบล็กลิสต์ในระบบใดๆ จะริบเงินค่าสมัครและไม่คืนเงินทุกกรณี 
-                หากติดปัญหาสามารถยื่นหลักฐานชี้แจงกับแอดมินโดยตรง{' '}
-                <Link href="#" className="font-semibold underline hover:text-red-800">
-                  คลิกที่นี่เพื่อติดต่อแอดมิน
-                </Link>
-              </p>
-            </div>
+    <div className="sub-page">
+      <header className="sub-header">
+        <Link href="/register/seller" className="sub-back">←</Link>
+        <span className="sub-htitle">ชำระเงิน</span>
+      </header>
+      <div className="pay-inner">
+        <div className="pay-summary-card">
+          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>{PAYMENT.label}</div>
+          <div className="pay-amount">฿{PAYMENT.amount}</div>
+          <div className="pay-desc">ต่ออายุ {PAYMENT.period} อัตโนมัติ · ยกเลิกได้ทุกเมื่อ</div>
+          <div className="pay-rows">
+            {PAYMENT.features.map(f => <div key={f} className="pay-row"><span>✅ {f}</span></div>)}
           </div>
         </div>
 
-        {/* Payment Form */}
-        <div className="glass-panel rounded-2xl p-6 sm:p-10 shadow-xl animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          <h1 className="text-2xl font-bold mb-6 text-center">ชำระค่าลงทะเบียน</h1>
-          
-          <div className="bg-white/50 dark:bg-gray-900/50 rounded-xl p-6 text-center border border-gray-200 dark:border-gray-700 mb-8">
-            <div className="w-48 h-48 mx-auto bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center mb-4">
-              {/* This would be an actual QR code image in production */}
-              <div className="text-center">
-                <QrCode className="w-24 h-24 mx-auto text-gray-800 mb-2" />
-                <span className="text-xs font-semibold text-gray-500">สแกนเพื่อชำระเงิน</span>
-              </div>
-            </div>
-            
-            <div className="space-y-1">
-              <p className="text-sm text-gray-500">หรือโอนผ่านบัญชีธนาคาร</p>
-              <p className="font-bold text-lg text-blue-600 dark:text-blue-400">ธนาคารกสิกรไทย (KBANK)</p>
-              <p className="text-xl tracking-wider font-mono">123-4-56789-0</p>
-              <p className="text-sm font-medium">ชื่อบัญชี: บจก. คนกลาง กรุ๊ป</p>
-              <p className="font-bold text-lg mt-4">จำนวนเงิน: 500 บาท</p>
-            </div>
+        <div className="bank-card">
+          <div className="bank-title">ข้อมูลการโอนเงิน</div>
+          <div className="bank-row"><span className="bank-lbl">ธนาคาร</span><span className="bank-val">{BANK.name}</span></div>
+          <div className="bank-row"><span className="bank-lbl">เลขบัญชี</span><span className="bank-acct">{BANK.acct}</span></div>
+          <div className="bank-row"><span className="bank-lbl">ชื่อบัญชี</span><span className="bank-val">{BANK.owner}</span></div>
+          <div className="bank-row"><span className="bank-lbl">PromptPay</span><span className="bank-acct">{BANK.pp}</span></div>
+          <div className="qr-box">
+            <svg width="110" height="110" viewBox="0 0 10 10" shapeRendering="crispEdges">
+              {[0,1,2,3,4,5,6,7,8,9].map(r => [0,1,2,3,4,5,6,7,8,9].map(c => {
+                const v = ((r < 3 || r > 6) && (c < 3 || c > 6)) || (Math.sin(r * 2.9 + c * 3.7 + 1.1) > 0.05);
+                return v ? <rect key={`${r}-${c}`} x={c} y={r} width="0.9" height="0.9" fill="#0d1b3e" /> : null;
+              }))}
+            </svg>
+            <span className="qr-label">สแกน PromptPay ฿{PAYMENT.amount}</span>
           </div>
-
-          <form onSubmit={handleSubmit}>
-            <div className="mb-8">
-              <label className="block text-sm font-medium mb-3">แนบสลิปการโอนเงิน</label>
-              <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer">
-                <Upload className="w-10 h-10 mx-auto text-blue-500 mb-3" />
-                <p className="text-sm font-medium mb-1">คลิกเพื่ออัปโหลด หรือลากไฟล์มาวาง</p>
-                <p className="text-xs text-gray-500 mb-4">รองรับ JPG, PNG ขนาดไม่เกิน 5MB</p>
-                <input type="file" required accept="image/*" className="mx-auto text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-            >
-              <CheckCircle className="w-5 h-5" /> ยืนยันการชำระเงิน
-            </button>
-          </form>
         </div>
+
+        <div className="upload-card">
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 14 }}>อัปโหลดสลิปโอนเงิน</div>
+          <div className="upload-zone" style={slipUploaded ? { borderColor: 'var(--green-400)', background: 'var(--green-50)' } : {}} onClick={() => setSlipUploaded(v => !v)}>
+            <div className="upload-zone-icon">{slipUploaded ? '✅' : '🧾'}</div>
+            <div className="upload-zone-t">{slipUploaded ? 'อัปโหลดสลิปแล้ว — คลิกเพื่อเปลี่ยน' : 'คลิกเพื่ออัปโหลดสลิปการโอนเงิน'}</div>
+            <div className="upload-zone-sub">PNG, JPG — ยอดโอน ฿{PAYMENT.amount}</div>
+          </div>
+        </div>
+
+        <button className="btn btn-primary btn-block" disabled={!slipUploaded} style={{ opacity: slipUploaded ? 1 : .5 }} onClick={() => setSubmitted(true)}>ยืนยันการชำระเงิน</button>
+        <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', marginTop: 12, lineHeight: 1.6 }}>ทีมงานจะตรวจสอบและเปิดใช้งานภายใน 1–3 วันทำการ</p>
       </div>
     </div>
   );

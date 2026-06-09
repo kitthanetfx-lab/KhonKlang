@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { account } from '@/lib/appwrite';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Icon } from '@/components/Icon';
+import { Nav, Footer, useReveal } from '@/components/Site';
 
 interface Listing {
   $id: string;
@@ -31,6 +33,11 @@ function imgUrl(fileId: string) {
 }
 
 const CATS = ['ทั้งหมด','สินค้าทั่วไป','อิเล็กทรอนิกส์','เสื้อผ้า','ยานพาหนะ','อสังหาริมทรัพย์','บริการ','อื่นๆ'];
+const CAT_ICON: Record<string, string> = {
+  'ทั้งหมด': 'grid', 'สินค้าทั่วไป': 'box', 'อิเล็กทรอนิกส์': 'smartphone',
+  'เสื้อผ้า': 'gem', 'ยานพาหนะ': 'car', 'อสังหาริมทรัพย์': 'building',
+  'บริการ': 'handCoins', 'อื่นๆ': 'package',
+};
 const PROVINCES = [
   'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร',
   'ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ',
@@ -46,6 +53,7 @@ const PROVINCES = [
   'สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู',
   'อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี',
 ];
+const CARD_BG = ['#0d1b3e','#2f6bf0','#10a566','#6841d9','#e89211','#0d9aa6'];
 
 export default function Marketplace() {
   const router = useRouter();
@@ -54,14 +62,23 @@ export default function Marketplace() {
   const [myId,     setMyId]     = useState('');
   const [jwt,      setJwt]      = useState('');
 
-  // Filters
   const [search,     setSearch]     = useState('');
   const [cat,        setCat]        = useState('ทั้งหมด');
   const [province,   setProvince]   = useState('');
   const [certified,  setCertified]  = useState(false);
+  const [sort,       setSort]       = useState('ล่าสุด');
 
   const [joining,  setJoining]  = useState<string | null>(null);
   const [contacting, setContacting] = useState<string | null>(null);
+
+  useReveal();
+
+  useEffect(() => {
+    const r = document.documentElement;
+    r.style.setProperty('--accent', '#2f6bf0');
+    r.style.setProperty('--accent-strong', '#1f54d6');
+    r.style.setProperty('--accent-soft', '#eef4ff');
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -73,7 +90,6 @@ export default function Marketplace() {
         const res = await fetch('/api/deals?role=buyer', { headers: { 'x-session-jwt': j } });
         if (res.ok) { const data = await res.json(); setListings(data.deals || []); }
       } catch {
-        // Guest — try without auth
         const res = await fetch('/api/deals?role=buyer').catch(() => null);
         if (res?.ok) { const data = await res.json(); setListings(data.deals || []); }
       } finally { setLoading(false); }
@@ -97,7 +113,6 @@ export default function Marketplace() {
 
   async function callMiddleman(dealId: string) {
     if (!myId) { router.push('/login'); return; }
-    // Join the deal first, then go to the deal room to select middleman
     setContacting(dealId);
     try {
       const j = jwt || (await account.createJWT()).jwt;
@@ -107,14 +122,11 @@ export default function Marketplace() {
         body: JSON.stringify({ action: 'join_as_buyer' }),
       });
       if (res.ok) router.push(`/deal/${dealId}`);
-      else {
-        // If already joined, just navigate
-        router.push(`/deal/${dealId}`);
-      }
+      else router.push(`/deal/${dealId}`);
     } finally { setContacting(null); }
   }
 
-  const filtered = listings
+  let filtered = listings
     .filter(d => d.status === 'posted' && d.sellerId !== myId)
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)
     .filter(d => !province || d.location === province)
@@ -123,9 +135,8 @@ export default function Marketplace() {
       d.title.toLowerCase().includes(search.toLowerCase()) ||
       (d.description || '').toLowerCase().includes(search.toLowerCase())
     );
-
-  const certifiedList = filtered.filter(d => d.sellingMode === 'certified');
-  const normalList    = filtered.filter(d => d.sellingMode !== 'certified');
+  if (sort === 'ราคา: น้อย→มาก') filtered = [...filtered].sort((a, b) => a.price - b.price);
+  else if (sort === 'ราคา: มาก→น้อย') filtered = [...filtered].sort((a, b) => b.price - a.price);
 
   function getFirstImage(listing: Listing): string {
     try {
@@ -134,93 +145,58 @@ export default function Marketplace() {
     } catch { return ''; }
   }
 
-  function ListingCard({ listing }: { listing: Listing }) {
+  function ListingCard({ listing, idx }: { listing: Listing; idx: number }) {
     const isCertified = listing.sellingMode === 'certified';
     const firstImg    = getFirstImage(listing);
     const isMyDeal    = listing.buyerId === myId;
+    const c1 = CARD_BG[idx % 3 === 0 ? 0 : 2], c2 = CARD_BG[(idx % 5) + 1];
+    const avatarBg = CARD_BG[(idx % 5) + 1];
 
     return (
-      <div className={`rounded-2xl border overflow-hidden transition ${
-        isCertified
-          ? 'bg-gradient-to-br from-yellow-900/20 to-green-900/15 border-yellow-500/50 shadow-yellow-900/20 shadow-lg'
-          : 'bg-white/5 border-white/10'
-      }`}>
-        {/* Image */}
-        <div className="relative">
-          {firstImg ? (
-            <img src={firstImg} alt={listing.title}
-              className="w-full h-44 object-cover"
-            />
-          ) : (
-            <div className="w-full h-44 bg-white/5 flex items-center justify-center">
-              <span className="text-4xl opacity-30">📦</span>
-            </div>
-          )}
-          {isCertified && (
-            <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-yellow-500 text-black text-xs font-bold px-2.5 py-1 rounded-full shadow">
-              ⭐ Certified
-            </div>
-          )}
-          {listing.condition && (
-            <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-              {listing.condition}
-            </div>
-          )}
+      <div className="lc-card reveal" style={{ ['--d' as string]: idx * 50 + 'ms', ...(isCertified ? { borderColor: 'var(--amber-400)' } : {}) }}>
+        <div className="lc-img" style={firstImg ? { padding: 0 } : { background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)` }}>
+          {firstImg
+            ? <img src={firstImg} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <Icon name="package" size={52} style={{ color: 'rgba(255,255,255,0.22)' }} />}
+          <span className="lc-img-label">
+            {isCertified
+              ? <span className="badge badge-amber" style={{ background: 'var(--amber-400)', color: '#3a2700', border: 'none' }}>⭐ Certified</span>
+              : <span className="badge badge-green" style={{ background: 'rgba(16,165,102,.9)', color: '#fff', border: 'none' }}><span className="dot" /> Escrow</span>}
+          </span>
         </div>
-
-        {/* Body */}
-        <div className="p-4 space-y-3">
+        <div className="lc-body">
           {isCertified && (
-            <div className="flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
-              <span>✅</span>
-              <span>ตรวจสอบและพร้อมส่งโดยคนกลาง Khonklang</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--green-700)', background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-sm)', padding: '7px 11px' }}>
+              ✅ ตรวจสอบและพร้อมส่งโดยคนกลาง
             </div>
           )}
-
-          <div>
-            <p className="font-semibold text-white text-base leading-tight line-clamp-2">{listing.title}</p>
-            {listing.description && (
-              <p className="text-sm text-gray-400 mt-1 line-clamp-2">{listing.description}</p>
-            )}
+          <div className="lc-tags">
+            {listing.category && <span className="badge badge-gray">{listing.category}</span>}
+            {listing.condition && <span className="badge badge-gray">{listing.condition}</span>}
           </div>
-
-          <div className="flex items-center justify-between">
-            <p className={`text-xl font-bold ${isCertified ? 'text-yellow-400' : 'text-green-400'}`}>
-              {listing.price.toLocaleString()} ฿
-            </p>
-            <div className="flex flex-col items-end gap-0.5 text-xs text-gray-500">
-              {listing.location && <span>📍 {listing.location}</span>}
-              {listing.category && <span>📦 {listing.category}</span>}
-            </div>
+          <div className="lc-price">฿{(listing.price || 0).toLocaleString()}</div>
+          <h3 className="lc-title">{listing.title}</h3>
+          <div className="lc-seller">
+            <span className="avatar" style={{ width: 24, height: 24, fontSize: 11, background: avatarBg }}>{(listing.sellerName || 'ผู้ขาย').slice(0, 1)}</span>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.sellerName || 'ผู้ขาย'}</span>
+            {listing.location && <span style={{ fontSize: 12, color: 'var(--faint)' }}>📍 {listing.location}</span>}
           </div>
-
-          <p className="text-xs text-gray-500">👤 {listing.sellerName || 'ผู้ขาย'}</p>
-
-          {/* Actions */}
-          <div className="space-y-2 pt-1">
+          <div className="lc-actions">
             {isMyDeal ? (
-              <Link href={`/deal/${listing.$id}`}
-                className="block w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium text-center transition text-sm"
-              >เข้าห้อง Deal ของคุณ</Link>
+              <Link href={`/deal/${listing.$id}`} className="btn btn-primary btn-sm" style={{ flex: 1, background: 'var(--green-500)' }}>เข้าห้อง Deal ของคุณ</Link>
             ) : isCertified ? (
-              <button onClick={() => joinDeal(listing.$id)} disabled={joining === listing.$id}
-                className="w-full py-2.5 rounded-xl bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white font-semibold transition text-sm"
-              >
-                {joining === listing.$id ? 'กำลังเข้าร่วม...' : '⭐ ซื้อสินค้า Certified'}
+              <button onClick={() => joinDeal(listing.$id)} disabled={joining === listing.$id} className="btn btn-primary btn-sm" style={{ flex: 1, background: 'var(--amber-500)', color: '#3a2700' }}>
+                {joining === listing.$id ? 'กำลังเข้าร่วม...' : '⭐ ซื้อ Certified'}
               </button>
             ) : (
-              <div className="flex gap-2">
-                <button onClick={() => joinDeal(listing.$id)} disabled={joining === listing.$id}
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium transition text-sm"
-                >
+              <>
+                <button onClick={() => joinDeal(listing.$id)} disabled={joining === listing.$id} className="btn btn-primary btn-sm" style={{ flex: 1 }}>
                   {joining === listing.$id ? '...' : 'ขอซื้อ'}
                 </button>
-                <button onClick={() => callMiddleman(listing.$id)} disabled={contacting === listing.$id}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white font-medium transition text-sm"
-                >
-                  {contacting === listing.$id ? '...' : '🤝 เรียกคนกลาง'}
+                <button onClick={() => callMiddleman(listing.$id)} disabled={contacting === listing.$id} className="btn btn-ghost btn-sm" style={{ flex: 1 }}>
+                  {contacting === listing.$id ? '...' : '🤝 คนกลาง'}
                 </button>
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -229,98 +205,78 @@ export default function Marketplace() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-white">
-      {/* Header */}
-      <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-        <Link href="/" className="text-gray-400 hover:text-white transition">←</Link>
-        <h1 className="text-xl font-bold">ตลาด Khonklang</h1>
-        <span className="ml-auto text-xs text-gray-500">{filtered.length} รายการ</span>
+    <>
+      <Nav active="market" />
+
+      <section className="mkt-hero">
+        <div className="container mkt-hero-inner">
+          <div>
+            <div className="kicker" style={{ marginBottom: 10 }}>ตลาดคนกลาง</div>
+            <h1 className="mkt-headline reveal">ซื้อขายได้ทุกหมวด <span className="gradient-text">มั่นใจทุกมูลค่า</span></h1>
+            <p className="mkt-sub reveal" style={{ ['--d' as string]: '60ms' }}>ทุกรายการปลอดภัยด้วยระบบ Escrow — พักเงินจนกว่าจะได้ของตรงปก</p>
+          </div>
+          <div className="mkt-search reveal" style={{ ['--d' as string]: '100ms' }}>
+            <Icon name="search" size={18} style={{ color: 'var(--faint)', flexShrink: 0 }} />
+            <input type="text" placeholder="ค้นหา iPhone, รถมือสอง, ไอดีเกม…" value={search} onChange={e => setSearch(e.target.value)} />
+            <button className="btn btn-primary btn-sm">ค้นหา</button>
+          </div>
+          <div className="mkt-cats reveal" style={{ ['--d' as string]: '140ms' }}>
+            {CATS.map(c => (
+              <button key={c} className={`chip ${cat === c ? 'is-active' : ''}`} onClick={() => setCat(c)}>
+                <Icon name={CAT_ICON[c] || 'box'} />{c}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="container mkt-layout">
+        <aside className="mkt-sidebar">
+          <div className="mkt-filter-card">
+            <h4>จังหวัด</h4>
+            <select value={province} onChange={e => setProvince(e.target.value)} style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '10px 12px', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink)', background: 'var(--surface-2)' }}>
+              <option value="">📍 ทุกจังหวัด</option>
+              {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div className="mkt-filter-card" style={{ marginTop: 14 }}>
+            <h4>การรับรอง</h4>
+            <label className="filter-row" onClick={() => setCertified(c => !c)} style={{ cursor: 'pointer' }}>
+              <span>⭐ Certified เท่านั้น</span>
+              <input type="checkbox" checked={certified} readOnly />
+            </label>
+          </div>
+        </aside>
+
+        <div>
+          <div className="mkt-topbar">
+            <span className="mkt-count">แสดง <b style={{ color: 'var(--ink)' }}>{filtered.length}</b> รายการ {cat !== 'ทั้งหมด' && `ใน "${cat}"`}</span>
+            <div className="mkt-sort">
+              <span style={{ fontSize: 14, color: 'var(--muted)' }}>เรียงโดย</span>
+              <select value={sort} onChange={e => setSort(e.target.value)}>
+                {['ล่าสุด', 'ราคา: น้อย→มาก', 'ราคา: มาก→น้อย'].map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
+              <div style={{ width: 32, height: 32, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'dashSpin .8s linear infinite' }} />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="mkt-empty">
+              <div className="mkt-empty-ic"><Icon name="search" size={32} /></div>
+              <p>ไม่พบสินค้าที่ตรงกับที่ค้นหา</p>
+              <button className="btn btn-soft" style={{ marginTop: 14 }} onClick={() => { setCat('ทั้งหมด'); setSearch(''); setProvince(''); setCertified(false); }}>ล้างตัวกรอง</button>
+            </div>
+          ) : (
+            <div className="mkt-grid">
+              {filtered.map((item, i) => <ListingCard key={item.$id} listing={item} idx={i} />)}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
-        {/* Search */}
-        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="🔍 ค้นหาสินค้า..."
-          className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
-        />
-
-        {/* Filter row */}
-        <div className="flex gap-2 flex-wrap items-center">
-          <select value={province} onChange={e => setProvince(e.target.value)}
-            className="bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition"
-          >
-            <option value="">📍 ทุกจังหวัด</option>
-            {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-
-          <button onClick={() => setCertified(c => !c)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm transition ${
-              certified
-                ? 'bg-yellow-600/30 border-yellow-500 text-yellow-300'
-                : 'bg-white/5 border-white/15 text-gray-400 hover:border-yellow-500 hover:text-yellow-300'
-            }`}
-          >
-            ⭐ Certified เท่านั้น
-            <span className={`w-4 h-4 rounded-full border transition ${
-              certified ? 'bg-yellow-400 border-yellow-400' : 'border-gray-500'
-            }`} />
-          </button>
-        </div>
-
-        {/* Category chips */}
-        <div className="flex gap-2 flex-wrap">
-          {CATS.map(c => (
-            <button key={c} onClick={() => setCat(c)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition ${
-                cat === c ? 'bg-blue-600 border-blue-500 text-white' : 'border-white/15 text-gray-400 hover:text-white'
-              }`}
-            >{c}</button>
-          ))}
-        </div>
-
-        {/* Results */}
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20 space-y-2">
-            <p className="text-4xl">🛒</p>
-            <p className="text-gray-400">ไม่พบสินค้าที่ตรงกัน</p>
-            <p className="text-sm text-gray-600">ลองเปลี่ยนตัวกรองหรือค้นหาด้วยคำอื่น</p>
-          </div>
-        ) : (
-          <>
-            {/* Certified section */}
-            {certifiedList.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-yellow-400 font-semibold text-sm">⭐ Khonklang Certified</span>
-                  <span className="text-xs text-gray-500">({certifiedList.length} รายการ)</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {certifiedList.map(d => <ListingCard key={d.$id} listing={d} />)}
-                </div>
-              </div>
-            )}
-
-            {/* Normal section */}
-            {normalList.length > 0 && (
-              <div className="space-y-3">
-                {certifiedList.length > 0 && (
-                  <div className="flex items-center gap-2 pt-2">
-                    <span className="text-gray-300 font-semibold text-sm">🏪 สินค้าทั่วไป</span>
-                    <span className="text-xs text-gray-500">({normalList.length} รายการ)</span>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {normalList.map(d => <ListingCard key={d.$id} listing={d} />)}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+      <Footer />
+    </>
   );
 }

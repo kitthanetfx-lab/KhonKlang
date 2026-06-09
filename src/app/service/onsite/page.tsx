@@ -1,73 +1,51 @@
 'use client';
 import Link from 'next/link';
 
+const EXPERTS = [
+  { icon: '🔧', t: 'ช่างยนต์', sub: 'ตรวจรถมือสอง' },
+  { icon: '📱', t: 'ช่างมือถือ', sub: 'ทดสอบสมาร์ทโฟน' },
+  { icon: '💻', t: 'ช่างคอม', sub: 'ตรวจสเปค+แบต' },
+  { icon: '👜', t: 'เซียนแบรนด์', sub: 'ตรวจของแท้' },
+  { icon: '🪨', t: 'เซียนพระ', sub: 'ตรวจพระ+ของสะสม' },
+  { icon: '🏠', t: 'สถาปนิก', sub: 'ตรวจบ้าน+คอนโด' },
+];
 const STEPS = [
-  { icon: '📋', title: 'ผู้ซื้อสร้างคำขอ', desc: 'ระบุสินค้า ที่อยู่ผู้ขาย และงบที่ยอมรับได้' },
-  { icon: '🤝', title: 'คนกลางเสนอราคา', desc: 'คนกลางในพื้นที่ส่งใบเสนอค่าเดินทาง + ค่าบริการ' },
-  { icon: '✅', title: 'ผู้ซื้ออนุมัติ', desc: 'ผู้ซื้อเห็นเงินประกันคนกลางและยืนยันรับข้อเสนอ' },
-  { icon: '🚗', title: 'คนกลางลงพื้นที่', desc: 'เดินทางไปถึงสถานที่ ตรวจสอบสินค้าจริง ถ่ายรูป/วิดีโอ' },
-  { icon: '📦', title: 'รายงานผล + ส่งสินค้า', desc: 'คนกลางส่งรายงาน หากผ่านก็นำส่งหรือช่วยประสานงานส่งให้ผู้ซื้อ' },
+  { t: 'สร้างงานออนไซต์', d: 'กรอกรายละเอียดสินค้า ที่อยู่ผู้ขาย และงบประมาณ' },
+  { t: 'ผู้เชี่ยวชาญรับงาน', d: 'ผู้เชี่ยวชาญในพื้นที่รับงานและยืนยันเวลา' },
+  { t: 'เข้าตรวจสถานที่จริง', d: 'ผู้เชี่ยวชาญออกไปตรวจ ณ ที่ตั้งผู้ขาย พร้อมถ่ายวิดีโอ' },
+  { t: 'รับรายงานผล', d: 'คุณได้รับรายงานละเอียด ก่อนตัดสินใจซื้อ' },
+  { t: 'ตัดสินใจ', d: 'ถ้าพอใจ สร้างดีล Escrow ต่อ หรือยกเลิกได้เลย' },
 ];
 
-export default function OnsiteService() {
+export default function ServiceOnsitePage() {
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-white">
-      <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
-        <Link href="/service/trade" className="text-gray-400 hover:text-white">←</Link>
-        <h1 className="text-xl font-bold">จ้างคนกลางลงพื้นที่</h1>
-      </div>
-
-      <div className="max-w-2xl mx-auto px-4 py-10 space-y-8">
-        {/* Hero */}
-        <div className="text-center space-y-3">
-          <div className="text-6xl">🔍</div>
-          <h2 className="text-2xl font-bold">On-site Inspection</h2>
-          <p className="text-gray-400 leading-relaxed">
-            ส่งคนกลางไปดูสินค้าถึงที่ ตรวจสอบสภาพจริง ถ่ายวิดีโอ<br />
-            เหมาะกับรถมือสอง เครื่องจักร หรืออสังหาริมทรัพย์
-          </p>
+    <div className="sub-page">
+      <header className="sub-header">
+        <Link href="/" className="sub-back">←</Link>
+        <span className="sub-htitle">บริการออนไซต์</span>
+      </header>
+      <div className="svc-inner">
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontSize: 52, lineHeight: 1, marginBottom: 14 }}>🔍</div>
+          <h1 style={{ fontSize: 'clamp(22px,4vw,30px)', marginBottom: 10 }}>ผู้เชี่ยวชาญตรวจถึงที่</h1>
+          <p style={{ color: 'var(--muted)', fontSize: 14.5, lineHeight: 1.6, maxWidth: '44ch', margin: '0 auto' }}>ส่งผู้เชี่ยวชาญไปตรวจสินค้า ณ ที่ตั้งผู้ขายก่อนโอนเงิน เหมาะกับรถ เครื่องจักร บ้าน พระเครื่อง</p>
         </div>
-
-        {/* Safety guarantee */}
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center gap-2 font-semibold text-yellow-300">
-            🛡️ ระบบเงินประกันป้องกันทุจริต
-          </div>
-          <p className="text-sm text-gray-300 leading-relaxed">
-            คนกลางทุกคนต้องวางเงินประกันกับระบบ (Bronze 1,000 ฿ / Silver 5,000 ฿ / Gold 20,000 ฿ / Platinum 50,000 ฿)
-            หากพบการทุจริตหรือฮั้วกับผู้ขาย <strong className="text-yellow-300">แพลตฟอร์มยึดเงินประกันชดเชยคุณทันที</strong>
-          </p>
-        </div>
-
-        {/* Steps */}
-        <div className="space-y-3">
-          <h3 className="font-semibold text-gray-300">ขั้นตอนการทำงาน</h3>
-          {STEPS.map((s, i) => (
-            <div key={i} className="flex gap-4 bg-white/5 border border-white/10 rounded-xl p-4">
-              <div className="text-2xl flex-shrink-0">{s.icon}</div>
-              <div>
-                <p className="font-medium text-white">{s.title}</p>
-                <p className="text-sm text-gray-400 mt-0.5">{s.desc}</p>
-              </div>
-            </div>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 12 }}>ผู้เชี่ยวชาญที่มีให้บริการ</div>
+        <div className="expert-grid">
+          {EXPERTS.map(e => (
+            <div key={e.t} className="expert-card"><div className="expert-icon">{e.icon}</div><div className="expert-title">{e.t}</div><div className="expert-sub">{e.sub}</div></div>
           ))}
         </div>
-
-        {/* Use cases */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
-          <h3 className="font-semibold text-gray-300">เหมาะกับสินค้าประเภทใด?</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm text-gray-400">
-            {['🚗 รถยนต์มือสอง','🏍️ มอเตอร์ไซค์','🏠 อสังหาริมทรัพย์','⚙️ เครื่องจักร','🖥️ คอมพิวเตอร์/สินค้าชิ้นใหญ่','💎 ของมีค่า'].map(u => (
-              <div key={u} className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">{u}</div>
-            ))}
-          </div>
+        <div className="how-card">
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 14 }}>วิธีการทำงาน</div>
+          {STEPS.map((s, i) => (
+            <div key={i} className="how-step"><div className="how-num">{i + 1}</div><div><div className="how-t">{s.t}</div><div className="how-d">{s.d}</div></div></div>
+          ))}
         </div>
-
-        <Link href="/onsite/create"
-          className="block w-full py-4 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-center text-lg transition"
-        >
-          📋 สร้างคำขอลงพื้นที่
-        </Link>
+        <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 20 }}>
+          💰 ค่าบริการ: ฿200–800 ขึ้นอยู่กับประเภทสินค้าและระยะทาง · จ่ายเฉพาะเมื่อรับงานสำเร็จ
+        </div>
+        <Link href="/onsite/create" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>สร้างงานออนไซต์ →</Link>
       </div>
     </div>
   );

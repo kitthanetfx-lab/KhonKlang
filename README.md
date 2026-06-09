@@ -1,36 +1,25 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# คนกลาง (Khonklang) — Next.js
 
-## Getting Started
+แพลตฟอร์มซื้อขายปลอดภัยผ่านคนกลาง (Escrow) — เวอร์ชันที่ปรับ **ดีไซน์ใหม่ทั้งหมด** (light fintech)
+โดย **คงตรรกะเดิมทุกอย่างไว้** (Appwrite, LINE/Google/Facebook login, KYC upload, API routes, thai-address)
 
-First, run the development server:
+## โครงสร้าง
+- **เปลี่ยนใหม่:** ดีไซน์ UI ทุกหน้า + `src/app/globals.css` (design system ใหม่)
+- **คงเดิม:** `src/app/api/**` (backend ทั้งหมด), `src/lib/**`, ตรรกะ fetch/auth/upload ในทุกหน้า
 
+## เริ่มใช้งาน
 ```bash
+npm install
+cp .env.local.example .env.local   # แล้วกรอกค่า Appwrite / LINE จริง
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
+เปิด http://localhost:3000
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## คอมโพเนนต์ดีไซน์ใหม่ที่เพิ่ม
+- `src/components/Site.tsx` — Nav, Footer, Logo, hooks (reveal/tilt/countup)
+- `src/components/Icon.tsx` — ชุดไอคอน geometric (แทน lucide ในหน้าหลัก)
+- `src/components/EscrowStage.tsx` — แอนิเมชัน Escrow หน้าแรก
+- `src/components/ServiceSlider.tsx` — สไลด์บริการหน้าแรก
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> หน้า KYC register (seller/middleman) และ `/admin/*` ยังใช้ Tailwind + lucide เดิม
+> เพื่อคงความถูกต้องของฟอร์มหลายขั้นตอนและตาราง admin ไว้ครบถ้วน

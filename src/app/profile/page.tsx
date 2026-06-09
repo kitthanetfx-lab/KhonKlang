@@ -1,35 +1,21 @@
 'use client';
 
-import { Suspense, useState, useEffect, Fragment } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  User, Mail, Phone, MapPin, ShieldCheck, Pencil, Check, X,
-  Store, HandshakeIcon, ChevronRight, Clock, CheckCircle2,
-  XCircle, AlertTriangle, LogOut, ArrowLeft, Camera,
-  Landmark, FileText,
-} from 'lucide-react';
-import { account } from '@/lib/appwrite';
 import type { ReactNode } from 'react';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
+import { account } from '@/lib/appwrite';
+import { Icon } from '@/components/Icon';
 
 const PROVINCES = ['กระบี่','กรุงเทพมหานคร','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
-const ROLE_INFO: Record<string, { label: string; icon: ReactNode; color: string; bg: string }> = {
-  admin:     { label: 'ผู้ดูแลระบบ', icon: <ShieldCheck size={14} />, color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700' },
-  middleman: { label: 'คนกลาง',     icon: <HandshakeIcon size={14} />, color: 'text-green-700 dark:text-green-300',  bg: 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700' },
-  seller:    { label: 'ผู้ขาย',     icon: <Store size={14} />,        color: 'text-blue-700 dark:text-blue-300',    bg: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700' },
-  user:      { label: 'ผู้ใช้งาน', icon: <User size={14} />,         color: 'text-gray-600 dark:text-gray-300',    bg: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600' },
+const ROLE_INFO: Record<string, { label: string; cls: string }> = {
+  admin:     { label: 'ผู้ดูแลระบบ', cls: 'pf-role-middleman' },
+  middleman: { label: 'คนกลาง',     cls: 'pf-role-middleman' },
+  seller:    { label: 'ผู้ขาย',     cls: 'pf-role-seller' },
+  user:      { label: 'ผู้ใช้งาน', cls: 'pf-role-user' },
 };
 
-const APP_STATUS: Record<string, { label: string; icon: ReactNode; color: string }> = {
-  pending_review: { label: 'รอตรวจสอบ',    icon: <Clock size={14} />,        color: 'text-amber-600 dark:text-amber-400' },
-  approved:       { label: 'อนุมัติแล้ว',  icon: <CheckCircle2 size={14} />, color: 'text-green-600 dark:text-green-400' },
-  rejected:       { label: 'ไม่อนุมัติ',  icon: <XCircle size={14} />,      color: 'text-red-600 dark:text-red-400' },
-};
-
-/** แยก address string → structured fields */
 function parseAddress(addr: string) {
   const postalM = addr.match(/\b(\d{5})\b/);
   const roadM   = addr.match(/ถ\.(\S+)/);
@@ -38,62 +24,45 @@ function parseAddress(addr: string) {
   const tambonM = addr.match(/ต\.(\S+)/);
   const firstTok = addr.trim().split(/\s+/)[0];
   return {
-    houseNo:      (firstTok && /^[\d\/]/.test(firstTok)) ? firstTok : '',
-    moo:          mooM  ? mooM[1]  : '',
-    road:         roadM ? roadM[1] : '',
+    houseNo: (firstTok && /^[\d\/]/.test(firstTok)) ? firstTok : '',
+    moo: mooM ? mooM[1] : '', road: roadM ? roadM[1] : '',
     provinceName: PROVINCES.find(p => addr.includes(p)) || '',
-    amphoreName:  amphoeM ? amphoeM[1] : '',
-    tambonName:   tambonM ? tambonM[1] : '',
-    postalCode:   postalM ? postalM[1] : '',
+    amphoreName: amphoeM ? amphoeM[1] : '', tambonName: tambonM ? tambonM[1] : '',
+    postalCode: postalM ? postalM[1] : '',
   };
 }
-
 function buildAddress(f: ReturnType<typeof parseAddress>) {
-  return [
-    f.houseNo,
-    f.moo          ? `หมู่ ${f.moo}`      : '',
-    f.road         ? `ถ.${f.road}`         : '',
-    f.tambonName   ? `ต.${f.tambonName}`   : '',
-    f.amphoreName  ? `อ.${f.amphoreName}`  : '',
-    f.provinceName ? `จ.${f.provinceName}` : '',
-    f.postalCode,
-  ].filter(Boolean).join(' ');
+  return [f.houseNo, f.moo ? `หมู่ ${f.moo}` : '', f.road ? `ถ.${f.road}` : '', f.tambonName ? `ต.${f.tambonName}` : '', f.amphoreName ? `อ.${f.amphoreName}` : '', f.provinceName ? `จ.${f.provinceName}` : '', f.postalCode].filter(Boolean).join(' ');
 }
-
-// ─── Main component ────────────────────────────────────────────────────────────
 
 function ProfilePage() {
   const router = useRouter();
-
-  // raw user data
-  const [userId, setUserId]       = useState('');
+  const [userId, setUserId] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [email, setEmail]         = useState('');
-  const [prefs, setPrefs]         = useState<Record<string, string>>({});
+  const [email, setEmail] = useState('');
+  const [prefs, setPrefs] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState('');
+  const [saveOk, setSaveOk] = useState(false);
 
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [editing, setEditing]   = useState(false);
-  const [error, setError]       = useState('');
-  const [saveOk, setSaveOk]     = useState(false);
-
-  // edit form state
   const [editFirst, setEditFirst] = useState('');
-  const [editLast, setEditLast]   = useState('');
+  const [editLast, setEditLast] = useState('');
   const [editPhone, setEditPhone] = useState('');
-  const [editAddr, setEditAddr]   = useState({
-    houseNo: '', moo: '', road: '',
-    provinceName: '', amphoreName: '', tambonName: '', postalCode: '',
-  });
-
-  const [amphoes, setAmphoes]         = useState<string[]>([]);
-  const [tambons, setTambons]         = useState<[string, string][]>([]);
+  const [editAddr, setEditAddr] = useState({ houseNo: '', moo: '', road: '', provinceName: '', amphoreName: '', tambonName: '', postalCode: '' });
+  const [amphoes, setAmphoes] = useState<string[]>([]);
+  const [tambons, setTambons] = useState<[string, string][]>([]);
   const [loadingAmph, setLoadingAmph] = useState(false);
   const [loadingTamb, setLoadingTamb] = useState(false);
 
-  const ic = 'w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-40 text-sm';
+  useEffect(() => {
+    const r = document.documentElement;
+    r.style.setProperty('--accent', '#2f6bf0');
+    r.style.setProperty('--accent-strong', '#1f54d6');
+    r.style.setProperty('--accent-soft', '#eef4ff');
+  }, []);
 
-  // Load user + sync approval status across accounts
   useEffect(() => {
     account.get()
       .then(async u => {
@@ -103,25 +72,17 @@ function ProfilePage() {
         setEmail(em);
         let p = (u.prefs || {}) as Record<string, string>;
         setPrefs(p);
-
-        // Sync approval prefs for multi-account users (LINE vs Google)
         try {
           const jwt = (await account.createJWT()).jwt;
           const [sellerRes, middlemanRes] = await Promise.all([
             fetch('/api/register/seller', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
             fetch('/api/register/middleman', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
           ]);
-          const sellerData     = sellerRes?.ok     ? await sellerRes.json()     : null;
-          const middlemanData  = middlemanRes?.ok  ? await middlemanRes.json()  : null;
+          const sellerData = sellerRes?.ok ? await sellerRes.json() : null;
+          const middlemanData = middlemanRes?.ok ? await middlemanRes.json() : null;
           let synced = false;
-          if (sellerData?.status && sellerData.status !== p.sellerStatus) {
-            p = { ...p, sellerStatus: sellerData.status };
-            synced = true;
-          }
-          if (middlemanData?.status && middlemanData.status !== p.middlemanStatus) {
-            p = { ...p, middlemanStatus: middlemanData.status };
-            synced = true;
-          }
+          if (sellerData?.status && sellerData.status !== p.sellerStatus) { p = { ...p, sellerStatus: sellerData.status }; synced = true; }
+          if (middlemanData?.status && middlemanData.status !== p.middlemanStatus) { p = { ...p, middlemanStatus: middlemanData.status }; synced = true; }
           if (synced) setPrefs(p);
         } catch { /* best-effort */ }
       })
@@ -129,42 +90,30 @@ function ProfilePage() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  // Open edit form
   const openEdit = () => {
-    setEditFirst(prefs.firstName || '');
-    setEditLast(prefs.lastName   || '');
-    setEditPhone(prefs.phone     || '');
-    setEditAddr(parseAddress(prefs.address || ''));
-    setError('');
-    setSaveOk(false);
-    setEditing(true);
+    setEditFirst(prefs.firstName || ''); setEditLast(prefs.lastName || '');
+    setEditPhone(prefs.phone || ''); setEditAddr(parseAddress(prefs.address || ''));
+    setError(''); setSaveOk(false); setEditing(true);
   };
-
   const cancelEdit = () => { setEditing(false); setError(''); };
 
-  // Province → amphoe cascade
   useEffect(() => {
     if (!editAddr.provinceName) { setAmphoes([]); setTambons([]); return; }
     setLoadingAmph(true);
     fetch(`/api/thai-address?type=amphures&province=${encodeURIComponent(editAddr.provinceName)}`)
-      .then(r => r.json()).then(d => setAmphoes(Array.isArray(d) ? d : []))
-      .catch(() => setAmphoes([]))
-      .finally(() => setLoadingAmph(false));
+      .then(r => r.json()).then(d => setAmphoes(Array.isArray(d) ? d : [])).catch(() => setAmphoes([])).finally(() => setLoadingAmph(false));
   }, [editAddr.provinceName]);
 
-  // Amphoe → tambon cascade
   useEffect(() => {
     if (!editAddr.amphoreName || !editAddr.provinceName) { setTambons([]); return; }
     setLoadingTamb(true);
     fetch(`/api/thai-address?type=tambons&province=${encodeURIComponent(editAddr.provinceName)}&amphoe=${encodeURIComponent(editAddr.amphoreName)}`)
-      .then(r => r.json()).then(d => setTambons(Array.isArray(d) ? d : []))
-      .catch(() => setTambons([]))
-      .finally(() => setLoadingTamb(false));
+      .then(r => r.json()).then(d => setTambons(Array.isArray(d) ? d : [])).catch(() => setTambons([])).finally(() => setLoadingTamb(false));
   }, [editAddr.provinceName, editAddr.amphoreName]);
 
   const onProvince = (name: string) => setEditAddr({ houseNo: editAddr.houseNo, moo: editAddr.moo, road: editAddr.road, provinceName: name, amphoreName: '', tambonName: '', postalCode: '' });
-  const onAmphoe   = (name: string) => setEditAddr(a => ({ ...a, amphoreName: name, tambonName: '', postalCode: '' }));
-  const onTambon   = (val: string)  => { const [n, z] = val.split('|'); setEditAddr(a => ({ ...a, tambonName: n, postalCode: z })); };
+  const onAmphoe = (name: string) => setEditAddr(a => ({ ...a, amphoreName: name, tambonName: '', postalCode: '' }));
+  const onTambon = (val: string) => { const [n, z] = val.split('|'); setEditAddr(a => ({ ...a, tambonName: n, postalCode: z })); };
 
   const handleSave = async () => {
     if (!editFirst.trim() || !editLast.trim()) return setError('กรุณากรอกชื่อ-นามสกุล');
@@ -179,410 +128,164 @@ function ProfilePage() {
         body: JSON.stringify({ firstName: editFirst, lastName: editLast, phone: editPhone, address }),
       });
       if (!res.ok) { const d = await res.json(); setError(d.error || 'เกิดข้อผิดพลาด'); return; }
-      // update local state
       const newPrefs = { ...prefs, firstName: editFirst, lastName: editLast, phone: editPhone, address, displayName: `${editFirst} ${editLast}`.trim() };
-      setPrefs(newPrefs);
-      setDisplayName(`${editFirst} ${editLast}`.trim());
-      setSaveOk(true);
+      setPrefs(newPrefs); setDisplayName(`${editFirst} ${editLast}`.trim()); setSaveOk(true);
       setTimeout(() => { setEditing(false); setSaveOk(false); }, 1200);
-    } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่');
-    } finally {
-      setSaving(false);
-    }
+    } catch { setError('เกิดข้อผิดพลาด กรุณาลองใหม่'); } finally { setSaving(false); }
   };
 
-  const logout = async () => {
-    await account.deleteSession('current');
-    router.push('/');
-  };
+  const logout = async () => { await account.deleteSession('current'); router.push('/'); };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400 animate-pulse">กำลังโหลด...</p>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: 'var(--muted)' }}>กำลังโหลด...</p>
     </div>
   );
 
-  const role      = (prefs.role || 'user') as string;
-  const roleInfo  = ROLE_INFO[role] ?? ROLE_INFO.user;
-  const firstName = prefs.firstName || '';
-  const lastName  = prefs.lastName  || '';
-  const phone     = prefs.phone     || '';
-  const address   = prefs.address   || '';
-  const initials  = (displayName || 'U').slice(0, 2).toUpperCase();
+  const role = (prefs.role || 'user') as string;
+  const roleInfo = ROLE_INFO[role] ?? ROLE_INFO.user;
+  const firstName = prefs.firstName || '', lastName = prefs.lastName || '';
+  const phone = prefs.phone || '', address = prefs.address || '';
+  const initials = (displayName || 'U').slice(0, 2).toUpperCase();
+  const sellerStatus = prefs.sellerStatus || '', middlemanStatus = prefs.middlemanStatus || '';
 
-  const sellerStatus    = prefs.sellerStatus    || '';
-  const middlemanStatus = prefs.middlemanStatus || '';
+  function StatusBadge({ status }: { status: string }) {
+    if (status === 'approved') return <span className="pf-status-badge pf-status-approved">✅ อนุมัติแล้ว</span>;
+    if (status === 'pending_review') return <span className="pf-status-badge pf-status-pending">⏳ รอตรวจสอบ</span>;
+    if (status === 'rejected') return <span className="pf-status-badge pf-status-rejected">❌ ไม่อนุมัติ</span>;
+    return <span className="pf-status-badge pf-status-pending">{status}</span>;
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4 sm:px-6">
-      <div className="max-w-2xl mx-auto space-y-5">
+    <div className="sub-page">
+      <header className="sub-header">
+        <Link href="/" className="sub-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
+        <span className="sub-htitle" style={{ flex: 1 }}>โปรไฟล์ของฉัน</span>
+        {!editing
+          ? <button className="btn btn-ghost btn-sm" onClick={openEdit}><Icon name="user" size={14} /> แก้ไข</button>
+          : <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={cancelEdit}>ยกเลิก</button>
+              <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+            </div>}
+      </header>
 
-        {/* Back */}
-        <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-sm transition-colors">
-          <ArrowLeft size={16} /> กลับหน้าแรก
-        </Link>
-
-        {/* ── Header card ── */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-          {/* Blue bar */}
-          <div className="h-24 bg-gradient-to-r from-blue-600 to-blue-800 relative">
-            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 50%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-          </div>
-
-          <div className="px-6 pb-6">
-            {/* Avatar */}
-            <div className="flex items-end justify-between -mt-12 mb-4">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 border-4 border-white dark:border-gray-900 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                  {initials}
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" title="ออนไลน์" />
-              </div>
-
-              <div className="flex gap-2 pt-14">
-                {!editing && (
-                  <button onClick={openEdit}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all">
-                    <Pencil size={14} /> แก้ไขข้อมูล
-                  </button>
-                )}
-                <button onClick={logout}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl text-red-500 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800 transition-all">
-                  <LogOut size={14} /> ออกจากระบบ
-                </button>
-              </div>
-            </div>
-
-            <h1 className="text-xl font-bold">{displayName || 'ผู้ใช้งาน'}</h1>
-            {email && <p className="text-sm text-gray-500 mt-0.5">{email}</p>}
-
-            <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border text-xs font-medium ${roleInfo.bg} ${roleInfo.color}`}>
-              {roleInfo.icon} {roleInfo.label}
+      <div className="pf-inner">
+        <div className="pf-hero">
+          <div className="pf-avatar">{initials}</div>
+          <div className="pf-hero-info">
+            <div className="pf-name">{displayName || 'ผู้ใช้งาน'}</div>
+            {email && <div style={{ fontSize: 13, color: 'var(--muted)' }}>{email}</div>}
+            <div className="pf-badges">
+              <span className={`pf-role-badge ${roleInfo.cls}`}>{roleInfo.label}</span>
+              {sellerStatus === 'approved' && <span className="pf-role-badge pf-role-seller">🛒 ผู้ขาย</span>}
+              {middlemanStatus === 'approved' && <span className="pf-role-badge pf-role-middleman">🤝 คนกลาง</span>}
             </div>
           </div>
         </div>
 
-        {/* ── View mode: personal info ── */}
-        {!editing && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-              <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">ข้อมูลส่วนตัว</h2>
-              <button onClick={openEdit} className="text-blue-600 text-xs hover:underline flex items-center gap-1">
-                <Pencil size={11} /> แก้ไข
-              </button>
-            </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              <InfoRow icon={<User size={15} />}    label="ชื่อ-นามสกุล" value={`${firstName} ${lastName}`.trim() || '—'} />
-              <InfoRow icon={<Mail size={15} />}    label="อีเมล"         value={email || '—'} />
-              <InfoRow icon={<Phone size={15} />}   label="เบอร์โทรศัพท์" value={phone || '—'} />
-              <InfoRow icon={<MapPin size={15} />}  label="ที่อยู่"        value={address || '—'} multiline />
-            </div>
-          </div>
-        )}
-
-        {/* ── Edit mode ── */}
-        {editing && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-              <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">แก้ไขข้อมูลส่วนตัว</h2>
-              <button onClick={cancelEdit} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {/* Name */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">ชื่อ <span className="text-red-500">*</span></label>
-                  <input className={ic} value={editFirst} onChange={e => setEditFirst(e.target.value)} placeholder="ชื่อ" />
+        {/* Personal info */}
+        <div className="pf-card">
+          <div className="pf-card-title">ข้อมูลส่วนตัว</div>
+          {editing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div><div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>ชื่อ *</div><input className="pf-edit-input" value={editFirst} onChange={e => setEditFirst(e.target.value)} placeholder="ชื่อ" /></div>
+                <div><div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>นามสกุล *</div><input className="pf-edit-input" value={editLast} onChange={e => setEditLast(e.target.value)} placeholder="นามสกุล" /></div>
+              </div>
+              <div><div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>เบอร์โทรศัพท์ *</div><input className="pf-edit-input" value={editPhone} onChange={e => setEditPhone(e.target.value.replace(/\D/g, ''))} placeholder="0812345678" maxLength={10} inputMode="numeric" /></div>
+              <div style={{ borderTop: '1px solid var(--line-2)', paddingTop: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, fontWeight: 600 }}>ที่อยู่</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                  <input className="pf-edit-input" value={editAddr.houseNo} onChange={e => setEditAddr(a => ({ ...a, houseNo: e.target.value }))} placeholder="บ้านเลขที่" />
+                  <input className="pf-edit-input" value={editAddr.moo} onChange={e => setEditAddr(a => ({ ...a, moo: e.target.value }))} placeholder="หมู่" />
+                  <input className="pf-edit-input" value={editAddr.road} onChange={e => setEditAddr(a => ({ ...a, road: e.target.value }))} placeholder="ถนน" />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">นามสกุล <span className="text-red-500">*</span></label>
-                  <input className={ic} value={editLast} onChange={e => setEditLast(e.target.value)} placeholder="นามสกุล" />
+                <select className="pf-edit-input" style={{ marginBottom: 10 }} value={editAddr.provinceName} onChange={e => onProvince(e.target.value)}>
+                  <option value="">เลือกจังหวัด</option>
+                  {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <select className="pf-edit-input" style={{ marginBottom: 10 }} value={editAddr.amphoreName} onChange={e => onAmphoe(e.target.value)} disabled={!editAddr.provinceName || loadingAmph}>
+                  <option value="">{loadingAmph ? 'กำลังโหลด...' : editAddr.provinceName ? 'เลือกอำเภอ' : '— เลือกจังหวัดก่อน —'}</option>
+                  {amphoes.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <select className="pf-edit-input" value={editAddr.tambonName ? `${editAddr.tambonName}|${editAddr.postalCode}` : ''} onChange={e => onTambon(e.target.value)} disabled={!editAddr.amphoreName || loadingTamb}>
+                    <option value="">{loadingTamb ? 'กำลังโหลด...' : editAddr.amphoreName ? 'เลือกตำบล' : '— เลือกอำเภอก่อน —'}</option>
+                    {tambons.map(([n, z]) => <option key={n} value={`${n}|${z}`}>{n}</option>)}
+                  </select>
+                  <input readOnly className="pf-edit-input" style={{ background: 'var(--surface-2)', color: 'var(--muted)' }} value={editAddr.postalCode} placeholder="รหัสไปรษณีย์" />
                 </div>
               </div>
-
-              {/* Phone */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">เบอร์โทรศัพท์ <span className="text-red-500">*</span></label>
-                <input className={ic} value={editPhone} onChange={e => setEditPhone(e.target.value.replace(/\D/g,''))} placeholder="0812345678" maxLength={10} inputMode="numeric" />
-              </div>
-
-              {/* Address */}
-              <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
-                <p className="text-xs font-medium text-gray-500 mb-3">ที่อยู่</p>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">บ้านเลขที่</label>
-                      <input className={ic} value={editAddr.houseNo} onChange={e => setEditAddr(a => ({...a, houseNo: e.target.value}))} placeholder="207/2" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">หมู่ที่</label>
-                      <input className={ic} value={editAddr.moo} onChange={e => setEditAddr(a => ({...a, moo: e.target.value}))} placeholder="1" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">ถนน</label>
-                      <input className={ic} value={editAddr.road} onChange={e => setEditAddr(a => ({...a, road: e.target.value}))} placeholder="พหลโยธิน" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">จังหวัด</label>
-                    <select className={ic} value={editAddr.provinceName} onChange={e => onProvince(e.target.value)}>
-                      <option value="">เลือกจังหวัด</option>
-                      {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">อำเภอ / เขต</label>
-                    <select className={ic} value={editAddr.amphoreName} onChange={e => onAmphoe(e.target.value)} disabled={!editAddr.provinceName || loadingAmph}>
-                      <option value="">{loadingAmph ? 'กำลังโหลด...' : editAddr.provinceName ? 'เลือกอำเภอ' : '— เลือกจังหวัดก่อน —'}</option>
-                      {amphoes.map(a => <option key={a} value={a}>{a}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">ตำบล / แขวง</label>
-                      <select className={ic} value={editAddr.tambonName ? `${editAddr.tambonName}|${editAddr.postalCode}` : ''} onChange={e => onTambon(e.target.value)} disabled={!editAddr.amphoreName || loadingTamb}>
-                        <option value="">{loadingTamb ? 'กำลังโหลด...' : editAddr.amphoreName ? 'เลือกตำบล' : '— เลือกอำเภอก่อน —'}</option>
-                        {tambons.map(([n, z]) => <option key={n} value={`${n}|${z}`}>{n}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">รหัสไปรษณีย์</label>
-                      <input readOnly className={ic + ' bg-gray-50 dark:bg-gray-800/80 cursor-default text-gray-500'} value={editAddr.postalCode} placeholder="ออโต้" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
-                  <AlertTriangle size={15} /> {error}
-                </div>
-              )}
-
-              {saveOk && (
-                <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 py-3">
-                  <CheckCircle2 size={15} /> บันทึกสำเร็จ!
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-1">
-                <button onClick={cancelEdit} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
-                  ยกเลิก
-                </button>
-                <button onClick={handleSave} disabled={saving}
-                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2">
-                  {saving ? 'กำลังบันทึก...' : <><Check size={15} /> บันทึกข้อมูล</>}
-                </button>
-              </div>
+              {error && <div style={{ color: '#b22441', fontSize: 13, background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>⚠️ {error}</div>}
+              {saveOk && <div style={{ color: 'var(--green-700)', fontSize: 13, background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>✅ บันทึกสำเร็จ!</div>}
             </div>
-          </div>
-        )}
+          ) : (
+            [['ชื่อ-นามสกุล', `${firstName} ${lastName}`.trim() || '—'], ['อีเมล', email || '—'], ['เบอร์โทร', phone || '—'], ['ที่อยู่', address || '—']].map(([l, v]) => (
+              <div key={l} className="pf-row"><span className="pf-row-lbl">{l}</span><span className="pf-row-val" style={{ maxWidth: '62%', wordBreak: 'break-word' }}>{v}</span></div>
+            ))
+          )}
+        </div>
 
-        {/* ── Application status ── */}
+        {/* Application status */}
         {(sellerStatus || middlemanStatus) && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">สถานะการสมัคร</h2>
-            </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {sellerStatus && (
-                <ApplicationStatusRow
-                  icon={<Store size={16} />}
-                  label="ผู้ขายในเครือ"
-                  status={sellerStatus}
-                  bgColor="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                />
-              )}
-              {middlemanStatus && (
-                <ApplicationStatusRow
-                  icon={<HandshakeIcon size={16} />}
-                  label="คนกลาง"
-                  status={middlemanStatus}
-                  bgColor="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400"
-                />
-              )}
-            </div>
+          <div className="pf-card">
+            <div className="pf-card-title">สถานะการสมัคร</div>
+            {sellerStatus && <div className="pf-row"><span className="pf-row-lbl">ผู้ขาย 🛒</span><StatusBadge status={sellerStatus} /></div>}
+            {middlemanStatus && <div className="pf-row"><span className="pf-row-lbl">คนกลาง 🤝</span><StatusBadge status={middlemanStatus} /></div>}
           </div>
         )}
 
-        {/* ── Upgrade buttons (if not yet applied) ── */}
-        {role !== 'middleman' && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">ขยายสิทธิ์การใช้งาน</h2>
-            </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {role !== 'seller' && role !== 'middleman' && !sellerStatus && (
-                <Link href="/register/seller"
-                  className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                      <Store size={18} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">สมัครเป็นผู้ขายในเครือ</p>
-                      <p className="text-xs text-gray-400">เปิดร้านและขายสินค้าผ่านระบบคนกลาง</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
-                </Link>
-              )}
-              {!middlemanStatus && (
-                <Link href="/register/middleman"
-                  className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
-                      <HandshakeIcon size={18} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">สมัครเป็นคนกลาง</p>
-                      <p className="text-xs text-gray-400">รับงานเป็นตัวกลางในการซื้อขาย มีรายได้เพิ่ม</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-gray-400 group-hover:text-green-600 group-hover:translate-x-0.5 transition-all" />
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Bank info (from seller/middleman registration) ── */}
+        {/* Bank info */}
         {(prefs.bankAcct || prefs.bankName) && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">บัญชีธนาคาร</h2>
-            </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {prefs.bankName  && <InfoRow icon={<Landmark size={15} />} label="ธนาคาร"      value={prefs.bankName} />}
-              {prefs.bankAcct  && <InfoRow icon={<Landmark size={15} />} label="เลขที่บัญชี" value={prefs.bankAcct} mono />}
-              {prefs.bankOwner && <InfoRow icon={<User size={15} />}     label="ชื่อบัญชี"   value={prefs.bankOwner} />}
-            </div>
+          <div className="pf-card">
+            <div className="pf-card-title">บัญชีธนาคาร</div>
+            {prefs.bankName && <div className="pf-row"><span className="pf-row-lbl">ธนาคาร</span><span className="pf-row-val">{prefs.bankName}</span></div>}
+            {prefs.bankAcct && <div className="pf-row"><span className="pf-row-lbl">เลขที่บัญชี</span><span className="pf-row-val mono">{prefs.bankAcct}</span></div>}
+            {prefs.bankOwner && <div className="pf-row"><span className="pf-row-lbl">ชื่อบัญชี</span><span className="pf-row-val">{prefs.bankOwner}</span></div>}
           </div>
         )}
 
-        {/* ── Uploaded docs ── */}
-        {(prefs.idCardFileId || prefs.bookbankFileId) && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">เอกสารที่อัปโหลด</h2>
-            </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {prefs.idCardFileId && (
-                <div className="flex items-center gap-3 px-6 py-4">
-                  <FileText size={15} className="text-gray-400 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400 mb-0.5">บัตรประชาชน</p>
-                    <p className="text-sm font-medium text-green-600 dark:text-green-400 flex items-center gap-1.5">
-                      <CheckCircle2 size={13} /> อัปโหลดแล้ว
-                    </p>
-                  </div>
-                </div>
-              )}
-              {prefs.bookbankFileId && (
-                <div className="flex items-center gap-3 px-6 py-4">
-                  <FileText size={15} className="text-gray-400 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400 mb-0.5">สมุดบัญชี (Bookbank)</p>
-                    <p className="text-sm font-medium text-green-600 dark:text-green-400 flex items-center gap-1.5">
-                      <CheckCircle2 size={13} /> อัปโหลดแล้ว
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Account info ── */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-            <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500">ข้อมูลบัญชี</h2>
-          </div>
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            <InfoRow icon={<ShieldCheck size={15} />} label="รหัสผู้ใช้" value={userId ? userId.slice(0,8) + '...' : '—'} mono />
-            {prefs.linkedTo && <InfoRow icon={<Camera size={15} />} label="เชื่อมบัญชี" value="เชื่อมบัญชีแล้ว ✓" />}
-          </div>
+        {/* Quick links / upgrade */}
+        <div className="pf-links">
+          {sellerStatus === 'approved' && (
+            <Link href="/dashboard/seller" className="pf-link">
+              <div className="pf-link-left"><div className="pf-link-icon" style={{ background: 'var(--blue-50)' }}>🛒</div><div><span className="pf-link-t">บอร์ดผู้ขาย</span><span className="pf-link-d">จัดการประกาศและดีลของคุณ</span></div></div>
+              <span style={{ color: 'var(--faint)', fontSize: 18 }}>›</span>
+            </Link>
+          )}
+          {middlemanStatus === 'approved' && (
+            <Link href="/dashboard/middleman" className="pf-link">
+              <div className="pf-link-left"><div className="pf-link-icon" style={{ background: 'var(--green-50)' }}>🤝</div><div><span className="pf-link-t">บอร์ดคนกลาง</span><span className="pf-link-d">ดีลที่คุณกำลังดูแลอยู่</span></div></div>
+              <span style={{ color: 'var(--faint)', fontSize: 18 }}>›</span>
+            </Link>
+          )}
+          {role !== 'seller' && role !== 'middleman' && !sellerStatus && (
+            <Link href="/register/seller" className="pf-link">
+              <div className="pf-link-left"><div className="pf-link-icon" style={{ background: 'var(--blue-50)' }}>🛒</div><div><span className="pf-link-t">สมัครเป็นผู้ขาย</span><span className="pf-link-d">เปิดร้านและขายผ่านระบบคนกลาง</span></div></div>
+              <span style={{ color: 'var(--faint)', fontSize: 18 }}>›</span>
+            </Link>
+          )}
+          {!middlemanStatus && (
+            <Link href="/register/middleman" className="pf-link">
+              <div className="pf-link-left"><div className="pf-link-icon" style={{ background: 'var(--green-50)' }}>🤝</div><div><span className="pf-link-t">สมัครเป็นคนกลาง</span><span className="pf-link-d">รับงานตัวกลาง มีรายได้เพิ่ม</span></div></div>
+              <span style={{ color: 'var(--faint)', fontSize: 18 }}>›</span>
+            </Link>
+          )}
+          <Link href="/check-scam" className="pf-link">
+            <div className="pf-link-left"><div className="pf-link-icon" style={{ background: '#fef5e3' }}>🛡️</div><div><span className="pf-link-t">เช็คคนโกง</span><span className="pf-link-d">ตรวจสอบประวัติก่อนทำธุรกรรม</span></div></div>
+            <span style={{ color: 'var(--faint)', fontSize: 18 }}>›</span>
+          </Link>
         </div>
 
-        {/* Danger zone */}
-        <div className="flex justify-end">
-          <button onClick={logout}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all">
-            <LogOut size={14} /> ออกจากระบบ
-          </button>
-        </div>
+        <button className="pf-logout" onClick={logout}><Icon name="logout" size={16} /> ออกจากระบบ</button>
       </div>
     </div>
   );
 }
-
-// ─── Helper components ─────────────────────────────────────────────────────────
-
-function InfoRow({ icon, label, value, multiline, mono }: {
-  icon: ReactNode; label: string; value: string; multiline?: boolean; mono?: boolean;
-}) {
-  return (
-    <div className="flex items-start gap-3 px-6 py-4">
-      <div className="text-gray-400 mt-0.5 shrink-0">{icon}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-        <p className={`text-sm font-medium text-gray-800 dark:text-gray-100 ${multiline ? 'leading-relaxed' : 'truncate'} ${mono ? 'font-mono text-xs' : ''}`}>
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function ApplicationStatusRow({ icon, label, status, bgColor }: {
-  icon: ReactNode; label: string; status: string; bgColor: string;
-}) {
-  const info = APP_STATUS[status] || { label: status, icon: <Clock size={14} />, color: 'text-gray-500' };
-  return (
-    <div className="flex items-center justify-between px-6 py-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${bgColor}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="text-sm font-medium">{label}</p>
-          <div className={`flex items-center gap-1 text-xs mt-0.5 ${info.color}`}>
-            {info.icon} {info.label}
-          </div>
-        </div>
-      </div>
-      {status === 'pending_review' && (
-        <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-full">
-          รอ 1-3 วัน
-        </span>
-      )}
-      {status === 'approved' && (
-        <span className="text-xs text-green-600 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-2.5 py-1 rounded-full">
-          ✓ อนุมัติ
-        </span>
-      )}
-      {status === 'rejected' && (
-        <span className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-2.5 py-1 rounded-full">
-          ✕ ไม่ผ่าน
-        </span>
-      )}
-    </div>
-  );
-}
-
-// ─── Export ───────────────────────────────────────────────────────────────────
 
 export default function ProfilePageWrapper() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-400 animate-pulse">กำลังโหลด...</p></div>}>
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: 'var(--muted)' }}>กำลังโหลด...</p></div>}>
       <ProfilePage />
     </Suspense>
   );

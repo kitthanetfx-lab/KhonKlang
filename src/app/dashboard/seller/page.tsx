@@ -4,119 +4,65 @@ import { useEffect, useState, useCallback } from 'react';
 import { account } from '@/lib/appwrite';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Icon } from '@/components/Icon';
 
 interface Deal {
-  $id: string;
-  sellerId: string;
-  sellerName: string;
-  middlemanId: string;
-  middlemanName: string;
-  title: string;
-  description: string;
-  price: number;
-  category: string;
-  condition: string;
-  location: string;
-  sellingMode: string;
-  imageFileIds: string;
-  status: string;
-  sellerConfirmed: boolean;
-  middlemanConfirmed: boolean;
-  rejectReason: string;
-  createdAt: string;
+  $id: string; sellerId: string; sellerName: string; middlemanId: string; middlemanName: string;
+  title: string; description: string; price: number; category: string; condition: string;
+  location: string; sellingMode: string; imageFileIds: string; status: string;
+  sellerConfirmed: boolean; middlemanConfirmed: boolean; rejectReason: string; createdAt: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  posted:                 'รอคนกลาง',
-  buyer_joined:           'มีผู้ซื้อ',
-  terms_pending:          'รอยอมรับเงื่อนไข',
-  payment_pending:        'รอโอนเงิน',
-  payment_uploaded:       'ตรวจสลิป',
-  packing:                'แพ็คของ',
-  shipped_to_middleman:   'รอคนกลางรับ',
-  middleman_received:     'คนกลางรับแล้ว',
-  middleman_checking:     'คนกลางตรวจสินค้า',
-  shipped_to_buyer:       'จัดส่งให้ผู้ซื้อ',
-  delivered:              'รอยืนยันรับ',
-  completed:              'เสร็จสิ้น',
-  cancelled:              'ยกเลิก',
-  disputed:               'มีปัญหา',
+  posted: 'รอคนกลาง', buyer_joined: 'มีผู้ซื้อ', terms_pending: 'รอยอมรับเงื่อนไข', payment_pending: 'รอโอนเงิน',
+  payment_uploaded: 'ตรวจสลิป', packing: 'แพ็คของ', shipped_to_middleman: 'รอคนกลางรับ', middleman_received: 'คนกลางรับแล้ว',
+  middleman_checking: 'คนกลางตรวจสินค้า', shipped_to_buyer: 'จัดส่งให้ผู้ซื้อ', delivered: 'รอยืนยันรับ',
+  completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก', disputed: 'มีปัญหา',
 };
-
-const STATUS_COLOR: Record<string, string> = {
-  posted:               'bg-blue-500/20 text-blue-300 border-blue-500/40',
-  buyer_joined:         'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
-  terms_pending:        'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
-  payment_pending:      'bg-orange-500/20 text-orange-300 border-orange-500/40',
-  payment_uploaded:     'bg-orange-500/20 text-orange-300 border-orange-500/40',
-  packing:              'bg-purple-500/20 text-purple-300 border-purple-500/40',
-  shipped_to_middleman: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
-  middleman_received:   'bg-teal-500/20 text-teal-300 border-teal-500/40',
-  middleman_checking:   'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
-  shipped_to_buyer:     'bg-blue-500/20 text-blue-300 border-blue-500/40',
-  delivered:            'bg-green-500/20 text-green-300 border-green-500/40',
-  completed:            'bg-green-700/30 text-green-300 border-green-600/40',
-  cancelled:            'bg-gray-500/20 text-gray-300 border-gray-500/40',
-  disputed:             'bg-red-500/20 text-red-300 border-red-500/40',
+const STATUS_CLS: Record<string, string> = {
+  posted: 'sb-blue', buyer_joined: 'sb-teal', terms_pending: 'sb-amber', payment_pending: 'sb-amber', payment_uploaded: 'sb-amber',
+  packing: 'sb-purple', shipped_to_middleman: 'sb-teal', middleman_received: 'sb-teal', middleman_checking: 'sb-purple',
+  shipped_to_buyer: 'sb-blue', delivered: 'sb-green', completed: 'sb-green', cancelled: 'sb-gray', disputed: 'sb-red',
 };
-
 const CATEGORIES = ['สินค้าทั่วไป', 'อิเล็กทรอนิกส์', 'เสื้อผ้า', 'ยานพาหนะ', 'อสังหาริมทรัพย์', 'บริการ', 'อื่นๆ'];
-const CONDITIONS  = ['ของใหม่', 'มือสองสภาพดี', 'มือสองมีตำหนิ'];
-const PROVINCES   = [
-  'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร',
-  'ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ',
-  'ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก',
-  'นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์',
-  'นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี',
-  'ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา',
-  'พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์',
-  'แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร',
-  'ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง',
-  'ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ',
-  'สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย',
-  'สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู',
-  'อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี',
-];
+const CONDITIONS = ['ของใหม่', 'มือสองสภาพดี', 'มือสองมีตำหนิ'];
+const PROVINCES = ['กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
-const ENDPOINT  = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT  || 'https://sgp.cloud.appwrite.io/v1';
-const PROJECT   = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
+const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
+const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
 const BUCKET_ID = 'deal_files';
-
-function imgUrl(fileId: string) {
-  return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${PROJECT}`;
-}
+function imgUrl(fileId: string) { return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${PROJECT}`; }
 
 interface UploadedImage { fileId: string; url: string; name: string; }
 
 export default function SellerDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [deals, setDeals]     = useState<Deal[]>([]);
-  const [tab, setTab]         = useState<'active' | 'post' | 'history'>('active');
-  const [myId, setMyId]       = useState('');
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [tab, setTab] = useState<'active' | 'post' | 'history'>('active');
+  const [myId, setMyId] = useState('');
 
-  // Post form
-  const [title,       setTitle]       = useState('');
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [price,       setPrice]       = useState('');
-  const [category,    setCategory]    = useState('');
-  const [condition,   setCondition]   = useState('');
-  const [location,    setLocation]    = useState('');
+  const [price, setPrice] = useState('');
+  const [category, setCategory] = useState('');
+  const [condition, setCondition] = useState('');
+  const [location, setLocation] = useState('');
   const [sellingMode, setSellingMode] = useState<'normal' | 'certified'>('normal');
-  const [images,      setImages]      = useState<UploadedImage[]>([]);
-  const [uploading,   setUploading]   = useState(false);
-  const [posting,     setPosting]     = useState(false);
-  const [postError,   setPostError]   = useState('');
-  const [postDone,    setPostDone]    = useState(false);
+  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState('');
+  const [postDone, setPostDone] = useState(false);
+
+  useEffect(() => {
+    const r = document.documentElement;
+    r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
+  }, []);
 
   const fetchDeals = useCallback(async (jwt: string) => {
-    const res = await fetch('/api/deals?role=seller', {
-      headers: { 'x-session-jwt': jwt },
-    }).catch(() => null);
-    if (res?.ok) {
-      const data = await res.json();
-      setDeals(data.deals || []);
-    }
+    const res = await fetch('/api/deals?role=seller', { headers: { 'x-session-jwt': jwt } }).catch(() => null);
+    if (res?.ok) { const data = await res.json(); setDeals(data.deals || []); }
   }, []);
 
   useEffect(() => {
@@ -140,59 +86,43 @@ export default function SellerDashboard() {
       const jwt = (await account.createJWT()).jwt;
       const uploaded: UploadedImage[] = [];
       for (const file of Array.from(files)) {
-        const fd = new FormData();
-        fd.append('file', file);
-        const res = await fetch('/api/upload-deal', {
-          method: 'POST',
-          headers: { 'x-session-jwt': jwt },
-          body: fd,
-        });
-        if (res.ok) {
-          const d = await res.json();
-          uploaded.push({ fileId: d.fileId, url: d.url, name: file.name });
-        }
+        const fd = new FormData(); fd.append('file', file);
+        const res = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd });
+        if (res.ok) { const d = await res.json(); uploaded.push({ fileId: d.fileId, url: d.url, name: file.name }); }
       }
       setImages(prev => [...prev, ...uploaded]);
     } finally { setUploading(false); }
   }
-
-  function removeImage(fileId: string) {
-    setImages(prev => prev.filter(i => i.fileId !== fileId));
-  }
+  function removeImage(fileId: string) { setImages(prev => prev.filter(i => i.fileId !== fileId)); }
 
   async function handlePost() {
     if (!title || !price) { setPostError('กรุณากรอกชื่อสินค้าและราคา'); return; }
-    if (!condition)        { setPostError('กรุณาเลือกสภาพสินค้า'); return; }
+    if (!condition) { setPostError('กรุณาเลือกสภาพสินค้า'); return; }
     setPosting(true); setPostError('');
     try {
       const jwt = (await account.createJWT()).jwt;
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title, description, price: Number(price), category,
-          condition, location, sellingMode,
-          imageFileIds: images.map(i => i.fileId),
-          creatorRole: 'seller',
-        }),
+        body: JSON.stringify({ title, description, price: Number(price), category, condition, location, sellingMode, imageFileIds: images.map(i => i.fileId), creatorRole: 'seller' }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
       setPostDone(true);
-      setTitle(''); setDescription(''); setPrice(''); setCategory('');
-      setCondition(''); setLocation(''); setSellingMode('normal'); setImages([]);
+      setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation(''); setSellingMode('normal'); setImages([]);
       await fetchDeals(jwt);
       setTimeout(() => { setPostDone(false); setTab('active'); }, 1800);
     } finally { setPosting(false); }
   }
 
-  const ACTIVE_STATUSES = ['posted','buyer_joined','terms_pending','payment_pending','payment_uploaded','packing','shipped_to_middleman','middleman_received','middleman_checking','shipped_to_buyer','delivered'];
-  const DONE_STATUSES   = ['completed','cancelled','disputed'];
-  const activeDeals  = deals.filter(d => d.sellerId === myId && ACTIVE_STATUSES.includes(d.status));
+  const ACTIVE_STATUSES = ['posted', 'buyer_joined', 'terms_pending', 'payment_pending', 'payment_uploaded', 'packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered'];
+  const DONE_STATUSES = ['completed', 'cancelled', 'disputed'];
+  const activeDeals = deals.filter(d => d.sellerId === myId && ACTIVE_STATUSES.includes(d.status));
   const historyDeals = deals.filter(d => d.sellerId === myId && DONE_STATUSES.includes(d.status));
+  const totalRev = historyDeals.filter(d => d.status === 'completed').reduce((s, d) => s + (d.price || 0), 0);
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    <div className="dash-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div style={{ width: 32, height: 32, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'dashSpin .8s linear infinite' }} />
     </div>
   );
 
@@ -200,220 +130,144 @@ export default function SellerDashboard() {
     let firstImg = '';
     try { const ids = JSON.parse(deal.imageFileIds || '[]'); if (ids.length) firstImg = imgUrl(ids[0]); } catch {}
     return (
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
-        <div className="flex items-start gap-4">
-          {firstImg && (
-            <img src={firstImg} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-white/10" />
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <p className="font-semibold text-white text-base leading-tight truncate">{deal.title}</p>
-              <span className={`text-xs px-2 py-1 rounded-full border whitespace-nowrap flex-shrink-0 ${STATUS_COLOR[deal.status] || 'bg-gray-500/20 text-gray-300'}`}>
-                {STATUS_LABEL[deal.status] || deal.status}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-400">
-              <span>💰 {deal.price.toLocaleString()} บาท</span>
-              {deal.condition  && <span>✨ {deal.condition}</span>}
-              {deal.location   && <span>📍 {deal.location}</span>}
-              {deal.sellingMode === 'certified' && (
-                <span className="text-yellow-400 font-medium">⭐ Certified</span>
-              )}
+      <div className="deal-card">
+        <div className="deal-card-header">
+          <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 0 }}>
+            {firstImg && <img src={firstImg} alt="" style={{ width: 56, height: 56, borderRadius: 'var(--r-md)', objectFit: 'cover', flexShrink: 0 }} />}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="deal-card-title">{deal.title}</div>
+              <div className="deal-card-meta">
+                <span className="deal-card-price">฿{(deal.price || 0).toLocaleString()}</span>
+                {deal.condition && <span>{deal.condition}</span>}
+                {deal.location && <span>📍 {deal.location}</span>}
+                {deal.sellingMode === 'certified' && <span style={{ color: 'var(--amber-500)', fontWeight: 700 }}>⭐ Certified</span>}
+              </div>
             </div>
           </div>
+          <span className={`sb ${STATUS_CLS[deal.status] || 'sb-gray'}`}>{STATUS_LABEL[deal.status] || deal.status}</span>
         </div>
-        <Link href={`/deal/${deal.$id}`}
-          className="block w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-center transition text-sm"
-        >💬 เข้าห้อง Deal</Link>
+        <Link href={`/deal/${deal.$id}`} className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }}>💬 เข้าห้องดีล →</Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-white">
-      {/* Header */}
-      <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-gray-400 hover:text-white transition">←</button>
-        <h1 className="text-xl font-bold">บอร์ดผู้ขาย</h1>
-      </div>
+    <div className="dash-root">
+      <header className="dash-header">
+        <button onClick={() => router.back()} className="dash-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
+        <div className="dash-head-info"><div className="dash-head-title">🛒 บอร์ดผู้ขาย</div></div>
+        <div className="dash-head-actions"><button className="btn btn-primary btn-sm" onClick={() => setTab('post')}>+ ลงประกาศ</button></div>
+      </header>
 
-      {/* Tabs */}
-      <div className="px-4 max-w-2xl mx-auto pt-4">
-        <div className="flex gap-1 bg-white/5 rounded-xl p-1">
-          {([
-            { key: 'active',  label: `กำลังขาย (${activeDeals.length})` },
-            { key: 'post',    label: '+ ลงประกาศ' },
-            { key: 'history', label: `ประวัติ (${historyDeals.length})` },
-          ] as const).map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition ${
-                tab === t.key ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >{t.label}</button>
-          ))}
-        </div>
-      </div>
+      <nav className="dash-tabs-wrap">
+        {([{ k: 'active', l: `กำลังขาย (${activeDeals.length})` }, { k: 'post', l: '+ ลงประกาศ' }, { k: 'history', l: `ประวัติ (${historyDeals.length})` }] as const).map(({ k, l }) => (
+          <button key={k} className={`dash-tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
+        ))}
+      </nav>
 
-      <div className="px-4 pb-10 max-w-2xl mx-auto mt-4 space-y-3">
-        {/* Active tab */}
+      <main className="dash-body">
+        {tab !== 'post' && (
+          <div className="dash-stats">
+            <div className="dash-stat"><div className="dash-stat-val">{activeDeals.length}</div><div className="dash-stat-lbl">กำลังขาย</div></div>
+            <div className="dash-stat"><div className="dash-stat-val">{historyDeals.filter(d => d.status === 'completed').length}</div><div className="dash-stat-lbl">เสร็จสิ้น</div></div>
+            <div className="dash-stat"><div className="dash-stat-val" style={{ fontSize: 17 }}>฿{totalRev.toLocaleString()}</div><div className="dash-stat-lbl">รายได้รวม</div></div>
+          </div>
+        )}
+
         {tab === 'active' && (activeDeals.length === 0 ? (
-          <div className="text-center py-16 space-y-3">
-            <p className="text-gray-500">ยังไม่มีประกาศที่กำลังดำเนินการ</p>
-            <button onClick={() => setTab('post')} className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition">
-              ลงประกาศใหม่
-            </button>
+          <div className="dash-empty">
+            <div className="dash-empty-icon">📦</div>
+            <p>ยังไม่มีประกาศที่กำลังดำเนินการ</p>
+            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setTab('post')}>+ ลงประกาศใหม่</button>
           </div>
         ) : activeDeals.map(d => <DealCard key={d.$id} deal={d} />))}
 
-        {/* Post form tab */}
         {tab === 'post' && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5">
-            <h2 className="text-lg font-bold">ลงประกาศสินค้าใหม่</h2>
+          <div className="form-section">
+            <h3 style={{ marginBottom: 20 }}>ลงประกาศสินค้าใหม่</h3>
+            {postDone && <div style={{ background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 18, color: 'var(--green-700)', fontWeight: 600 }}>✅ ลงประกาศสำเร็จ!</div>}
+            {postError && <div style={{ background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 18, color: '#b22441' }}>⚠️ {postError}</div>}
 
-            {postDone && (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-green-300 text-center">
-                ✅ ลงประกาศสำเร็จ!
-              </div>
-            )}
-            {postError && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-300 text-sm">
-                {postError}
-              </div>
-            )}
-
-            {/* Images */}
-            <div>
-              <label className="text-sm text-gray-400 mb-2 block">รูปภาพสินค้า</label>
-              <div className="flex flex-wrap gap-3">
+            <div className="form-field">
+              <label>รูปภาพสินค้า</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                 {images.map(img => (
-                  <div key={img.fileId} className="relative">
-                    <img src={img.url} alt={img.name} className="w-20 h-20 object-cover rounded-xl bg-white/10" />
-                    <button onClick={() => removeImage(img.fileId)}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 text-white text-xs flex items-center justify-center hover:bg-red-500 transition"
-                    >×</button>
+                  <div key={img.fileId} style={{ position: 'relative' }}>
+                    <img src={img.url} alt={img.name} style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 'var(--r-md)' }} />
+                    <button onClick={() => removeImage(img.fileId)} style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%', background: 'var(--rose-500)', color: '#fff', border: 'none', fontSize: 14, cursor: 'pointer' }}>×</button>
                   </div>
                 ))}
-                <label className={`w-20 h-20 rounded-xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                  <span className="text-2xl">{uploading ? '⏳' : '📷'}</span>
-                  <span className="text-xs text-gray-500 mt-1">{uploading ? 'กำลังอัป...' : 'เพิ่มรูป'}</span>
-                  <input type="file" accept="image/*" multiple className="hidden"
-                    onChange={e => handleImageUpload(e.target.files)}
-                  />
+                <label className="img-upload-box" style={{ width: 80, height: 80, padding: 0, margin: 0 }}>
+                  <span style={{ fontSize: 22 }}>{uploading ? '⏳' : '📷'}</span>
+                  <span style={{ fontSize: 11 }}>{uploading ? 'กำลังอัป...' : 'เพิ่มรูป'}</span>
+                  <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImageUpload(e.target.files)} />
                 </label>
               </div>
             </div>
 
-            {/* Title */}
-            <div>
-              <label className="text-sm text-gray-400 mb-1.5 block">ชื่อสินค้า / บริการ *</label>
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)}
-                placeholder="เช่น iPhone 15 Pro Max 256GB สีดำ"
-                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
-              />
+            <div className="form-field">
+              <label>ชื่อสินค้า / บริการ *</label>
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="เช่น iPhone 15 Pro Max 256GB สีดำ" />
             </div>
 
-            {/* Price + Category */}
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="text-sm text-gray-400 mb-1.5 block">ราคา (บาท) *</label>
-                <input type="number" value={price} onChange={e => setPrice(e.target.value)}
-                  placeholder="0" min="0"
-                  className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
-                />
+            <div className="form-row-2">
+              <div className="form-field" style={{ margin: 0 }}>
+                <label>ราคา (บาท) *</label>
+                <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" min="0" />
               </div>
-              <div className="flex-1">
-                <label className="text-sm text-gray-400 mb-1.5 block">หมวดหมู่</label>
-                <select value={category} onChange={e => setCategory(e.target.value)}
-                  className="w-full bg-[#1a2035] border border-white/15 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition"
-                >
+              <div className="form-field" style={{ margin: 0 }}>
+                <label>หมวดหมู่</label>
+                <select value={category} onChange={e => setCategory(e.target.value)}>
                   <option value="">เลือก...</option>
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             </div>
 
-            {/* Condition */}
-            <div>
-              <label className="text-sm text-gray-400 mb-2 block">สภาพสินค้า *</label>
-              <div className="flex gap-2 flex-wrap">
+            <div className="form-field">
+              <label>สภาพสินค้า *</label>
+              <div className="cond-chips">
                 {CONDITIONS.map(c => (
-                  <button key={c} type="button" onClick={() => setCondition(c)}
-                    className={`px-4 py-2 rounded-xl text-sm border transition ${
-                      condition === c
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-white/5 border-white/15 text-gray-300 hover:border-blue-500'
-                    }`}
-                  >{c}</button>
+                  <button key={c} type="button" className={`cond-chip${condition === c ? ' sel' : ''}`} onClick={() => setCondition(c)}>{c}</button>
                 ))}
               </div>
             </div>
 
-            {/* Location */}
-            <div>
-              <label className="text-sm text-gray-400 mb-1.5 block">จังหวัดที่ตั้งสินค้า</label>
-              <select value={location} onChange={e => setLocation(e.target.value)}
-                className="w-full bg-[#1a2035] border border-white/15 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition"
-              >
+            <div className="form-field">
+              <label>จังหวัดที่ตั้งสินค้า</label>
+              <select value={location} onChange={e => setLocation(e.target.value)}>
                 <option value="">เลือกจังหวัด...</option>
                 {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
 
-            {/* Selling Mode */}
-            <div>
-              <label className="text-sm text-gray-400 mb-2 block">รูปแบบการขาย</label>
-              <div className="space-y-2">
-                <button type="button" onClick={() => setSellingMode('normal')}
-                  className={`w-full flex items-start gap-3 p-4 rounded-xl border text-left transition ${
-                    sellingMode === 'normal'
-                      ? 'bg-blue-600/20 border-blue-500 text-white'
-                      : 'bg-white/5 border-white/15 text-gray-300 hover:border-white/30'
-                  }`}
-                >
-                  <span className="text-xl mt-0.5">🏪</span>
-                  <div>
-                    <p className="font-medium text-sm">ลงขายปกติ</p>
-                    <p className="text-xs text-gray-400 mt-0.5">ผู้ซื้อเลือกคนกลางเอง ค่าธรรมเนียมมาตรฐาน</p>
-                  </div>
-                </button>
-                <button type="button" onClick={() => setSellingMode('certified')}
-                  className={`w-full flex items-start gap-3 p-4 rounded-xl border text-left transition ${
-                    sellingMode === 'certified'
-                      ? 'bg-yellow-600/20 border-yellow-500 text-white'
-                      : 'bg-white/5 border-white/15 text-gray-300 hover:border-white/30'
-                  }`}
-                >
-                  <span className="text-xl mt-0.5">⭐</span>
-                  <div>
-                    <p className="font-medium text-sm">ส่งฝากขายผ่านคนกลาง <span className="text-yellow-400">Khonklang Certified</span></p>
-                    <p className="text-xs text-gray-400 mt-0.5">คนกลางตรวจสอบและดูแลสินค้าก่อนส่ง เพิ่มความน่าเชื่อถือ</p>
-                  </div>
-                </button>
+            <div className="form-field">
+              <label>รูปแบบการขาย</label>
+              <div className="mode-opts">
+                <div className={`mode-opt${sellingMode === 'normal' ? ' sel' : ''}`} onClick={() => setSellingMode('normal')}>
+                  <div className="mode-opt-icon">🏪</div>
+                  <div><div className="mode-opt-t">ลงขายปกติ</div><div className="mode-opt-d">ผู้ซื้อเลือกคนกลางเอง ค่าธรรมเนียมมาตรฐาน</div></div>
+                </div>
+                <div className={`mode-opt${sellingMode === 'certified' ? ' sel' : ''}`} onClick={() => setSellingMode('certified')}>
+                  <div className="mode-opt-icon">⭐</div>
+                  <div><div className="mode-opt-t">Khonklang Certified</div><div className="mode-opt-d">คนกลางตรวจสอบสินค้าก่อนส่ง เพิ่มความน่าเชื่อถือ</div></div>
+                </div>
               </div>
             </div>
 
-            {/* Description */}
-            <div>
-              <label className="text-sm text-gray-400 mb-1.5 block">รายละเอียดเพิ่มเติม</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)}
-                rows={4} placeholder="รายละเอียดสินค้า สภาพ อุปกรณ์ที่มา เงื่อนไข..."
-                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition resize-none"
-              />
+            <div className="form-field">
+              <label>รายละเอียดเพิ่มเติม</label>
+              <textarea rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="รายละเอียดสินค้า สภาพ อุปกรณ์ที่มา เงื่อนไข..." />
             </div>
 
-            <button onClick={handlePost} disabled={posting || postDone || uploading}
-              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold transition"
-            >
+            <button className="btn btn-primary btn-block" style={{ marginTop: 4 }} onClick={handlePost} disabled={posting || postDone || uploading}>
               {posting ? 'กำลังลงประกาศ...' : 'ลงประกาศ'}
             </button>
           </div>
         )}
 
-        {/* History tab */}
-        {tab === 'history' && (historyDeals.length === 0 ? (
-          <p className="text-center text-gray-500 py-16">ยังไม่มีประวัติการขาย</p>
-        ) : historyDeals.map(d => <DealCard key={d.$id} deal={d} />))}
-      </div>
+        {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.$id} deal={d} />))}
+      </main>
     </div>
   );
 }

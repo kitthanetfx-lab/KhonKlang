@@ -3,140 +3,113 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { account } from '@/lib/appwrite';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { Icon } from '@/components/Icon';
 
-// ─── Jitsi Meet component using External API (no app redirect) ──────────────
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+// ─── Jitsi Meet via External API ──────────────────────────────────────────
 function JitsiMeet({ roomName, displayName }: { roomName: string; displayName: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
-
   useEffect(() => {
     if (!containerRef.current || apiRef.current) return;
     let api: any;
-
     function initJitsi() {
       if (!containerRef.current) return;
       const h = Math.max(window.innerHeight - 120, 400);
-      // @ts-ignore
-      api = new window.JitsiMeetExternalAPI('meet.jit.si', {
-        roomName,
-        parentNode: containerRef.current,
-        width: '100%',
-        height: h,
+      api = new (window as any).JitsiMeetExternalAPI('meet.jit.si', {
+        roomName, parentNode: containerRef.current, width: '100%', height: h,
         userInfo: { displayName },
-        configOverwrite: {
-          startWithAudioMuted: false,
-          startWithVideoMuted: false,
-          disableDeepLinking: true,
-          prejoinPageEnabled: false,
-        },
-        interfaceConfigOverwrite: {
-          SHOW_JITSI_WATERMARK: false,
-          SHOW_BRAND_WATERMARK: false,
-          MOBILE_APP_PROMO: false,
-          TOOLBAR_BUTTONS: ['microphone','camera','hangup','tileview','raisehand'],
-        },
+        configOverwrite: { startWithAudioMuted: false, startWithVideoMuted: false, disableDeepLinking: true, prejoinPageEnabled: false },
+        interfaceConfigOverwrite: { SHOW_JITSI_WATERMARK: false, SHOW_BRAND_WATERMARK: false, MOBILE_APP_PROMO: false, TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'tileview', 'raisehand'] },
       });
       apiRef.current = api;
     }
-
-    if ((window as any).JitsiMeetExternalAPI) {
-      initJitsi();
-    } else {
+    if ((window as any).JitsiMeetExternalAPI) initJitsi();
+    else {
       const script = document.createElement('script');
-      script.src = 'https://meet.jit.si/external_api.js';
-      script.async = true;
-      script.onload = initJitsi;
+      script.src = 'https://meet.jit.si/external_api.js'; script.async = true; script.onload = initJitsi;
       document.head.appendChild(script);
     }
-
-    return () => {
-      try { apiRef.current?.dispose(); } catch {}
-      apiRef.current = null;
-    };
+    return () => { try { apiRef.current?.dispose(); } catch {} apiRef.current = null; };
   }, [roomName, displayName]);
-
-  return <div ref={containerRef} className="w-full rounded-b-xl overflow-hidden" />;
+  return <div ref={containerRef} style={{ width: '100%', overflow: 'hidden' }} />;
 }
 
 interface Deal {
-  $id: string; sellerId: string; sellerName: string;
-  middlemanId: string; middlemanName: string;
-  buyerId: string; buyerName: string;
-  title: string; description: string; price: number; category: string;
+  $id: string; sellerId: string; sellerName: string; middlemanId: string; middlemanName: string;
+  buyerId: string; buyerName: string; title: string; description: string; price: number; category: string;
   status: string; rejectReason: string;
   sellerAcceptedTerms: boolean; middlemanAcceptedTerms: boolean; buyerAcceptedTerms: boolean;
   middlemanConfirmedPayment: boolean; buyerConfirmedCheck: boolean;
-  paymentSlipFileId: string; evidenceData: string;
-  trackingToMiddleman: string; trackingToBuyer: string;
+  paymentSlipFileId: string; evidenceData: string; trackingToMiddleman: string; trackingToBuyer: string;
 }
-interface Msg {
-  $id: string; senderId: string; senderName: string;
-  role: string; type: string; content: string;
-  fileId: string; fileName: string; createdAt: string;
-}
-interface Middleman {
-  userId: string; name: string; tier: string;
-  workProvince: string; phone: string;
-  categories?: string;
-  reviewScore: number; reviewCount: number;
-}
+interface Msg { $id: string; senderId: string; senderName: string; role: string; type: string; content: string; fileId: string; fileName: string; createdAt: string; }
+interface Middleman { userId: string; name: string; tier: string; workProvince: string; phone: string; categories?: string; reviewScore: number; reviewCount: number; }
 
 const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
-const PROJECT  = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const BUCKET   = 'deal_files';
+const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
+const BUCKET = 'deal_files';
 function fileUrl(id: string) { return `${ENDPOINT}/storage/buckets/${BUCKET}/files/${id}/view?project=${PROJECT}`; }
 
-const STEP_LABEL: Record<string,string> = {
-  posted:'รอผู้ซื้อ', waiting_seller:'รอผู้ขาย', waiting_buyer:'รอผู้ซื้อ',
-  buyer_joined:'รอเลือกคนกลาง', terms_pending:'รอยอมรับเงื่อนไข',
-  payment_pending:'รอโอนเงิน', payment_uploaded:'รอคนกลางยืนยัน',
-  packing:'ผู้ขายแพ็คของ', shipped_to_middleman:'รอคนกลางรับ',
-  middleman_received:'คนกลางรับแล้ว', middleman_checking:'คนกลางตรวจ',
-  shipped_to_buyer:'จัดส่งให้ผู้ซื้อ', delivered:'รอยืนยันรับ',
-  completed:'เสร็จสมบูรณ์', cancelled:'ยกเลิก', disputed:'มีปัญหา',
+const STEP_LABEL: Record<string, string> = {
+  posted: 'รอผู้ซื้อ', waiting_seller: 'รอผู้ขาย', waiting_buyer: 'รอผู้ซื้อ', buyer_joined: 'รอเลือกคนกลาง',
+  terms_pending: 'รอยอมรับเงื่อนไข', payment_pending: 'รอโอนเงิน', payment_uploaded: 'รอคนกลางยืนยัน',
+  packing: 'ผู้ขายแพ็คของ', shipped_to_middleman: 'รอคนกลางรับ', middleman_received: 'คนกลางรับแล้ว',
+  middleman_checking: 'คนกลางตรวจ', shipped_to_buyer: 'จัดส่งให้ผู้ซื้อ', delivered: 'รอยืนยันรับ',
+  completed: 'เสร็จสมบูรณ์', cancelled: 'ยกเลิก', disputed: 'มีปัญหา',
 };
-const STEP_ORDER = ['posted','buyer_joined','terms_pending','payment_pending','payment_uploaded','packing','shipped_to_middleman','middleman_received','middleman_checking','shipped_to_buyer','delivered','completed'];
+const STEP_ORDER = ['posted', 'buyer_joined', 'terms_pending', 'payment_pending', 'payment_uploaded', 'packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered', 'completed'];
+const TIMELINE = [
+  { key: 'terms_pending', label: 'รอยอมรับเงื่อนไข' }, { key: 'payment_pending', label: 'รอโอนเงิน' },
+  { key: 'payment_uploaded', label: 'รอยืนยันเงิน' }, { key: 'packing', label: 'ผู้ขายแพ็คของ' },
+  { key: 'shipped_to_middleman', label: 'รอคนกลางรับ' }, { key: 'middleman_received', label: 'คนกลางรับแล้ว' },
+  { key: 'middleman_checking', label: 'คนกลางตรวจสอบ' }, { key: 'shipped_to_buyer', label: 'จัดส่งให้ผู้ซื้อ' },
+  { key: 'delivered', label: 'รอยืนยันรับ' }, { key: 'completed', label: 'เสร็จสมบูรณ์' },
+];
 
 export default function DealRoom() {
-  const router  = useRouter();
-  const params  = useParams();
-  const dealId  = params.id as string;
+  const router = useRouter();
+  const params = useParams();
+  const dealId = params.id as string;
 
-  const [deal, setDeal]           = useState<Deal | null>(null);
-  const [msgs, setMsgs]           = useState<Msg[]>([]);
-  const [middlemen, setMiddlemen]  = useState<Middleman[]>([]);
-  const [myId, setMyId]           = useState('');
-  const [myName, setMyName]       = useState('');
-  const [myRole, setMyRole]       = useState('');
-  const [loading, setLoading]     = useState(true);
+  const [deal, setDeal] = useState<Deal | null>(null);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [middlemen, setMiddlemen] = useState<Middleman[]>([]);
+  const [myId, setMyId] = useState('');
+  const [myName, setMyName] = useState('');
+  const [myRole, setMyRole] = useState('');
+  const [loading, setLoading] = useState(true);
   const [chatInput, setChatInput] = useState('');
-  const [sending, setSending]     = useState(false);
-  const [acting, setActing]       = useState(false);
+  const [sending, setSending] = useState(false);
+  const [acting, setActing] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
   const [showJitsi, setShowJitsi] = useState(false);
-  const [tab, setTab]             = useState<'steps'|'chat'|'evidence'>('steps');
+  const [tab, setTab] = useState<'steps' | 'chat' | 'evidence'>('steps');
   const [evidenceType, setEvidenceType] = useState('packing');
-  const [copied, setCopied]           = useState(false);
-  const [jwt, setJwt]                 = useState('');
-  const [dealError, setDealError]     = useState('');
+  const [copied, setCopied] = useState(false);
+  const [jwt, setJwt] = useState('');
+  const [dealError, setDealError] = useState('');
   const [showSelectMM, setShowSelectMM] = useState(false);
-  const [mmFilter, setMmFilter]       = useState({ province: '', tier: '', minRating: 0 });
-  const [mmLoading, setMmLoading]     = useState(false);
-  const chatBottomRef  = useRef<HTMLDivElement>(null);
-  const fileInputRef   = useRef<HTMLInputElement>(null);
-  const evidInputRef   = useRef<HTMLInputElement>(null);
+  const [mmFilter, setMmFilter] = useState({ province: '', tier: '', minRating: 0 });
+  const [mmLoading, setMmLoading] = useState(false);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const evidInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const r = document.documentElement;
+    r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
+  }, []);
 
   const fetchDeal = useCallback(async (j?: string) => {
-    const headers: Record<string,string> = {};
+    const headers: Record<string, string> = {};
     if (j) headers['x-session-jwt'] = j;
     try {
       const r = await fetch(`/api/deals/${dealId}`, { headers });
       const d = await r.json();
-      if (r.ok) { setDeal(d.deal); setDealError(''); }
-      else setDealError(d.error || `Error ${r.status}`);
-    } catch (e: any) {
-      setDealError(e?.message || 'Network error');
-    }
+      if (r.ok) { setDeal(d.deal); setDealError(''); } else setDealError(d.error || `Error ${r.status}`);
+    } catch (e: any) { setDealError(e?.message || 'Network error'); }
   }, [dealId]);
 
   const fetchMsgs = useCallback(async (j: string) => {
@@ -147,19 +120,17 @@ export default function DealRoom() {
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     (async () => {
-      // Always load deal (public) — no login required to view
       await fetchDeal();
       try {
         const user = await account.get();
         setMyId(user.$id); setMyName(user.name || '');
         const j = (await account.createJWT()).jwt;
-        setJwt(j);
-        fetchMsgs(j);
+        setJwt(j); fetchMsgs(j);
         timer = setInterval(async () => {
           const j2 = (await account.createJWT().catch(() => ({ jwt: '' }))).jwt;
           if (j2) { setJwt(j2); fetchMsgs(j2); fetchDeal(j2); }
         }, 4000);
-      } catch { /* not logged in — guest view only */ }
+      } catch { /* guest */ }
       finally { setLoading(false); }
     })();
     return () => clearInterval(timer);
@@ -167,51 +138,40 @@ export default function DealRoom() {
 
   useEffect(() => {
     if (!deal || !myId) return;
-    if      (deal.sellerId    === myId) setMyRole('seller');
+    if (deal.sellerId === myId) setMyRole('seller');
     else if (deal.middlemanId === myId) setMyRole('middleman');
-    else if (deal.buyerId     === myId) setMyRole('buyer');
-    else                                setMyRole('guest');
+    else if (deal.buyerId === myId) setMyRole('buyer');
+    else setMyRole('guest');
   }, [deal, myId]);
 
-  // Load middlemen list when buyer needs to select (or change)
   const loadMiddlemen = useCallback(async (j: string, f = mmFilter) => {
     setMmLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (f.province) params.set('province', f.province);
-      if (f.tier)     params.set('tier', f.tier);
-      const r = await fetch(`/api/middlemen?${params}`, { headers: { 'x-session-jwt': j } });
+      const p = new URLSearchParams();
+      if (f.province) p.set('province', f.province);
+      if (f.tier) p.set('tier', f.tier);
+      const r = await fetch(`/api/middlemen?${p}`, { headers: { 'x-session-jwt': j } });
       const d = await r.json();
       setMiddlemen(d.middlemen || []);
-    } catch {}
-    finally { setMmLoading(false); }
+    } catch {} finally { setMmLoading(false); }
   }, [mmFilter]);
 
   useEffect(() => {
-    const needsSelect = myRole === 'buyer' && (
-      (deal?.status === 'buyer_joined' && !deal.middlemanId) || showSelectMM
-    );
+    const needsSelect = myRole === 'buyer' && ((deal?.status === 'buyer_joined' && !deal.middlemanId) || showSelectMM);
     if (needsSelect && jwt) loadMiddlemen(jwt);
   }, [myRole, deal?.status, deal?.middlemanId, jwt, showSelectMM]); // eslint-disable-line
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
 
-  async function getJwt() {
-    const j = (await account.createJWT()).jwt;
-    setJwt(j); return j;
-  }
+  async function getJwt() { const j = (await account.createJWT()).jwt; setJwt(j); return j; }
 
-  async function doAction(action: string, extra: Record<string,unknown> = {}) {
+  async function doAction(action: string, extra: Record<string, unknown> = {}) {
     setActing(true);
     try {
       const j = await getJwt();
-      const r = await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH', headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...extra }),
-      });
+      const r = await fetch(`/api/deals/${dealId}`, { method: 'PATCH', headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...extra }) });
       const d = await r.json();
-      if (r.ok) { setDeal(d.deal); fetchMsgs(j); }
-      else alert(d.error || 'เกิดข้อผิดพลาด');
+      if (r.ok) { setDeal(d.deal); fetchMsgs(j); } else alert(d.error || 'เกิดข้อผิดพลาด');
     } finally { setActing(false); }
   }
 
@@ -220,12 +180,8 @@ export default function DealRoom() {
     setSending(true);
     try {
       const j = await getJwt();
-      await fetch('/api/messages', {
-        method: 'POST', headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dealId, content: text, type, fileId, fileName, role: myRole }),
-      });
-      setChatInput('');
-      await fetchMsgs(j);
+      await fetch('/api/messages', { method: 'POST', headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId, content: text, type, fileId, fileName, role: myRole }) });
+      setChatInput(''); await fetchMsgs(j);
     } finally { setSending(false); }
   }
 
@@ -239,279 +195,101 @@ export default function DealRoom() {
     else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', d.fileId, d.fileName);
   }
 
-  async function copyLink() {
-    await navigator.clipboard.writeText(window.location.href).catch(() => {});
-    setCopied(true); setTimeout(() => setCopied(false), 2000);
-  }
+  async function copyLink() { await navigator.clipboard.writeText(window.location.href).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000); }
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    <div className="dr-root" style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 32, height: 32, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'dashSpin .8s linear infinite' }} />
     </div>
   );
   if (!deal) return (
-    <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center text-white gap-4 p-6 text-center">
-      <p className="text-2xl">❌ ไม่พบ Deal</p>
-      {dealError && <p className="text-sm text-red-400 bg-red-900/30 border border-red-700 rounded-xl px-4 py-2 max-w-sm break-all">{dealError}</p>}
-      <p className="text-gray-400 text-sm">Deal อาจถูกลบหรือลิงก์ไม่ถูกต้อง</p>
-      <a href="/deal/create" className="mt-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-medium transition">สร้าง Deal ใหม่</a>
+    <div className="dr-root" style={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 14, padding: 24 }}>
+      <p style={{ fontSize: 22 }}>❌ ไม่พบ Deal</p>
+      {dealError && <p style={{ fontSize: 13, color: '#b22441', background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '8px 14px' }}>{dealError}</p>}
+      <p style={{ color: 'var(--muted)', fontSize: 14 }}>Deal อาจถูกลบหรือลิงก์ไม่ถูกต้อง</p>
+      <Link href="/deal/create" className="btn btn-primary">สร้าง Deal ใหม่</Link>
     </div>
   );
 
-  const jitsiRoom = `khonklang-${dealId.slice(0,10)}`;
-  const stepIdx   = STEP_ORDER.indexOf(deal.status);
-  const pct       = stepIdx >= 0 ? Math.round((stepIdx / (STEP_ORDER.length - 1)) * 100) : 0;
-  const isFinished = ['completed','cancelled','disputed'].includes(deal.status);
+  const jitsiRoom = `khonklang-${dealId.slice(0, 10)}`;
+  const stepIdx = STEP_ORDER.indexOf(deal.status);
+  const pct = stepIdx >= 0 ? Math.round((stepIdx / (STEP_ORDER.length - 1)) * 100) : 0;
+  const isFinished = ['completed', 'cancelled', 'disputed'].includes(deal.status);
 
-  // ─── QR Payment section ────────────────────────────────────────────────────
-  function PaymentSection() {
-    if (!['payment_pending','payment_uploaded'].includes(deal!.status)) return null;
-    const amount = deal!.price;
-    // Use middleman's phone for PromptPay if available
-    const mmPhone = ''; // Will be populated from middleman prefs in future
-    const qrUrl = mmPhone ? `https://promptpay.io/${mmPhone}/${amount}` : '';
-    return (
-      <div className="bg-gradient-to-br from-green-900/30 to-blue-900/30 border border-green-500/30 rounded-2xl p-5 space-y-4">
-        <p className="font-semibold text-green-300">💳 ชำระเงินค่าสินค้า</p>
-        <div className="text-center">
-          <p className="text-3xl font-bold text-white">{amount.toLocaleString()} <span className="text-lg font-normal text-gray-400">บาท</span></p>
-        </div>
-        <div className="bg-white/5 rounded-xl p-4 space-y-2 text-sm">
-          <p className="text-gray-400 text-xs mb-2">โอนเงินให้คนกลาง (บัญชีพักเงิน)</p>
-          <div className="flex justify-between"><span className="text-gray-400">ชื่อ</span><span className="font-medium">{deal!.middlemanName}</span></div>
-          {qrUrl ? (
-            <div className="flex justify-center pt-2">
-              <img src={qrUrl} alt="PromptPay QR" className="w-40 h-40 rounded-xl bg-white p-1" />
-            </div>
-          ) : (
-            <p className="text-yellow-400 text-xs">⚠️ ติดต่อคนกลางเพื่อรับข้อมูลการชำระเงิน</p>
-          )}
-        </div>
-        {deal!.status === 'payment_pending' && myRole === 'buyer' && (
-          <button onClick={() => evidInputRef.current?.click()}
-            className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium transition"
-          >📎 อัปโหลดสลิปหลังโอน</button>
-        )}
-        <input ref={evidInputRef} type="file" accept="image/*,.pdf" className="hidden"
-          onChange={async e => {
-            const f = e.target.files?.[0]; if (!f) return;
-            const j = await getJwt();
-            const form = new FormData(); form.append('file', f);
-            const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form });
-            const d = await r.json();
-            if (r.ok) await doAction('upload_payment', { fileId: d.fileId });
-            e.target.value = '';
-          }}
-        />
-      </div>
-    );
-  }
-
-  // ─── Guest / not-logged-in join panel ────────────────────────────────────
+  // ─── Guest / not-logged-in join panel ───────────────────────────────────
   if (myRole === 'guest' || myRole === '') {
-    const canBeBuyer  = !deal.buyerId;
-    const canBeSeller = !deal.sellerId;
-    const notLoggedIn = !myId;
+    const canBeBuyer = !deal.buyerId, canBeSeller = !deal.sellerId, notLoggedIn = !myId;
     const dealUrl = typeof window !== 'undefined' ? window.location.href : '';
-
     function handleJoin(role: 'buyer' | 'seller') {
-      if (notLoggedIn) {
-        // Redirect to login, then come back here
-        router.push(`/login?returnTo=${encodeURIComponent(dealUrl || `/deal/${dealId}`)}`);
-      } else {
-        doAction(role === 'buyer' ? 'join_as_buyer' : 'join_as_seller');
-      }
+      if (notLoggedIn) router.push(`/login?returnTo=${encodeURIComponent(dealUrl || `/deal/${dealId}`)}`);
+      else doAction(role === 'buyer' ? 'join_as_buyer' : 'join_as_seller');
     }
-
     return (
-      <div className="min-h-screen bg-[#0a0f1e] text-white flex flex-col">
-        <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
-          <Link href="/" className="text-gray-400 hover:text-white">←</Link>
-          <h1 className="text-xl font-bold truncate">{deal.title}</h1>
-        </div>
-        <div className="max-w-md mx-auto px-4 py-12 space-y-6 w-full">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-3">
-            <p className="text-xl font-bold">{deal.title}</p>
-            {deal.description && <p className="text-gray-400 text-sm">{deal.description}</p>}
-            <p className="text-2xl font-bold text-green-400">{deal.price.toLocaleString()} ฿</p>
-            <div className="flex flex-wrap gap-3 text-sm text-gray-400 pt-1">
+      <div className="dr-root">
+        <header className="dr-header">
+          <Link href="/" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
+          <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div></div>
+        </header>
+        <div style={{ maxWidth: 440, margin: '0 auto', padding: '40px 16px', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="dr-card">
+            <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--ink)' }}>{deal.title}</div>
+            {deal.description && <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>{deal.description}</p>}
+            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--green-600)', fontFamily: 'var(--font-display)', marginTop: 10 }}>฿{deal.price.toLocaleString()}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 13, color: 'var(--muted)', marginTop: 8 }}>
               {deal.sellerName && <span>ผู้ขาย: {deal.sellerName}</span>}
-              {deal.buyerName  && <span>ผู้ซื้อ: {deal.buyerName}</span>}
+              {deal.buyerName && <span>ผู้ซื้อ: {deal.buyerName}</span>}
             </div>
           </div>
-
-          {notLoggedIn && (
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-300 text-center">
-              ⚠️ กรุณาเข้าสู่ระบบก่อนเข้าร่วมดีล<br/>
-              <span className="text-xs text-yellow-400/70">แนะนำให้เปิดลิงก์ใน Chrome หรือ Safari</span>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {canBeBuyer && (
-              <button onClick={() => handleJoin('buyer')} disabled={acting}
-                className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-lg transition"
-              >{acting ? '...' : notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ซื้อ' : '🛍️ เข้าร่วมเป็นผู้ซื้อ'}</button>
-            )}
-            {canBeSeller && (
-              <button onClick={() => handleJoin('seller')} disabled={acting}
-                className="w-full py-4 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-lg transition"
-              >{acting ? '...' : notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ขาย' : '🛒 เข้าร่วมเป็นผู้ขาย'}</button>
-            )}
-            {!canBeBuyer && !canBeSeller && (
-              <p className="text-center text-gray-500">ดีลนี้มีผู้ซื้อและผู้ขายครบแล้ว</p>
-            )}
+          {notLoggedIn && <div style={{ background: '#fef5e3', border: '1px solid #fbe6bf', borderRadius: 'var(--r-md)', padding: '12px 16px', fontSize: 13, color: '#9a6209', textAlign: 'center' }}>⚠️ กรุณาเข้าสู่ระบบก่อนเข้าร่วมดีล</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {canBeBuyer && <button onClick={() => handleJoin('buyer')} disabled={acting} className="btn btn-primary btn-block btn-lg">{acting ? '...' : notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ซื้อ' : '🛍️ เข้าร่วมเป็นผู้ซื้อ'}</button>}
+            {canBeSeller && <button onClick={() => handleJoin('seller')} disabled={acting} className="btn btn-block btn-lg" style={{ background: '#6841d9', color: '#fff' }}>{acting ? '...' : notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ขาย' : '🛒 เข้าร่วมเป็นผู้ขาย'}</button>}
+            {!canBeBuyer && !canBeSeller && <p style={{ textAlign: 'center', color: 'var(--muted)' }}>ดีลนี้มีผู้ซื้อและผู้ขายครบแล้ว</p>}
           </div>
-
-          <button onClick={copyLink}
-            className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition text-sm"
-          >{copied ? '✅ คัดลอกลิงก์แล้ว' : '🔗 คัดลอกลิงก์แชร์'}</button>
+          <button onClick={copyLink} className="btn btn-ghost btn-block">{copied ? '✅ คัดลอกลิงก์แล้ว' : '🔗 คัดลอกลิงก์แชร์'}</button>
         </div>
       </div>
     );
   }
 
-  // ─── Middleman selection (buyer only, after buyer_joined) ─────────────────
+  // ─── Middleman selection ─────────────────────────────────────────────────
   const needsFirstSelect = myRole === 'buyer' && deal.status === 'buyer_joined' && !deal.middlemanId;
   if (needsFirstSelect || showSelectMM) {
     const TIERS = ['', 'Bronze', 'Silver', 'Gold', 'Platinum'];
-    const RATINGS = [0, 3, 4, 4.5];
-    const filtered = middlemen.filter(m =>
-      (mmFilter.minRating === 0 || m.reviewScore >= mmFilter.minRating)
-    );
-
-    function StarRating({ score, count }: { score: number; count: number }) {
-      if (count === 0) return <span className="text-xs text-gray-500">ยังไม่มีรีวิว</span>;
-      const full = Math.floor(score); const half = score - full >= 0.5;
-      return (
-        <span className="flex items-center gap-0.5 text-xs">
-          {[1,2,3,4,5].map(i => (
-            <span key={i} className={i <= full ? 'text-yellow-400' : (i === full+1 && half ? 'text-yellow-300' : 'text-gray-600')}>★</span>
-          ))}
-          <span className="ml-1 text-gray-400">{score.toFixed(1)} ({count})</span>
-        </span>
-      );
-    }
-
-    const TIER_BADGE: Record<string,string> = {
-      Bronze:   'bg-orange-500/20 text-orange-300 border-orange-400/30',
-      Silver:   'bg-slate-500/20 text-slate-200 border-slate-400/30',
-      Gold:     'bg-yellow-500/20 text-yellow-300 border-yellow-400/30',
-      Platinum: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30',
-    };
-
+    const filtered = middlemen.filter(m => (mmFilter.minRating === 0 || m.reviewScore >= mmFilter.minRating));
+    const TIER_COLOR: Record<string, string> = { Bronze: '#cd7f32', Silver: '#a0a0a0', Gold: '#f5b13d', Platinum: '#9db5c9' };
     return (
-      <div className="min-h-screen bg-[#0a0f1e] text-white flex flex-col">
-        {/* Header */}
-        <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-          <button onClick={() => {
-            if (showSelectMM) setShowSelectMM(false);
-            else router.back();
-          }} className="text-gray-400 hover:text-white">←</button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold">{showSelectMM ? 'เลือกคนกลางใหม่' : 'เลือกคนกลาง'}</h1>
-            <p className="text-xs text-gray-400">{deal.title} • {deal.price.toLocaleString()} ฿</p>
-          </div>
-          <button onClick={() => { const j = jwt; if(j) loadMiddlemen(j, mmFilter); }}
-            disabled={mmLoading}
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs transition"
-          >{mmLoading ? '...' : '🔄'}</button>
-        </div>
-
-        {/* Filters */}
-        <div className="px-4 pt-4 pb-3 max-w-xl mx-auto w-full space-y-3">
-          <p className="text-sm text-gray-400">เลือกคนกลางที่คุณไว้วางใจเพื่อดูแลธุรกรรมนี้</p>
-          <div className="grid grid-cols-3 gap-2">
-            {/* Province */}
-            <input
-              type="text"
-              value={mmFilter.province}
-              onChange={e => setMmFilter(f => ({ ...f, province: e.target.value }))}
-              placeholder="จังหวัด"
-              className="col-span-1 bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-            />
-            {/* Tier */}
-            <select
-              value={mmFilter.tier}
-              onChange={e => setMmFilter(f => ({ ...f, tier: e.target.value }))}
-              className="col-span-1 bg-[#1a2035] border border-white/15 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-            >
-              {TIERS.map(t => <option key={t} value={t}>{t || 'ทุกเทียร์'}</option>)}
-            </select>
-            {/* Min rating */}
-            <select
-              value={mmFilter.minRating}
-              onChange={e => setMmFilter(f => ({ ...f, minRating: parseFloat(e.target.value) }))}
-              className="col-span-1 bg-[#1a2035] border border-white/15 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-            >
-              <option value={0}>ทุกคะแนน</option>
-              <option value={3}>★★★ ขึ้นไป</option>
-              <option value={4}>★★★★ ขึ้นไป</option>
-              <option value={4.5}>★★★★½ ขึ้นไป</option>
+      <div className="dr-root">
+        <header className="dr-header">
+          <button onClick={() => { if (showSelectMM) setShowSelectMM(false); else router.back(); }} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
+          <div className="dr-header-info"><div className="dr-htitle">{showSelectMM ? 'เลือกคนกลางใหม่' : 'เลือกคนกลาง'}</div><div className="dr-hsub">{deal.title} · ฿{deal.price.toLocaleString()}</div></div>
+          <button onClick={() => { if (jwt) loadMiddlemen(jwt, mmFilter); }} disabled={mmLoading} className="dr-cta-link">{mmLoading ? '...' : '🔄'}</button>
+        </header>
+        <div style={{ maxWidth: 600, margin: '0 auto', width: '100%', padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 14, color: 'var(--muted)' }}>เลือกคนกลางที่คุณไว้วางใจเพื่อดูแลธุรกรรมนี้</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <input className="dr-select" value={mmFilter.province} onChange={e => setMmFilter(f => ({ ...f, province: e.target.value }))} placeholder="จังหวัด" />
+            <select className="dr-select" value={mmFilter.tier} onChange={e => setMmFilter(f => ({ ...f, tier: e.target.value }))}>{TIERS.map(t => <option key={t} value={t}>{t || 'ทุกเทียร์'}</option>)}</select>
+            <select className="dr-select" value={mmFilter.minRating} onChange={e => setMmFilter(f => ({ ...f, minRating: parseFloat(e.target.value) }))}>
+              <option value={0}>ทุกคะแนน</option><option value={3}>★★★ ขึ้นไป</option><option value={4}>★★★★ ขึ้นไป</option><option value={4.5}>★★★★½ ขึ้นไป</option>
             </select>
           </div>
-          <button
-            onClick={() => { if(jwt) loadMiddlemen(jwt, mmFilter); }}
-            disabled={mmLoading}
-            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white text-sm font-medium transition"
-          >{mmLoading ? 'กำลังค้นหา...' : '🔍 ค้นหาคนกลาง'}</button>
-        </div>
-
-        {/* Results */}
-        <div className="flex-1 overflow-y-auto px-4 pb-8 max-w-xl mx-auto w-full space-y-4">
-          {mmLoading && (
-            <div className="flex justify-center py-12">
-              <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/>
-            </div>
-          )}
-          {!mmLoading && filtered.length === 0 && (
-            <div className="text-center py-16 text-gray-500">
-              <p>ไม่พบคนกลางที่ตรงกับเงื่อนไข</p>
-              <p className="text-xs mt-2">ลองปรับตัวกรอง</p>
-            </div>
-          )}
+          <button onClick={() => { if (jwt) loadMiddlemen(jwt, mmFilter); }} disabled={mmLoading} className="btn btn-primary btn-block">{mmLoading ? 'กำลังค้นหา...' : '🔍 ค้นหาคนกลาง'}</button>
+          {mmLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}><div style={{ width: 28, height: 28, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'dashSpin .8s linear infinite' }} /></div>}
+          {!mmLoading && filtered.length === 0 && <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--muted)' }}><p>ไม่พบคนกลางที่ตรงกับเงื่อนไข</p></div>}
           {!mmLoading && filtered.map(m => (
-            <div key={m.userId} className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
-              {/* Top row: name + tier badge */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="font-semibold text-white text-base">{m.name}</p>
-                  {m.workProvince && (
-                    <p className="text-xs text-gray-400">📍 {m.workProvince}</p>
-                  )}
-                  {m.categories && (
-                    <p className="text-xs text-gray-500">📦 {m.categories}</p>
-                  )}
+            <div key={m.userId} className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>{m.name}</div>
+                  {m.workProvince && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>📍 {m.workProvince}</div>}
+                  {m.categories && <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 2 }}>📦 {m.categories}</div>}
                 </div>
-                <span className={`text-xs px-2.5 py-1 rounded-full border flex-shrink-0 font-medium ${TIER_BADGE[m.tier] || 'bg-gray-500/20 text-gray-300 border-gray-500/30'}`}>
-                  {m.tier}
-                </span>
+                <span className="dr-party-tier" style={{ background: TIER_COLOR[m.tier] || 'var(--muted)', alignSelf: 'flex-start' }}>{m.tier}</span>
               </div>
-
-              {/* Rating */}
-              <StarRating score={m.reviewScore} count={m.reviewCount} />
-
-              {/* Phone */}
-              {m.phone ? (
-                <div className="flex items-center justify-between bg-green-900/20 border border-green-500/20 rounded-xl px-4 py-3">
-                  <span className="text-sm text-gray-300">📞 เบอร์โทร</span>
-                  <a href={`tel:${m.phone}`}
-                    className="text-sm font-semibold text-green-400 hover:text-green-300 transition"
-                  >{m.phone}</a>
-                </div>
-              ) : (
-                <p className="text-xs text-gray-600 text-center">ไม่ได้ระบุเบอร์โทร</p>
-              )}
-
-              {/* Select button */}
-              <button
-                onClick={() => {
-                  doAction('select_middleman', { middlemanId: m.userId, middlemanName: m.name });
-                  setShowSelectMM(false);
-                }}
-                disabled={acting}
-                className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-semibold transition"
-              >{acting ? '...' : '✅ เลือกคนกลางนี้'}</button>
+              <div style={{ fontSize: 13, color: 'var(--amber-500)' }}>{m.reviewCount === 0 ? <span style={{ color: 'var(--faint)' }}>ยังไม่มีรีวิว</span> : <>★ {m.reviewScore.toFixed(1)} <span style={{ color: 'var(--muted)' }}>({m.reviewCount})</span></>}</div>
+              {m.phone && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-md)', padding: '10px 14px' }}><span style={{ fontSize: 13, color: 'var(--ink-2)' }}>📞 เบอร์โทร</span><a href={`tel:${m.phone}`} style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-600)' }}>{m.phone}</a></div>}
+              <button onClick={() => { doAction('select_middleman', { middlemanId: m.userId, middlemanName: m.name }); setShowSelectMM(false); }} disabled={acting} className="btn btn-green btn-block">{acting ? '...' : '✅ เลือกคนกลางนี้'}</button>
             </div>
           ))}
         </div>
@@ -519,295 +297,219 @@ export default function DealRoom() {
     );
   }
 
-  // ─── Action panel ──────────────────────────────────────────────────────────
+  // ─── Payment section ─────────────────────────────────────────────────────
+  function PaymentSection() {
+    if (!['payment_pending', 'payment_uploaded'].includes(deal!.status)) return null;
+    return (
+      <div className="dr-card dr-pay-card">
+        <div className="dr-card-title">💳 ชำระเงินค่าสินค้า</div>
+        <div className="dr-pay-amount">฿{deal!.price.toLocaleString()}</div>
+        <div className="dr-pay-to">โอนให้คนกลาง — {deal!.middlemanName}</div>
+        <div style={{ fontSize: 12.5, color: 'var(--amber-500)' }}>⚠️ ติดต่อคนกลางเพื่อรับข้อมูลการชำระเงิน (PromptPay/บัญชี)</div>
+        {deal!.status === 'payment_pending' && myRole === 'buyer' && (
+          <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 14 }}>📎 อัปโหลดสลิปหลังโอน</button>
+        )}
+        {deal!.status === 'payment_uploaded' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — รอคนกลางยืนยัน</div>}
+        <input ref={evidInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }}
+          onChange={async e => { const f = e.target.files?.[0]; if (!f) return; const j = await getJwt(); const form = new FormData(); form.append('file', f); const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form }); const d = await r.json(); if (r.ok) await doAction('upload_payment', { fileId: d.fileId }); e.target.value = ''; }} />
+      </div>
+    );
+  }
+
+  // ─── Action panel ────────────────────────────────────────────────────────
   function ActionPanel() {
-    if (acting) return <div className="text-center text-gray-400 py-3 text-sm">กำลังดำเนินการ...</div>;
+    if (acting) return <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0', fontSize: 13 }}>กำลังดำเนินการ...</div>;
     const s = deal!.status;
     const btns: { label: string; cls: string; fn: () => void }[] = [];
-    const BLU = 'bg-blue-600 hover:bg-blue-500';
-    const GRN = 'bg-green-600 hover:bg-green-500';
-    const YLW = 'bg-yellow-600 hover:bg-yellow-500';
-    const PRP = 'bg-purple-600 hover:bg-purple-500';
-    const RED = 'bg-red-700/70 hover:bg-red-700';
-
-    if (['buyer_joined','terms_pending'].includes(s)) {
-      const accepted =
-        (myRole==='seller' && deal!.sellerAcceptedTerms) ||
-        (myRole==='middleman' && deal!.middlemanAcceptedTerms) ||
-        (myRole==='buyer' && deal!.buyerAcceptedTerms);
-      if (!accepted) btns.push({ label:'✅ ยอมรับเงื่อนไขข้อตกลง', cls:BLU, fn:() => doAction('accept_terms') });
-      else return <p className="text-green-400 text-sm text-center py-2">✅ คุณยอมรับเงื่อนไขแล้ว — รอฝ่ายอื่น</p>;
+    if (['buyer_joined', 'terms_pending'].includes(s)) {
+      const accepted = (myRole === 'seller' && deal!.sellerAcceptedTerms) || (myRole === 'middleman' && deal!.middlemanAcceptedTerms) || (myRole === 'buyer' && deal!.buyerAcceptedTerms);
+      if (!accepted) btns.push({ label: '✅ ยอมรับเงื่อนไขข้อตกลง', cls: 'btn-primary', fn: () => doAction('accept_terms') });
+      else return <p style={{ color: 'var(--green-600)', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>✅ คุณยอมรับเงื่อนไขแล้ว — รอฝ่ายอื่น</p>;
     }
-    if (s==='payment_uploaded' && myRole==='middleman')
-      btns.push({ label:'✅ ยืนยันรับเงิน — เริ่มขั้นตอนแพ็คของ', cls:GRN, fn:() => doAction('confirm_payment') });
-    if (s==='packing' && myRole==='seller')
-      btns.push({ label:'📦 แพ็คของเสร็จ — จัดส่งให้คนกลาง', cls:YLW, fn:() => { if(trackingInput) doAction('seller_done_packing',{trackingNumber:trackingInput}); else alert('กรอกเลขพัสดุ'); }});
-    if (s==='shipped_to_middleman' && myRole==='middleman')
-      btns.push({ label:'📬 รับสินค้าแล้ว', cls:PRP, fn:() => doAction('middleman_received') });
-    if (s==='middleman_checking' && myRole==='buyer' && !deal!.buyerConfirmedCheck)
-      btns.push({ label:'✅ ยืนยันสินค้าไม่มีปัญหา', cls:GRN, fn:() => doAction('buyer_confirm_check') });
-    if (s==='middleman_checking' && myRole==='middleman' && deal!.buyerConfirmedCheck)
-      btns.push({ label:'🚚 จัดส่งให้ผู้ซื้อแล้ว', cls:BLU, fn:() => { if(trackingInput) doAction('middleman_ship_to_buyer',{trackingNumber:trackingInput}); else alert('กรอกเลขพัสดุ'); }});
-    if (s==='shipped_to_buyer' && myRole==='buyer')
-      btns.push({ label:'🎉 ได้รับสินค้าแล้ว — ดีลเสร็จสมบูรณ์', cls:GRN, fn:() => doAction('buyer_received') });
-    // Buyer can change middleman before payment is uploaded
-    if (myRole==='buyer' && deal!.middlemanId && ['terms_pending','payment_pending'].includes(s))
-      btns.push({ label:'🔄 เลือกคนกลางใหม่', cls:'bg-yellow-600 hover:bg-yellow-500', fn:() => setShowSelectMM(true) });
+    if (s === 'payment_uploaded' && myRole === 'middleman') btns.push({ label: '✅ ยืนยันรับเงิน — เริ่มขั้นตอนแพ็คของ', cls: 'btn-green', fn: () => doAction('confirm_payment') });
+    if (s === 'packing' && myRole === 'seller') btns.push({ label: '📦 แพ็คของเสร็จ — จัดส่งให้คนกลาง', cls: 'btn-primary', fn: () => { if (trackingInput) doAction('seller_done_packing', { trackingNumber: trackingInput }); else alert('กรอกเลขพัสดุ'); } });
+    if (s === 'shipped_to_middleman' && myRole === 'middleman') btns.push({ label: '📬 รับสินค้าแล้ว', cls: 'btn-primary', fn: () => doAction('middleman_received') });
+    if (s === 'middleman_checking' && myRole === 'buyer' && !deal!.buyerConfirmedCheck) btns.push({ label: '✅ ยืนยันสินค้าไม่มีปัญหา', cls: 'btn-green', fn: () => doAction('buyer_confirm_check') });
+    if (s === 'middleman_checking' && myRole === 'middleman' && deal!.buyerConfirmedCheck) btns.push({ label: '🚚 จัดส่งให้ผู้ซื้อแล้ว', cls: 'btn-primary', fn: () => { if (trackingInput) doAction('middleman_ship_to_buyer', { trackingNumber: trackingInput }); else alert('กรอกเลขพัสดุ'); } });
+    if (s === 'shipped_to_buyer' && myRole === 'buyer') btns.push({ label: '🎉 ได้รับสินค้าแล้ว — ดีลเสร็จสมบูรณ์', cls: 'btn-green', fn: () => doAction('buyer_received') });
+    if (myRole === 'buyer' && deal!.middlemanId && ['terms_pending', 'payment_pending'].includes(s)) btns.push({ label: '🔄 เลือกคนกลางใหม่', cls: 'btn-ghost', fn: () => setShowSelectMM(true) });
+    if (!isFinished && myRole !== 'guest') btns.push({ label: '❌ ยกเลิก', cls: 'btn-danger', fn: () => { const r = prompt('เหตุผล'); doAction('cancel', { reason: r || '' }); } });
 
-    if (!isFinished && myRole!=='guest')
-      btns.push({ label:'❌ ยกเลิก', cls:RED, fn:() => { const r=prompt('เหตุผล'); doAction('cancel',{reason:r||''}); }});
-
-    if (btns.length===0) return <p className="text-gray-500 text-sm text-center py-2">ไม่มีการกระทำในขั้นตอนนี้</p>;
+    if (btns.length === 0) return <p style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>ไม่มีการกระทำในขั้นตอนนี้</p>;
     return (
-      <div className="space-y-2">
-        {(['packing','middleman_checking'].includes(s) && (myRole==='seller'||(myRole==='middleman'&&deal!.buyerConfirmedCheck))) && (
-          <input type="text" value={trackingInput} onChange={e=>setTrackingInput(e.target.value)}
-            placeholder="เลขพัสดุ / Tracking number"
-            className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 text-sm"
-          />
+      <div className="dr-actions">
+        {(['packing', 'middleman_checking'].includes(s) && (myRole === 'seller' || (myRole === 'middleman' && deal!.buyerConfirmedCheck))) && (
+          <input type="text" className="dr-select" value={trackingInput} onChange={e => setTrackingInput(e.target.value)} placeholder="เลขพัสดุ / Tracking number" />
         )}
-        {btns.map(b=>(<button key={b.label} onClick={b.fn} className={`w-full py-3 rounded-xl text-white font-medium transition ${b.cls}`}>{b.label}</button>))}
+        {btns.map(b => <button key={b.label} onClick={b.fn} className={`btn ${b.cls} btn-block`}>{b.label}</button>)}
       </div>
     );
   }
 
-  // ─── Evidence panel ────────────────────────────────────────────────────────
+  // ─── Evidence panel ──────────────────────────────────────────────────────
   function EvidencePanel() {
-    const canUp = (myRole==='seller'&&['packing','shipped_to_middleman'].includes(deal!.status)) ||
-      (myRole==='middleman'&&['middleman_received','middleman_checking'].includes(deal!.status));
-    const typeLabel: Record<string,string> = {
-      packing:'📦 แพ็คของ', testing:'🔧 ทดสอบ',
-      receive:'📬 รับสินค้า (คนกลาง)', check:'🔍 ตรวจสินค้า (คนกลาง)',
-    };
-    const items: {type:string;fileId:string;fileName:string}[] = (() => {
-      try { return JSON.parse(deal!.evidenceData || '[]'); } catch { return []; }
-    })();
+    const canUp = (myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status)) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
+    const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)' };
+    const items: { type: string; fileId: string; fileName: string }[] = (() => { try { return JSON.parse(deal!.evidenceData || '[]'); } catch { return []; } })();
     return (
-      <div className="space-y-4">
+      <div className="dr-evid-inner">
         {canUp && (
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
-            <p className="text-sm font-medium">อัปโหลดหลักฐาน</p>
-            <select value={evidenceType} onChange={e=>setEvidenceType(e.target.value)}
-              className="w-full bg-[#1a2035] border border-white/15 rounded-lg px-3 py-2 text-white text-sm"
-            >
-              {myRole==='seller'&&<><option value="packing">วิดีโอแพ็คของ</option><option value="testing">วิดีโอทดสอบ</option></>}
-              {myRole==='middleman'&&<><option value="receive">วิดีโอรับสินค้า</option><option value="check">วิดีโอตรวจ</option></>}
+          <div className="dr-card">
+            <div className="dr-card-title">อัปโหลดหลักฐาน</div>
+            <select className="dr-select" style={{ marginBottom: 12 }} value={evidenceType} onChange={e => setEvidenceType(e.target.value)}>
+              {myRole === 'seller' && <><option value="packing">วิดีโอแพ็คของ</option><option value="testing">วิดีโอทดสอบ</option></>}
+              {myRole === 'middleman' && <><option value="receive">วิดีโอรับสินค้า</option><option value="check">วิดีโอตรวจ</option></>}
             </select>
-            <button onClick={()=>evidInputRef.current?.click()}
-              className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium text-sm"
-            >📎 เลือกไฟล์ (รูป/วิดีโอ)</button>
-            <input ref={evidInputRef} type="file" accept="image/*,video/*" className="hidden"
-              onChange={e=>{const f=e.target.files?.[0];if(f)uploadFile(f,true);e.target.value='';}}
-            />
+            <button onClick={() => evidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> เลือกไฟล์ (รูป/วิดีโอ)</button>
+            <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true); e.target.value = ''; }} />
           </div>
         )}
-        {items.length === 0 && !canUp && (
-          <p className="text-center text-gray-500 py-8">ยังไม่มีหลักฐาน</p>
-        )}
-        {items.map((item, i) => {
-          const url = fileUrl(item.fileId);
-          const isVid = item.fileName?.match(/\.(mp4|mov|avi|webm)$/i);
-          return (
-            <div key={i} className="space-y-1">
-              <p className="text-xs text-gray-400">{typeLabel[item.type] || item.type}</p>
-              <div className="bg-white/5 rounded-xl overflow-hidden">
-                {isVid
-                  ? <video src={url} controls className="w-full max-h-52 object-contain"/>
-                  : <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.fileName} className="w-full max-h-52 object-contain"/></a>
-                }
+        {items.length === 0 && !canUp && <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '32px 0' }}>ยังไม่มีหลักฐาน</p>}
+        <div className="dr-evid-list">
+          {items.map((item, i) => {
+            const url = fileUrl(item.fileId);
+            const isVid = item.fileName?.match(/\.(mp4|mov|avi|webm)$/i);
+            return (
+              <div key={i} className="dr-card" style={{ padding: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{typeLabel[item.type] || item.type}</div>
+                {isVid ? <video src={url} controls style={{ width: '100%', maxHeight: 220, borderRadius: 'var(--r-md)', background: '#000' }} /> : <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.fileName} style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 'var(--r-md)' }} /></a>}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     );
   }
 
-  // ─── Main render ───────────────────────────────────────────────────────────
+  // ─── Main render ─────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-white flex flex-col">
-
-      {/* Header */}
-      <div className="bg-[#111827] border-b border-white/10 px-4 py-3 flex items-center gap-2 sticky top-0 z-30">
-        <button onClick={()=>router.back()} className="text-gray-400 hover:text-white">←</button>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold truncate text-sm">{deal.title}</p>
-          <p className="text-xs text-gray-400">{STEP_LABEL[deal.status]} • {deal.price.toLocaleString()} ฿</p>
+    <div className="dr-root">
+      <header className="dr-header">
+        <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
+        <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{STEP_LABEL[deal.status]} · ฿{deal.price.toLocaleString()}</div></div>
+        <div className="dr-hctas">
+          <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
+          <button className="dr-cta-green" onClick={() => setShowJitsi(!showJitsi)}>📹 Video</button>
         </div>
-        <button onClick={copyLink}
-          className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium transition"
-        >{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์ลิงค์'}</button>
-        <button onClick={()=>setShowJitsi(!showJitsi)}
-          className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-xs font-medium transition"
-        >📹 Video</button>
-      </div>
+      </header>
 
-      {/* ═══ VIDEO MODE ═══ */}
       {showJitsi ? (
-        <div className="flex-1 flex flex-col bg-[#0d1117]" style={{minHeight:0}}>
-          <div className="flex items-center justify-between px-3 py-2 bg-black/40 border-b border-white/10 flex-shrink-0">
-            <span className="text-xs text-gray-400">📹 วิดีโอคอล กำลังดำเนินการ...</span>
-            <button onClick={()=>setShowJitsi(false)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition"
-            >✕ วางสาย</button>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0d1117', minHeight: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,.4)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>📹 วิดีโอคอล กำลังดำเนินการ...</span>
+            <button onClick={() => setShowJitsi(false)} className="btn btn-danger btn-sm">✕ วางสาย</button>
           </div>
-          <div className="flex-1" style={{minHeight:'60vh'}}>
-            <JitsiMeet roomName={jitsiRoom} displayName={myName || 'ผู้ใช้'} />
-          </div>
+          <div style={{ flex: 1, minHeight: '60vh' }}><JitsiMeet roomName={jitsiRoom} displayName={myName || 'ผู้ใช้'} /></div>
         </div>
       ) : (
         <>
-      {/* Progress */}
-      <div className="px-4 pt-3 pb-1">
-        <div className="flex justify-between text-xs text-gray-400 mb-1">
-          <span>{STEP_LABEL[deal.status]}</span><span>{pct}%</span>
-        </div>
-        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 transition-all" style={{width:`${pct}%`}}/>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="px-4 pt-2">
-        <div className="flex gap-1 bg-white/5 rounded-xl p-1">
-          {(['steps','chat','evidence'] as const).map(k=>(
-            <button key={k} onClick={()=>setTab(k)}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tab===k?'bg-blue-600 text-white':'text-gray-400 hover:text-white'}`}
-            >{k==='steps'?'ขั้นตอน':k==='chat'?`แชท (${msgs.filter(m=>m.role!=='system').length})`:'หลักฐาน'}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 max-w-2xl mx-auto w-full">
-
-        {/* Steps tab */}
-        {tab==='steps'&&(
-          <div className="space-y-4">
-            {/* Parties */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2 text-sm">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">ผู้เกี่ยวข้อง</p>
-              <div className="flex justify-between"><span className="text-gray-400">ผู้ขาย</span><span>{deal.sellerName||'(รอผู้ขาย)'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-400">ผู้ซื้อ</span><span>{deal.buyerName||'(รอผู้ซื้อ)'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-400">คนกลาง</span><span>{deal.middlemanName||'(ยังไม่ได้เลือก)'}</span></div>
-            </div>
-
-            {/* Terms status */}
-            {(deal.sellerAcceptedTerms||deal.buyerAcceptedTerms||deal.middlemanAcceptedTerms)&&(
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2 text-sm">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">ยอมรับเงื่อนไข</p>
-                <div className="flex justify-between"><span className="text-gray-400">ผู้ขาย</span><span className={deal.sellerAcceptedTerms?'text-green-400':'text-gray-500'}>{deal.sellerAcceptedTerms?'✅ ยอมรับแล้ว':'⏳ รอ'}</span></div>
-                {deal.middlemanId&&<div className="flex justify-between"><span className="text-gray-400">คนกลาง</span><span className={deal.middlemanAcceptedTerms?'text-green-400':'text-gray-500'}>{deal.middlemanAcceptedTerms?'✅ ยอมรับแล้ว':'⏳ รอ'}</span></div>}
-                <div className="flex justify-between"><span className="text-gray-400">ผู้ซื้อ</span><span className={deal.buyerAcceptedTerms?'text-green-400':'text-gray-500'}>{deal.buyerAcceptedTerms?'✅ ยอมรับแล้ว':'⏳ รอ'}</span></div>
-              </div>
-            )}
-
-            {/* Payment QR */}
-            <PaymentSection/>
-
-            {/* Payment slip */}
-            {deal.paymentSlipFileId&&(
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                <p className="text-xs text-gray-400 mb-2">หลักฐานการโอนเงิน</p>
-                <a href={fileUrl(deal.paymentSlipFileId)} target="_blank" rel="noreferrer">
-                  <img src={fileUrl(deal.paymentSlipFileId)} alt="slip" className="w-full max-h-48 object-contain rounded-xl"/>
-                </a>
-              </div>
-            )}
-
-            {/* Tracking */}
-            {deal.trackingToMiddleman&&(
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-sm">
-                <p className="text-gray-400 text-xs mb-1">เลขพัสดุ ผู้ขาย→คนกลาง</p>
-                <p className="font-mono text-white">{deal.trackingToMiddleman}</p>
-              </div>
-            )}
-            {deal.trackingToBuyer&&(
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-sm">
-                <p className="text-gray-400 text-xs mb-1">เลขพัสดุ คนกลาง→ผู้ซื้อ</p>
-                <p className="font-mono text-white">{deal.trackingToBuyer}</p>
-              </div>
-            )}
-
-            {/* Completed */}
-            {deal.status==='completed'&&(
-              <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-6 text-center">
-                <p className="text-3xl mb-2">🎉</p>
-                <p className="text-green-300 font-bold text-lg">ดีลเสร็จสมบูรณ์!</p>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">การกระทำ</p>
-              <ActionPanel/>
-            </div>
+          <div className="dr-progress-wrap">
+            <div className="dr-prog-meta"><span className="dr-prog-status">{STEP_LABEL[deal.status]}</span><span className="dr-prog-pct">{pct}%</span></div>
+            <div className="dr-prog-track"><div className="dr-prog-fill" style={{ width: `${pct}%`, background: deal.status === 'completed' ? 'var(--green-500)' : 'var(--accent)' }} /></div>
           </div>
-        )}
 
-        {/* Chat tab */}
-        {tab==='chat'&&(
-          <div className="flex flex-col" style={{minHeight:'60vh'}}>
-            <div className="flex-1 space-y-2 pb-4">
-              {msgs.length===0&&<p className="text-center text-gray-500 py-8 text-sm">ยังไม่มีข้อความ</p>}
-              {msgs.map(m=>{
-                if(m.role==='system') return(
-                  <div key={m.$id} className="text-center">
-                    <span className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full">{m.content}</span>
+          <nav className="dr-tabs">
+            {(['steps', 'chat', 'evidence'] as const).map(k => (
+              <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
+                {k === 'steps' ? 'ขั้นตอน' : k === 'chat' ? `แชท (${msgs.filter(m => m.role !== 'system').length})` : 'หลักฐาน'}
+              </button>
+            ))}
+          </nav>
+
+          <main className="dr-body">
+            {tab === 'steps' && (
+              <div className="dr-inner">
+                <div className="dr-card">
+                  <div className="dr-card-title">ผู้เกี่ยวข้อง</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {[['ผู้ขาย', deal.sellerName || '(รอผู้ขาย)'], ['ผู้ซื้อ', deal.buyerName || '(รอผู้ซื้อ)'], ['คนกลาง', deal.middlemanName || '(ยังไม่ได้เลือก)']].map(([l, v]) => (
+                      <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--line-2)', fontSize: 14 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ fontWeight: 600, color: 'var(--ink)' }}>{v}</span></div>
+                    ))}
                   </div>
-                );
-                const isMe=m.senderId===myId;
-                return(
-                  <div key={m.$id} className={`flex ${isMe?'justify-end':'justify-start'}`}>
-                    <div className={`max-w-[75%] flex flex-col ${isMe?'items-end':'items-start'}`}>
-                      {!isMe&&<span className="text-xs text-gray-500 px-1 mb-0.5">{m.senderName}</span>}
-                      <div className={`rounded-2xl px-4 py-2.5 ${isMe?'bg-blue-600 rounded-br-sm':'bg-white/10 rounded-bl-sm'}`}>
-                        {m.type==='image'?(
-                          <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer">
-                            <img src={fileUrl(m.fileId)} alt={m.fileName} className="max-w-[200px] rounded-lg object-contain"/>
-                          </a>
-                        ):m.type==='file'?(
-                          <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer" className="underline text-sm">📎 {m.fileName}</a>
-                        ):(<p className="text-sm">{m.content}</p>)}
+                </div>
+
+                {(deal.sellerAcceptedTerms || deal.buyerAcceptedTerms || deal.middlemanAcceptedTerms) && (
+                  <div className="dr-card">
+                    <div className="dr-card-title">ยอมรับเงื่อนไข</div>
+                    {[['ผู้ขาย', deal.sellerAcceptedTerms], ...(deal.middlemanId ? [['คนกลาง', deal.middlemanAcceptedTerms] as [string, boolean]] : []), ['ผู้ซื้อ', deal.buyerAcceptedTerms]].map(([l, ok]) => (
+                      <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--line-2)', fontSize: 14 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ยอมรับแล้ว' : '⏳ รอ'}</span></div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Timeline */}
+                <div className="dr-card">
+                  <div className="dr-card-title">ขั้นตอน Escrow</div>
+                  <div className="dr-timeline">
+                    {TIMELINE.map(st => {
+                      const si = STEP_ORDER.indexOf(deal.status);
+                      const ti = STEP_ORDER.indexOf(st.key);
+                      const d = ti < si, a = ti === si;
+                      return (
+                        <div key={st.key} className={`dr-tl-item${d ? ' done' : ''}${a ? ' active' : ''}`}>
+                          <div className="dr-tl-dot">{d ? <Icon name="check" size={10} /> : a ? <div className="dr-tl-pulse" /> : null}</div>
+                          <span className="dr-tl-label">{st.label}</span>
+                          {a && <span className="dr-tl-now">กำลังดำเนินการ</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <PaymentSection />
+
+                {deal.paymentSlipFileId && (
+                  <div className="dr-card">
+                    <div className="dr-card-title">หลักฐานการโอนเงิน</div>
+                    <a href={fileUrl(deal.paymentSlipFileId)} target="_blank" rel="noreferrer"><img src={fileUrl(deal.paymentSlipFileId)} alt="slip" style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 'var(--r-md)' }} /></a>
+                  </div>
+                )}
+                {deal.trackingToMiddleman && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ ผู้ขาย → คนกลาง</div><div className="dr-track-code">{deal.trackingToMiddleman}</div></div>}
+                {deal.trackingToBuyer && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ คนกลาง → ผู้ซื้อ</div><div className="dr-track-code">{deal.trackingToBuyer}</div></div>}
+
+                {deal.status === 'completed' && (
+                  <div className="dr-card dr-done-card"><div className="dr-done-emoji">🎉</div><div className="dr-done-title">ดีลเสร็จสมบูรณ์!</div><div className="dr-done-sub">เงินถูกโอนให้ผู้ขายเรียบร้อยแล้ว</div></div>
+                )}
+
+                <div className="dr-card"><div className="dr-card-title">การกระทำ</div><ActionPanel /></div>
+              </div>
+            )}
+
+            {tab === 'chat' && (
+              <div className="dr-chat-root">
+                <div className="dr-chat-feed">
+                  {msgs.length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '32px 0', fontSize: 14 }}>ยังไม่มีข้อความ</p>}
+                  {msgs.map(m => {
+                    if (m.role === 'system') return <div key={m.$id} className="dr-sys-msg"><span>{m.content}</span></div>;
+                    const isMe = m.senderId === myId;
+                    return (
+                      <div key={m.$id} className={`dr-bubble-row${isMe ? ' mine' : ''}`}>
+                        {!isMe && <div className="dr-bubble-av" style={{ background: '#6841d9' }}>{(m.senderName || '?').slice(0, 1)}</div>}
+                        <div className="dr-bubble-col">
+                          {!isMe && <span className="dr-bubble-sender">{m.senderName}</span>}
+                          <div className={`dr-bubble${isMe ? ' dr-bubble-mine' : ''}`}>
+                            {m.type === 'image' ? <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer"><img src={fileUrl(m.fileId)} alt={m.fileName} style={{ maxWidth: 200, borderRadius: 10 }} /></a>
+                              : m.type === 'file' ? <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', fontSize: 14 }}>📎 {m.fileName}</a>
+                                : m.content}
+                          </div>
+                          <span className="dr-bubble-t">{new Date(m.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-gray-600 px-1 mt-0.5">{new Date(m.createdAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</span>
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={chatBottomRef}/>
-            </div>
-            <div className="sticky bottom-0 bg-[#0a0f1e] pt-2 pb-4">
-              {sending&&<p className="text-xs text-gray-500 text-center mb-1">กำลังส่ง...</p>}
-              <div className="flex gap-2 items-end">
-                <button onClick={()=>fileInputRef.current?.click()} disabled={sending}
-                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40 text-gray-300 flex-shrink-0 text-lg leading-none"
-                >🖼️</button>
-                <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden"
-                  onChange={async e=>{
-                    const f=e.target.files?.[0]; e.target.value='';
-                    if(!f) return;
-                    if(f.size>10*1024*1024){alert('ไฟล์ใหญ่เกิน 10MB'); return;}
-                    await uploadFile(f);
-                  }}
-                />
-                <textarea value={chatInput} onChange={e=>setChatInput(e.target.value)}
-                  onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(chatInput.trim())sendMsg(chatInput);}}}
-                  placeholder="พิมพ์ข้อความ..."
-                  rows={1}
-                  className="flex-1 bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none text-sm"
-                />
-                <button onClick={()=>{if(chatInput.trim())sendMsg(chatInput);}} disabled={!chatInput.trim()||sending}
-                  className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 flex-shrink-0"
-                >➤</button>
+                    );
+                  })}
+                  <div ref={chatBottomRef} />
+                </div>
+                <div className="dr-chat-bar">
+                  <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending}>🖼️</button>
+                  <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; if (f.size > 10 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 10MB'); return; } await uploadFile(f); }} />
+                  <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="พิมพ์ข้อความ..." onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) sendMsg(chatInput); } }} />
+                  <button className="dr-chat-send" onClick={() => { if (chatInput.trim()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending}><Icon name="arrowRight" size={16} /></button>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Evidence tab */}
-        {tab==='evidence'&&<EvidencePanel/>}
-      </div>
+            {tab === 'evidence' && <EvidencePanel />}
+          </main>
         </>
       )}
     </div>
