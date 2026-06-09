@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { account } from './appwrite';
+import { account, clearPersistedSession, hydratePersistedSession } from './appwrite';
 
 export type UserRole = 'seller' | 'middleman' | 'user';
 
@@ -31,6 +31,7 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    hydratePersistedSession();
     account.get()
       .then((u) => setUser(u as AppUser))
       .catch(() => setUser(null))
@@ -38,9 +39,15 @@ export function useUser() {
   }, []);
 
   const logout = async () => {
-    await account.deleteSession('current');
-    setUser(null);
-    window.location.href = '/';
+    try {
+      await account.deleteSession('current');
+    } catch {
+      // Clear local auth state even if the remote session is already gone.
+    } finally {
+      clearPersistedSession();
+      setUser(null);
+      window.location.href = '/';
+    }
   };
 
   return { user, loading, setUser, logout };

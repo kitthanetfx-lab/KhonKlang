@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { Icon } from './Icon';
+import { useUser } from '@/lib/useUser';
 
 /* ---------- hooks ---------- */
 export function useScrolled(threshold = 8) {
@@ -118,7 +119,10 @@ function DropItem({ it }: { it: NavItem }) {
 export function Nav({ active }: { active?: string }) {
   const scrolled = useScrolled();
   const [drawer, setDrawer] = useState(false);
+  const { user, loading, logout } = useUser();
   useEffect(() => { document.body.style.overflow = drawer ? 'hidden' : ''; }, [drawer]);
+  const displayName = user?.prefs?.displayName || user?.name || 'บัญชีของฉัน';
+  const shortName = displayName.length > 18 ? `${displayName.slice(0, 18)}...` : displayName;
 
   return (
     <nav className={`nav ${scrolled ? 'scrolled' : ''}`}>
@@ -137,8 +141,19 @@ export function Nav({ active }: { active?: string }) {
           <Link className="nav-link" href="/check-scam"><Icon name="search" size={17} /> เช็คคนโกง</Link>
         </div>
         <div className="nav-cta-group">
-          <Link className="btn btn-ghost btn-sm" href="/login">เข้าสู่ระบบ</Link>
-          <Link className="btn btn-primary btn-sm" href="/register">เริ่มต้นใช้งาน <Icon name="arrowRight" size={16} /></Link>
+          {loading ? (
+            <span className="btn btn-ghost btn-sm" aria-busy="true">กำลังโหลด...</span>
+          ) : user ? (
+            <>
+              <Link className="btn btn-ghost btn-sm" href="/profile"><Icon name="user" size={16} /> {shortName}</Link>
+              <button type="button" className="btn btn-primary btn-sm" onClick={logout}>ออกจากระบบ</button>
+            </>
+          ) : (
+            <>
+              <Link className="btn btn-ghost btn-sm" href="/login">เข้าสู่ระบบ</Link>
+              <Link className="btn btn-primary btn-sm" href="/register">เริ่มต้นใช้งาน <Icon name="arrowRight" size={16} /></Link>
+            </>
+          )}
         </div>
         <button className="nav-burger" onClick={() => setDrawer(true)} aria-label="เมนู"><Icon name="menu" size={22} /></button>
       </div>
@@ -150,8 +165,21 @@ export function Nav({ active }: { active?: string }) {
           <button className="nav-burger" style={{ display: 'grid' }} onClick={() => setDrawer(false)}><Icon name="x" size={20} /></button>
         </div>
         <div className="drawer-sep" />
-        <Link className="btn btn-primary btn-block" href="/register" style={{ marginBottom: 8 }}>เริ่มต้นใช้งาน <Icon name="arrowRight" size={16} /></Link>
-        <Link className="btn btn-ghost btn-block" href="/login">เข้าสู่ระบบ</Link>
+        {loading ? (
+          <span className="btn btn-ghost btn-block" aria-busy="true">กำลังโหลด...</span>
+        ) : user ? (
+          <>
+            <Link className="btn btn-primary btn-block" href="/profile" style={{ marginBottom: 8 }} onClick={() => setDrawer(false)}>
+              <Icon name="user" size={16} /> {shortName}
+            </Link>
+            <button type="button" className="btn btn-ghost btn-block" onClick={() => { setDrawer(false); logout(); }}>ออกจากระบบ</button>
+          </>
+        ) : (
+          <>
+            <Link className="btn btn-primary btn-block" href="/register" style={{ marginBottom: 8 }}>เริ่มต้นใช้งาน <Icon name="arrowRight" size={16} /></Link>
+            <Link className="btn btn-ghost btn-block" href="/login">เข้าสู่ระบบ</Link>
+          </>
+        )}
         <div className="drawer-sep" />
         <div className="drawer-label">บริการผ่านคนกลาง</div>
         {NAV_SERVICES.map(s => (

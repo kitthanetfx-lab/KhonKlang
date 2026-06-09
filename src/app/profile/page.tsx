@@ -3,8 +3,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
-import { account } from '@/lib/appwrite';
+import { account, clearPersistedSession } from '@/lib/appwrite';
 import { Icon } from '@/components/Icon';
 
 const PROVINCES = ['กระบี่','กรุงเทพมหานคร','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
@@ -37,7 +36,6 @@ function buildAddress(f: ReturnType<typeof parseAddress>) {
 
 function ProfilePage() {
   const router = useRouter();
-  const [userId, setUserId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [prefs, setPrefs] = useState<Record<string, string>>({});
@@ -66,7 +64,6 @@ function ProfilePage() {
   useEffect(() => {
     account.get()
       .then(async u => {
-        setUserId(u.$id);
         setDisplayName(u.name || '');
         const em = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
         setEmail(em);
@@ -134,7 +131,14 @@ function ProfilePage() {
     } catch { setError('เกิดข้อผิดพลาด กรุณาลองใหม่'); } finally { setSaving(false); }
   };
 
-  const logout = async () => { await account.deleteSession('current'); router.push('/'); };
+  const logout = async () => {
+    try {
+      await account.deleteSession('current');
+    } finally {
+      clearPersistedSession();
+      router.push('/');
+    }
+  };
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

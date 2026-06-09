@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { client, account } from '@/lib/appwrite';
+import { account, hydratePersistedSession, persistSession } from '@/lib/appwrite';
 import { Suspense } from 'react';
 
 function LineCompleteInner() {
@@ -23,6 +23,7 @@ function LineCompleteInner() {
       const secret = cookieMap['line_session_pending'];
 
       if (!secret) {
+        hydratePersistedSession();
         // ไม่มี pending cookie — ลอง account.get() โดยตรง
         try {
           const u = await account.get();
@@ -42,7 +43,7 @@ function LineCompleteInner() {
       document.cookie = 'line_session_pending=; max-age=0; path=/';
 
       // บอก Appwrite SDK ให้ใช้ session นี้ (สำคัญมาก — SDK ไม่ auto-read server cookies)
-      client.setSession(secret);
+      persistSession(secret);
       setStatus('กำลังโหลดข้อมูล...');
 
       try {

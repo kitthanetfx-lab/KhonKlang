@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { account } from '@/lib/appwrite';
+import { account, clearPersistedSession } from '@/lib/appwrite';
 import {
   LayoutDashboard, Store, Shield, Users, Settings,
   LogOut, Menu, ChevronRight, Bell,
@@ -94,7 +94,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <p className="text-xs text-gray-400">Admin</p>
             </div>
             <button
-              onClick={() => { account.deleteSession('current').catch(() => {}); router.push('/login'); }}
+              onClick={async () => {
+                try {
+                  await account.deleteSession('current');
+                } catch {
+                  // Continue clearing local auth state even if the remote session is gone.
+                } finally {
+                  clearPersistedSession();
+                  router.push('/login');
+                }
+              }}
               className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
               <LogOut size={15} />
             </button>

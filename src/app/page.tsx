@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Icon } from '@/components/Icon';
 import { Nav, Footer, CountUp, useReveal, useTilt } from '@/components/Site';
 import { EscrowStage } from '@/components/EscrowStage';
@@ -51,6 +52,16 @@ function Hero() {
       </div>
       <div className="container hero-inner">
         <div className="hero-copy">
+          <div className="hero-brand reveal">
+            <Image
+              src="/logo.png"
+              alt="โลโก้คนกลาง"
+              width={420}
+              height={420}
+              priority
+              className="hero-brand-image"
+            />
+          </div>
           <div className="eyebrow reveal"><Icon name="shieldCheck" size={15} /> ซื้อขายปลอดภัยผ่านคนกลางรับรอง</div>
           <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
             จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span>
