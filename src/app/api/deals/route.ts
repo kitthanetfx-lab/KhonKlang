@@ -68,13 +68,12 @@ async function ensureCollection(databases: Databases) {
 
 /** Add new attributes to existing collection (idempotent — ignores errors if attr already exists) */
 async function ensureExtraAttributes(databases: Databases) {
-  const extras: Promise<unknown>[] = [
-    databases.createStringAttribute(DB_ID, COL_ID, 'condition',    50,   false, '').catch(() => {}),
-    databases.createStringAttribute(DB_ID, COL_ID, 'location',     100,  false, '').catch(() => {}),
-    databases.createStringAttribute(DB_ID, COL_ID, 'sellingMode',  50,   false, 'normal').catch(() => {}),
-    databases.createStringAttribute(DB_ID, COL_ID, 'imageFileIds', 2000, false, '[]').catch(() => {}),
-  ];
-  await Promise.all(extras);
+  await Promise.all([
+    ensureAttributeReady(databases, 'condition', () => databases.createStringAttribute(DB_ID, COL_ID, 'condition', 50, false, '')),
+    ensureAttributeReady(databases, 'location', () => databases.createStringAttribute(DB_ID, COL_ID, 'location', 100, false, '')),
+    ensureAttributeReady(databases, 'sellingMode', () => databases.createStringAttribute(DB_ID, COL_ID, 'sellingMode', 50, false, 'normal')),
+    ensureAttributeReady(databases, 'imageFileIds', () => databases.createStringAttribute(DB_ID, COL_ID, 'imageFileIds', 2000, false, '[]')),
+  ]);
 }
 
 async function ensureIndexes(databases: Databases) {
@@ -95,14 +94,55 @@ function getUser(jwt: string) {
   return new Account(c).get();
 }
 
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function ensureAttributeReady(
+  databases: Databases,
+  key: string,
+  createAttribute: () => Promise<unknown>,
+) {
+  try {
+    const attr = await databases.getAttribute(DB_ID, COL_ID, key);
+    if (attr.status === 'available') return;
+  } catch {
+    // Attribute does not exist yet.
+  }
+
+  await createAttribute().catch(() => {});
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      const attr = await databases.getAttribute(DB_ID, COL_ID, key);
+      if (attr.status === 'available') return;
+    } catch {
+      // Keep polling until Appwrite finishes creating the attribute.
+    }
+    await sleep(500);
+  }
+
+  throw new Error(`แอตทริบิวต์ ${key} ยังไม่พร้อมใช้งาน`);
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const currentUser = await getUser(jwt);
     const role = req.nextUrl.searchParams.get('role') || 'seller';
     const databases = getAdminClient();
     await ensureIndexes(databases);
+
+    if (role === 'buyer' && !req.headers.get('x-session-jwt')) {
+      const posted = await databases.listDocuments(DB_ID, COL_ID, [
+        Query.equal('status', 'posted'),
+        Query.orderDesc('createdAt'),
+        Query.limit(100),
+      ]).catch(() => ({ documents: [] }));
+      return NextResponse.json({ deals: posted.documents });
+    }
+
+    const jwt = req.headers.get('x-session-jwt');
+    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const currentUser = await getUser(jwt);
 
     if (role === 'middleman') {
       const result = await databases.listDocuments(DB_ID, COL_ID, [

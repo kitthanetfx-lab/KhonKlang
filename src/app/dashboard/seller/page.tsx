@@ -82,15 +82,22 @@ export default function SellerDashboard() {
   async function handleImageUpload(files: FileList | null) {
     if (!files || files.length === 0) return;
     setUploading(true);
+    setPostError('');
     try {
       const jwt = (await account.createJWT()).jwt;
       const uploaded: UploadedImage[] = [];
       for (const file of Array.from(files)) {
         const fd = new FormData(); fd.append('file', file);
         const res = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd });
-        if (res.ok) { const d = await res.json(); uploaded.push({ fileId: d.fileId, url: d.url, name: file.name }); }
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(d.error || `อัปโหลดรูปไม่สำเร็จ (${file.name})`);
+        }
+        uploaded.push({ fileId: d.fileId, url: d.url, name: file.name });
       }
       setImages(prev => [...prev, ...uploaded]);
+    } catch (err: unknown) {
+      setPostError(err instanceof Error ? err.message : 'อัปโหลดรูปไม่สำเร็จ');
     } finally { setUploading(false); }
   }
   function removeImage(fileId: string) { setImages(prev => prev.filter(i => i.fileId !== fileId)); }
@@ -111,6 +118,8 @@ export default function SellerDashboard() {
       setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation(''); setSellingMode('normal'); setImages([]);
       await fetchDeals(jwt);
       setTimeout(() => { setPostDone(false); setTab('active'); }, 1800);
+    } catch (err: unknown) {
+      setPostError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally { setPosting(false); }
   }
 
