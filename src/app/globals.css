@@ -230,6 +230,7 @@ button.nav-link { background: none; border: none; }
 .nav-link:hover { background: var(--surface-2); color: var(--ink); }
 .nav-cta-group { display:none; align-items:center; gap: 10px; }
 @media (min-width: 980px){ .nav-cta-group { display:flex; } }
+.profile-trigger { display:inline-flex; align-items:center; gap:8px; }
 .nav-burger { display:grid; place-items:center; width:42px;height:42px;border-radius:var(--r-sm); border:1px solid var(--line); background: var(--surface); color: var(--ink); }
 @media (min-width: 980px){ .nav-burger { display:none; } }
 
@@ -241,6 +242,7 @@ button.nav-link { background: none; border: none; }
   box-shadow: var(--sh-lg); padding: 8px; opacity:0; transform: translateY(6px) scale(.98);
   pointer-events:none; transition: opacity .18s, transform .18s var(--ease-out); transform-origin: top left; z-index: 70;
 }
+.dropdown-menu-right { left: auto; right: 0; transform-origin: top right; }
 .dropdown:hover .dropdown-menu, .dropdown.open .dropdown-menu { opacity:1; transform: none; pointer-events:auto; }
 .dropdown-item { display:flex; gap:12px; align-items:flex-start; padding:11px 12px; border-radius: var(--r-sm); transition: background .15s; }
 .dropdown-item:hover { background: var(--surface-2); }

@@ -119,10 +119,34 @@ function DropItem({ it }: { it: NavItem }) {
 export function Nav({ active }: { active?: string }) {
   const scrolled = useScrolled();
   const [drawer, setDrawer] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const { user, loading, logout } = useUser();
   useEffect(() => { document.body.style.overflow = drawer ? 'hidden' : ''; }, [drawer]);
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [profileOpen]);
   const displayName = user?.prefs?.displayName || user?.name || 'บัญชีของฉัน';
   const shortName = displayName.length > 18 ? `${displayName.slice(0, 18)}...` : displayName;
+  const profileItems: NavItem[] = [
+    { icon: 'user', tint: '', t: 'โปรไฟล์ของฉัน', d: 'ดูและแก้ไขข้อมูลบัญชี', href: '/profile' },
+    ...(user?.prefs?.sellerStatus === 'approved'
+      ? [{ icon: 'store', tint: '', t: 'บอร์ดผู้ขาย', d: 'จัดการประกาศและดีลของคุณ', href: '/dashboard/seller' }]
+      : []),
+    ...(user?.prefs?.middlemanStatus === 'approved'
+      ? [{ icon: 'handCoins', tint: 'green', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' }]
+      : []),
+    ...(user?.prefs?.role === 'admin'
+      ? [{ icon: 'layoutDashboard', tint: 'violet', t: 'แอดมิน', d: 'เข้าแผงจัดการระบบ', href: '/admin' }]
+      : []),
+  ];
 
   return (
     <nav className={`nav ${scrolled ? 'scrolled' : ''}`}>
@@ -145,7 +169,14 @@ export function Nav({ active }: { active?: string }) {
             <span className="btn btn-ghost btn-sm" aria-busy="true">กำลังโหลด...</span>
           ) : user ? (
             <>
-              <Link className="btn btn-ghost btn-sm" href="/profile"><Icon name="user" size={16} /> {shortName}</Link>
+              <div className={`dropdown ${profileOpen ? 'open' : ''}`} ref={profileMenuRef}>
+                <button type="button" className="btn btn-ghost btn-sm profile-trigger" onClick={() => setProfileOpen(v => !v)}>
+                  <Icon name="user" size={16} /> {shortName} <Icon name="chevronDown" size={16} />
+                </button>
+                <div className="dropdown-menu dropdown-menu-right">
+                  {profileItems.map(it => <DropItem key={it.href} it={it} />)}
+                </div>
+              </div>
               <button type="button" className="btn btn-primary btn-sm" onClick={logout}>ออกจากระบบ</button>
             </>
           ) : (
@@ -172,6 +203,11 @@ export function Nav({ active }: { active?: string }) {
             <Link className="btn btn-primary btn-block" href="/profile" style={{ marginBottom: 8 }} onClick={() => setDrawer(false)}>
               <Icon name="user" size={16} /> {shortName}
             </Link>
+            {profileItems.filter(it => it.href !== '/profile').map(it => (
+              <Link key={it.href} className="drawer-link" href={it.href} onClick={() => setDrawer(false)}>
+                <Icon name={it.icon} /> {it.t}
+              </Link>
+            ))}
             <button type="button" className="btn btn-ghost btn-block" onClick={() => { setDrawer(false); logout(); }}>ออกจากระบบ</button>
           </>
         ) : (

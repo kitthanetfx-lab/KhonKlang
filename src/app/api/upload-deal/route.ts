@@ -45,6 +45,9 @@ async function ensureBucket(storage: Storage) {
         return;
       } catch {
         const msg = createErr instanceof Error ? createErr.message : String(createErr);
+        if (msg.includes('buckets.write')) {
+          throw new Error('ยังอัปโหลดรูปสินค้าไม่ได้ เพราะ production ยังไม่มี bucket `deal_files` และ API key ปัจจุบันไม่มีสิทธิ์สร้าง bucket อัตโนมัติ กรุณาสร้าง bucket นี้ใน Appwrite Console หรือเพิ่ม scope `buckets.write`');
+        }
         throw new Error(`ไม่พบบัคเก็ตรูปสินค้าและสร้างอัตโนมัติไม่สำเร็จ: ${msg}`);
       }
     }

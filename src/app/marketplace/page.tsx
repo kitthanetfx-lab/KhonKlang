@@ -127,7 +127,7 @@ export default function Marketplace() {
   }
 
   let filtered = listings
-    .filter(d => d.status === 'posted' && d.sellerId !== myId)
+    .filter(d => d.status === 'posted')
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)
     .filter(d => !province || d.location === province)
     .filter(d => !certified || d.sellingMode === 'certified')
@@ -148,7 +148,7 @@ export default function Marketplace() {
   function ListingCard({ listing, idx }: { listing: Listing; idx: number }) {
     const isCertified = listing.sellingMode === 'certified';
     const firstImg    = getFirstImage(listing);
-    const isMyDeal    = listing.buyerId === myId;
+    const isMyDeal    = listing.sellerId === myId || listing.buyerId === myId;
     const c1 = CARD_BG[idx % 3 === 0 ? 0 : 2], c2 = CARD_BG[(idx % 5) + 1];
     const avatarBg = CARD_BG[(idx % 5) + 1];
 
@@ -183,7 +183,9 @@ export default function Marketplace() {
           </div>
           <div className="lc-actions">
             {isMyDeal ? (
-              <Link href={`/deal/${listing.$id}`} className="btn btn-primary btn-sm" style={{ flex: 1, background: 'var(--green-500)' }}>เข้าห้อง Deal ของคุณ</Link>
+              <Link href={`/deal/${listing.$id}`} className="btn btn-primary btn-sm" style={{ flex: 1, background: 'var(--green-500)' }}>
+                {listing.sellerId === myId ? 'รายการของคุณ' : 'เข้าห้อง Deal ของคุณ'}
+              </Link>
             ) : isCertified ? (
               <button onClick={() => joinDeal(listing.$id)} disabled={joining === listing.$id} className="btn btn-primary btn-sm" style={{ flex: 1, background: 'var(--amber-500)', color: '#3a2700' }}>
                 {joining === listing.$id ? 'กำลังเข้าร่วม...' : '⭐ ซื้อ Certified'}
