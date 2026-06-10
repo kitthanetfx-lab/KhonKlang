@@ -4,17 +4,17 @@ import { Icon } from './Icon';
 
 const EF_NODES: Record<string, { x: number; y: number; label: string; icon: string; tint: string }> = {
   buyer:  { x: 14, y: 26, label: 'ผู้ซื้อ', icon: 'user', tint: 'blue' },
+  agent:  { x: 50, y: 26, label: 'คนกลาง', icon: 'users', tint: 'blue' },
   seller: { x: 86, y: 26, label: 'ผู้ขาย', icon: 'store', tint: 'violet' },
-  agent:  { x: 74, y: 56, label: 'คนกลาง', icon: 'users', tint: 'blue' },
   hub:    { x: 50, y: 73, label: 'ศูนย์กลาง', icon: 'shieldCheck', tint: 'green' },
 };
 
 interface Seg { key: string; dur: number; from?: string; to?: string; ctrl?: { x: number; y: number }; hold?: boolean; icon: string; color: string; label: string; sub: string; }
 const EF_SEGMENTS: Seg[] = [
-  { key: 'deposit', dur: 1500, from: 'agent', to: 'hub', ctrl: { x: 62, y: 72 }, icon: 'coins', color: 'var(--amber-500)', label: 'คนกลางวางเงินประกันกับศูนย์กลาง', sub: 'ตั้งวงเงินประกันไว้ก่อนรับงาน (เช่น ฿10,000)' },
+  { key: 'deposit', dur: 1500, from: 'agent', to: 'hub', ctrl: { x: 55, y: 66 }, icon: 'coins', color: 'var(--amber-500)', label: 'คนกลางวางเงินประกันกับศูนย์กลาง', sub: 'ตั้งวงเงินประกันไว้ก่อนรับงาน (เช่น ฿10,000)' },
   { key: 'pay', dur: 1700, from: 'buyer', to: 'hub', ctrl: { x: 26, y: 58 }, icon: 'coins', color: 'var(--blue-500)', label: 'ผู้ซื้อโอนเงินเข้าศูนย์กลาง', sub: 'เงินพักไว้ที่บริษัทคนกลาง จำกัด ยังไม่ถึงผู้ขาย' },
   { key: 'lock', dur: 1500, hold: true, icon: 'lock', color: 'var(--green-500)', label: 'ผู้ขายยืนยันราคา • ระบบล็อกเครดิตคนกลาง', sub: 'หักวงเงินประกันตามค่าสินค้า (เช่น ล็อก ฿3,000)' },
-  { key: 'ship', dur: 1700, from: 'seller', to: 'agent', ctrl: { x: 86, y: 46 }, icon: 'package', color: 'var(--accent)', label: 'ผู้ขายส่งของให้คนกลาง', sub: 'คนกลางตรวจสอบ แล้วส่งต่อผู้ซื้อ' },
+  { key: 'ship', dur: 1700, from: 'seller', to: 'agent', ctrl: { x: 74, y: 12 }, icon: 'package', color: 'var(--accent)', label: 'ผู้ขายส่งของให้คนกลาง', sub: 'คนกลางตรวจสอบ แล้วส่งต่อผู้ซื้อ' },
   { key: 'release', dur: 1700, from: 'hub', to: 'seller', ctrl: { x: 74, y: 62 }, icon: 'coins', color: 'var(--green-500)', label: 'ผู้ซื้อรับของ • ศูนย์กลางจ่ายผู้ขาย + คืนเครดิต', sub: 'โอนค่าสินค้าให้ผู้ขาย และคืนยอดล็อกให้คนกลาง' },
 ];
 
@@ -68,8 +68,8 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
 
   const lines = [
     { from: 'buyer', to: 'hub', c: { x: 26, y: 58 }, on: s.key === 'pay' },
-    { from: 'agent', to: 'hub', c: { x: 62, y: 72 }, on: s.key === 'deposit' || s.key === 'lock' || s.key === 'release' },
-    { from: 'seller', to: 'agent', c: { x: 86, y: 46 }, on: s.key === 'ship' },
+    { from: 'agent', to: 'hub', c: { x: 55, y: 66 }, on: s.key === 'deposit' || s.key === 'lock' || s.key === 'release' },
+    { from: 'seller', to: 'agent', c: { x: 74, y: 12 }, on: s.key === 'ship' },
     { from: 'hub', to: 'seller', c: { x: 74, y: 62 }, on: s.key === 'release' },
   ];
   const pos = (k: string) => ({ left: EF_NODES[k].x + '%', top: EF_NODES[k].y + '%' });
