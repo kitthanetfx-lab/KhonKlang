@@ -1739,7 +1739,7 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .dr-call-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green-500); animation: efPulse 1.4s infinite; flex: 0 0 auto; }
 .dr-call-tx { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: 13.5px; color: var(--green-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dr-call-banner button { flex: 0 0 auto; border: none; background: var(--green-500); color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 13px; padding: 8px 18px; border-radius: var(--r-pill); cursor: pointer; box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--green-500) 70%, transparent); transition: all .2s; }
-.dr-call-banner button:hover { background: var(--green-600); transfo
+.dr-call-banner button:hover { background: var(--green-600); transform: translateY(-1px); }
 /* ---- Orders / history page ---- */
 .od-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-sm); padding: 18px 20px; transition: box-shadow .2s, transform .2s var(--ease-out); }
 .od-card:hover { box-shadow: var(--sh-md); transform: translateY(-1px); }
