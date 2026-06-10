@@ -37,7 +37,14 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 });
+    if (!file) return NextResponse.json({ error: 'ไม่พบไฟล์ที่อัปโหลด' }, { status: 400 });
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'ไฟล์ใหญ่เกิน 10MB กรุณาเลือกไฟล์ที่เล็กลง' }, { status: 413 });
+    }
+    const okType = file.type.startsWith('image/') || file.type === 'application/pdf';
+    if (!okType) {
+      return NextResponse.json({ error: 'รองรับเฉพาะไฟล์รูปภาพหรือ PDF' }, { status: 400 });
+    }
 
     const storage = getStorage();
     await ensureBucket(storage);

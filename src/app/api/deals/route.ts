@@ -73,6 +73,8 @@ async function ensureExtraAttributes(databases: Databases) {
     ensureAttributeReady(databases, 'location', () => databases.createStringAttribute(DB_ID, COL_ID, 'location', 100, false, '')),
     ensureAttributeReady(databases, 'sellingMode', () => databases.createStringAttribute(DB_ID, COL_ID, 'sellingMode', 50, false, 'normal')),
     ensureAttributeReady(databases, 'imageFileIds', () => databases.createStringAttribute(DB_ID, COL_ID, 'imageFileIds', 2000, false, '[]')),
+    // source: 'listing' = ประกาศขายสาธารณะ (โชว์ในตลาด) / 'private' = ดีลส่วนตัว (แชร์ลิงก์เอง)
+    ensureAttributeReady(databases, 'source', () => databases.createStringAttribute(DB_ID, COL_ID, 'source', 20, false, '')),
   ]);
 }
 
@@ -208,7 +210,7 @@ export async function POST(req: NextRequest) {
     if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const currentUser = await getUser(jwt);
     const body = await req.json();
-    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds } = body;
+    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isBuyer = creatorRole === 'buyer';
     const databases = getAdminClient();
@@ -224,6 +226,7 @@ export async function POST(req: NextRequest) {
       condition: condition || '',
       location: location || '',
       sellingMode: sellingMode || 'normal',
+      source: source === 'listing' ? 'listing' : 'private',
       imageFileIds: JSON.stringify(imageFileIds || []),
       status: isBuyer ? 'waiting_seller' : 'posted',
       sellerAcceptedTerms: false, middlemanAcceptedTerms: false, buyerAcceptedTerms: false,

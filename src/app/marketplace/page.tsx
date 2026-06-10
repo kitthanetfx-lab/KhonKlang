@@ -19,6 +19,7 @@ interface Listing {
   condition: string;
   location: string;
   sellingMode: string;
+  source?: string;
   imageFileIds: string;
   status: string;
   buyerId: string;
@@ -96,6 +97,8 @@ export default function Marketplace() {
 
   let filtered = listings
     .filter(d => d.status === 'posted')
+    // ตลาดแสดงเฉพาะ "ประกาศขาย" — ไม่รวมดีลส่วนตัว/ดีลจากหน้าบริการ
+    .filter(d => d.source === 'listing' || (!d.source && !!d.sellingMode && d.sellingMode !== 'normal'))
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)
     .filter(d => !province || d.location === province)
     .filter(d => !certified || isCertifiedMode(d.sellingMode))
@@ -179,6 +182,9 @@ export default function Marketplace() {
             <div className="kicker" style={{ marginBottom: 10 }}>ตลาดคนกลาง</div>
             <h1 className="mkt-headline reveal">ซื้อขายได้ทุกหมวด <span className="gradient-text">มั่นใจทุกมูลค่า</span></h1>
             <p className="mkt-sub reveal" style={{ ['--d' as string]: '60ms' }}>ทุกรายการปลอดภัยด้วยระบบ Escrow — พักเงินจนกว่าจะได้ของตรงปก</p>
+            <Link href="/wanted" className="btn btn-ghost btn-sm reveal" style={{ marginTop: 14, ['--d' as string]: '80ms' }}>
+              📢 หาของไม่เจอ? ลงประกาศหาสินค้า <Icon name="arrowRight" size={15} />
+            </Link>
           </div>
           <div className="mkt-search reveal" style={{ ['--d' as string]: '100ms' }}>
             <Icon name="search" size={18} style={{ color: 'var(--faint)', flexShrink: 0 }} />
@@ -231,7 +237,10 @@ export default function Marketplace() {
             <div className="mkt-empty">
               <div className="mkt-empty-ic"><Icon name="search" size={32} /></div>
               <p>ไม่พบสินค้าที่ตรงกับที่ค้นหา</p>
-              <button className="btn btn-soft" style={{ marginTop: 14 }} onClick={() => { setCat('ทั้งหมด'); setSearch(''); setProvince(''); setCertified(false); }}>ล้างตัวกรอง</button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 14 }}>
+                <button className="btn btn-soft" onClick={() => { setCat('ทั้งหมด'); setSearch(''); setProvince(''); setCertified(false); }}>ล้างตัวกรอง</button>
+                <Link href="/wanted" className="btn btn-primary">📢 ลงประกาศหาสินค้านี้</Link>
+              </div>
             </div>
           ) : (
             <div className="mkt-grid">

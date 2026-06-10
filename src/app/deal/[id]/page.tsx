@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { ReviewPanel } from '@/components/ReviewPanel';
+import { compressImage } from '@/lib/imageCompress';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -93,6 +94,7 @@ export default function DealRoom() {
   const [jwt, setJwt] = useState('');
   const [dealError, setDealError] = useState('');
   const [showSelectMM, setShowSelectMM] = useState(false);
+  const [uploadPreview, setUploadPreview] = useState<{ url: string; name: string } | null>(null);
   const [mmFilter, setMmFilter] = useState({ q: '', province: '', tier: '', minRating: 0, need: '' });
   const [mmLoading, setMmLoading] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
@@ -195,14 +197,29 @@ export default function DealRoom() {
     } finally { setSending(false); }
   }
 
+  /** โชว์รูปที่เพิ่งเลือกทันทีระหว่างรออัปโหลด — ผู้ใช้เห็นรูปเสมอ ไม่ใช่แค่ชื่อไฟล์ */
+  function beginUploadPreview(f: File) {
+    const url = f.type.startsWith('image/') ? URL.createObjectURL(f) : '';
+    setUploadPreview({ url, name: f.name });
+    return url;
+  }
+  function endUploadPreview(url: string) {
+    if (url) URL.revokeObjectURL(url);
+    setUploadPreview(null);
+  }
+
   async function uploadFile(file: File, isEvidence = false) {
-    const j = await getJwt();
-    const form = new FormData(); form.append('file', file);
-    const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form });
-    const d = await r.json();
-    if (!r.ok) { alert(d.error || 'Upload failed'); return; }
-    if (isEvidence) await doAction('add_evidence', { evidenceType, fileId: d.fileId, fileName: d.fileName });
-    else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', d.fileId, d.fileName);
+    const purl = beginUploadPreview(file);
+    try {
+      const j = await getJwt();
+      const prepared = await compressImage(file); // บีบอัดเฉพาะรูป — วิดีโอ/PDF ส่งตามเดิม
+      const form = new FormData(); form.append('file', prepared);
+      const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form });
+      const d = await r.json();
+      if (!r.ok) { alert(d.error || 'Upload failed'); return; }
+      if (isEvidence) await doAction('add_evidence', { evidenceType, fileId: d.fileId, fileName: d.fileName });
+      else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', d.fileId, d.fileName);
+    } finally { endUploadPreview(purl); }
   }
 
   async function copyLink() { await navigator.clipboard.writeText(window.location.href).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000); }
@@ -332,7 +349,7 @@ export default function DealRoom() {
         )}
         {deal!.status === 'payment_uploaded' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — รอคนกลางยืนยัน</div>}
         <input ref={evidInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }}
-          onChange={async e => { const f = e.target.files?.[0]; if (!f) return; const j = await getJwt(); const form = new FormData(); form.append('file', f); const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form }); const d = await r.json(); if (r.ok) await doAction('upload_payment', { fileId: d.fileId }); e.target.value = ''; }} />
+          onChange={async e => { const f = e.target.files?.[0]; if (!f) return; const purl = beginUploadPreview(f); try { const j = await getJwt(); const prepared = await compressImage(f); const form = new FormData(); form.append('file', prepared); const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form }); const d = await r.json(); if (r.ok) await doAction('upload_payment', { fileId: d.fileId }); else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ'); } finally { endUploadPreview(purl); } e.target.value = ''; }} />
       </div>
     );
   }
@@ -552,6 +569,15 @@ export default function DealRoom() {
             {tab === 'evidence' && <EvidencePanel />}
           </main>
         </>
+      )}
+      {uploadPreview && (
+        <div className="up-toast" role="status" aria-live="polite">
+          {uploadPreview.url
+            ? <img src={uploadPreview.url} alt={`พรีวิว ${uploadPreview.name}`} />
+            : <span className="up-ic">📎</span>}
+          <div className="up-tx"><b>กำลังอัปโหลด...</b><span>{uploadPreview.name}</span></div>
+          <span className="up-spin" aria-hidden="true" />
+        </div>
       )}
     </div>
   );

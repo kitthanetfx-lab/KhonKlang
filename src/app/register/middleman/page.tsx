@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
 import { uploadKycFiles } from '@/lib/uploadKyc';
+import { FileUpload } from '@/components/FileUpload';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -87,33 +88,7 @@ function StepIndicator({ current }: { current: number }) {
   );
 }
 
-function FileUpload({ label, accept, file, onChange, hint, required }: {
-  label: string; accept: string; file: File | null;
-  onChange: (f: File | null) => void; hint?: string; required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium mb-1.5 opacity-75">
-        {label}{required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-all">
-        <input type="file" accept={accept} className="hidden" onChange={e => onChange(e.target.files?.[0] ?? null)} />
-        {file ? (
-          <div className="flex items-center gap-2 text-green-600">
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
-            <span className="text-sm font-medium truncate max-w-[220px]">{file.name}</span>
-          </div>
-        ) : (
-          <div className="text-center text-gray-400">
-            <Upload className="w-6 h-6 mx-auto mb-1.5" />
-            <p className="text-sm">คลิกเพื่อเลือกไฟล์</p>
-            {hint && <p className="text-xs mt-0.5">{hint}</p>}
-          </div>
-        )}
-      </label>
-    </div>
-  );
-}
+// FileUpload (พร้อมพรีวิวรูป) ย้ายไปเป็นคอมโพเนนต์กลางที่ '@/components/FileUpload'
 
 // ─── Main form ───────────────────────────────────────────────────────────────
 
@@ -231,7 +206,6 @@ function MiddlemanForm() {
   const handleSubmit = async () => {
     setSubmitting(true); setError('');
     try {
-      setError('กำลังอัปโหลดเอกสาร...');
       const fileIds = await uploadKycFiles({
         idCard:   idCardFile,
         bookbank: bookbankFile,
@@ -262,8 +236,8 @@ function MiddlemanForm() {
         return;
       }
       setDone(true);
-    } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     } finally {
       setSubmitting(false);
     }

@@ -1,4 +1,5 @@
 import { account } from './appwrite';
+import { compressImage } from './imageCompress';
 
 export interface KycFiles {
   idCard?:      File | null;
@@ -14,18 +15,27 @@ export interface KycFileIds {
   slip:        string;
 }
 
-async function uploadOne(file: File | null | undefined, jwt: string): Promise<string> {
+const MAX_BYTES = 8 * 1024 * 1024; // 8MB หลังบีบอัด
+
+async function uploadOne(file: File | null | undefined, jwt: string, label: string): Promise<string> {
   if (!file) return '';
+  // บีบอัดรูปก่อนส่ง — รูปจากกล้องมือถือมักใหญ่เกินลิมิต request ของเซิร์ฟเวอร์
+  const prepared = await compressImage(file);
+  if (prepared.size > MAX_BYTES) {
+    throw new Error(`ไฟล์ "${label}" ใหญ่เกิน 8MB กรุณาเลือกไฟล์ที่เล็กลง`);
+  }
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', prepared);
   const res = await fetch('/api/upload-kyc', {
     method: 'POST',
     headers: { 'x-session-jwt': jwt },
     body: form,
   });
   if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error || `Upload failed (${res.status})`);
+    if (res.status === 413) throw new Error(`ไฟล์ "${label}" ใหญ่เกินกว่าเซิร์ฟเวอร์รับได้ กรุณาเลือกไฟล์ที่เล็กลง`);
+    if (res.status === 401) throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง');
+    const d = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(d.error ? `อัปโหลด "${label}" ไม่สำเร็จ: ${d.error}` : `อัปโหลด "${label}" ไม่สำเร็จ (${res.status})`);
   }
   const { fileId } = await res.json();
   return fileId as string;
@@ -36,12 +46,14 @@ async function uploadOne(file: File | null | undefined, jwt: string): Promise<st
  * คืนค่า object ที่มี fileId ของแต่ละไฟล์
  */
 export async function uploadKycFiles(files: KycFiles): Promise<KycFileIds> {
-  const jwt = (await account.createJWT()).jwt;
+  let jwt = '';
+  try { jwt = (await account.createJWT()).jwt; }
+  catch { throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง'); }
   const [idCard, bookbank, companyCert, slip] = await Promise.all([
-    uploadOne(files.idCard,      jwt),
-    uploadOne(files.bookbank,    jwt),
-    uploadOne(files.companyCert, jwt),
-    uploadOne(files.slip,        jwt),
+    uploadOne(files.idCard,      jwt, 'บัตรประชาชน'),
+    uploadOne(files.bookbank,    jwt, 'หน้าสมุดบัญชี'),
+    uploadOne(files.companyCert, jwt, 'หนังสือรับรองบริษัท'),
+    uploadOne(files.slip,        jwt, 'สลิปการโอนเงิน'),
   ]);
   return { idCard, bookbank, companyCert, slip };
 }

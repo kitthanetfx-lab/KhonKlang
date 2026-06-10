@@ -149,6 +149,7 @@ export function Nav({ active }: { active?: string }) {
             <div className="dropdown-menu" style={{ minWidth: 290 }}>{NAV_SERVICES.map(it => <DropItem key={it.t} it={it} />)}</div>
           </div>
           <Link className={`nav-link ${active === 'market' ? 'is-active' : ''}`} href="/marketplace"><Icon name="store" size={17} /> ตลาด</Link>
+          <Link className={`nav-link ${active === 'wanted' ? 'is-active' : ''}`} href="/wanted"><Icon name="bell" size={17} /> ประกาศหา</Link>
           <Link className="nav-link" href="/check-scam"><Icon name="search" size={17} /> เช็คคนโกง</Link>
         </div>
         <div className="nav-cta-group">
@@ -214,6 +215,7 @@ export function Nav({ active }: { active?: string }) {
         ))}
         <div className="drawer-sep" />
         <Link className="drawer-link" href="/marketplace" onClick={() => setDrawer(false)}><Icon name="store" /> ตลาด</Link>
+        <Link className="drawer-link" href="/wanted" onClick={() => setDrawer(false)}><Icon name="bell" /> ประกาศหาสินค้า</Link>
         <Link className="drawer-link" href="/check-scam" onClick={() => setDrawer(false)}><Icon name="search" /> เช็คคนโกง</Link>
         <div className="drawer-sep" />
         <div className="drawer-label">สมัครสมาชิก</div>
@@ -234,6 +236,7 @@ const FOOT_COLS: { h: string; links: { t: string; href: string }[] }[] = [
     { t: 'บริการนัดออนไซต์', href: '/service/onsite' },
   ] },
   { h: 'ตลาด', links: [
+    { t: 'ประกาศหาสินค้า', href: '/wanted' },
     { t: 'สินค้ามือสอง', href: '/marketplace' },
     { t: 'แบรนด์เนม', href: '/marketplace' },
     { t: 'ไอดีเกม', href: '/marketplace' },

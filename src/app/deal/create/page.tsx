@@ -1,16 +1,18 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { account } from '@/lib/appwrite';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 
 const CATS = ['สินค้าทั่วไป', 'อิเล็กทรอนิกส์', 'เสื้อผ้า', 'ยานพาหนะ', 'อสังหาริมทรัพย์', 'บริการ', 'อื่นๆ'];
 
-export default function CreateDeal() {
+function CreateDealForm() {
   const router = useRouter();
-  const [role, setRole] = useState<'seller' | 'buyer'>('seller');
-  const [title, setTitle] = useState('');
+  const searchParams = useSearchParams();
+  // prefill จากหน้าอื่น เช่น /wanted ("เสนอขายผ่านคนกลาง")
+  const [role, setRole] = useState<'seller' | 'buyer'>(searchParams.get('role') === 'buyer' ? 'buyer' : 'seller');
+  const [title, setTitle] = useState(searchParams.get('title') || '');
   const [description, setDesc] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
@@ -30,7 +32,7 @@ export default function CreateDeal() {
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, price: Number(price), category, creatorRole: role }),
+        body: JSON.stringify({ title, description, price: Number(price), category, creatorRole: role, source: 'private' }),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || 'เกิดข้อผิดพลาด'); return; }
@@ -97,5 +99,13 @@ export default function CreateDeal() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreateDeal() {
+  return (
+    <Suspense fallback={<div className="mkt-detail-loading" />}>
+      <CreateDealForm />
+    </Suspense>
   );
 }

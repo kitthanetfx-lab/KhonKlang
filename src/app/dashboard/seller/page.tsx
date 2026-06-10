@@ -113,7 +113,7 @@ export default function SellerDashboard() {
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, price: Number(price), category, condition, location, sellingMode: serializeListingMode(listingMode), imageFileIds: images.map(i => i.fileId), creatorRole: 'seller' }),
+        body: JSON.stringify({ title, description, price: Number(price), category, condition, location, sellingMode: serializeListingMode(listingMode), imageFileIds: images.map(i => i.fileId), creatorRole: 'seller', source: 'listing' }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
       setPostDone(true);
