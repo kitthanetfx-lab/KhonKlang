@@ -98,6 +98,11 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function hasScopeError(err: unknown, scope: string) {
+  const msg = String(err);
+  return msg.includes(`missing scopes ["${scope}"]`);
+}
+
 async function ensureAttributeReady(
   databases: Databases,
   key: string,
@@ -125,11 +130,24 @@ async function ensureAttributeReady(
   throw new Error(`แอตทริบิวต์ ${key} ยังไม่พร้อมใช้งาน`);
 }
 
+async function ensureDealsSchemaBestEffort(databases: Databases) {
+  try {
+    await ensureCollection(databases);
+    await ensureExtraAttributes(databases);
+    await ensureIndexes(databases);
+  } catch (err) {
+    // In production we can keep working with an existing collection even if
+    // the API key is not allowed to mutate collection schema.
+    if (hasScopeError(err, 'collections.write')) return;
+    throw err;
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const role = req.nextUrl.searchParams.get('role') || 'seller';
     const databases = getAdminClient();
-    await ensureIndexes(databases);
+    await ensureDealsSchemaBestEffort(databases);
 
     if (role === 'buyer' && !req.headers.get('x-session-jwt')) {
       const posted = await databases.listDocuments(DB_ID, COL_ID, [
@@ -194,9 +212,7 @@ export async function POST(req: NextRequest) {
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isBuyer = creatorRole === 'buyer';
     const databases = getAdminClient();
-    await ensureCollection(databases);
-    // Ensure new attributes exist on already-created collections
-    await ensureExtraAttributes(databases);
+    await ensureDealsSchemaBestEffort(databases);
     const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
       sellerId: isBuyer ? '' : currentUser.$id,
       sellerName: isBuyer ? '' : (currentUser.name || ''),

@@ -120,32 +120,14 @@ export function Nav({ active }: { active?: string }) {
   const scrolled = useScrolled();
   const [drawer, setDrawer] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const profileMenuRef = useRef<HTMLDivElement>(null);
   const { user, loading, logout } = useUser();
   useEffect(() => { document.body.style.overflow = drawer ? 'hidden' : ''; }, [drawer]);
-  useEffect(() => {
-    if (!profileOpen) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!profileMenuRef.current?.contains(event.target as Node)) {
-        setProfileOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [profileOpen]);
   const displayName = user?.prefs?.displayName || user?.name || 'บัญชีของฉัน';
   const shortName = displayName.length > 18 ? `${displayName.slice(0, 18)}...` : displayName;
   const profileItems: NavItem[] = [
-    { icon: 'user', tint: '', t: 'โปรไฟล์ของฉัน', d: 'ดูและแก้ไขข้อมูลบัญชี', href: '/profile' },
-    ...(user?.prefs?.sellerStatus === 'approved'
-      ? [{ icon: 'store', tint: '', t: 'บอร์ดผู้ขาย', d: 'จัดการประกาศและดีลของคุณ', href: '/dashboard/seller' }]
-      : []),
-    ...(user?.prefs?.middlemanStatus === 'approved'
-      ? [{ icon: 'handCoins', tint: 'green', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' }]
-      : []),
-    ...(user?.prefs?.role === 'admin'
-      ? [{ icon: 'layoutDashboard', tint: 'violet', t: 'แอดมิน', d: 'เข้าแผงจัดการระบบ', href: '/admin' }]
-      : []),
+    { icon: 'user', tint: '', t: 'เข้าสู่โปรไฟล์', d: 'ดูและแก้ไขข้อมูลบัญชี', href: '/profile' },
+    { icon: 'store', tint: '', t: 'บอร์ดผู้ขาย', d: 'จัดการประกาศและดีลของคุณ', href: '/dashboard/seller' },
+    { icon: 'handCoins', tint: 'green', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' },
   ];
 
   return (
@@ -169,7 +151,11 @@ export function Nav({ active }: { active?: string }) {
             <span className="btn btn-ghost btn-sm" aria-busy="true">กำลังโหลด...</span>
           ) : user ? (
             <>
-              <div className={`dropdown ${profileOpen ? 'open' : ''}`} ref={profileMenuRef}>
+              <div
+                className={`dropdown ${profileOpen ? 'open' : ''}`}
+                onMouseEnter={() => setProfileOpen(true)}
+                onMouseLeave={() => setProfileOpen(false)}
+              >
                 <button type="button" className="btn btn-ghost btn-sm profile-trigger" onClick={() => setProfileOpen(v => !v)}>
                   <Icon name="user" size={16} /> {shortName} <Icon name="chevronDown" size={16} />
                 </button>
