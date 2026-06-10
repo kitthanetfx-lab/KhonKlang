@@ -1757,7 +1757,7 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .rec-btn { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.1); color: #fff; border-radius: var(--r-pill); padding: 7px 14px; font-family: var(--font-display); font-weight: 600; font-size: 12.5px; cursor: pointer; transition: all .2s; white-space: nowrap; }
 .rec-btn:hover { background: rgba(255,255,255,.18); }
 .rec-btn.on { background: var(--rose-500); border-color: var(--rose-500); }
-.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: ef
+.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: efPulse 1.4s infinite; }
 /* ============================================================
    Direct messages (กล่องข้อความแบบ Messenger)
    ============================================================ */
