@@ -1527,7 +1527,7 @@ button.nav-link { background: none; border: none; }
 
 /* ---------- helpers for KYC register + admin pages (light theme) ---------- */
 .glass-panel { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-md); }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; t
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 /* ============================================================
    Review panel (deal completed)
    ============================================================ */
