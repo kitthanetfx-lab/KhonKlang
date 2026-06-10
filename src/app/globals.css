@@ -1707,7 +1707,7 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .csr-acct { font-family: var(--font-mono); font-weight: 600; color: var(--ink); }
 .csr-hit-detail { margin-top: 10px; font-size: 13.5px; color: var(--muted); line-height: 1.7; white-space: pre-wrap; }
 .csr-hit-imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 12px; }
-.csr-hit-imgs img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); border:
+.csr-hit-imgs img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--line); }
 /* ============================================================
    Notification bell
    ============================================================ */
