@@ -3,18 +3,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from './Icon';
 
 const EF_NODES: Record<string, { x: number; y: number; label: string; icon: string; tint: string }> = {
-  buyer:  { x: 17, y: 23, label: 'ผู้ซื้อ',   icon: 'user',  tint: 'blue' },
-  seller: { x: 83, y: 23, label: 'ผู้ขาย',   icon: 'store', tint: 'violet' },
-  vault:  { x: 50, y: 73, label: 'คนกลาง',  icon: 'shieldCheck', tint: 'green' },
+  buyer:  { x: 14, y: 26, label: 'ผู้ซื้อ', icon: 'user', tint: 'blue' },
+  seller: { x: 86, y: 26, label: 'ผู้ขาย', icon: 'store', tint: 'violet' },
+  agent:  { x: 74, y: 56, label: 'คนกลาง', icon: 'users', tint: 'blue' },
+  hub:    { x: 50, y: 73, label: 'ศูนย์กลาง', icon: 'shieldCheck', tint: 'green' },
 };
 
 interface Seg { key: string; dur: number; from?: string; to?: string; ctrl?: { x: number; y: number }; hold?: boolean; icon: string; color: string; label: string; sub: string; }
 const EF_SEGMENTS: Seg[] = [
-  { key: 'pay',       dur: 1700, from: 'buyer',  to: 'vault',  ctrl: { x: 22, y: 54 }, icon: 'coins',   color: 'var(--blue-500)',  label: 'ผู้ซื้อโอนเงินเข้าแอปคนกลาง.com', sub: 'เงินพักไว้ที่ระบบคนกลาง ยังไม่ถึงผู้ขาย' },
-  { key: 'guarantee', dur: 1600, from: 'seller', to: 'vault',  ctrl: { x: 78, y: 54 }, icon: 'shieldCheck', color: 'var(--amber-500)', label: 'ผู้ขายกดส่ง • ล็อกประกันโดยคนกลาง', sub: 'ระบบนำวงเงินประกันของคนกลางเท่าราคาสินค้า' },
-  { key: 'ship_in',   dur: 1700, from: 'seller', to: 'vault',  ctrl: { x: 78, y: 54 }, icon: 'package', color: 'var(--accent)',    label: 'ผู้ขายส่งสินค้าให้คนกลาง', sub: 'ส่งของจริงให้คนกลางรับไปตรวจสอบก่อน' },
-  { key: 'check',     dur: 1700, from: 'vault',  to: 'buyer',  ctrl: { x: 22, y: 54 }, icon: 'badgeCheck', color: 'var(--green-500)', label: 'คนกลางตรวจสภาพ + แพ็คส่งผู้ซื้อ', sub: 'เช็กของตรงปก แล้วส่งต่อให้ผู้ซื้อ' },
-  { key: 'release',   dur: 1700, from: 'vault',  to: 'seller', ctrl: { x: 78, y: 54 }, icon: 'coins',   color: 'var(--green-500)', label: 'ผู้ซื้อรับของ • จ่ายผู้ขาย + คืนประกัน', sub: 'โอนค่าสินค้าให้ผู้ขาย คืนวงเงินประกันคนกลาง' },
+  { key: 'deposit', dur: 1500, from: 'agent', to: 'hub', ctrl: { x: 62, y: 72 }, icon: 'coins', color: 'var(--amber-500)', label: 'คนกลางวางเงินประกันกับศูนย์กลาง', sub: 'ตั้งวงเงินประกันไว้ก่อนรับงาน (เช่น ฿10,000)' },
+  { key: 'pay', dur: 1700, from: 'buyer', to: 'hub', ctrl: { x: 26, y: 58 }, icon: 'coins', color: 'var(--blue-500)', label: 'ผู้ซื้อโอนเงินเข้าศูนย์กลาง', sub: 'เงินพักไว้ที่บริษัทคนกลาง จำกัด ยังไม่ถึงผู้ขาย' },
+  { key: 'lock', dur: 1500, hold: true, icon: 'lock', color: 'var(--green-500)', label: 'ผู้ขายยืนยันราคา • ระบบล็อกเครดิตคนกลาง', sub: 'หักวงเงินประกันตามค่าสินค้า (เช่น ล็อก ฿3,000)' },
+  { key: 'ship', dur: 1700, from: 'seller', to: 'agent', ctrl: { x: 86, y: 46 }, icon: 'package', color: 'var(--accent)', label: 'ผู้ขายส่งของให้คนกลาง', sub: 'คนกลางตรวจสอบ แล้วส่งต่อผู้ซื้อ' },
+  { key: 'release', dur: 1700, from: 'hub', to: 'seller', ctrl: { x: 74, y: 62 }, icon: 'coins', color: 'var(--green-500)', label: 'ผู้ซื้อรับของ • ศูนย์กลางจ่ายผู้ขาย + คืนเครดิต', sub: 'โอนค่าสินค้าให้ผู้ขาย และคืนยอดล็อกให้คนกลาง' },
 ];
 
 function efBezier(a: {x:number;y:number}, c: {x:number;y:number}, b: {x:number;y:number}, t: number) {
@@ -47,7 +48,7 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
   }, [seg, speed]);
 
   const s = EF_SEGMENTS[seg];
-  let tok: {x:number;y:number} = EF_NODES.vault;
+  let tok: {x:number;y:number} = EF_NODES.hub;
   let tokScale = 1, tokVisible = true;
   if (!s.hold && s.from && s.to && s.ctrl) {
     const a = EF_NODES[s.from], b = EF_NODES[s.to];
@@ -58,16 +59,18 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
   } else { tokVisible = false; }
 
   const active: Record<string, boolean> = {
-    buyer:  s.key === 'pay' || s.key === 'check' || s.key === 'release',
-    seller: s.key === 'guarantee' || s.key === 'ship_in' || s.key === 'release',
-    vault:  s.key === 'pay' || s.key === 'guarantee' || s.key === 'ship_in' || s.key === 'check' || s.key === 'release',
+    buyer: s.key === 'pay' || s.key === 'release',
+    seller: s.key === 'ship' || s.key === 'release' || s.key === 'lock',
+    agent: s.key === 'deposit' || s.key === 'ship' || s.key === 'release' || s.key === 'lock',
+    hub: s.key === 'deposit' || s.key === 'pay' || s.key === 'lock' || s.key === 'release',
   };
   const pct = ((seg + t) / EF_SEGMENTS.length) * 100;
 
   const lines = [
-    { from: 'buyer',  to: 'vault',  c: { x: 22, y: 54 }, on: s.key === 'pay' },
-    { from: 'seller', to: 'vault',  c: { x: 78, y: 54 }, on: s.key === 'guarantee' || s.key === 'ship_in' || s.key === 'release' },
-    { from: 'vault',  to: 'buyer',  c: { x: 22, y: 54 }, on: s.key === 'check' },
+    { from: 'buyer', to: 'hub', c: { x: 26, y: 58 }, on: s.key === 'pay' },
+    { from: 'agent', to: 'hub', c: { x: 62, y: 72 }, on: s.key === 'deposit' || s.key === 'lock' || s.key === 'release' },
+    { from: 'seller', to: 'agent', c: { x: 86, y: 46 }, on: s.key === 'ship' },
+    { from: 'hub', to: 'seller', c: { x: 74, y: 62 }, on: s.key === 'release' },
   ];
   const pos = (k: string) => ({ left: EF_NODES[k].x + '%', top: EF_NODES[k].y + '%' });
 
@@ -95,17 +98,17 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
             );
           })}
         </svg>
-        {['buyer', 'seller'].map(k => (
+        {['buyer', 'seller', 'agent'].map(k => (
           <div key={k} className={`ef-node ${active[k] ? 'on' : ''}`} style={pos(k)}>
             <span className={`ef-node-ic ${EF_NODES[k].tint}`}><Icon name={EF_NODES[k].icon} size={20} /></span>
             <span className="ef-node-lb">{EF_NODES[k].label}</span>
           </div>
         ))}
-        <div className={`ef-vault ${active.vault ? 'on' : ''}`} style={pos('vault')}>
+        <div className={`ef-vault ${active.hub ? 'on' : ''}`} style={pos('hub')}>
           <div className="ef-vault-ring" style={{ background: `conic-gradient(var(--green-400) ${pct * 3.6}deg, var(--line) 0)` }}>
             <div className="ef-vault-core"><Icon name="shieldCheck" size={26} /></div>
           </div>
-          <div className="ef-vault-meta"><b>คนกลาง</b><span>ถือเงินไว้ให้</span></div>
+          <div className="ef-vault-meta"><b>ศูนย์กลาง</b><span>พักเงิน + ค้ำประกัน</span></div>
         </div>
         <div className="ef-token" style={{
           left: tok.x + '%', top: tok.y + '%',

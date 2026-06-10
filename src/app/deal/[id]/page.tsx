@@ -443,7 +443,12 @@ export default function DealRoom() {
                 <div className="dr-card">
                   <div className="dr-card-title">ผู้เกี่ยวข้อง</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    {[['ผู้ขาย', deal.sellerName || '(รอผู้ขาย)'], ['ผู้ซื้อ', deal.buyerName || '(รอผู้ซื้อ)'], ['คนกลาง', deal.middlemanName || '(ยังไม่ได้เลือก)']].map(([l, v]) => (
+                    {[
+                      ['ผู้ขาย', deal.sellerName || '(รอผู้ขาย)'],
+                      ['ผู้ซื้อ', deal.buyerName || '(รอผู้ซื้อ)'],
+                      ['คนกลาง', deal.middlemanName || '(ยังไม่ได้เลือก)'],
+                      ['ศูนย์กลาง', 'บริษัท คนกลาง จำกัด'],
+                    ].map(([l, v]) => (
                       <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--line-2)', fontSize: 14 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ fontWeight: 600, color: 'var(--ink)' }}>{v}</span></div>
                     ))}
                   </div>
