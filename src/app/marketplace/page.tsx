@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/Icon';
 import { Nav, Footer, useReveal } from '@/components/Site';
+import { isCertifiedMode } from '@/lib/listingMode';
 
 interface Listing {
   $id: string;
@@ -68,9 +69,6 @@ export default function Marketplace() {
   const [certified,  setCertified]  = useState(false);
   const [sort,       setSort]       = useState('ล่าสุด');
 
-  const [joining,  setJoining]  = useState<string | null>(null);
-  const [contacting, setContacting] = useState<string | null>(null);
-
   useReveal();
 
   useEffect(() => {
@@ -96,41 +94,11 @@ export default function Marketplace() {
     })();
   }, []);
 
-  async function joinDeal(dealId: string) {
-    if (!myId) { router.push('/login'); return; }
-    setJoining(dealId);
-    try {
-      const j = jwt || (await account.createJWT()).jwt;
-      const res = await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH',
-        headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'join_as_buyer' }),
-      });
-      if (res.ok) router.push(`/deal/${dealId}`);
-      else { const d = await res.json(); alert(d.error || 'เกิดข้อผิดพลาด'); }
-    } finally { setJoining(null); }
-  }
-
-  async function callMiddleman(dealId: string) {
-    if (!myId) { router.push('/login'); return; }
-    setContacting(dealId);
-    try {
-      const j = jwt || (await account.createJWT()).jwt;
-      const res = await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH',
-        headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'join_as_buyer' }),
-      });
-      if (res.ok) router.push(`/deal/${dealId}`);
-      else router.push(`/deal/${dealId}`);
-    } finally { setContacting(null); }
-  }
-
   let filtered = listings
     .filter(d => d.status === 'posted')
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)
     .filter(d => !province || d.location === province)
-    .filter(d => !certified || d.sellingMode === 'certified')
+    .filter(d => !certified || isCertifiedMode(d.sellingMode))
     .filter(d => !search ||
       d.title.toLowerCase().includes(search.toLowerCase()) ||
       (d.description || '').toLowerCase().includes(search.toLowerCase())
@@ -146,24 +114,27 @@ export default function Marketplace() {
   }
 
   function ListingCard({ listing, idx }: { listing: Listing; idx: number }) {
-    const isCertified = listing.sellingMode === 'certified';
+    const isCertified = isCertifiedMode(listing.sellingMode);
     const firstImg    = getFirstImage(listing);
     const isMyDeal    = listing.sellerId === myId || listing.buyerId === myId;
     const c1 = CARD_BG[idx % 3 === 0 ? 0 : 2], c2 = CARD_BG[(idx % 5) + 1];
     const avatarBg = CARD_BG[(idx % 5) + 1];
+    const detailHref = `/marketplace/${listing.$id}`;
 
     return (
       <div className="lc-card reveal" style={{ ['--d' as string]: idx * 50 + 'ms', ...(isCertified ? { borderColor: 'var(--amber-400)' } : {}) }}>
-        <div className="lc-img" style={firstImg ? { padding: 0 } : { background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)` }}>
-          {firstImg
-            ? <img src={firstImg} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <Icon name="package" size={52} style={{ color: 'rgba(255,255,255,0.22)' }} />}
-          <span className="lc-img-label">
-            {isCertified
-              ? <span className="badge badge-amber" style={{ background: 'var(--amber-400)', color: '#3a2700', border: 'none' }}>⭐ Certified</span>
-              : <span className="badge badge-green" style={{ background: 'rgba(16,165,102,.9)', color: '#fff', border: 'none' }}><span className="dot" /> Escrow</span>}
-          </span>
-        </div>
+        <Link href={detailHref} className="lc-link-shell" aria-label={`ดูรายละเอียด ${listing.title}`}>
+          <div className="lc-img" style={firstImg ? { padding: 0 } : { background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)` }}>
+            {firstImg
+              ? <img src={firstImg} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <Icon name="package" size={52} style={{ color: 'rgba(255,255,255,0.22)' }} />}
+            <span className="lc-img-label">
+              {isCertified
+                ? <span className="badge badge-amber" style={{ background: 'var(--amber-400)', color: '#3a2700', border: 'none' }}>⭐ Certified</span>
+                : <span className="badge badge-green" style={{ background: 'rgba(16,165,102,.9)', color: '#fff', border: 'none' }}><span className="dot" /> Escrow</span>}
+            </span>
+          </div>
+        </Link>
         <div className="lc-body">
           {isCertified && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--green-700)', background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-sm)', padding: '7px 11px' }}>
@@ -174,31 +145,23 @@ export default function Marketplace() {
             {listing.category && <span className="badge badge-gray">{listing.category}</span>}
             {listing.condition && <span className="badge badge-gray">{listing.condition}</span>}
           </div>
-          <div className="lc-price">฿{(listing.price || 0).toLocaleString()}</div>
-          <h3 className="lc-title">{listing.title}</h3>
+          <Link href={detailHref} className="lc-link-shell">
+            <div className="lc-price">฿{(listing.price || 0).toLocaleString()}</div>
+            <h3 className="lc-title">{listing.title}</h3>
+          </Link>
           <div className="lc-seller">
             <span className="avatar" style={{ width: 24, height: 24, fontSize: 11, background: avatarBg }}>{(listing.sellerName || 'ผู้ขาย').slice(0, 1)}</span>
             <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.sellerName || 'ผู้ขาย'}</span>
             {listing.location && <span style={{ fontSize: 12, color: 'var(--faint)' }}>📍 {listing.location}</span>}
           </div>
           <div className="lc-actions">
-            {isMyDeal ? (
-              <Link href={`/deal/${listing.$id}`} className="btn btn-primary btn-sm" style={{ flex: 1, background: 'var(--green-500)' }}>
-                {listing.sellerId === myId ? 'รายการของคุณ' : 'เข้าห้อง Deal ของคุณ'}
+            <Link href={detailHref} className="btn btn-primary btn-sm" style={{ flex: 1 }}>
+              ดูรายละเอียด
+            </Link>
+            {isMyDeal && (
+              <Link href={`/deal/${listing.$id}`} className="btn btn-ghost btn-sm" style={{ flex: 1 }}>
+                {listing.sellerId === myId ? 'เปิดดีลของคุณ' : 'เข้าห้อง Deal'}
               </Link>
-            ) : isCertified ? (
-              <button onClick={() => joinDeal(listing.$id)} disabled={joining === listing.$id} className="btn btn-primary btn-sm" style={{ flex: 1, background: 'var(--amber-500)', color: '#3a2700' }}>
-                {joining === listing.$id ? 'กำลังเข้าร่วม...' : '⭐ ซื้อ Certified'}
-              </button>
-            ) : (
-              <>
-                <button onClick={() => joinDeal(listing.$id)} disabled={joining === listing.$id} className="btn btn-primary btn-sm" style={{ flex: 1 }}>
-                  {joining === listing.$id ? '...' : 'ขอซื้อ'}
-                </button>
-                <button onClick={() => callMiddleman(listing.$id)} disabled={contacting === listing.$id} className="btn btn-ghost btn-sm" style={{ flex: 1 }}>
-                  {contacting === listing.$id ? '...' : '🤝 คนกลาง'}
-                </button>
-              </>
             )}
           </div>
         </div>

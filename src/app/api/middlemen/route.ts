@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const filterProvince = searchParams.get('province') || '';
     const filterTier     = searchParams.get('tier')     || '';
+    const filterQuery    = (searchParams.get('q') || '').trim().toLowerCase();
+    const filterNeed     = (searchParams.get('need') || '').trim().toLowerCase();
 
     const { db, users } = getAdmin();
     const queries: string[] = [Query.equal('status', 'approved'), Query.limit(200)];
@@ -46,6 +48,7 @@ export async function GET(req: NextRequest) {
       } catch {}
       return {
         userId:       doc.userId       as string,
+        code:         String(doc.userId || '').slice(-6).toUpperCase(),
         name:         displayName,
         tier:         (doc.tier        as string) || 'Bronze',
         categories:   (doc.categories  as string) || '',
@@ -54,7 +57,22 @@ export async function GET(req: NextRequest) {
       };
     }));
 
-    return NextResponse.json({ middlemen });
+    const filtered = middlemen.filter(mm => {
+      const haystack = [
+        mm.name,
+        mm.userId,
+        mm.code,
+        mm.categories,
+        mm.workProvince,
+        mm.tier,
+      ].join(' ').toLowerCase();
+
+      if (filterQuery && !haystack.includes(filterQuery)) return false;
+      if (filterNeed && !haystack.includes(filterNeed)) return false;
+      return true;
+    });
+
+    return NextResponse.json({ middlemen: filtered });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
