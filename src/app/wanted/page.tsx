@@ -254,6 +254,11 @@ export default function WantedPage() {
                         เสนอขายผ่านคนกลาง <Icon name="arrowRight" size={15} />
                       </button>
                     )}
+                    {!mine && (
+                      <Link className="btn btn-ghost btn-sm" href={`/messages?to=${p.userId}&name=${encodeURIComponent(p.userName || 'สมาชิก')}`}>
+                        <Icon name="message" size={15} /> ส่งข้อความ
+                      </Link>
+                    )}
                     {!mine && p.contact && (p.buyMode === 'direct' || p.buyMode === 'both') && (
                       contactOpen === p.$id
                         ? <span className="wt-contact">{p.contact}</span>

@@ -268,6 +268,9 @@ export default function MarketplaceDetailPage() {
                         <Icon name="chat" size={18} /> {joining ? 'กำลังเปิดแชท...' : 'แชทกับผู้ขาย'}
                       </button>
                     )}
+                    <Link href={`/messages?to=${listing.sellerId}&name=${encodeURIComponent(listing.sellerName || 'ผู้ขาย')}`} className="btn btn-ghost btn-lg">
+                      <Icon name="message" size={18} /> ฝากข้อความถึงผู้ขาย
+                    </Link>
                   </>
                 )}
               </div>
