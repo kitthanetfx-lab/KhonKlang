@@ -39,6 +39,60 @@ function JitsiMeet({ roomName, displayName }: { roomName: string; displayName: s
   return <div ref={containerRef} style={{ width: '100%', overflow: 'hidden' }} />;
 }
 
+// ─── บันทึกวิดีโอคอล (อัดหน้าจอ+เสียงแท็บ แล้วเซฟลงเครื่องเป็น .webm) ───────
+function CallRecorder({ dealId }: { dealId: string }) {
+  const [recording, setRecording] = useState(false);
+  const [sec, setSec] = useState(0);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { try { recRef.current?.stop(); } catch {} if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  async function start() {
+    try {
+      const md = navigator.mediaDevices as MediaDevices & { getDisplayMedia?: (c: MediaStreamConstraints) => Promise<MediaStream> };
+      if (!md.getDisplayMedia) { alert('เบราว์เซอร์นี้ไม่รองรับการบันทึกหน้าจอ — แนะนำ Chrome/Edge บนคอมพิวเตอร์ (มือถือใช้ปุ่มอัดหน้าจอของเครื่องแทน)'); return; }
+      const stream = await md.getDisplayMedia({ video: true, audio: true });
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus'
+        : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '';
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        if (timerRef.current) clearInterval(timerRef.current);
+        setRecording(false); setSec(0);
+        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        if (blob.size === 0) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+        a.href = url; a.download = `khonklang-call-${dealId.slice(0, 8)}-${stamp}.webm`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      };
+      // ผู้ใช้กด "หยุดแชร์" ของเบราว์เซอร์ → หยุดบันทึกและเซฟให้เลย
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => { if (mr.state !== 'inactive') mr.stop(); });
+      mr.start(1000);
+      recRef.current = mr;
+      setRecording(true); setSec(0);
+      timerRef.current = setInterval(() => setSec(s => s + 1), 1000);
+    } catch { /* ผู้ใช้กดยกเลิกการเลือกหน้าจอ */ }
+  }
+
+  function stop() { try { recRef.current?.stop(); } catch {} }
+
+  const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+  const ss = String(sec % 60).padStart(2, '0');
+  return (
+    <button type="button" className={`rec-btn ${recording ? 'on' : ''}`} onClick={recording ? stop : start}
+      title={recording ? 'หยุดและบันทึกลงเครื่อง' : 'อัดวิดีโอคอลเก็บไว้เป็นหลักฐาน (เลือกแท็บนี้ + แชร์เสียงแท็บ)'}>
+      {recording ? <><span className="rec-dot" /> {mm}:{ss} หยุด & เซฟ</> : <>⏺ บันทึกวิดีโอ</>}
+    </button>
+  );
+}
+
 interface Deal {
   $id: string; sellerId: string; sellerName: string; middlemanId: string; middlemanName: string;
   buyerId: string; buyerName: string; title: string; description: string; price: number; category: string;
@@ -490,7 +544,10 @@ export default function DealRoom() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0d1117', minHeight: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,.4)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>📹 วิดีโอคอล กำลังดำเนินการ...</span>
-            <button onClick={() => setShowJitsi(false)} className="btn btn-danger btn-sm">✕ วางสาย</button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <CallRecorder dealId={dealId} />
+              <button onClick={() => setShowJitsi(false)} className="btn btn-danger btn-sm">✕ วางสาย</button>
+            </div>
           </div>
           <div style={{ flex: 1, minHeight: '60vh' }}><JitsiMeet roomName={jitsiRoom} displayName={myName || 'ผู้ใช้'} /></div>
         </div>

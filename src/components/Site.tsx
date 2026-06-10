@@ -132,6 +132,7 @@ export function Nav({ active }: { active?: string }) {
   const shortName = displayName.length > 18 ? `${displayName.slice(0, 18)}...` : displayName;
   const profileItems: NavItem[] = [
     { icon: 'user', tint: '', t: 'เข้าสู่โปรไฟล์', d: 'ดูและแก้ไขข้อมูลบัญชี', href: '/profile' },
+    { icon: 'clock', tint: 'amber', t: 'ดีลของฉัน / ประวัติ', d: 'ประวัติซื้อขายทุกบทบาท + กล่องข้อความ', href: '/orders' },
     { icon: 'store', tint: '', t: 'บอร์ดผู้ขาย', d: 'จัดการประกาศและดีลของคุณ', href: '/dashboard/seller' },
     { icon: 'handCoins', tint: 'green', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' },
   ];
