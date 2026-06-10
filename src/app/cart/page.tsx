@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Footer, Nav } from '@/components/Site';
@@ -15,9 +17,12 @@ export default function CartPage() {
   }
 
   useEffect(() => {
-    syncCart();
+    const timer = window.setTimeout(syncCart, 0);
     window.addEventListener('khonklang-cart-updated', syncCart);
-    return () => window.removeEventListener('khonklang-cart-updated', syncCart);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('khonklang-cart-updated', syncCart);
+    };
   }, []);
 
   const subtotal = useMemo(

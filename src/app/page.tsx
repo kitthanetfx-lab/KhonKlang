@@ -66,7 +66,7 @@ function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: 
 }
 
 function Hero({ stats }: { stats: SiteStats | null }) {
-  const stageTilt = useTilt(7);
+  const { ref: stageTiltRef, onMouseLeave, onMouseMove } = useTilt(7);
   const hasReviews = !!stats && stats.reviewCount > 0;
   const avgStars = hasReviews ? Math.round((stats!.satisfaction / 20) * 10) / 10 : 0;
   return (
@@ -111,7 +111,7 @@ function Hero({ stats }: { stats: SiteStats | null }) {
             </div>
           </div>
         </div>
-        <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} {...stageTilt} ref={stageTilt.ref}>
+        <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
           <EscrowStage speed={1} />
         </div>
       </div>

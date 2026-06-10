@@ -214,6 +214,12 @@ export async function POST(req: NextRequest) {
     const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isBuyer = creatorRole === 'buyer';
+    const prefs = ((currentUser.prefs || {}) as Record<string, string>);
+    const sellerStatus = prefs.sellerStatus || '';
+    const role = prefs.role || '';
+    if (!isBuyer && source === 'listing' && !['approved'].includes(sellerStatus) && !['seller', 'admin'].includes(role)) {
+      return NextResponse.json({ error: 'บัญชีนี้ยังไม่ได้รับอนุมัติเป็นผู้ขาย จึงยังลงประกาศขายสาธารณะไม่ได้' }, { status: 403 });
+    }
     const databases = getAdminClient();
     await ensureDealsSchemaBestEffort(databases);
     const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {

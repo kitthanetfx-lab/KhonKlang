@@ -54,9 +54,10 @@ function LineCompleteInner() {
           ? (returnTo.startsWith('/') ? returnTo : '/')
           : '/register';
         router.replace(dest);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('LINE complete error:', err);
-        router.replace(`/login?error=line_failed&msg=${encodeURIComponent(err?.message || 'session_invalid')}`);
+        const message = err instanceof Error ? err.message : 'session_invalid';
+        router.replace(`/login?error=line_failed&msg=${encodeURIComponent(message)}`);
       }
     }
 

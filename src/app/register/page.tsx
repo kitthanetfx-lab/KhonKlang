@@ -1,12 +1,13 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function RegisterSelectPage() {
   return (
     <div className="rsel-page">
       <div className="rsel-inner">
         <div className="rsel-header">
-          <img src="/logo.png" alt="คนกลาง" className="rsel-logo" />
+          <Image src="/logo.png" alt="คนกลาง" className="rsel-logo" width={160} height={160} priority />
           <h1 className="rsel-title">เลือกประเภทการสมัคร</h1>
           <p className="rsel-sub">คุณต้องการเข้าร่วมแพลตฟอร์ม Khonklang ในฐานะอะไร?</p>
         </div>

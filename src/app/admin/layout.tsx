@@ -21,12 +21,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router   = useRouter();
   const pathname = usePathname();
   const [adminName, setAdminName] = useState('');
-  const [checking, setChecking]   = useState(true);
+  const [checking, setChecking]   = useState(() => pathname !== '/admin/setup');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     // หน้า setup ไม่ต้องผ่าน guard
-    if (pathname === '/admin/setup') { setChecking(false); return; }
+    if (pathname === '/admin/setup') return;
     account.get()
       .then(u => {
         const prefs = (u.prefs as Record<string, string>) || {};

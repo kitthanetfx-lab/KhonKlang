@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Storage, ID, Permission, Role } from 'node-appwrite';
+import { Client, Storage, Account, ID, Permission, Role } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 
 const ENDPOINT   = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!;
@@ -13,6 +13,14 @@ function getStorage() {
     .setProject(PROJECT_ID)
     .setKey(API_KEY);
   return new Storage(client);
+}
+
+function getUserFromJwt(jwt: string) {
+  const client = new Client()
+    .setEndpoint(ENDPOINT)
+    .setProject(PROJECT_ID)
+    .setJWT(jwt);
+  return new Account(client).get();
 }
 
 async function ensureBucket(storage: Storage) {
@@ -34,6 +42,8 @@ export async function POST(req: NextRequest) {
   try {
     const jwt = req.headers.get('x-session-jwt');
     if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const currentUser = await getUserFromJwt(jwt).catch(() => null);
+    if (!currentUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -53,7 +63,11 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
     const inputFile = InputFile.fromBuffer(buffer, file.name);
 
-    const result = await storage.createFile(BUCKET_ID, ID.unique(), inputFile);
+    const result = await storage.createFile(BUCKET_ID, ID.unique(), inputFile, [
+      Permission.read(Role.user(currentUser.$id)),
+      Permission.update(Role.user(currentUser.$id)),
+      Permission.delete(Role.user(currentUser.$id)),
+    ]);
     return NextResponse.json({ fileId: result.$id });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

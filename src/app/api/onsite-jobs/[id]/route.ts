@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Databases, Users, Query } from 'node-appwrite';
+import { Client, Account, Databases, Users } from 'node-appwrite';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'onsite_jobs';

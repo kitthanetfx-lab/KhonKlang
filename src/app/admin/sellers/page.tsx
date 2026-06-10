@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
@@ -283,10 +285,18 @@ function SellersContent() {
   }, [jwt, statusFilter]);
 
   useEffect(() => {
-    account.createJWT().then(({ jwt: j }) => { setJwt(j); load(j); });
-  }, []);
-
-  useEffect(() => { if (jwt) load(); }, [statusFilter, jwt]);
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const { jwt: j } = await account.createJWT().catch(() => ({ jwt: '' }));
+      if (!j || cancelled) return;
+      setJwt(j);
+      await load(j);
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [load]);
 
   const handleAction = async (docId: string, action: 'approve' | 'reject', reason?: string) => {
     const res = await fetch('/api/admin/sellers', {

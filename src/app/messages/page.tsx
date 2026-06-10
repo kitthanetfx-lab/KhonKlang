@@ -21,9 +21,12 @@ function timeAgo(iso: string) {
 function MessagesInner() {
   const router = useRouter();
   const sp = useSearchParams();
+  const initialTo = sp.get('to');
   const [myId, setMyId] = useState('');
   const [threads, setThreads] = useState<Thread[] | null>(null);
-  const [active, setActive] = useState<{ id: string; name: string } | null>(null);
+  const [active, setActive] = useState<{ id: string; name: string } | null>(
+    initialTo ? { id: initialTo, name: sp.get('name') || 'สมาชิก' } : null,
+  );
   const [msgs, setMsgs] = useState<Dm[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -36,13 +39,18 @@ function MessagesInner() {
     return j;
   }, []);
 
+  const currentReturnTo = useCallback(() => {
+    const query = sp.toString();
+    return `/messages${query ? `?${query}` : ''}`;
+  }, [sp]);
+
   const loadThreads = useCallback(async () => {
     try {
       const j = await getJwt();
       const r = await fetch('/api/dm', { headers: { 'x-session-jwt': j } });
       if (r.ok) { const d = await r.json(); setThreads(d.threads || []); }
-    } catch { router.push(`/login?returnTo=${encodeURIComponent('/messages')}`); }
-  }, [getJwt, router]);
+    } catch { router.push(`/login?returnTo=${encodeURIComponent(currentReturnTo())}`); }
+  }, [currentReturnTo, getJwt, router]);
 
   const loadThread = useCallback(async (otherId: string) => {
     try {
@@ -54,12 +62,12 @@ function MessagesInner() {
 
   // init: ตัวตน + รายชื่อบทสนทนา + เปิดแชทจาก ?to=
   useEffect(() => {
-    account.get().then(u => setMyId(u.$id)).catch(() => router.push(`/login?returnTo=${encodeURIComponent('/messages')}`));
-    loadThreads();
-    const to = sp.get('to');
-    if (to) setActive({ id: to, name: sp.get('name') || 'สมาชิก' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const timer = window.setTimeout(() => {
+      account.get().then(u => setMyId(u.$id)).catch(() => router.push(`/login?returnTo=${encodeURIComponent(currentReturnTo())}`));
+      void loadThreads();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [currentReturnTo, loadThreads, router]);
 
   // โพล: รายชื่อทุก 15 วิ / ห้องที่เปิดอยู่ทุก 4 วิ
   useEffect(() => {
@@ -68,9 +76,12 @@ function MessagesInner() {
   }, [loadThreads]);
   useEffect(() => {
     if (!active) return;
-    loadThread(active.id);
-    const t = setInterval(() => loadThread(active.id), 4000);
-    return () => clearInterval(t);
+    const timer = window.setTimeout(() => { void loadThread(active.id); }, 0);
+    const t = setInterval(() => { void loadThread(active.id); }, 4000);
+    return () => {
+      window.clearTimeout(timer);
+      clearInterval(t);
+    };
   }, [active, loadThread]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs.length]);
 

@@ -2,12 +2,11 @@
 
 import { account } from '@/lib/appwrite';
 import { OAuthProvider } from 'appwrite';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
   const msg = searchParams.get('msg');

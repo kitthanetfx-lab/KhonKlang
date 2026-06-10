@@ -4,6 +4,14 @@ import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
 
 const COL = 'seller_applications';
 
+async function ensureRejectReasonAttribute(databases: Databases) {
+  try {
+    await databases.getAttribute(DB_ID, COL, 'rejectReason');
+  } catch {
+    await databases.createStringAttribute(DB_ID, COL, 'rejectReason', 500, false, '').catch(() => {});
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
@@ -28,6 +36,7 @@ export async function PATCH(req: NextRequest) {
     const client    = getAdminClient();
     const databases = new Databases(client);
     const users     = new Users(client);
+    await ensureRejectReasonAttribute(databases);
 
     const { docId, action, reason } = await req.json();
     if (!docId || !action) return NextResponse.json({ error: 'missing params' }, { status: 400 });

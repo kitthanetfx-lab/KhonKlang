@@ -43,8 +43,15 @@ async function ensureCollection(databases: Databases) {
       databases.createStringAttribute(DB_ID, COL_ID, 'bookbankFileId',    255, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'slipFileId',        255, false),
       databases.createStringAttribute(DB_ID, COL_ID, 'status',               50, false, 'pending_review'),
+      databases.createStringAttribute(DB_ID, COL_ID, 'rejectReason',       500, false, ''),
     ]);
     await new Promise(r => setTimeout(r, 3000));
+  }
+
+  try {
+    await databases.getAttribute(DB_ID, COL_ID, 'rejectReason');
+  } catch {
+    await databases.createStringAttribute(DB_ID, COL_ID, 'rejectReason', 500, false, '').catch(() => {});
   }
 }
 
@@ -129,6 +136,14 @@ export async function POST(req: NextRequest) {
     const { databases, users } = getAdminClient();
     await ensureCollection(databases);
 
+    const existing = await databases.listDocuments(DB_ID, COL_ID, [
+      Query.equal('userId', userId),
+      Query.limit(1),
+    ]).then(r => r.documents).catch(() => []);
+    if (existing.length > 0) {
+      return NextResponse.json({ error: 'บัญชีนี้เคยยื่นสมัครผู้ขายแล้ว กรุณารอผลตรวจสอบหรือดูสถานะในโปรไฟล์' }, { status: 409 });
+    }
+
     await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
       userId,
       sellerType, fullNameId, idNumber,
@@ -147,6 +162,7 @@ export async function POST(req: NextRequest) {
       bookbankFileId:    bookbankFileId    || '',
       slipFileId:        slipFileId        || '',
       status: 'pending_review',
+      rejectReason: '',
     });
 
     // Save bank info + doc names + status to prefs (visible in profile)

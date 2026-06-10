@@ -34,6 +34,13 @@ function buildAddress(f: ReturnType<typeof parseAddress>) {
   return [f.houseNo, f.moo ? `หมู่ ${f.moo}` : '', f.road ? `ถ.${f.road}` : '', f.tambonName ? `ต.${f.tambonName}` : '', f.amphoreName ? `อ.${f.amphoreName}` : '', f.provinceName ? `จ.${f.provinceName}` : '', f.postalCode].filter(Boolean).join(' ');
 }
 
+function StatusBadge({ status }: { status: string }) {
+  if (status === 'approved') return <span className="pf-status-badge pf-status-approved">✅ อนุมัติแล้ว</span>;
+  if (status === 'pending_review') return <span className="pf-status-badge pf-status-pending">⏳ รอตรวจสอบ</span>;
+  if (status === 'rejected') return <span className="pf-status-badge pf-status-rejected">❌ ไม่อนุมัติ</span>;
+  return <span className="pf-status-badge pf-status-pending">{status}</span>;
+}
+
 function ProfilePage() {
   const router = useRouter();
   const [displayName, setDisplayName] = useState('');
@@ -95,18 +102,28 @@ function ProfilePage() {
   const cancelEdit = () => { setEditing(false); setError(''); };
 
   useEffect(() => {
-    if (!editAddr.provinceName) { setAmphoes([]); setTambons([]); return; }
-    setLoadingAmph(true);
-    fetch(`/api/thai-address?type=amphures&province=${encodeURIComponent(editAddr.provinceName)}`)
-      .then(r => r.json()).then(d => setAmphoes(Array.isArray(d) ? d : [])).catch(() => setAmphoes([])).finally(() => setLoadingAmph(false));
+    if (!editAddr.provinceName) return;
+    const timer = window.setTimeout(() => {
+      setLoadingAmph(true);
+      fetch(`/api/thai-address?type=amphures&province=${encodeURIComponent(editAddr.provinceName)}`)
+        .then(r => r.json()).then(d => setAmphoes(Array.isArray(d) ? d : [])).catch(() => setAmphoes([])).finally(() => setLoadingAmph(false));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [editAddr.provinceName]);
 
   useEffect(() => {
-    if (!editAddr.amphoreName || !editAddr.provinceName) { setTambons([]); return; }
-    setLoadingTamb(true);
-    fetch(`/api/thai-address?type=tambons&province=${encodeURIComponent(editAddr.provinceName)}&amphoe=${encodeURIComponent(editAddr.amphoreName)}`)
-      .then(r => r.json()).then(d => setTambons(Array.isArray(d) ? d : [])).catch(() => setTambons([])).finally(() => setLoadingTamb(false));
+    if (!editAddr.amphoreName || !editAddr.provinceName) return;
+    const timer = window.setTimeout(() => {
+      setLoadingTamb(true);
+      fetch(`/api/thai-address?type=tambons&province=${encodeURIComponent(editAddr.provinceName)}&amphoe=${encodeURIComponent(editAddr.amphoreName)}`)
+        .then(r => r.json()).then(d => setTambons(Array.isArray(d) ? d : [])).catch(() => setTambons([])).finally(() => setLoadingTamb(false));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [editAddr.provinceName, editAddr.amphoreName]);
+
+
+  const availableAmphoes = editAddr.provinceName ? amphoes : [];
+  const availableTambons = editAddr.provinceName && editAddr.amphoreName ? tambons : [];
 
   const onProvince = (name: string) => setEditAddr({ houseNo: editAddr.houseNo, moo: editAddr.moo, road: editAddr.road, provinceName: name, amphoreName: '', tambonName: '', postalCode: '' });
   const onAmphoe = (name: string) => setEditAddr(a => ({ ...a, amphoreName: name, tambonName: '', postalCode: '' }));
@@ -152,13 +169,6 @@ function ProfilePage() {
   const phone = prefs.phone || '', address = prefs.address || '';
   const initials = (displayName || 'U').slice(0, 2).toUpperCase();
   const sellerStatus = prefs.sellerStatus || '', middlemanStatus = prefs.middlemanStatus || '';
-
-  function StatusBadge({ status }: { status: string }) {
-    if (status === 'approved') return <span className="pf-status-badge pf-status-approved">✅ อนุมัติแล้ว</span>;
-    if (status === 'pending_review') return <span className="pf-status-badge pf-status-pending">⏳ รอตรวจสอบ</span>;
-    if (status === 'rejected') return <span className="pf-status-badge pf-status-rejected">❌ ไม่อนุมัติ</span>;
-    return <span className="pf-status-badge pf-status-pending">{status}</span>;
-  }
 
   return (
     <div className="sub-page">
@@ -210,12 +220,12 @@ function ProfilePage() {
                 </select>
                 <select className="pf-edit-input" style={{ marginBottom: 10 }} value={editAddr.amphoreName} onChange={e => onAmphoe(e.target.value)} disabled={!editAddr.provinceName || loadingAmph}>
                   <option value="">{loadingAmph ? 'กำลังโหลด...' : editAddr.provinceName ? 'เลือกอำเภอ' : '— เลือกจังหวัดก่อน —'}</option>
-                  {amphoes.map(a => <option key={a} value={a}>{a}</option>)}
+                  {availableAmphoes.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <select className="pf-edit-input" value={editAddr.tambonName ? `${editAddr.tambonName}|${editAddr.postalCode}` : ''} onChange={e => onTambon(e.target.value)} disabled={!editAddr.amphoreName || loadingTamb}>
                     <option value="">{loadingTamb ? 'กำลังโหลด...' : editAddr.amphoreName ? 'เลือกตำบล' : '— เลือกอำเภอก่อน —'}</option>
-                    {tambons.map(([n, z]) => <option key={n} value={`${n}|${z}`}>{n}</option>)}
+                    {availableTambons.map(([n, z]) => <option key={n} value={`${n}|${z}`}>{n}</option>)}
                   </select>
                   <input readOnly className="pf-edit-input" style={{ background: 'var(--surface-2)', color: 'var(--muted)' }} value={editAddr.postalCode} placeholder="รหัสไปรษณีย์" />
                 </div>

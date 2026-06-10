@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 import React, { useEffect, useRef, useState } from 'react';
 import { account } from '@/lib/appwrite';
 import { compressImage } from '@/lib/imageCompress';
@@ -26,12 +27,11 @@ interface SpeechRec {
 function useDictation(append: (text: string) => void, setInterim: (t: string) => void) {
   const recRef = useRef<SpeechRec | null>(null);
   const [listening, setListening] = useState(false);
-  const [supported, setSupported] = useState(true);
-
-  useEffect(() => {
+  const [supported, setSupported] = useState(() => {
+    if (typeof window === 'undefined') return true;
     const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
-    setSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
-  }, []);
+    return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+  });
 
   function toggle() {
     if (listening) { recRef.current?.stop(); return; }

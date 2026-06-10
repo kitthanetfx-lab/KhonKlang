@@ -17,11 +17,15 @@ export function MessengerIcon() {
   }, []);
 
   useEffect(() => {
-    load();
-    const t = setInterval(load, 25000);
-    const onFocus = () => load();
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    const t = setInterval(() => { void load(); }, 25000);
+    const onFocus = () => { void load(); };
     window.addEventListener('focus', onFocus);
-    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); };
+    return () => {
+      window.clearTimeout(timer);
+      clearInterval(t);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [load]);
 
   return (

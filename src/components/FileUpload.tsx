@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { CheckCircle2, Upload, FileText, X } from 'lucide-react';
 
 /**
@@ -10,16 +10,12 @@ export function FileUpload({ label, accept, file, onChange, hint, required }: {
   label: string; accept: string; file: File | null;
   onChange: (f: File | null) => void; hint?: string; required?: boolean;
 }) {
-  const [previewUrl, setPreviewUrl] = useState('');
-
-  useEffect(() => {
-    if (file && file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setPreviewUrl('');
-  }, [file]);
+  const previewUrl = useMemo(() => (
+    file && file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+  ), [file]);
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   const sizeText = file ? (file.size >= 1024 * 1024
     ? `${(file.size / 1024 / 1024).toFixed(1)} MB`

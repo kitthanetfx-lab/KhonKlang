@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Client, Users } from 'node-appwrite';
 import crypto from 'crypto';
 
+type AppwriteLikeError = { code?: number; message?: string };
+type LineIdTokenPayload = { email?: string };
+
 export async function GET(request: NextRequest) {
   const code    = request.nextUrl.searchParams.get('code');
   const state   = request.nextUrl.searchParams.get('state') || '';
   const returnTo = (state && state !== 'line_login') ? decodeURIComponent(state) : '/';
   const appUrl  = process.env.NEXT_PUBLIC_APP_URL!;
+  const secureCookie = appUrl.startsWith('https://');
 
   if (!code) {
     return NextResponse.redirect(`${appUrl}/login?error=line_cancelled`);
@@ -42,7 +46,7 @@ export async function GET(request: NextRequest) {
     let email = `line_${profile.userId}@line.khonklang.app`;
     if (tokenData.id_token) {
       try {
-        const payload = JSON.parse(Buffer.from(tokenData.id_token.split('.')[1], 'base64url').toString());
+        const payload = JSON.parse(Buffer.from(tokenData.id_token.split('.')[1], 'base64url').toString()) as LineIdTokenPayload;
         if (payload.email) email = payload.email;
       } catch { /* synthetic */ }
     }
@@ -59,8 +63,9 @@ export async function GET(request: NextRequest) {
     // 5. Upsert user
     try {
       await users.create(userId, email, undefined, password, profile.displayName);
-    } catch (e: any) {
-      if (e?.code !== 409) throw new Error(`Create user: ${e?.message}`);
+    } catch (error: unknown) {
+      const appwriteError = error as AppwriteLikeError;
+      if (appwriteError.code !== 409) throw new Error(`Create user: ${appwriteError.message}`);
     }
 
     // 6. Create session
@@ -76,11 +81,11 @@ export async function GET(request: NextRequest) {
     const yr = 60 * 60 * 24 * 365;
     // line_session_pending: httpOnly=false so bridge page JS can read it
     response.cookies.set('line_session_pending', session.secret, {
-      httpOnly: false, secure: true, sameSite: 'lax', path: '/', maxAge: 300, // 5 min TTL
+      httpOnly: false, secure: secureCookie, sameSite: 'lax', path: '/', maxAge: 300, // 5 min TTL
     });
     // Also set standard Appwrite cookies for any server-side use
     response.cookies.set(`a_session_${projectId}`, session.secret, {
-      httpOnly: false, secure: true, sameSite: 'lax', path: '/', maxAge: yr,
+      httpOnly: false, secure: secureCookie, sameSite: 'lax', path: '/', maxAge: yr,
     });
     response.cookies.set(`a_session_${projectId}_legacy`, session.secret, {
       httpOnly: false, secure: false, sameSite: 'lax', path: '/', maxAge: yr,
@@ -88,9 +93,9 @@ export async function GET(request: NextRequest) {
 
     return response;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('LINE login error:', error);
-    const msg = encodeURIComponent(error?.message || 'unknown');
+    const msg = encodeURIComponent(error instanceof Error ? error.message : 'unknown');
     return NextResponse.redirect(`${appUrl}/login?error=line_failed&msg=${msg}`);
   }
 }

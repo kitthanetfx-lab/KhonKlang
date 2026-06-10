@@ -3,7 +3,7 @@
  * สร้าง KYC storage bucket ถ้ายังไม่มี
  * เรียกจาก client ก่อน upload ไฟล์ครั้งแรก
  */
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { Client, Storage, Permission, Role } from 'node-appwrite';
 
 const BUCKET_ID = 'kyc_docs';
@@ -16,7 +16,7 @@ function getAdminStorage() {
   return new Storage(client);
 }
 
-export async function POST(_req: NextRequest) {
+export async function POST() {
   try {
     const s = getAdminStorage();
 

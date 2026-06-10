@@ -1,6 +1,8 @@
 'use client';
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { Icon } from './Icon';
 import { NotifyBell } from './NotifyBell';
 import { MessengerIcon } from './MessengerIcon';
@@ -47,15 +49,20 @@ export function useReveal() {
 }
 
 export function useTilt(max = 9) {
-  const ref = useRef<HTMLDivElement>(null);
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    elRef.current = node;
+  }, []);
   const onMouseMove = useCallback((e: React.MouseEvent) => {
-    const el = ref.current; if (!el) return;
+    const el = elRef.current; if (!el) return;
     const r = el.getBoundingClientRect();
     const px = (e.clientX - r.left) / r.width - 0.5;
     const py = (e.clientY - r.top) / r.height - 0.5;
     el.style.transform = `perspective(900px) rotateX(${(-py * max).toFixed(2)}deg) rotateY(${(px * max).toFixed(2)}deg) translateZ(0)`;
   }, [max]);
-  const onMouseLeave = useCallback(() => { if (ref.current) ref.current.style.transform = 'perspective(900px) rotateX(0) rotateY(0)'; }, []);
+  const onMouseLeave = useCallback(() => {
+    if (elRef.current) elRef.current.style.transform = 'perspective(900px) rotateX(0) rotateY(0)';
+  }, []);
   return { ref, onMouseMove, onMouseLeave };
 }
 
@@ -85,7 +92,7 @@ export function Logo({ sub = true }: { sub?: boolean }) {
   return (
     <Link href="/" className="logo" aria-label="คนกลาง หน้าแรก">
       <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}>
-        <img src="/logo.png" alt="คนกลาง" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <Image src="/logo.png" alt="คนกลาง" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
       </span>
       <span className="logo-word">คนกลาง{sub && <small>KHONKLANG</small>}</span>
     </Link>
@@ -120,6 +127,8 @@ function DropItem({ it }: { it: NavItem }) {
 /* ---------- Nav ---------- */
 export function Nav({ active }: { active?: string }) {
   const scrolled = useScrolled();
+  const pathname = usePathname() || '';
+  const isAct = (p: string) => pathname === p || pathname.startsWith(p + '/');
   const [drawer, setDrawer] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const { user, loading, logout } = useUser();
@@ -144,16 +153,15 @@ export function Nav({ active }: { active?: string }) {
         <Logo />
         <div className="nav-links">
           <div className="dropdown">
-            <button className="nav-link" aria-haspopup="true">สมัคร <Icon name="chevronDown" size={16} /></button>
+            <button className={`nav-link ${isAct('/register') ? 'is-active' : ''}`} aria-haspopup="true">สมัคร <Icon name="chevronDown" size={16} /></button>
             <div className="dropdown-menu">{NAV_REGISTER.map(it => <DropItem key={it.t} it={it} />)}</div>
           </div>
           <div className="dropdown">
-            <button className="nav-link" aria-haspopup="true">บริการผ่านคนกลาง <Icon name="chevronDown" size={16} /></button>
+            <button className={`nav-link ${isAct('/service') ? 'is-active' : ''}`} aria-haspopup="true">บริการผ่านคนกลาง <Icon name="chevronDown" size={16} /></button>
             <div className="dropdown-menu" style={{ minWidth: 290 }}>{NAV_SERVICES.map(it => <DropItem key={it.t} it={it} />)}</div>
           </div>
-          <Link className={`nav-link ${active === 'market' ? 'is-active' : ''}`} href="/marketplace"><Icon name="store" size={17} /> ตลาด</Link>
-          <Link className={`nav-link ${active === 'wanted' ? 'is-active' : ''}`} href="/wanted"><Icon name="bell" size={17} /> ประกาศหา</Link>
-          <Link className="nav-link" href="/check-scam"><Icon name="search" size={17} /> เช็คคนโกง</Link>
+          <Link className={`nav-link ${active === 'market' || isAct('/marketplace') ? 'is-active' : ''}`} href="/marketplace"><Icon name="store" size={17} /> ตลาด</Link>
+          <Link className={`nav-link ${isAct('/check-scam') ? 'is-active' : ''}`} href="/check-scam"><Icon name="search" size={17} /> เช็คคนโกง</Link>
         </div>
         {user && <MessengerIcon />}
         {user && <NotifyBell />}
@@ -201,7 +209,7 @@ export function Nav({ active }: { active?: string }) {
               <Icon name="user" size={16} /> {shortName}
             </Link>
             {profileItems.filter(it => it.href !== '/profile').map(it => (
-              <Link key={it.href} className="drawer-link" href={it.href} onClick={() => setDrawer(false)}>
+              <Link key={it.href} className={`drawer-link ${isAct(it.href) ? 'active' : ''}`} href={it.href} onClick={() => setDrawer(false)}>
                 <Icon name={it.icon} /> {it.t}
               </Link>
             ))}
@@ -216,16 +224,16 @@ export function Nav({ active }: { active?: string }) {
         <div className="drawer-sep" />
         <div className="drawer-label">บริการผ่านคนกลาง</div>
         {NAV_SERVICES.map(s => (
-          <Link key={s.t} className="drawer-link" href={s.href} onClick={() => setDrawer(false)}><Icon name={s.icon} /> {s.t}</Link>
+          <Link key={s.t} className={`drawer-link ${isAct(s.href) ? 'active' : ''}`} href={s.href} onClick={() => setDrawer(false)}><Icon name={s.icon} /> {s.t}</Link>
         ))}
         <div className="drawer-sep" />
-        <Link className="drawer-link" href="/marketplace" onClick={() => setDrawer(false)}><Icon name="store" /> ตลาด</Link>
-        <Link className="drawer-link" href="/wanted" onClick={() => setDrawer(false)}><Icon name="bell" /> ประกาศหาสินค้า</Link>
-        <Link className="drawer-link" href="/check-scam" onClick={() => setDrawer(false)}><Icon name="search" /> เช็คคนโกง</Link>
+        <Link className={`drawer-link ${isAct('/marketplace') ? 'active' : ''}`} href="/marketplace" onClick={() => setDrawer(false)}><Icon name="store" /> ตลาด</Link>
+        <Link className={`drawer-link ${isAct('/wanted') ? 'active' : ''}`} href="/wanted" onClick={() => setDrawer(false)}><Icon name="bell" /> ประกาศหาสินค้า</Link>
+        <Link className={`drawer-link ${isAct('/check-scam') ? 'active' : ''}`} href="/check-scam" onClick={() => setDrawer(false)}><Icon name="search" /> เช็คคนโกง</Link>
         <div className="drawer-sep" />
         <div className="drawer-label">สมัครสมาชิก</div>
         {NAV_REGISTER.map(s => (
-          <Link key={s.t} className="drawer-link" href={s.href} onClick={() => setDrawer(false)}><Icon name={s.icon} /> {s.t}</Link>
+          <Link key={s.t} className={`drawer-link ${isAct(s.href) ? 'active' : ''}`} href={s.href} onClick={() => setDrawer(false)}><Icon name={s.icon} /> {s.t}</Link>
         ))}
       </aside>
     </nav>
@@ -264,7 +272,7 @@ export function Footer() {
         <div style={{ display: 'grid', gap: 38, gridTemplateColumns: '1.4fr repeat(3, 1fr)' }} className="foot-grid">
           <div>
             <div className="logo" style={{ marginBottom: 14 }}>
-              <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}><img src="/logo.png" alt="คนกลาง" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></span>
+              <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}><Image src="/logo.png" alt="คนกลาง" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></span>
               <span className="logo-word" style={{ color: '#fff' }}>คนกลาง<small style={{ color: 'rgba(255,255,255,.45)' }}>KHONKLANG</small></span>
             </div>
             <p style={{ color: '#9aa6c4', fontSize: 14, maxWidth: '34ch' }}>แพลตฟอร์มซื้อขายปลอดภัยผ่านคนกลางที่ผ่านการรับรอง พักเงินไว้กับระบบจนกว่าจะได้รับของจริง</p>

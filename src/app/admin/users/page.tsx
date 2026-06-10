@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { account } from '@/lib/appwrite';
-import { Search, Users, RefreshCw, ShieldCheck, UserX, MoreVertical } from 'lucide-react';
+import { Search, Users, RefreshCw, MoreVertical } from 'lucide-react';
 
 interface AppUser {
   $id: string;
@@ -121,7 +121,7 @@ function UsersContent() {
   const [jwt, setJwt]         = useState('');
   const [total, setTotal]     = useState(0);
 
-  const load = async (j?: string) => {
+  const load = useCallback(async (j?: string) => {
     const token = j ?? jwt;
     if (!token) return;
     setLoading(true);
@@ -132,9 +132,11 @@ function UsersContent() {
       setTotal(data.total ?? 0);
     } catch { /* ignore */ }
     setLoading(false);
-  };
+  }, [jwt]);
 
-  useEffect(() => { account.createJWT().then(({ jwt: j }) => { setJwt(j); load(j); }); }, []);
+  useEffect(() => {
+    account.createJWT().then(({ jwt: j }) => { setJwt(j); void load(j); });
+  }, [load]);
 
   const filtered = users.filter(u => {
     const name  = (u.name || u.prefs?.firstName || '').toLowerCase();

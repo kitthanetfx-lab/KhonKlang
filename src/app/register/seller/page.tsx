@@ -1,9 +1,11 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { Suspense, useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowRight, ArrowLeft, Upload, CheckCircle2,
+  ArrowRight, ArrowLeft, CheckCircle2,
   AlertTriangle, Copy, Check, Store, ClipboardList, Plus, Trash2, MapPin,
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
@@ -105,23 +107,32 @@ function BranchAddressForm({ branch, onChange, onRemove, showRemove, profileAddr
 
   // Load amphoes when province changes
   useEffect(() => {
-    if (!branch.provinceName) { setAmphoes([]); setTambons([]); return; }
-    setLoadingAmph(true);
-    fetch(`/api/thai-address?type=amphures&province=${encodeURIComponent(branch.provinceName)}`)
-      .then(r => r.json()).then(d => setAmphoes(Array.isArray(d) ? d : []))
-      .catch(() => setAmphoes([]))
-      .finally(() => setLoadingAmph(false));
+    if (!branch.provinceName) return;
+    const timer = window.setTimeout(() => {
+      setLoadingAmph(true);
+      fetch(`/api/thai-address?type=amphures&province=${encodeURIComponent(branch.provinceName)}`)
+        .then(r => r.json()).then(d => setAmphoes(Array.isArray(d) ? d : []))
+        .catch(() => setAmphoes([]))
+        .finally(() => setLoadingAmph(false));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [branch.provinceName]);
 
   // Load tambons when amphoe changes
   useEffect(() => {
-    if (!branch.amphoreName || !branch.provinceName) { setTambons([]); return; }
-    setLoadingTamb(true);
-    fetch(`/api/thai-address?type=tambons&province=${encodeURIComponent(branch.provinceName)}&amphoe=${encodeURIComponent(branch.amphoreName)}`)
-      .then(r => r.json()).then(d => setTambons(Array.isArray(d) ? d : []))
-      .catch(() => setTambons([]))
-      .finally(() => setLoadingTamb(false));
+    if (!branch.amphoreName || !branch.provinceName) return;
+    const timer = window.setTimeout(() => {
+      setLoadingTamb(true);
+      fetch(`/api/thai-address?type=tambons&province=${encodeURIComponent(branch.provinceName)}&amphoe=${encodeURIComponent(branch.amphoreName)}`)
+        .then(r => r.json()).then(d => setTambons(Array.isArray(d) ? d : []))
+        .catch(() => setTambons([]))
+        .finally(() => setLoadingTamb(false));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [branch.provinceName, branch.amphoreName]);
+
+  const availableAmphoes = branch.provinceName ? amphoes : [];
+  const availableTambons = branch.provinceName && branch.amphoreName ? tambons : [];
 
   const upd = (key: keyof BranchData, val: string) => onChange({ ...branch, [key]: val });
   const onProvince = (name: string) => { onChange({ ...branch, provinceName: name, amphoreName: '', tambonName: '', postalCode: '' }); setAmphoes([]); setTambons([]); };
@@ -166,7 +177,7 @@ function BranchAddressForm({ branch, onChange, onRemove, showRemove, profileAddr
       {/* Form fields */}
       <div className="p-4 space-y-3">
         {/* House no / Moo / Road */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div>
             <label className="block text-xs text-gray-500 mb-1">บ้านเลขที่</label>
             <input type="text" value={branch.houseNo} onChange={e => upd('houseNo', e.target.value)} className={IC} placeholder="207/2" />
@@ -196,19 +207,19 @@ function BranchAddressForm({ branch, onChange, onRemove, showRemove, profileAddr
           <select value={branch.amphoreName} onChange={e => onAmphoe(e.target.value)}
             disabled={!branch.provinceName || loadingAmph} className={IC}>
             <option value="">{loadingAmph ? 'กำลังโหลด...' : branch.provinceName ? 'เลือกอำเภอ' : '— เลือกจังหวัดก่อน —'}</option>
-            {amphoes.map(a => <option key={a} value={a}>{a}</option>)}
+            {availableAmphoes.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
 
         {/* Tambon + Postal */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">ตำบล / แขวง <span className="text-red-500">*</span></label>
             <select value={branch.tambonName ? `${branch.tambonName}|${branch.postalCode}` : ''}
               onChange={e => onTambon(e.target.value)}
               disabled={!branch.amphoreName || loadingTamb} className={IC}>
               <option value="">{loadingTamb ? 'กำลังโหลด...' : branch.amphoreName ? 'เลือกตำบล' : '— เลือกอำเภอก่อน —'}</option>
-              {tambons.map(([n, z]) => <option key={n} value={`${n}|${z}`}>{n}</option>)}
+              {availableTambons.map(([n, z]) => <option key={n} value={`${n}|${z}`}>{n}</option>)}
             </select>
           </div>
           <div>
@@ -497,7 +508,7 @@ function SellerForm() {
 
               <div>
                 <label className="block text-sm font-medium mb-2 opacity-75">ประเภทผู้ขาย <span className="text-red-500">*</span></label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {SELLER_TYPES.map(t => (
                     <button key={t.value} type="button" onClick={() => setSellerType(t.value)}
                       className={`rounded-xl border-2 p-3 text-left transition-all
@@ -587,7 +598,7 @@ function SellerForm() {
               )}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
                 <p className="text-sm font-semibold">บัญชีธนาคาร — สำหรับรับเงินค่าสินค้า</p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 opacity-75">เลขที่บัญชี <span className="text-red-500">*</span></label>
                     <input className={ic} value={bankAcct} onChange={e => setBankAcct(e.target.value)} placeholder="xxx-x-xxxxx-x" />
@@ -608,7 +619,7 @@ function SellerForm() {
               {isCorporate && (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
                   <p className="text-sm font-semibold">บัญชีธนาคารบริษัท</p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1.5 opacity-75">เลขที่บัญชีบริษัท <span className="text-red-500">*</span></label>
                       <input className={ic} value={companyBankAcct} onChange={e => setCompanyBankAcct(e.target.value)} placeholder="xxx-x-xxxxx-x" />

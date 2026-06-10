@@ -1,9 +1,11 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { Suspense, useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowRight, ArrowLeft, Upload, CheckCircle2,
+  ArrowRight, ArrowLeft, CheckCircle2,
   AlertTriangle, Copy, Check, Shield, ClipboardList,
 } from 'lucide-react';
 import { account } from '@/lib/appwrite';
@@ -104,7 +106,6 @@ function MiddlemanForm() {
 
   const [displayName, setDisplayName]         = useState('');
   const [oauthEmail, setOauthEmail]           = useState('');
-  const [profileAddress, setProfileAddress]   = useState('');
   const [profileProvince, setProfileProvince] = useState('');
 
   // Step 1 – Basic Identity
@@ -143,7 +144,6 @@ function MiddlemanForm() {
         setFullNameId(u.name || '');
         const prefs = (u.prefs as Record<string, string>) || {};
         if (prefs.address) {
-          setProfileAddress(prefs.address);
           setProfileProvince(extractProvince(prefs.address));
           setWorkProvince(extractProvince(prefs.address));
         }
@@ -407,7 +407,7 @@ function MiddlemanForm() {
                   ประเภทสินค้าที่เชี่ยวชาญ <span className="text-red-500">*</span>
                   <span className="ml-2 text-xs text-gray-400 font-normal">เลือกได้หลายประเภท</span>
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {CATEGORIES.map(cat => {
                     const sel = categories.includes(cat.id);
                     return (
@@ -484,7 +484,7 @@ function MiddlemanForm() {
 
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
                 <p className="text-sm font-semibold">บัญชีธนาคาร — สำหรับรับ-คืนเงินประกันและค่าบริการ</p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 opacity-75">เลขที่บัญชี <span className="text-red-500">*</span></label>
                     <input className={ic} value={bankAcct} onChange={e => setBankAcct(e.target.value)}

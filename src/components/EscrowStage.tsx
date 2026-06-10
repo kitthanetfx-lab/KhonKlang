@@ -24,14 +24,14 @@ function efBezier(a: {x:number;y:number}, c: {x:number;y:number}, b: {x:number;y
 }
 
 export function EscrowStage({ speed = 1 }: { speed?: number }) {
+  const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const [seg, setSeg] = useState(0);
   const [t, setT] = useState(0);
-  const reduce = useRef(typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const raf = useRef(0);
   const last = useRef(0);
 
   useEffect(() => {
-    if (reduce.current) { setSeg(3); setT(1); return; }
+    if (reduce) return;
     const loop = (now: number) => {
       if (!last.current) last.current = now;
       const dt = now - last.current; last.current = now;
@@ -45,15 +45,17 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
     };
     raf.current = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf.current); last.current = 0; };
-  }, [seg, speed]);
+  }, [reduce, seg, speed]);
 
-  const s = EF_SEGMENTS[seg];
+  const activeSeg = reduce ? 3 : seg;
+  const activeT = reduce ? 1 : t;
+  const s = EF_SEGMENTS[activeSeg];
   let tok: {x:number;y:number} = EF_NODES.hub;
   let tokScale = 1, tokVisible = true;
   if (!s.hold && s.from && s.to && s.ctrl) {
     const a = EF_NODES[s.from], b = EF_NODES[s.to];
-    tok = efBezier(a, { x: s.ctrl.x, y: s.ctrl.y }, b, t);
-    const e = Math.sin(t * Math.PI);
+    tok = efBezier(a, { x: s.ctrl.x, y: s.ctrl.y }, b, activeT);
+    const e = Math.sin(activeT * Math.PI);
     tokScale = 0.7 + e * 0.5;
     tokVisible = e > 0.04;
   } else { tokVisible = false; }
@@ -64,7 +66,7 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
     agent:  s.key === 'lock' || s.key === 'ship' || s.key === 'deliver' || s.key === 'release',
     hub:    s.key === 'pay' || s.key === 'lock' || s.key === 'release',
   };
-  const pct = ((seg + t) / EF_SEGMENTS.length) * 100;
+  const pct = ((activeSeg + activeT) / EF_SEGMENTS.length) * 100;
 
   const lines = [
     { from: 'buyer', to: 'hub', c: { x: 26, y: 58 }, on: s.key === 'pay' },

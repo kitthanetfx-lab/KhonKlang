@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import { account } from '@/lib/appwrite';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -56,7 +56,7 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
   const [conditions,       setConditions]       = useState('');
   const [reportNotes,      setReportNotes]      = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const user = await account.get();
       setMyId(user.$id);
@@ -69,9 +69,12 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
       else setError(data.error || 'โหลดไม่ได้');
     } catch { router.replace('/login'); }
     finally { setLoading(false); }
-  }
+  }, [id, router]);
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   async function doAction(action: string, extra: Record<string, string> = {}) {
     setActing(true); setError('');

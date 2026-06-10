@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { account } from '@/lib/appwrite';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
@@ -125,25 +126,33 @@ const TIMELINE = [
   { key: 'delivered', label: 'รอยืนยันรับ' }, { key: 'completed', label: 'เสร็จสมบูรณ์' },
 ];
 
+type DealTab = 'steps' | 'chat' | 'evidence';
+type DealRole = 'seller' | 'middleman' | 'buyer' | 'guest' | '';
+
+function readDealTab(input: string | null): DealTab {
+  return input === 'chat' || input === 'evidence' || input === 'steps' ? input : 'steps';
+}
+
 export default function DealRoom() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const dealId = params.id as string;
+  const requestedTab = searchParams.get('tab');
+  const requestedCall = searchParams.get('call') === '1';
 
   const [deal, setDeal] = useState<Deal | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [middlemen, setMiddlemen] = useState<Middleman[]>([]);
   const [myId, setMyId] = useState('');
   const [myName, setMyName] = useState('');
-  const [myRole, setMyRole] = useState('');
   const [loading, setLoading] = useState(true);
   const [chatInput, setChatInput] = useState('');
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
-  const [showJitsi, setShowJitsi] = useState(false);
-  const [tab, setTab] = useState<'steps' | 'chat' | 'evidence'>('steps');
+  const [showJitsi, setShowJitsi] = useState(requestedCall);
+  const [tab, setTab] = useState<DealTab>(readDealTab(requestedTab));
   const [evidenceType, setEvidenceType] = useState('packing');
   const [copied, setCopied] = useState(false);
   const [jwt, setJwt] = useState('');
@@ -152,6 +161,7 @@ export default function DealRoom() {
   const [uploadPreview, setUploadPreview] = useState<{ url: string; name: string } | null>(null);
   const [mmFilter, setMmFilter] = useState({ q: '', province: '', tier: '', minRating: 0, need: '' });
   const [mmLoading, setMmLoading] = useState(false);
+  const [nowTs, setNowTs] = useState(() => Date.now());
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const callNotifyAt = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -163,13 +173,12 @@ export default function DealRoom() {
   }, []);
 
   useEffect(() => {
-    const requestedTab = searchParams.get('tab');
-    if (requestedTab === 'chat' || requestedTab === 'evidence' || requestedTab === 'steps') {
-      setTab(requestedTab);
-    }
-    // มาจากแจ้งเตือนวิดีโอคอล → เปิดห้องคอลให้เลย
-    if (searchParams.get('call') === '1') setShowJitsi(true);
-  }, [searchParams]);
+    const timer = window.setTimeout(() => {
+      setTab(readDealTab(requestedTab));
+      if (requestedCall) setShowJitsi(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [requestedCall, requestedTab]);
 
   const fetchDeal = useCallback(async (j?: string) => {
     const headers: Record<string, string> = {};
@@ -179,12 +188,12 @@ export default function DealRoom() {
       const d = await r.json();
       if (r.ok) { setDeal(d.deal); setDealError(''); } else setDealError(d.error || `Error ${r.status}`);
     } catch (e: any) { setDealError(e?.message || 'Network error'); }
-  }, [dealId]);
+  }, [dealId, setDeal, setDealError]);
 
   const fetchMsgs = useCallback(async (j: string) => {
     const r = await fetch(`/api/messages?dealId=${dealId}`, { headers: { 'x-session-jwt': j } }).catch(() => null);
     if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); }
-  }, [dealId]);
+  }, [dealId, setMsgs]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
@@ -204,14 +213,6 @@ export default function DealRoom() {
     })();
     return () => clearInterval(timer);
   }, [dealId, fetchDeal, fetchMsgs]);
-
-  useEffect(() => {
-    if (!deal || !myId) return;
-    if (deal.sellerId === myId) setMyRole('seller');
-    else if (deal.middlemanId === myId) setMyRole('middleman');
-    else if (deal.buyerId === myId) setMyRole('buyer');
-    else setMyRole('guest');
-  }, [deal, myId]);
 
   // แจ้งผู้ร่วมดีลว่ามีคนเข้ามาดูห้องนี้ — ครั้งเดียวต่อ session ต่อดีล กันสแปม
   const visitSent = useRef(false);
@@ -247,13 +248,19 @@ export default function DealRoom() {
       const d = await r.json();
       setMiddlemen(d.middlemen || []);
     } catch {} finally { setMmLoading(false); }
-  }, [mmFilter]);
+  }, [mmFilter, setMiddlemen, setMmLoading]);
 
   useEffect(() => {
-    if (showSelectMM && jwt) loadMiddlemen(jwt);
+    if (!showSelectMM || !jwt) return;
+    const timer = window.setTimeout(() => { void loadMiddlemen(jwt); }, 0);
+    return () => window.clearTimeout(timer);
   }, [jwt, showSelectMM, loadMiddlemen]);
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowTs(Date.now()), 15000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   async function getJwt() { const j = (await account.createJWT()).jwt; setJwt(j); return j; }
 
@@ -340,9 +347,25 @@ export default function DealRoom() {
   );
 
   const jitsiRoom = `khonklang-${dealId.slice(0, 10)}`;
+  const myRole: DealRole = !deal || !myId
+    ? (myId ? 'guest' : '')
+    : deal.sellerId === myId
+      ? 'seller'
+      : deal.middlemanId === myId
+        ? 'middleman'
+        : deal.buyerId === myId
+          ? 'buyer'
+          : 'guest';
   // มีคอลกำลังดำเนินอยู่หรือไม่ — ดูจาก system message ล่าสุดที่เป็นวิดีโอคอล (ภายใน 3 นาที)
-  const lastCallMsg = [...msgs].reverse().find(m => m.role === 'system' && m.content.includes('วิดีโอคอล'));
-  const callLive = !!lastCallMsg && (Date.now() - new Date(lastCallMsg.createdAt).getTime() < 3 * 60 * 1000);
+  let lastCallMsg: Msg | null = null;
+  for (let i = msgs.length - 1; i >= 0; i -= 1) {
+    const msg = msgs[i];
+    if (msg.role === 'system' && msg.content.includes('วิดีโอคอล')) {
+      lastCallMsg = msg;
+      break;
+    }
+  }
+  const callLive = !!lastCallMsg && (nowTs - new Date(lastCallMsg.createdAt).getTime() < 3 * 60 * 1000);
   const stepIdx = STEP_ORDER.indexOf(deal.status);
   const pct = stepIdx >= 0 ? Math.round((stepIdx / (STEP_ORDER.length - 1)) * 100) : 0;
   const isFinished = ['completed', 'cancelled', 'disputed'].includes(deal.status);
@@ -383,7 +406,7 @@ export default function DealRoom() {
     );
   }
 
-  function MiddlemanPickerPanel({ compact = false }: { compact?: boolean }) {
+  function renderMiddlemanPickerPanel(compact = false) {
     const currentDeal = deal!;
     const TIERS = ['', 'Bronze', 'Silver', 'Gold', 'Platinum'];
     const filtered = middlemen
@@ -443,7 +466,7 @@ export default function DealRoom() {
   }
 
   // ─── Payment section ─────────────────────────────────────────────────────
-  function PaymentSection() {
+  function renderPaymentSection() {
     if (!['payment_pending', 'payment_uploaded'].includes(deal!.status)) return null;
     return (
       <div className="dr-card dr-pay-card">
@@ -462,7 +485,7 @@ export default function DealRoom() {
   }
 
   // ─── Action panel ────────────────────────────────────────────────────────
-  function ActionPanel() {
+  function renderActionPanel() {
     if (acting) return <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0', fontSize: 13 }}>กำลังดำเนินการ...</div>;
     const s = deal!.status;
     const btns: { label: string; cls: string; fn: () => void }[] = [];
@@ -493,7 +516,7 @@ export default function DealRoom() {
   }
 
   // ─── Evidence panel ──────────────────────────────────────────────────────
-  function EvidencePanel() {
+  function renderEvidencePanel() {
     const canUp = (myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status)) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
     const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)' };
     const items: { type: string; fileId: string; fileName: string }[] = (() => { try { return JSON.parse(deal!.evidenceData || '[]'); } catch { return []; } })();
@@ -597,9 +620,7 @@ export default function DealRoom() {
                   )}
                 </div>
 
-                {myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && showSelectMM && (
-                  <MiddlemanPickerPanel />
-                )}
+                {myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && showSelectMM && renderMiddlemanPickerPanel()}
 
                 {(deal.sellerAcceptedTerms || deal.buyerAcceptedTerms || deal.middlemanAcceptedTerms) && (
                   <div className="dr-card">
@@ -629,7 +650,7 @@ export default function DealRoom() {
                   </div>
                 </div>
 
-                <PaymentSection />
+                {renderPaymentSection()}
 
                 {deal.paymentSlipFileId && (
                   <div className="dr-card">
@@ -647,7 +668,7 @@ export default function DealRoom() {
                   </>
                 )}
 
-                <div className="dr-card"><div className="dr-card-title">การกระทำ</div><ActionPanel /></div>
+                <div className="dr-card"><div className="dr-card-title">การกระทำ</div>{renderActionPanel()}</div>
               </div>
             )}
 
@@ -684,7 +705,7 @@ export default function DealRoom() {
               </div>
             )}
 
-            {tab === 'evidence' && <EvidencePanel />}
+            {tab === 'evidence' && renderEvidencePanel()}
           </main>
         </>
       )}

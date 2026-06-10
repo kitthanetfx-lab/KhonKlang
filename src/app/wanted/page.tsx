@@ -77,8 +77,11 @@ export default function WantedPage() {
   }, []);
 
   useEffect(() => {
-    load();
-    account.get().then(u => setMyId(u.$id)).catch(() => {});
+    const timer = window.setTimeout(() => {
+      void load();
+      account.get().then(u => setMyId(u.$id)).catch(() => {});
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   async function submitPost() {

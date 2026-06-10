@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -96,9 +98,7 @@ export default function MarketplaceDetailPage() {
     }
   }, [listing]);
 
-  useEffect(() => {
-    if (images.length && !mainImage) setMainImage(images[0]);
-  }, [images, mainImage]);
+  const displayImage = mainImage || images[0] || '';
 
   function pushToCart(goToCart = false) {
     if (!listing) return;
@@ -141,29 +141,13 @@ export default function MarketplaceDetailPage() {
     }
   }
 
-  async function openSellerChat() {
+  function sellerChatHref() {
     if (!listing) return;
     if (!myId) {
-      router.push(`/login?returnTo=${encodeURIComponent(`/marketplace/${listing.$id}`)}`);
+      router.push(`/login?returnTo=${encodeURIComponent(`/messages?to=${listing.sellerId}&name=${encodeURIComponent(listing.sellerName || 'ผู้ขาย')}`)}`);
       return;
     }
-    setJoining(true);
-    try {
-      const token = jwt || (await account.createJWT()).jwt;
-      const res = await fetch(`/api/deals/${listing.$id}`, {
-        method: 'PATCH',
-        headers: { 'x-session-jwt': token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'join_as_buyer' }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok && !String(data.error || '').includes('มีผู้ซื้อแล้ว')) {
-        alert(data.error || 'ยังไม่สามารถเปิดแชทกับผู้ขายได้');
-        return;
-      }
-      router.push(`/deal/${listing.$id}?tab=chat`);
-    } finally {
-      setJoining(false);
-    }
+    router.push(`/messages?to=${listing.sellerId}&name=${encodeURIComponent(listing.sellerName || 'ผู้ขาย')}`);
   }
 
   if (loading) {
@@ -210,8 +194,8 @@ export default function MarketplaceDetailPage() {
           <div className="mkt-detail-grid">
             <section className="mkt-detail-gallery">
               <div className="mkt-detail-main">
-                {mainImage ? (
-                  <img src={mainImage} alt={listing.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                {displayImage ? (
+                  <img src={displayImage} alt={listing.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <div className="mkt-detail-fallback"><Icon name="package" size={56} /></div>
                 )}
@@ -219,7 +203,7 @@ export default function MarketplaceDetailPage() {
               {images.length > 1 && (
                 <div className="mkt-detail-thumbs">
                   {images.map(src => (
-                    <button key={src} type="button" className={`mkt-detail-thumb${mainImage === src ? ' active' : ''}`} onClick={() => setMainImage(src)}>
+                    <button key={src} type="button" className={`mkt-detail-thumb${displayImage === src ? ' active' : ''}`} onClick={() => setMainImage(src)}>
                       <img src={src} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </button>
                   ))}
@@ -264,8 +248,8 @@ export default function MarketplaceDetailPage() {
                       </button>
                     )}
                     {canSellerChat && (
-                      <button type="button" className="btn btn-soft btn-lg" onClick={openSellerChat} disabled={joining}>
-                        <Icon name="chat" size={18} /> {joining ? 'กำลังเปิดแชท...' : 'แชทกับผู้ขาย'}
+                      <button type="button" className="btn btn-soft btn-lg" onClick={sellerChatHref}>
+                        <Icon name="chat" size={18} /> แชทกับผู้ขาย
                       </button>
                     )}
                     <Link href={`/messages?to=${listing.sellerId}&name=${encodeURIComponent(listing.sellerName || 'ผู้ขาย')}`} className="btn btn-ghost btn-lg">

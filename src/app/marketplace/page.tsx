@@ -1,9 +1,10 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useState } from 'react';
 import { account } from '@/lib/appwrite';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/Icon';
 import { Nav, Footer, useReveal } from '@/components/Site';
 import { isCertifiedMode } from '@/lib/listingMode';
@@ -58,11 +59,9 @@ const PROVINCES = [
 const CARD_BG = ['#0d1b3e','#2f6bf0','#10a566','#6841d9','#e89211','#0d9aa6'];
 
 export default function Marketplace() {
-  const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [myId,     setMyId]     = useState('');
-  const [jwt,      setJwt]      = useState('');
 
   const [search,     setSearch]     = useState('');
   const [cat,        setCat]        = useState('ทั้งหมด');
@@ -85,7 +84,6 @@ export default function Marketplace() {
         const user = await account.get();
         setMyId(user.$id);
         const j = (await account.createJWT()).jwt;
-        setJwt(j);
         const res = await fetch('/api/deals?role=buyer', { headers: { 'x-session-jwt': j } });
         if (res.ok) { const data = await res.json(); setListings(data.deals || []); }
       } catch {
@@ -182,9 +180,14 @@ export default function Marketplace() {
             <div className="kicker" style={{ marginBottom: 10 }}>ตลาดคนกลาง</div>
             <h1 className="mkt-headline reveal">ซื้อขายได้ทุกหมวด <span className="gradient-text">มั่นใจทุกมูลค่า</span></h1>
             <p className="mkt-sub reveal" style={{ ['--d' as string]: '60ms' }}>ทุกรายการปลอดภัยด้วยระบบ Escrow — พักเงินจนกว่าจะได้ของตรงปก</p>
-            <Link href="/wanted" className="btn btn-ghost btn-sm reveal" style={{ marginTop: 14, ['--d' as string]: '80ms' }}>
-              📢 หาของไม่เจอ? ลงประกาศหาสินค้า <Icon name="arrowRight" size={15} />
-            </Link>
+            <div className="reveal" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 16, ['--d' as string]: '80ms' }}>
+              <Link href="/dashboard/seller" className="btn btn-primary">
+                <Icon name="store" size={16} /> ลงขายสินค้า
+              </Link>
+              <Link href="/wanted" className="btn btn-ghost">
+                📢 ประกาศหาสินค้า <Icon name="arrowRight" size={15} />
+              </Link>
+            </div>
           </div>
           <div className="mkt-search reveal" style={{ ['--d' as string]: '100ms' }}>
             <Icon name="search" size={18} style={{ color: 'var(--faint)', flexShrink: 0 }} />

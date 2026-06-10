@@ -125,6 +125,14 @@ export async function POST(req: NextRequest) {
     const { databases, users } = getAdminClient();
     await ensureCollection(databases);
 
+    const existing = await databases.listDocuments(DB_ID, COL_ID, [
+      Query.equal('userId', userId),
+      Query.limit(1),
+    ]).then(r => r.documents).catch(() => []);
+    if (existing.length > 0) {
+      return NextResponse.json({ error: 'บัญชีนี้เคยยื่นสมัครคนกลางแล้ว กรุณารอผลตรวจสอบหรือดูสถานะในโปรไฟล์' }, { status: 409 });
+    }
+
     await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
       userId,
       fullNameId, idNumber,
