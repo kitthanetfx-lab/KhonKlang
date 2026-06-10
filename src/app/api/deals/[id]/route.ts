@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, ID } from 'node-appwrite';
+import { notifyUsers } from '../../_lib/notify';
 
 const DB_ID  = 'khonklang_db';
 const COL_DEALS = 'deals';
@@ -173,11 +174,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         systemMsg = `แจ้งปัญหา: ${body.reason || 'ไม่ระบุ'}`;
         break;
       }
+      case 'start_call': {
+        if (!isSeller && !isMiddleman && !isBuyer)
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        // ไม่แก้ข้อมูลดีล — แค่แจ้งทุกฝ่ายว่ามีวิดีโอคอลเริ่มแล้ว
+        systemMsg = `📹 ${currentUser.name || 'ผู้ใช้'} เริ่มวิดีโอคอล — กดเข้าร่วมได้เลย`;
+        break;
+      }
       default:
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
 
-    const updated = await databases.updateDocument(DB_ID, COL_DEALS, id, updates);
+    const updated = Object.keys(updates).length > 0
+      ? await databases.updateDocument(DB_ID, COL_DEALS, id, updates)
+      : deal;
 
     if (systemMsg) {
       await databases.createDocument(DB_ID, COL_MSGS, ID.unique(), {
@@ -185,6 +195,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         role: 'system', type: 'system', content: systemMsg, fileId: '', fileName: '',
         createdAt: new Date().toISOString(),
       }).catch(() => {});
+
+      // แจ้งเตือนทุกฝ่ายในดีล ยกเว้นคนที่กดเอง — กระดิ่งใน Nav จะเด้งให้รู้ทันที
+      const recipients = [updated.sellerId, updated.buyerId, updated.middlemanId]
+        .filter((x): x is string => typeof x === 'string' && !!x && x !== uid);
+      if (recipients.length) {
+        await notifyUsers(databases, recipients, {
+          title: action === 'start_call' ? `📹 วิดีโอคอล: ${updated.title || 'ดีล'}` : `ดีล: ${updated.title || 'ไม่มีชื่อ'}`,
+          body: systemMsg,
+          link: action === 'start_call' ? `/deal/${id}?call=1` : `/deal/${id}`,
+        });
+      }
     }
 
     return NextResponse.json({ deal: updated });

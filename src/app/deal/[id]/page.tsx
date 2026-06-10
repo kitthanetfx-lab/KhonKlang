@@ -98,6 +98,7 @@ export default function DealRoom() {
   const [mmFilter, setMmFilter] = useState({ q: '', province: '', tier: '', minRating: 0, need: '' });
   const [mmLoading, setMmLoading] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const callNotifyAt = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const evidInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,6 +112,8 @@ export default function DealRoom() {
     if (requestedTab === 'chat' || requestedTab === 'evidence' || requestedTab === 'steps') {
       setTab(requestedTab);
     }
+    // มาจากแจ้งเตือนวิดีโอคอล → เปิดห้องคอลให้เลย
+    if (searchParams.get('call') === '1') setShowJitsi(true);
   }, [searchParams]);
 
   const fetchDeal = useCallback(async (j?: string) => {
@@ -223,6 +226,26 @@ export default function DealRoom() {
   }
 
   async function copyLink() { await navigator.clipboard.writeText(window.location.href).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+
+  /** เปิด/ปิดวิดีโอคอล — ตอนเปิดจะแจ้งเตือนทุกฝ่ายในดีล (กันสแปม: แจ้งซ้ำได้ทุก 2 นาที) */
+  function toggleCall() {
+    const opening = !showJitsi;
+    setShowJitsi(opening);
+    if (opening && myRole !== 'guest' && myRole !== '' && Date.now() - callNotifyAt.current > 120000) {
+      callNotifyAt.current = Date.now();
+      (async () => {
+        try {
+          const j = await getJwt();
+          await fetch(`/api/deals/${dealId}`, {
+            method: 'PATCH',
+            headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start_call' }),
+          });
+          fetchMsgs(j);
+        } catch { /* แจ้งเตือนไม่สำเร็จ ไม่กระทบการเข้าคอล */ }
+      })();
+    }
+  }
 
   if (loading) return (
     <div className="dr-root" style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -428,7 +451,7 @@ export default function DealRoom() {
         <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{STEP_LABEL[deal.status]} · ฿{deal.price.toLocaleString()}</div></div>
         <div className="dr-hctas">
           <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
-          <button className="dr-cta-green" onClick={() => setShowJitsi(!showJitsi)}>📹 Video</button>
+          <button className="dr-cta-green" onClick={toggleCall}>📹 Video</button>
         </div>
       </header>
 

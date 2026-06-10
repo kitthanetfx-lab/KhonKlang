@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { Icon } from './Icon';
+import { NotifyBell } from './NotifyBell';
 import { useUser } from '@/lib/useUser';
 
 /* ---------- hooks ---------- */
@@ -152,6 +153,7 @@ export function Nav({ active }: { active?: string }) {
           <Link className={`nav-link ${active === 'wanted' ? 'is-active' : ''}`} href="/wanted"><Icon name="bell" size={17} /> ประกาศหา</Link>
           <Link className="nav-link" href="/check-scam"><Icon name="search" size={17} /> เช็คคนโกง</Link>
         </div>
+        {user && <NotifyBell />}
         <div className="nav-cta-group">
           {loading ? (
             <span className="btn btn-ghost btn-sm" aria-busy="true">กำลังโหลด...</span>
