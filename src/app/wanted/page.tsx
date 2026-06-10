@@ -120,7 +120,7 @@ export default function WantedPage() {
 
   function offerToSell(p: WantedPost) {
     if (!myId) { router.push(`/login?returnTo=${encodeURIComponent('/wanted')}`); return; }
-    const params = new URLSearchParams({ title: `เสนอขาย: ${p.title}`, role: 'seller', ref: 'wanted' });
+    const params = new URLSearchParams({ title: `เสนอขาย: ${p.title}`, role: 'seller', ref: 'wanted', wantedId: p.$id });
     router.push(`/deal/create?${params}`);
   }
 

@@ -32,7 +32,7 @@ function CreateDealForm() {
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, price: Number(price), category, creatorRole: role, source: 'private' }),
+        body: JSON.stringify({ title, description, price: Number(price), category, creatorRole: role, source: 'private', wantedId: searchParams.get('wantedId') || '' }),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || 'เกิดข้อผิดพลาด'); return; }

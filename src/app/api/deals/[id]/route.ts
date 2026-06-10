@@ -53,6 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     let updates: Record<string, unknown> = {};
     let systemMsg = '';
+    let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
 
     switch (action) {
       case 'join_as_buyer': {
@@ -175,10 +176,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'start_call': {
-        if (!isSeller && !isMiddleman && !isBuyer)
-          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        // ไม่แก้ข้อมูลดีล — แค่แจ้งทุกฝ่ายว่ามีวิดีโอคอลเริ่มแล้ว
-        systemMsg = `📹 ${currentUser.name || 'ผู้ใช้'} เริ่มวิดีโอคอล — กดเข้าร่วมได้เลย`;
+        // ใครก็ตามที่ล็อกอินและเปิดคอลในดีลนี้ (รวมถึงคนที่มาจากลิงก์แชร์) → แจ้งผู้ร่วมดีลทุกคน
+        const isParty = isSeller || isMiddleman || isBuyer;
+        systemMsg = `📹 ${currentUser.name || 'ผู้ใช้'}${isParty ? '' : ' (ผู้สนใจจากลิงก์แชร์)'} เข้าร่วมวิดีโอคอล — กดเข้าร่วมได้เลย`;
+        break;
+      }
+      case 'visit': {
+        // มีคนเปิดห้องดีล (รวมคนคลิกลิงก์แชร์) → แจ้งผู้ร่วมดีลคนอื่น ไม่ลงข้อความในแชท
+        const roleLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : isMiddleman ? 'คนกลาง' : 'ผู้สนใจจากลิงก์แชร์';
+        systemMsg = `👀 ${currentUser.name || 'ผู้ใช้'} (${roleLabel}) เข้ามาดูห้องดีล`;
+        writeChatMsg = false;
         break;
       }
       default:
@@ -190,20 +197,37 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       : deal;
 
     if (systemMsg) {
-      await databases.createDocument(DB_ID, COL_MSGS, ID.unique(), {
-        dealId: id, senderId: 'system', senderName: 'ระบบ',
-        role: 'system', type: 'system', content: systemMsg, fileId: '', fileName: '',
-        createdAt: new Date().toISOString(),
-      }).catch(() => {});
+      if (writeChatMsg) {
+        await databases.createDocument(DB_ID, COL_MSGS, ID.unique(), {
+          dealId: id, senderId: 'system', senderName: 'ระบบ',
+          role: 'system', type: 'system', content: systemMsg, fileId: '', fileName: '',
+          createdAt: new Date().toISOString(),
+        }).catch(() => {});
+      }
 
       // แจ้งเตือนทุกฝ่ายในดีล ยกเว้นคนที่กดเอง — กระดิ่งใน Nav จะเด้งให้รู้ทันที
+      // (กรณีเลือกคนกลาง: คนกลางได้แจ้งเตือนเฉพาะตัวด้านล่าง จึงตัดออกจากรอบนี้กันแจ้งซ้ำ)
       const recipients = [updated.sellerId, updated.buyerId, updated.middlemanId]
-        .filter((x): x is string => typeof x === 'string' && !!x && x !== uid);
+        .filter((x): x is string => typeof x === 'string' && !!x && x !== uid)
+        .filter(x => !(action === 'select_middleman' && x === updated.middlemanId));
       if (recipients.length) {
+        const title =
+          action === 'start_call' ? `📹 วิดีโอคอล: ${updated.title || 'ดีล'}` :
+          action === 'visit' ? `👀 มีคนเข้ามาดูห้องดีล: ${updated.title || ''}` :
+          `ดีล: ${updated.title || 'ไม่มีชื่อ'}`;
         await notifyUsers(databases, recipients, {
-          title: action === 'start_call' ? `📹 วิดีโอคอล: ${updated.title || 'ดีล'}` : `ดีล: ${updated.title || 'ไม่มีชื่อ'}`,
+          title,
           body: systemMsg,
           link: action === 'start_call' ? `/deal/${id}?call=1` : `/deal/${id}`,
+        });
+      }
+
+      // แจ้งคนกลางแบบเจาะจงเมื่อถูกเลือก — ให้รู้ชัดว่า "คุณ" ถูกเลือก ไม่ใช่แค่ความเคลื่อนไหวของดีล
+      if (action === 'select_middleman' && updated.middlemanId && updated.middlemanId !== uid) {
+        await notifyUsers(databases, [updated.middlemanId as string], {
+          title: '🤝 คุณถูกเลือกเป็นคนกลาง!',
+          body: `ดีล "${updated.title || 'ไม่มีชื่อ'}" มูลค่า ฿${Number(updated.price || 0).toLocaleString()} — เข้าไปยอมรับเงื่อนไขเพื่อเริ่มงานได้เลย`,
+          link: `/deal/${id}`,
         });
       }
     }

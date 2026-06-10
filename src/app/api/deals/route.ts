@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, DatabasesIndexType, ID, OrderBy, Permission, Role, Query, Users } from 'node-appwrite';
+import { notifyUsers } from '../_lib/notify';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'deals';
@@ -235,6 +236,21 @@ export async function POST(req: NextRequest) {
       trackingToMiddleman: '', trackingToBuyer: '', rejectReason: '',
       createdAt: new Date().toISOString(),
     });
+
+    // ดีลนี้ถูกสร้างเพื่อเสนอขายตาม "ประกาศหาสินค้า" → แจ้งเจ้าของประกาศทันที
+    if (body.wantedId && typeof body.wantedId === 'string') {
+      try {
+        const wanted = await databases.getDocument(DB_ID, 'wanted_posts', body.wantedId);
+        if (wanted.userId && wanted.userId !== currentUser.$id) {
+          await notifyUsers(databases, [wanted.userId as string], {
+            title: `📢 มีผู้เสนอขายตามประกาศหาของคุณ`,
+            body: `${currentUser.name || 'สมาชิก'} เสนอขาย "${title}" ราคา ฿${Number(price).toLocaleString()} — กดเข้าดูดีลและเข้าร่วมเป็นผู้ซื้อได้เลย`,
+            link: `/deal/${doc.$id}`,
+          });
+        }
+      } catch { /* ประกาศอาจถูกลบ — ไม่กระทบการสร้างดีล */ }
+    }
+
     return NextResponse.json({ deal: doc });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

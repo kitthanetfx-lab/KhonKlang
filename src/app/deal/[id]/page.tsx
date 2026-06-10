@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { ReviewPanel } from '@/components/ReviewPanel';
+import { NotifyBell } from '@/components/NotifyBell';
 import { compressImage } from '@/lib/imageCompress';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -158,6 +159,28 @@ export default function DealRoom() {
     else setMyRole('guest');
   }, [deal, myId]);
 
+  // แจ้งผู้ร่วมดีลว่ามีคนเข้ามาดูห้องนี้ — ครั้งเดียวต่อ session ต่อดีล กันสแปม
+  const visitSent = useRef(false);
+  useEffect(() => {
+    if (!deal || !myId || visitSent.current) return;
+    visitSent.current = true;
+    try {
+      const key = `kk.visit.${dealId}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch { /* sessionStorage ใช้ไม่ได้ก็ยังแจ้งได้ */ }
+    (async () => {
+      try {
+        const j = (await account.createJWT()).jwt;
+        await fetch(`/api/deals/${dealId}`, {
+          method: 'PATCH',
+          headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'visit' }),
+        });
+      } catch { /* ไม่กระทบการใช้งาน */ }
+    })();
+  }, [deal, myId, dealId]);
+
   const loadMiddlemen = useCallback(async (j: string, f = mmFilter) => {
     setMmLoading(true);
     try {
@@ -231,7 +254,8 @@ export default function DealRoom() {
   function toggleCall() {
     const opening = !showJitsi;
     setShowJitsi(opening);
-    if (opening && myRole !== 'guest' && myRole !== '' && Date.now() - callNotifyAt.current > 120000) {
+    // แจ้งเตือนทุกครั้งที่มีคนล็อกอินเปิดคอล — รวมถึงผู้สนใจที่มาจากลิงก์แชร์ (guest ที่ล็อกอินแล้ว)
+    if (opening && myId && Date.now() - callNotifyAt.current > 120000) {
       callNotifyAt.current = Date.now();
       (async () => {
         try {
@@ -262,6 +286,9 @@ export default function DealRoom() {
   );
 
   const jitsiRoom = `khonklang-${dealId.slice(0, 10)}`;
+  // มีคอลกำลังดำเนินอยู่หรือไม่ — ดูจาก system message ล่าสุดที่เป็นวิดีโอคอล (ภายใน 3 นาที)
+  const lastCallMsg = [...msgs].reverse().find(m => m.role === 'system' && m.content.includes('วิดีโอคอล'));
+  const callLive = !!lastCallMsg && (Date.now() - new Date(lastCallMsg.createdAt).getTime() < 3 * 60 * 1000);
   const stepIdx = STEP_ORDER.indexOf(deal.status);
   const pct = stepIdx >= 0 ? Math.round((stepIdx / (STEP_ORDER.length - 1)) * 100) : 0;
   const isFinished = ['completed', 'cancelled', 'disputed'].includes(deal.status);
@@ -450,6 +477,7 @@ export default function DealRoom() {
         <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
         <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{STEP_LABEL[deal.status]} · ฿{deal.price.toLocaleString()}</div></div>
         <div className="dr-hctas">
+          {myId && <NotifyBell />}
           <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
           <button className="dr-cta-green" onClick={toggleCall}>📹 Video</button>
         </div>
@@ -465,6 +493,13 @@ export default function DealRoom() {
         </div>
       ) : (
         <>
+          {callLive && (
+            <div className="dr-call-banner" role="status">
+              <span className="dr-call-dot" />
+              <span className="dr-call-tx">📹 มีวิดีโอคอลกำลังดำเนินอยู่ในดีลนี้</span>
+              <button type="button" onClick={toggleCall}>เข้าร่วมเลย</button>
+            </div>
+          )}
           <div className="dr-progress-wrap">
             <div className="dr-prog-meta"><span className="dr-prog-status">{STEP_LABEL[deal.status]}</span><span className="dr-prog-pct">{pct}%</span></div>
             <div className="dr-prog-track"><div className="dr-prog-fill" style={{ width: `${pct}%`, background: deal.status === 'completed' ? 'var(--green-500)' : 'var(--accent)' }} /></div>
