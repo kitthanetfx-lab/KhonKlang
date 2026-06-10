@@ -1595,7 +1595,7 @@ button.nav-link { background: none; border: none; }
 .contact-card { display: flex; gap: 14px; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-sm); padding: 20px; transition: transform .2s var(--ease-out), box-shadow .2s; }
 a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .contact-card b { display: block; font-family: var(--font-display); font-size: 15px; color: var(--ink); margin-bottom: 2px; }
-.contact-card p { font-size: 13px; color: var(--m
+.contact-card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
 /* ---- Upload preview toast (deal room) ---- */
 .up-toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 120; display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--sh-lg); padding: 10px 14px; max-width: min(92vw, 380px); }
 .up-toast img { width: 48px; height: 48px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); flex: 0 0 auto; }
