@@ -4,7 +4,6 @@ import { Icon } from './Icon';
 
 const EF_NODES: Record<string, { x: number; y: number; label: string; icon: string; tint: string }> = {
   buyer:  { x: 14, y: 26, label: 'ผู้ซื้อ', icon: 'user', tint: 'blue' },
-  goods:  { x: 32, y: 26, label: '', icon: 'package', tint: 'blue' },
   agent:  { x: 50, y: 26, label: 'คนกลาง', icon: 'users', tint: 'blue' },
   seller: { x: 86, y: 26, label: 'ผู้ขาย', icon: 'store', tint: 'violet' },
   hub:    { x: 50, y: 73, label: 'ศูนย์กลาง', icon: 'shieldCheck', tint: 'green' },
@@ -13,8 +12,8 @@ const EF_NODES: Record<string, { x: number; y: number; label: string; icon: stri
 interface Seg { key: string; dur: number; from?: string; to?: string; ctrl?: { x: number; y: number }; hold?: boolean; icon: string; color: string; label: string; sub: string; }
 const EF_SEGMENTS: Seg[] = [
   { key: 'pay',     dur: 1700, from: 'buyer', to: 'hub',   ctrl: { x: 26, y: 58 }, icon: 'coins',   color: 'var(--blue-500)',  label: 'ผู้ซื้อโอนเงินขึ้นมาที่ศูนย์กลาง', sub: 'เงินพักไว้กับบริษัทคนกลาง จำกัด' },
-  { key: 'lock',    dur: 1500, from: 'agent', to: 'hub',   ctrl: { x: 52, y: 56 }, icon: 'lock',    color: 'var(--amber-500)', label: 'คนกลางโดนหักประกันหรือเครดิต', sub: 'ศูนย์กลางล็อกเครดิตตามค่าสินค้า (เช่น ฿3,000)' },
-  { key: 'ship',    dur: 1700, from: 'seller', to: 'agent', ctrl: { x: 74, y: 12 }, icon: 'package', color: 'var(--accent)',    label: 'ผู้ขายส่งสินค้าให้กลางตรวจสอบ', sub: 'ส่งของให้คนกลางรับและตรวจสอบ' },
+  { key: 'lock',    dur: 1500, from: 'agent', to: 'hub',   ctrl: { x: 52, y: 56 }, icon: 'lock',    color: 'var(--amber-500)', label: 'คนกลางวางเครดิตค้ำประกัน', sub: 'ศูนย์กลางล็อกเครดิตตามค่าสินค้า (เช่น ฿3,000)' },
+  { key: 'ship',    dur: 1700, from: 'seller', to: 'agent', ctrl: { x: 74, y: 12 }, icon: 'package', color: 'var(--accent)',    label: 'ผู้ขายส่งสินค้าให้คนกลางตรวจสอบ', sub: 'ส่งของให้คนกลางรับและตรวจสอบ' },
   { key: 'deliver', dur: 1700, from: 'agent',  to: 'buyer', ctrl: { x: 32, y: 18 }, icon: 'package', color: 'var(--accent)',    label: 'ตรวจเสร็จส่งสินค้าให้กับผู้ซื้อ', sub: 'คนกลางส่งต่อให้ผู้ซื้อหลังตรวจสอบ' },
   { key: 'release', dur: 1700, from: 'hub',   to: 'seller', ctrl: { x: 74, y: 62 }, icon: 'coins',   color: 'var(--green-500)', label: 'ศูนย์กลางส่งค่าสินค้าให้ผู้ขาย + คืนเครดิต', sub: 'โอนเงินให้ผู้ขาย และคืนเครดิตให้คนกลาง' },
 ];
@@ -62,7 +61,6 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
   const active: Record<string, boolean> = {
     buyer:  s.key === 'pay' || s.key === 'deliver' || s.key === 'release',
     seller: s.key === 'ship' || s.key === 'release',
-    goods:  s.key === 'deliver',
     agent:  s.key === 'lock' || s.key === 'ship' || s.key === 'deliver' || s.key === 'release',
     hub:    s.key === 'pay' || s.key === 'lock' || s.key === 'release',
   };
@@ -101,7 +99,7 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
             );
           })}
         </svg>
-        {(['buyer', 'goods', 'agent', 'seller'] as const).map(k => (
+        {(['buyer', 'agent', 'seller'] as const).map(k => (
           <div key={k} className={`ef-node ${active[k] ? 'on' : ''}`} style={pos(k)}>
             <span className={`ef-node-ic ${EF_NODES[k].tint}`}><Icon name={EF_NODES[k].icon} size={20} /></span>
             {EF_NODES[k].label ? <span className="ef-node-lb">{EF_NODES[k].label}</span> : null}

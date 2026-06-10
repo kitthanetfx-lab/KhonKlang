@@ -123,7 +123,9 @@ export function Nav({ active }: { active?: string }) {
   const { user, loading, logout } = useUser();
   useEffect(() => {
     document.body.style.overflow = drawer ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawer(false); setProfileOpen(false); } };
+    window.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); };
   }, [drawer]);
   const displayName = user?.prefs?.displayName || user?.name || 'บัญชีของฉัน';
   const shortName = displayName.length > 18 ? `${displayName.slice(0, 18)}...` : displayName;
@@ -139,11 +141,11 @@ export function Nav({ active }: { active?: string }) {
         <Logo />
         <div className="nav-links">
           <div className="dropdown">
-            <button className="nav-link">สมัคร <Icon name="chevronDown" size={16} /></button>
+            <button className="nav-link" aria-haspopup="true">สมัคร <Icon name="chevronDown" size={16} /></button>
             <div className="dropdown-menu">{NAV_REGISTER.map(it => <DropItem key={it.t} it={it} />)}</div>
           </div>
           <div className="dropdown">
-            <button className="nav-link">บริการผ่านคนกลาง <Icon name="chevronDown" size={16} /></button>
+            <button className="nav-link" aria-haspopup="true">บริการผ่านคนกลาง <Icon name="chevronDown" size={16} /></button>
             <div className="dropdown-menu" style={{ minWidth: 290 }}>{NAV_SERVICES.map(it => <DropItem key={it.t} it={it} />)}</div>
           </div>
           <Link className={`nav-link ${active === 'market' ? 'is-active' : ''}`} href="/marketplace"><Icon name="store" size={17} /> ตลาด</Link>
@@ -159,7 +161,7 @@ export function Nav({ active }: { active?: string }) {
                 onMouseEnter={() => setProfileOpen(true)}
                 onMouseLeave={() => setProfileOpen(false)}
               >
-                <button type="button" className="btn btn-ghost btn-sm profile-trigger" onClick={() => setProfileOpen(v => !v)}>
+                <button type="button" className="btn btn-ghost btn-sm profile-trigger" aria-haspopup="true" aria-expanded={profileOpen} onClick={() => setProfileOpen(v => !v)}>
                   <Icon name="user" size={16} /> {shortName} <Icon name="chevronDown" size={16} />
                 </button>
                 <div className="dropdown-menu dropdown-menu-right">
@@ -175,14 +177,14 @@ export function Nav({ active }: { active?: string }) {
             </>
           )}
         </div>
-        <button className="nav-burger" onClick={() => setDrawer(true)} aria-label="เมนู"><Icon name="menu" size={22} /></button>
+        <button className="nav-burger" onClick={() => setDrawer(true)} aria-label="เปิดเมนู" aria-expanded={drawer}><Icon name="menu" size={22} /></button>
       </div>
 
         <div className={`drawer-backdrop ${drawer ? 'open' : ''}`} onClick={() => setDrawer(false)} />
-      <aside className={`drawer ${drawer ? 'open' : ''}`}>
+      <aside className={`drawer ${drawer ? 'open' : ''}`} role="dialog" aria-modal="true" aria-label="เมนูหลัก" aria-hidden={!drawer}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <Logo sub={false} />
-          <button className="nav-burger" style={{ display: 'grid' }} onClick={() => setDrawer(false)}><Icon name="x" size={20} /></button>
+          <button className="nav-burger" style={{ display: 'grid' }} onClick={() => setDrawer(false)} aria-label="ปิดเมนู"><Icon name="x" size={20} /></button>
         </div>
         <div className="drawer-sep" />
         {loading ? (
@@ -224,10 +226,27 @@ export function Nav({ active }: { active?: string }) {
 }
 
 /* ---------- Footer ---------- */
-const FOOT_COLS = [
-  { h: 'บริการ', links: ['ซื้อขายผ่านกลาง', 'นัดรับผ่านกลาง', 'ฝากขายผ่านกลาง', 'บริการนัดออนไซต์'] },
-  { h: 'ตลาด', links: ['สินค้ามือสอง', 'แบรนด์เนม', 'ไอดีเกม', 'ของสะสม', 'เหมาสวน/ค้าส่ง'] },
-  { h: 'ช่วยเหลือ', links: ['วิธีใช้งาน', 'เช็คคนโกง', 'ค่าธรรมเนียม', 'ติดต่อทีมงาน', 'คำถามที่พบบ่อย'] },
+const FOOT_COLS: { h: string; links: { t: string; href: string }[] }[] = [
+  { h: 'บริการ', links: [
+    { t: 'ซื้อขายผ่านกลาง', href: '/service/trade' },
+    { t: 'นัดรับผ่านกลาง', href: '/service/meetup' },
+    { t: 'ฝากขายผ่านกลาง', href: '/service/consign' },
+    { t: 'บริการนัดออนไซต์', href: '/service/onsite' },
+  ] },
+  { h: 'ตลาด', links: [
+    { t: 'สินค้ามือสอง', href: '/marketplace' },
+    { t: 'แบรนด์เนม', href: '/marketplace' },
+    { t: 'ไอดีเกม', href: '/marketplace' },
+    { t: 'ของสะสม', href: '/marketplace' },
+    { t: 'เหมาสวน/ค้าส่ง', href: '/marketplace' },
+  ] },
+  { h: 'ช่วยเหลือ', links: [
+    { t: 'วิธีใช้งาน', href: '/how-it-works' },
+    { t: 'เช็คคนโกง', href: '/check-scam' },
+    { t: 'ค่าธรรมเนียม', href: '/fees' },
+    { t: 'คำถามที่พบบ่อย', href: '/faq' },
+    { t: 'ติดต่อทีมงาน', href: '/contact' },
+  ] },
 ];
 
 export function Footer() {
@@ -249,18 +268,19 @@ export function Footer() {
             <div key={c.h}>
               <h4>{c.h}</h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 11, fontSize: 14 }}>
-                {c.links.map(l => <li key={l}><a href="#">{l}</a></li>)}
+                {c.links.map(l => <li key={l.t}><Link href={l.href}>{l.t}</Link></li>)}
               </ul>
             </div>
           ))}
         </div>
         <hr style={{ border: 0, borderTop: '1px solid rgba(255,255,255,.1)', margin: '34px 0 18px' }} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: '#8694b5' }}>
-          <span>© 2568 Khonklang — ซื้อขายมั่นใจ ไร้กังวล</span>
-          <div style={{ display: 'flex', gap: 18 }}>
+          <span>© {new Date().getFullYear() + 543} Khonklang — ซื้อขายมั่นใจ ไร้กังวล</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
             <Link href="/privacy">ความเป็นส่วนตัว</Link>
-            <a href="#">เงื่อนไขการใช้งาน</a>
-            <a href="#">นโยบายคุกกี้</a>
+            <Link href="/terms">เงื่อนไขการใช้งาน</Link>
+            <Link href="/cookies">นโยบายคุกกี้</Link>
+            <Link href="/status">สถานะระบบ</Link>
           </div>
         </div>
       </div>

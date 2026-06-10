@@ -4,6 +4,7 @@ import { account } from '@/lib/appwrite';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
+import { ReviewPanel } from '@/components/ReviewPanel';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -505,7 +506,10 @@ export default function DealRoom() {
                 {deal.trackingToBuyer && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ คนกลาง → ผู้ซื้อ</div><div className="dr-track-code">{deal.trackingToBuyer}</div></div>}
 
                 {deal.status === 'completed' && (
-                  <div className="dr-card dr-done-card"><div className="dr-done-emoji">🎉</div><div className="dr-done-title">ดีลเสร็จสมบูรณ์!</div><div className="dr-done-sub">เงินถูกโอนให้ผู้ขายเรียบร้อยแล้ว</div></div>
+                  <>
+                    <div className="dr-card dr-done-card"><div className="dr-done-emoji">🎉</div><div className="dr-done-title">ดีลเสร็จสมบูรณ์!</div><div className="dr-done-sub">เงินถูกโอนให้ผู้ขายเรียบร้อยแล้ว</div></div>
+                    <ReviewPanel deal={deal} myRole={myRole as 'buyer' | 'seller' | 'middleman'} jwt={jwt} />
+                  </>
                 )}
 
                 <div className="dr-card"><div className="dr-card-title">การกระทำ</div><ActionPanel /></div>

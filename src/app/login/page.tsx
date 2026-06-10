@@ -93,7 +93,7 @@ function LoginForm() {
 
         <div className="login-footer">
           โดยการเข้าสู่ระบบ คุณยอมรับ <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
-          <br />และ <a href="#">เงื่อนไขการให้บริการ</a> ของเรา
+          <br />และ <a href="/terms">เงื่อนไขการให้บริการ</a> ของเรา
         </div>
       </div>
     </main>

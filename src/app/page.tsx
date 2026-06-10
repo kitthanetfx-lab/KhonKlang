@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Icon } from '@/components/Icon';
@@ -7,12 +7,34 @@ import { Nav, Footer, CountUp, useReveal, useTilt } from '@/components/Site';
 import { EscrowStage } from '@/components/EscrowStage';
 import { ServiceSlider } from '@/components/ServiceSlider';
 
-const STATS = [
-  { v: 10000, suf: '+', label: 'ดีลสำเร็จปลอดภัย', pre: '' },
-  { v: 500, suf: '+', label: 'คนกลางผ่านการรับรอง', pre: '' },
-  { v: 120, suf: 'ล้าน+', pre: '฿', label: 'มูลค่าที่คุ้มครอง' },
-  { v: 99, suf: '%', label: 'ความพึงพอใจผู้ใช้', pre: '' },
-];
+interface SiteStats { completedDeals: number; protectedValue: number; middlemen: number; satisfaction: number; reviewCount: number; }
+
+/** สถิติจริงจากระบบ — ดึงจาก /api/stats (นับจากดีลที่เสร็จสมบูรณ์, คนกลางที่อนุมัติ, รีวิวจริง) */
+function useSiteStats() {
+  const [stats, setStats] = useState<SiteStats | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(d => { if (!cancelled && typeof d.completedDeals === 'number') setStats(d); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  return stats;
+}
+
+function buildStatItems(s: SiteStats | null) {
+  const value = s?.protectedValue ?? 0;
+  const inMillions = value >= 1_000_000;
+  return [
+    { v: s?.completedDeals ?? 0, suf: '', pre: '', label: 'ดีลสำเร็จปลอดภัย' },
+    { v: s?.middlemen ?? 0, suf: '', pre: '', label: 'คนกลางผ่านการรับรอง' },
+    { v: inMillions ? Math.round(value / 100_000) / 10 : value, suf: inMillions ? 'ล้าน' : '', pre: '฿', label: 'มูลค่าที่คุ้มครอง' },
+    s && s.reviewCount > 0
+      ? { v: s.satisfaction, suf: '%', pre: '', label: 'ความพึงพอใจผู้ใช้' }
+      : { v: -1, suf: '', pre: '', label: 'ความพึงพอใจผู้ใช้' }, // -1 = ยังไม่มีรีวิว แสดง "—"
+  ];
+}
 
 const TRUST = [
   { icon: 'lock', tint: '', t: 'พักเงินไว้กับระบบ', d: 'เงินจะไม่ถึงมือผู้ขาย จนกว่าคุณจะกดยืนยันว่าได้รับของตรงปก' },
@@ -43,8 +65,10 @@ function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: 
   );
 }
 
-function Hero() {
+function Hero({ stats }: { stats: SiteStats | null }) {
   const stageTilt = useTilt(7);
+  const hasReviews = !!stats && stats.reviewCount > 0;
+  const avgStars = hasReviews ? Math.round((stats!.satisfaction / 20) * 10) / 10 : 0;
   return (
     <header className="hero">
       <div className="hero-bg" aria-hidden="true">
@@ -79,7 +103,11 @@ function Hero() {
             </div>
             <div>
               <div style={{ display: 'flex', gap: 2, color: 'var(--amber-500)' }}>{[0, 1, 2, 3, 4].map(i => <Icon key={i} name="star" size={15} style={{ fill: 'currentColor' }} />)}</div>
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}><b style={{ color: 'var(--ink)' }}>10,000+</b> ดีลสำเร็จ • รีวิว 4.9/5</span>
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                {stats && stats.completedDeals > 0
+                  ? <><b style={{ color: 'var(--ink)' }}>{stats.completedDeals.toLocaleString()}</b> ดีลสำเร็จ{hasReviews ? ` • รีวิว ${avgStars}/5` : ''}</>
+                  : <>พักเงินกับระบบ • ปลอดภัยทุกดีล</>}
+              </span>
             </div>
           </div>
         </div>
@@ -93,6 +121,8 @@ function Hero() {
 
 export default function HomePage() {
   useReveal();
+  const stats = useSiteStats();
+  const statItems = buildStatItems(stats);
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0');
@@ -103,13 +133,13 @@ export default function HomePage() {
   return (
     <>
       <Nav active="home" />
-      <Hero />
+      <Hero stats={stats} />
 
       <section className="stats-band">
         <div className="container stats-grid">
-          {STATS.map(s => (
+          {statItems.map(s => (
             <div key={s.label} className="stat reveal">
-              <div className="stat-v"><CountUp to={s.v} prefix={s.pre || ''} suffix={s.suf} /></div>
+              <div className="stat-v">{s.v < 0 ? '—' : <CountUp to={s.v} prefix={s.pre || ''} suffix={s.suf} />}</div>
               <div className="stat-l">{s.label}</div>
             </div>
           ))}
