@@ -85,6 +85,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'ผู้ซื้อเท่านั้นที่เลือกคนกลางได้' }, { status: 403 });
         if (!body.middlemanId || !body.middlemanName)
           return NextResponse.json({ error: 'Missing middlemanId' }, { status: 400 });
+        // กฎสำคัญ: ผู้ซื้อ/ผู้ขาย/คนกลาง ในดีลเดียวกันต้องเป็นคนละคนเสมอ
+        if (body.middlemanId === deal.buyerId)
+          return NextResponse.json({ error: 'ผู้ซื้อไม่สามารถเป็นคนกลางในดีลของตัวเองได้' }, { status: 400 });
+        if (body.middlemanId === deal.sellerId)
+          return NextResponse.json({ error: 'ผู้ขายไม่สามารถเป็นคนกลางในดีลที่ตัวเองขายได้' }, { status: 400 });
         updates = { middlemanId: body.middlemanId, middlemanName: body.middlemanName, status: 'terms_pending' };
         systemMsg = `ผู้ซื้อเลือก ${body.middlemanName} เป็นคนกลาง`;
         break;

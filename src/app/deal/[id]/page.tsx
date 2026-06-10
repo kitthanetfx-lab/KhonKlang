@@ -332,7 +332,10 @@ export default function DealRoom() {
   function MiddlemanPickerPanel({ compact = false }: { compact?: boolean }) {
     const currentDeal = deal!;
     const TIERS = ['', 'Bronze', 'Silver', 'Gold', 'Platinum'];
-    const filtered = middlemen.filter(m => (mmFilter.minRating === 0 || m.reviewScore >= mmFilter.minRating));
+    const filtered = middlemen
+      // คนกลางต้องไม่ใช่ผู้ซื้อหรือผู้ขายในดีลนี้ (3 บทบาทต้องเป็นคนละคน)
+      .filter(m => m.userId !== currentDeal.buyerId && m.userId !== currentDeal.sellerId)
+      .filter(m => (mmFilter.minRating === 0 || m.reviewScore >= mmFilter.minRating));
     const TIER_COLOR: Record<string, string> = { Bronze: '#cd7f32', Silver: '#a0a0a0', Gold: '#f5b13d', Platinum: '#9db5c9' };
 
     return (
