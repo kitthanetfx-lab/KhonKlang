@@ -10,10 +10,11 @@ const EF_NODES: Record<string, { x: number; y: number; label: string; icon: stri
 
 interface Seg { key: string; dur: number; from?: string; to?: string; ctrl?: { x: number; y: number }; hold?: boolean; icon: string; color: string; label: string; sub: string; }
 const EF_SEGMENTS: Seg[] = [
-  { key: 'pay',     dur: 1700, from: 'buyer',  to: 'vault',  ctrl: { x: 22, y: 54 }, icon: 'coins',   color: 'var(--blue-500)',  label: 'ผู้ซื้อชำระเงินเข้าระบบ',     sub: 'เงินถูกพักไว้ ยังไม่ถึงผู้ขาย' },
-  { key: 'hold',    dur: 1500, hold: true,                                            icon: 'lock',    color: 'var(--green-500)', label: 'คนกลางพักเงินไว้ปลอดภัย',     sub: 'ตรวจสอบตัวตนผู้ขายเรียบร้อย' },
-  { key: 'ship',    dur: 1700, from: 'seller', to: 'buyer',  ctrl: { x: 50, y: 2 },  icon: 'package', color: 'var(--accent)',    label: 'ผู้ขายส่งของ • ผู้ซื้อตรวจรับ', sub: 'ยืนยันว่าได้ของตรงปกแล้ว' },
-  { key: 'release', dur: 1700, from: 'vault',  to: 'seller', ctrl: { x: 78, y: 54 }, icon: 'coins',   color: 'var(--green-500)', label: 'ระบบปล่อยเงินให้ผู้ขายอัตโนมัติ', sub: 'จบดีลอย่างปลอดภัยทั้งสองฝ่าย' },
+  { key: 'pay',       dur: 1700, from: 'buyer',  to: 'vault',  ctrl: { x: 22, y: 54 }, icon: 'coins',   color: 'var(--blue-500)',  label: 'ผู้ซื้อโอนเงินเข้าแอปคนกลาง.com', sub: 'เงินพักไว้ที่ระบบคนกลาง ยังไม่ถึงผู้ขาย' },
+  { key: 'guarantee', dur: 1600, from: 'seller', to: 'vault',  ctrl: { x: 78, y: 54 }, icon: 'shieldCheck', color: 'var(--amber-500)', label: 'ผู้ขายกดส่ง • ล็อกประกันโดยคนกลาง', sub: 'ระบบนำวงเงินประกันของคนกลางเท่าราคาสินค้า' },
+  { key: 'ship_in',   dur: 1700, from: 'seller', to: 'vault',  ctrl: { x: 78, y: 54 }, icon: 'package', color: 'var(--accent)',    label: 'ผู้ขายส่งสินค้าให้คนกลาง', sub: 'ส่งของจริงให้คนกลางรับไปตรวจสอบก่อน' },
+  { key: 'check',     dur: 1700, from: 'vault',  to: 'buyer',  ctrl: { x: 22, y: 54 }, icon: 'badgeCheck', color: 'var(--green-500)', label: 'คนกลางตรวจสภาพ + แพ็คส่งผู้ซื้อ', sub: 'เช็กของตรงปก แล้วส่งต่อให้ผู้ซื้อ' },
+  { key: 'release',   dur: 1700, from: 'vault',  to: 'seller', ctrl: { x: 78, y: 54 }, icon: 'coins',   color: 'var(--green-500)', label: 'ผู้ซื้อรับของ • จ่ายผู้ขาย + คืนประกัน', sub: 'โอนค่าสินค้าให้ผู้ขาย คืนวงเงินประกันคนกลาง' },
 ];
 
 function efBezier(a: {x:number;y:number}, c: {x:number;y:number}, b: {x:number;y:number}, t: number) {
@@ -57,16 +58,16 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
   } else { tokVisible = false; }
 
   const active: Record<string, boolean> = {
-    buyer:  s.key === 'pay' || s.key === 'ship',
-    seller: s.key === 'release' || s.key === 'ship',
-    vault:  s.key === 'pay' || s.key === 'hold' || s.key === 'release',
+    buyer:  s.key === 'pay' || s.key === 'check' || s.key === 'release',
+    seller: s.key === 'guarantee' || s.key === 'ship_in' || s.key === 'release',
+    vault:  s.key === 'pay' || s.key === 'guarantee' || s.key === 'ship_in' || s.key === 'check' || s.key === 'release',
   };
   const pct = ((seg + t) / EF_SEGMENTS.length) * 100;
 
   const lines = [
     { from: 'buyer',  to: 'vault',  c: { x: 22, y: 54 }, on: s.key === 'pay' },
-    { from: 'seller', to: 'vault',  c: { x: 78, y: 54 }, on: s.key === 'release' },
-    { from: 'seller', to: 'buyer',  c: { x: 50, y: 2 },  on: s.key === 'ship' },
+    { from: 'seller', to: 'vault',  c: { x: 78, y: 54 }, on: s.key === 'guarantee' || s.key === 'ship_in' || s.key === 'release' },
+    { from: 'vault',  to: 'buyer',  c: { x: 22, y: 54 }, on: s.key === 'check' },
   ];
   const pos = (k: string) => ({ left: EF_NODES[k].x + '%', top: EF_NODES[k].y + '%' });
 

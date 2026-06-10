@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -212,7 +211,7 @@ export default function MarketplaceDetailPage() {
             <section className="mkt-detail-gallery">
               <div className="mkt-detail-main">
                 {mainImage ? (
-                  <Image src={mainImage} alt={listing.title} fill sizes="(max-width: 1040px) 100vw, 560px" style={{ objectFit: 'cover' }} />
+                  <img src={mainImage} alt={listing.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <div className="mkt-detail-fallback"><Icon name="package" size={56} /></div>
                 )}
@@ -221,7 +220,7 @@ export default function MarketplaceDetailPage() {
                 <div className="mkt-detail-thumbs">
                   {images.map(src => (
                     <button key={src} type="button" className={`mkt-detail-thumb${mainImage === src ? ' active' : ''}`} onClick={() => setMainImage(src)}>
-                      <Image src={src} alt={listing.title} width={84} height={84} style={{ objectFit: 'cover' }} />
+                      <img src={src} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </button>
                   ))}
                 </div>

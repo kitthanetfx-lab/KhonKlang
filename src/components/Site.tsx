@@ -121,7 +121,10 @@ export function Nav({ active }: { active?: string }) {
   const [drawer, setDrawer] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const { user, loading, logout } = useUser();
-  useEffect(() => { document.body.style.overflow = drawer ? 'hidden' : ''; }, [drawer]);
+  useEffect(() => {
+    document.body.style.overflow = drawer ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [drawer]);
   const displayName = user?.prefs?.displayName || user?.name || 'บัญชีของฉัน';
   const shortName = displayName.length > 18 ? `${displayName.slice(0, 18)}...` : displayName;
   const profileItems: NavItem[] = [
@@ -175,7 +178,7 @@ export function Nav({ active }: { active?: string }) {
         <button className="nav-burger" onClick={() => setDrawer(true)} aria-label="เมนู"><Icon name="menu" size={22} /></button>
       </div>
 
-      <div className={`drawer-backdrop ${drawer ? 'open' : ''}`} onClick={() => setDrawer(false)} />
+        <div className={`drawer-backdrop ${drawer ? 'open' : ''}`} onClick={() => setDrawer(false)} />
       <aside className={`drawer ${drawer ? 'open' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <Logo sub={false} />
@@ -205,15 +208,15 @@ export function Nav({ active }: { active?: string }) {
         <div className="drawer-sep" />
         <div className="drawer-label">บริการผ่านคนกลาง</div>
         {NAV_SERVICES.map(s => (
-          <Link key={s.t} className="drawer-link" href={s.href}><Icon name={s.icon} /> {s.t}</Link>
+          <Link key={s.t} className="drawer-link" href={s.href} onClick={() => setDrawer(false)}><Icon name={s.icon} /> {s.t}</Link>
         ))}
         <div className="drawer-sep" />
-        <Link className="drawer-link" href="/marketplace"><Icon name="store" /> ตลาด</Link>
-        <Link className="drawer-link" href="/check-scam"><Icon name="search" /> เช็คคนโกง</Link>
+        <Link className="drawer-link" href="/marketplace" onClick={() => setDrawer(false)}><Icon name="store" /> ตลาด</Link>
+        <Link className="drawer-link" href="/check-scam" onClick={() => setDrawer(false)}><Icon name="search" /> เช็คคนโกง</Link>
         <div className="drawer-sep" />
         <div className="drawer-label">สมัครสมาชิก</div>
         {NAV_REGISTER.map(s => (
-          <Link key={s.t} className="drawer-link" href={s.href}><Icon name={s.icon} /> {s.t}</Link>
+          <Link key={s.t} className="drawer-link" href={s.href} onClick={() => setDrawer(false)}><Icon name={s.icon} /> {s.t}</Link>
         ))}
       </aside>
     </nav>

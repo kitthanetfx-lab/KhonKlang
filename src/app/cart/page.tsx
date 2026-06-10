@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Footer, Nav } from '@/components/Site';
@@ -73,7 +72,7 @@ export default function CartPage() {
                   <article key={item.dealId} className="cart-item">
                     <div className="cart-thumb">
                       {item.imageUrl ? (
-                        <Image src={item.imageUrl} alt={item.title} fill sizes="120px" style={{ objectFit: 'cover' }} />
+                        <img src={item.imageUrl} alt={item.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <div className="mkt-detail-fallback"><Icon name="package" size={32} /></div>
                       )}
