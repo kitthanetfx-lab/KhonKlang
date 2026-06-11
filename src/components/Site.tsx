@@ -251,31 +251,110 @@ export function Nav({ active }: { active?: string }) {
 
 /* ---------- Footer ---------- */
 const FOOT_COLS: { h: string; links: { t: string; href: string }[] }[] = [
-  { h: 'บริการ', links: [
-    { t: 'ซื้อขายผ่านกลาง', href: '/service/trade' },
-    { t: 'นัดรับผ่านกลาง', href: '/service/meetup' },
-    { t: 'ฝากขายผ่านกลาง', href: '/service/consign' },
-    { t: 'บริการนัดออนไซต์', href: '/service/onsite' },
-  ] },
-  { h: 'ตลาด', links: [
-    { t: 'ประกาศหาสินค้า', href: '/wanted' },
-    { t: 'สินค้ามือสอง', href: '/marketplace' },
-    { t: 'แบรนด์เนม', href: '/marketplace' },
-    { t: 'ไอดีเกม', href: '/marketplace' },
-    { t: 'ของสะสม', href: '/marketplace' },
-    { t: 'เหมาสวน/ค้าส่ง', href: '/marketplace' },
-  ] },
-  { h: 'ช่วยเหลือ', links: [
-    { t: 'วิธีใช้งาน', href: '/how-it-works' },
-    { t: 'เช็คคนโกง', href: '/check-scam' },
-    { t: 'ค่าธรรมเนียม', href: '/fees' },
-    { t: 'คำถามที่พบบ่อย', href: '/faq' },
-    { t: 'ติดต่อทีมงาน', href: '/contact' },
-  ] },
+  {
+    h: 'บริการ',
+    links: [
+      { t: 'ซื้อขายผ่านกลาง', href: '/service/trade' },
+      { t: 'นัดรับผ่านกลาง', href: '/service/meetup' },
+      { t: 'ฝากขายผ่านกลาง', href: '/service/consign' },
+      { t: 'บริการนัดออนไซต์', href: '/service/onsite' },
+    ],
+  },
+  {
+    h: 'ตลาด',
+    links: [
+      { t: 'ประกาศหาสินค้า', href: '/wanted' },
+      { t: 'สินค้ามือสอง', href: '/marketplace' },
+      { t: 'แบรนด์เนม', href: '/marketplace' },
+      { t: 'ไอดีเกม', href: '/marketplace' },
+      { t: 'ของสะสม', href: '/marketplace' },
+      { t: 'ค้าส่ง/เหมาสวน', href: '/marketplace' },
+    ],
+  },
+  {
+    h: 'ช่วยเหลือ',
+    links: [
+      { t: 'วิธีใช้งาน', href: '/how-it-works' },
+      { t: 'เช็คคนโกง', href: '/check-scam' },
+      { t: 'ค่าธรรมเนียม', href: '/fees' },
+      { t: 'คำถามที่พบบ่อย', href: '/faq' },
+      { t: 'ติดต่อทีมงาน', href: '/contact' },
+    ],
+  },
 ];
 
 export function Footer() {
   return (
     <footer className="footer">
       <div className="container" style={{ padding: '56px 22px 26px' }}>
-        <div style={{ display: 'grid', gap: 38, gridTemplateColumns: '1.4fr repeat(3, 1
+        <div
+          className="foot-grid"
+          style={{ display: 'grid', gap: 38, gridTemplateColumns: '1.4fr repeat(3, 1fr)' }}
+        >
+          <div>
+            <div className="logo" style={{ marginBottom: 14 }}>
+              <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}>
+                <Image src="/logo.png" alt="คนกลาง" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </span>
+              <span className="logo-word" style={{ color: '#fff' }}>
+                คนกลาง
+                <small style={{ color: 'rgba(255,255,255,.45)' }}>KHONKLANG</small>
+              </span>
+            </div>
+            <p style={{ color: '#9aa6c4', fontSize: 14, maxWidth: '34ch' }}>
+              แพลตฟอร์มซื้อขายปลอดภัยผ่านคนกลาง ช่วยลดความเสี่ยงในการโอนเงิน ตรวจรับสินค้า
+              และติดตามดีลได้ในที่เดียว
+            </p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+              <span
+                className="badge badge-green"
+                style={{
+                  background: 'rgba(46,192,127,.16)',
+                  color: '#7fe7b8',
+                  border: '1px solid rgba(46,192,127,.3)',
+                }}
+              >
+                <span className="dot" /> ระบบคุ้มครองดีล
+              </span>
+            </div>
+          </div>
+
+          {FOOT_COLS.map((c) => (
+            <div key={c.h}>
+              <h4>{c.h}</h4>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 11, fontSize: 14 }}>
+                {c.links.map((l) => (
+                  <li key={l.t}>
+                    <Link href={l.href}>{l.t}</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <hr style={{ border: 0, borderTop: '1px solid rgba(255,255,255,.1)', margin: '34px 0 18px' }} />
+
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 12,
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: 13,
+            color: '#8694b5',
+          }}
+        >
+          <span>© {new Date().getFullYear() + 543} Khonklang - ซื้อขายมั่นใจผ่านคนกลาง</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
+            <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
+            <Link href="/terms">เงื่อนไขการใช้งาน</Link>
+            <Link href="/cookies">นโยบายคุกกี้</Link>
+            <Link href="/status">สถานะระบบ</Link>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}

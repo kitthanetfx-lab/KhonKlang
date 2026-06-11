@@ -225,7 +225,11 @@ export default function DealRoom() {
   }, [sendPosition]);
 
   useEffect(() => () => { if (shareLocTimer.current) clearInterval(shareLocTimer.current); }, []);
-  useEffect(() => { if (deal?.status === 'completed' || deal?.status === 'cancelled') stopShareLoc(); }, [deal?.status, stopShareLoc]);
+  useEffect(() => {
+    if (deal?.status !== 'completed' && deal?.status !== 'cancelled') return;
+    const timer = window.setTimeout(() => { stopShareLoc(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [deal?.status, stopShareLoc]);
   const [mmFilter, setMmFilter] = useState({ q: '', province: '', tier: '', minRating: 0, need: '' });
   const [mmLoading, setMmLoading] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());

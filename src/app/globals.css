@@ -1848,7 +1848,9 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 /* ---- Address picker (ต/อ/จ) ---- */
 .addr-grid { display: grid; gap: 8px; grid-template-columns: 1fr 1fr 1fr; }
 @media (max-width: 640px){ .addr-grid { grid-template-columns: 1fr; } }
-.addr-grid select { width: 100%; font-family: var(--font-body); fo
+.addr-grid select { width: 100%; font-family: var(--font-body); font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; }
+.addr-grid select:disabled { opacity: .5; }
+.addr-grid select:focus { outline: none; box-shadow: var(--ring); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 /* ============================================================
    Payment methods box (QR พร้อมเพย์ + บัญชีบริษัท)
    ============================================================ */

@@ -15,7 +15,7 @@ export function AddressPicker({ value, onChange, compact }: {
   const [tambons, setTambons] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!value.province) { setAmphures([]); return; }
+    if (!value.province) return;
     let off = false;
     fetch(`/api/thai-address?type=amphures&province=${encodeURIComponent(value.province)}`)
       .then(r => r.json())
@@ -25,7 +25,7 @@ export function AddressPicker({ value, onChange, compact }: {
   }, [value.province]);
 
   useEffect(() => {
-    if (!value.province || !value.amphoe) { setTambons([]); return; }
+    if (!value.province || !value.amphoe) return;
     let off = false;
     fetch(`/api/thai-address?type=tambons&province=${encodeURIComponent(value.province)}&amphoe=${encodeURIComponent(value.amphoe)}`)
       .then(r => r.json())
@@ -33,6 +33,9 @@ export function AddressPicker({ value, onChange, compact }: {
       .catch(() => { if (!off) setTambons([]); });
     return () => { off = true; };
   }, [value.province, value.amphoe]);
+
+  const visibleAmphures = value.province ? amphures : [];
+  const visibleTambons = value.province && value.amphoe ? tambons : [];
 
   return (
     <div className={`addr-grid ${compact ? 'compact' : ''}`}>
@@ -42,11 +45,11 @@ export function AddressPicker({ value, onChange, compact }: {
       </select>
       <select value={value.amphoe} disabled={!value.province} onChange={e => onChange({ ...value, amphoe: e.target.value, tambon: '' })}>
         <option value="">อำเภอ/เขต...</option>
-        {amphures.map(a => <option key={a} value={a}>{a}</option>)}
+        {visibleAmphures.map(a => <option key={a} value={a}>{a}</option>)}
       </select>
       <select value={value.tambon} disabled={!value.amphoe} onChange={e => onChange({ ...value, tambon: e.target.value })}>
         <option value="">ตำบล/แขวง...</option>
-        {tambons.map(t => <option key={t} value={t}>{t}</option>)}
+        {visibleTambons.map(t => <option key={t} value={t}>{t}</option>)}
       </select>
     </div>
   );

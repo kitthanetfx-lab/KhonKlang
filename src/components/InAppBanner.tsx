@@ -9,7 +9,13 @@ import { detectInApp, IN_APP_LABEL, withExternalBrowserParam, tryAutoEscape, InA
  * ปิดได้ และจำการปิดไว้ตลอด session
  */
 export function InAppBanner() {
-  const [kind, setKind] = useState<InAppKind>('');
+  const [kind] = useState<InAppKind>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      if (sessionStorage.getItem('kk.iab.dismiss')) return '';
+    } catch {}
+    return detectInApp();
+  });
   const [hidden, setHidden] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -26,10 +32,8 @@ export function InAppBanner() {
           // กำลังเด้งออก — ยังแสดงแบนเนอร์ไว้เผื่อระบบบล็อกการเด้ง
         }
       }
-      if (sessionStorage.getItem('kk.iab.dismiss')) return;
     } catch {}
-    setKind(k);
-  }, []);
+  }, [kind]);
 
   if (!kind || hidden) return null;
 
