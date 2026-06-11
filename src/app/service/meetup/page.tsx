@@ -68,7 +68,7 @@ export default function MeetupPage() {
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: `นัดรับ+ประกันเดินทาง: ${title.trim()}`,
-          description: `จุดนัดพบ: ${calc.meetProv} · ประกันผู้ซื้อ ฿${calc.buyer.deposit.toLocaleString()} · ประกันผู้ขาย ฿${calc.seller.deposit.toLocaleString()}`,
+          description: `จุดนัดพบ: ${calc.meetProv} · ประกันผู้ซื้อ ฿${calc.deposit.toLocaleString()} · ประกันผู้ขาย ฿${calc.deposit.toLocaleString()}`,
           price: Number(price) || 0,
           category: 'นัดรับผ่านกลาง',
           creatorRole: myRole,
