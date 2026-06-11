@@ -1810,7 +1810,16 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .dm-empty p { font-family: var(--font-display); font-weight: 600; color: var(--muted); margin-top: 10px; font-size: 14.5px; }
 .dm-empty span { font-size: 12.5px; line-height: 1.6; display: block; margin-top: 4px; max-width: 32ch; margin-inline: auto; }
 @media (max-width: 800px){
-  .dm-layout { grid-template-columns: 1fr; height: calc(100vh - 130px);
+  .dm-layout { grid-template-columns: 1fr; height: calc(100vh - 130px); }
+  .dm-list { border-right: none; }
+  .dm-layout.has-active .dm-list { display: none; }
+  .dm-layout:not(.has-active) .dm-room { display: none; }
+  .dm-back { display: grid; }
+  .dm-room { min-height: 0; }
+  .dm-room-head { padding: 10px 12px; }
+  .dm-bar { padding: 10px 12px; }
+  .dm-safety { padding-inline: 12px; }
+}
 /* ---- Meetup guarantee calculator ---- */
 .mu-form { display: grid; gap: 16px; }
 .mu-grid { display: grid; gap: 13px; grid-template-columns: 1fr 1fr; }
