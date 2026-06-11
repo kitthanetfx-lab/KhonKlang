@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Icon } from './Icon';
 import { NotifyBell } from './NotifyBell';
 import { MessengerIcon } from './MessengerIcon';
+import { InAppBanner } from './InAppBanner';
 import { useUser } from '@/lib/useUser';
 
 /* ---------- hooks ---------- */
@@ -156,6 +157,7 @@ export function Nav({ active }: { active?: string }) {
 
   return (
     <nav className={`nav ${scrolled ? 'scrolled' : ''}`}>
+      <InAppBanner />
       <div className="container nav-inner">
         <Logo />
         <div className="nav-links">
@@ -276,37 +278,4 @@ export function Footer() {
   return (
     <footer className="footer">
       <div className="container" style={{ padding: '56px 22px 26px' }}>
-        <div style={{ display: 'grid', gap: 38, gridTemplateColumns: '1.4fr repeat(3, 1fr)' }} className="foot-grid">
-          <div>
-            <div className="logo" style={{ marginBottom: 14 }}>
-              <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}><Image src="/logo.png" alt="คนกลาง" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></span>
-              <span className="logo-word" style={{ color: '#fff' }}>คนกลาง<small style={{ color: 'rgba(255,255,255,.45)' }}>KHONKLANG</small></span>
-            </div>
-            <p style={{ color: '#9aa6c4', fontSize: 14, maxWidth: '34ch' }}>แพลตฟอร์มซื้อขายปลอดภัยผ่านคนกลางที่ผ่านการรับรอง พักเงินไว้กับระบบจนกว่าจะได้รับของจริง</p>
-            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-              <span className="badge badge-green" style={{ background: 'rgba(46,192,127,.16)', color: '#7fe7b8', border: '1px solid rgba(46,192,127,.3)' }}><span className="dot" /> ระบบทำงานปกติ</span>
-            </div>
-          </div>
-          {FOOT_COLS.map(c => (
-            <div key={c.h}>
-              <h4>{c.h}</h4>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 11, fontSize: 14 }}>
-                {c.links.map(l => <li key={l.t}><Link href={l.href}>{l.t}</Link></li>)}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <hr style={{ border: 0, borderTop: '1px solid rgba(255,255,255,.1)', margin: '34px 0 18px' }} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: '#8694b5' }}>
-          <span>© {new Date().getFullYear() + 543} Khonklang — ซื้อขายมั่นใจ ไร้กังวล</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
-            <Link href="/privacy">ความเป็นส่วนตัว</Link>
-            <Link href="/terms">เงื่อนไขการใช้งาน</Link>
-            <Link href="/cookies">นโยบายคุกกี้</Link>
-            <Link href="/status">สถานะระบบ</Link>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
+        <div style={{ display: 'grid', gap: 38, gridTemplateColumns: '1.4fr repeat(3, 1

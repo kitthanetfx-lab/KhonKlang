@@ -8,6 +8,9 @@ import { Icon } from '@/components/Icon';
 import { ReviewPanel } from '@/components/ReviewPanel';
 import { NotifyBell } from '@/components/NotifyBell';
 import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
+import { PaymentMethods } from '@/components/PaymentMethods';
+import { InAppBanner } from '@/components/InAppBanner';
+import { withExternalBrowserParam } from '@/lib/inApp';
 import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
 
@@ -114,6 +117,8 @@ interface MeetupData {
   buyerProvince?: string; sellerProvince?: string; meetProvince?: string; // ดีลเก่า v1
   buyerKm?: number; sellerKm?: number; ratePerKm?: number;
   deposit?: number; // เงินประกันเท่ากันทั้งสองฝ่าย (ตกลงกันในห้องดีล)
+  buyerDepartedAt?: string; sellerDepartedAt?: string; // เวลาเริ่มออกเดินทาง
+  buyerPos?: { lat: number; lng: number; at: string }; sellerPos?: { lat: number; lng: number; at: string }; // ตำแหน่งล่าสุดระหว่างเดินทาง
   pendingDeposit?: number; pendingBy?: 'buyer' | 'seller'; // ข้อเสนอที่รออีกฝ่ายยอมรับ
   buyerDeposit?: number; sellerDeposit?: number; // รองรับดีลเก่า
   fee?: number; feeWho?: string; buyerFee?: number; sellerFee?: number;
@@ -187,6 +192,40 @@ export default function DealRoom() {
   const [showSelectMM, setShowSelectMM] = useState(false);
   const [uploadPreview, setUploadPreview] = useState<{ url: string; name: string } | null>(null);
   const [meetAddr, setMeetAddr] = useState<ThaiAddress>(EMPTY_ADDRESS); // ที่อยู่ของฉัน (ดีลนัดรับ)
+  const [payOpen, setPayOpen] = useState(false); // เปิดกล่องช่องทางชำระเงินก่อนอัปสลิป
+  const [sharingLoc, setSharingLoc] = useState(false); // กำลังแชร์ตำแหน่งระหว่างเดินทาง
+  const shareLocTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ส่งตำแหน่งแบบเงียบ (ไม่ลงแชท/ไม่แจ้งเตือน) — อีกฝ่ายเห็นในแผงนัดรับผ่านรอบโพลปกติ
+  const sendPosition = useCallback(async () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        const j = (await account.createJWT()).jwt;
+        await fetch(`/api/deals/${dealId}`, {
+          method: 'PATCH',
+          headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'meetup_position', lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        });
+      } catch { /* เงียบ */ }
+    }, () => { /* ผู้ใช้ไม่อนุญาต */ }, { enableHighAccuracy: false, maximumAge: 30000, timeout: 15000 });
+  }, [dealId]);
+
+  const stopShareLoc = useCallback(() => {
+    if (shareLocTimer.current) { clearInterval(shareLocTimer.current); shareLocTimer.current = null; }
+    setSharingLoc(false);
+  }, []);
+
+  const startShareLoc = useCallback(() => {
+    if (!navigator.geolocation) { alert('เบราว์เซอร์นี้ไม่รองรับการแชร์ตำแหน่ง'); return; }
+    if (shareLocTimer.current) return;
+    sendPosition(); // ส่งทันทีครั้งแรก (เบราว์เซอร์จะถามสิทธิ์ตำแหน่ง)
+    shareLocTimer.current = setInterval(sendPosition, 45000);
+    setSharingLoc(true);
+  }, [sendPosition]);
+
+  useEffect(() => () => { if (shareLocTimer.current) clearInterval(shareLocTimer.current); }, []);
+  useEffect(() => { if (deal?.status === 'completed' || deal?.status === 'cancelled') stopShareLoc(); }, [deal?.status, stopShareLoc]);
   const [mmFilter, setMmFilter] = useState({ q: '', province: '', tier: '', minRating: 0, need: '' });
   const [mmLoading, setMmLoading] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());
@@ -337,7 +376,8 @@ export default function DealRoom() {
     } finally { endUploadPreview(purl); }
   }
 
-  async function copyLink() { await navigator.clipboard.writeText(window.location.href).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+  // ลิงก์แชร์พ่วง openExternalBrowser=1 — ผู้รับที่เปิดจาก LINE จะเด้งไปเบราว์เซอร์หลักอัตโนมัติ
+  async function copyLink() { await navigator.clipboard.writeText(withExternalBrowserParam(window.location.href)).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000); }
 
   /** เปิด/ปิดวิดีโอคอล — ตอนเปิดจะแจ้งเตือนทุกฝ่ายในดีล (กันสแปม: แจ้งซ้ำได้ทุก 2 นาที) */
   function toggleCall() {
@@ -409,6 +449,7 @@ export default function DealRoom() {
     }
     return (
       <div className="dr-root">
+        <InAppBanner />
         <header className="dr-header">
           <Link href="/" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
           <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div></div>
@@ -513,9 +554,9 @@ export default function DealRoom() {
     const md = parseMeetup(deal!.meetupData);
     // เงินประกันเท่ากันทั้งสองฝ่าย (fallback รองรับดีลเก่าที่แยกยอด)
     const depositEach = md.deposit ?? Math.max(md.buyerDeposit || 0, md.sellerDeposit || 0);
-    const rows: { side: 'buyer' | 'seller'; label: string; prov?: string; km?: number; fee?: number; slip?: string; met?: boolean }[] = [
-      { side: 'buyer', label: '🛍️ ผู้ซื้อ', prov: md.buyerProvince, km: md.buyerKm, fee: md.buyerFee, slip: md.buyerSlip, met: md.buyerMet },
-      { side: 'seller', label: '🛒 ผู้ขาย', prov: md.sellerProvince, km: md.sellerKm, fee: md.sellerFee, slip: md.sellerSlip, met: md.sellerMet },
+    const rows: { side: 'buyer' | 'seller'; label: string; prov?: string; km?: number; fee?: number; slip?: string; met?: boolean; departedAt?: string; pos?: { lat: number; lng: number; at: string } }[] = [
+      { side: 'buyer', label: '🛍️ ผู้ซื้อ', prov: md.buyerProvince, km: md.buyerKm, fee: md.buyerFee, slip: md.buyerSlip, met: md.buyerMet, departedAt: md.buyerDepartedAt, pos: md.buyerPos },
+      { side: 'seller', label: '🛒 ผู้ขาย', prov: md.sellerProvince, km: md.sellerKm, fee: md.sellerFee, slip: md.sellerSlip, met: md.sellerMet, departedAt: md.sellerDepartedAt, pos: md.sellerPos },
     ];
     const s = deal!.status;
     const depositStage = s === 'payment_pending';
@@ -642,28 +683,72 @@ export default function DealRoom() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12.5, color: r.slip ? 'var(--green-600)' : 'var(--faint)' }}>
                   {r.slip ? '✅ วางเงินประกันแล้ว' : '⏳ ยังไม่วางเงินประกัน'}
-                  {meetStage || s === 'completed' ? (r.met ? ' · ✅ ยืนยันเจอแล้ว' : ' · ⏳ ยังไม่ยืนยันนัดเจอ') : ''}
+                  {meetStage || s === 'completed'
+                    ? (r.met ? ' · ✅ เจอกันแล้ว' : r.departedAt ? ' · 🚗 กำลังเดินทาง' : ' · ⏳ ยังไม่ออกเดินทาง')
+                    : ''}
                 </span>
                 {depositStage && myRole === r.side && !r.slip && !md.pendingDeposit && !!md.deposit && (
-                  <label className="btn btn-green btn-sm" style={{ cursor: 'pointer' }}>
-                    📎 อัปสลิปวางประกัน ฿{(depositEach + (r.fee || 0)).toLocaleString()}
-                    <input type="file" accept="image/*,.pdf" style={{ display: 'none' }}
-                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadMeetupSlip(f); e.target.value = ''; }} />
-                  </label>
-                )}
-                {meetStage && myRole === r.side && !r.met && (
-                  <button className="btn btn-green btn-sm" disabled={acting} onClick={() => { if (confirm('ยืนยันว่านัดเจอกันสำเร็จแล้ว?')) doAction('meetup_met'); }}>
-                    ✅ ยืนยันนัดเจอสำเร็จ
+                  <button type="button" className="btn btn-green btn-sm" onClick={() => setPayOpen(v => !v)}>
+                    💳 ชำระเงินประกัน ฿{(depositEach + (r.fee || 0)).toLocaleString()}
                   </button>
+                )}
+                {/* ลำดับ: เริ่มออกเดินทางก่อน → ค่อยยืนยันนัดเจอ (โอนเสร็จไม่ได้แปลว่าออกเดินทางทันที) */}
+                {meetStage && myRole === r.side && !r.departedAt && (
+                  <button className="btn btn-primary btn-sm" disabled={acting} onClick={() => {
+                    if (!confirm('เริ่มออกเดินทางตอนนี้? อีกฝ่ายจะได้รับแจ้งเตือนทันที')) return;
+                    doAction('meetup_depart');
+                    if (confirm('แชร์ตำแหน่งให้คู่ดีลเห็นระหว่างเดินทางไหม?\n(อัปเดตทุก ~45 วินาที เฉพาะตอนเปิดหน้านี้ — ปิดได้ตลอด)')) startShareLoc();
+                  }}>🚗 เริ่มออกเดินทาง</button>
+                )}
+                {meetStage && myRole === r.side && !!r.departedAt && !r.met && (
+                  <>
+                    <button className="btn btn-green btn-sm" disabled={acting} onClick={() => { if (confirm('ยืนยันว่านัดเจอกันสำเร็จแล้ว?')) { stopShareLoc(); doAction('meetup_met'); } }}>
+                      ✅ ยืนยันนัดเจอสำเร็จ
+                    </button>
+                    <button className="btn btn-ghost btn-sm" type="button" onClick={() => (sharingLoc ? stopShareLoc() : startShareLoc())}>
+                      {sharingLoc ? '🛰️ กำลังแชร์ตำแหน่ง — กดเพื่อหยุด' : '🛰️ แชร์ตำแหน่งให้อีกฝ่าย'}
+                    </button>
+                  </>
                 )}
                 {r.slip && <a href={fileUrl(r.slip)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--accent-strong)', textDecoration: 'underline' }}>ดูสลิป</a>}
               </div>
+              {/* สถานะการเดินทาง: เวลาออกเดินทาง + ตำแหน่งล่าสุด (เปิดดูแผนที่ได้) */}
+              {(meetStage || s === 'completed') && r.departedAt && (
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--line)' }}>
+                  🚗 ออกเดินทางเมื่อ {new Date(r.departedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+                  {r.pos && !r.met && (
+                    <>
+                      {' '}· 🛰️ ตำแหน่งล่าสุด {Math.max(0, Math.floor((nowTs - new Date(r.pos.at).getTime()) / 60000))} นาทีที่แล้ว —{' '}
+                      <a href={`https://www.google.com/maps?q=${r.pos.lat},${r.pos.lng}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-strong)', textDecoration: 'underline' }}>
+                        เปิดดูแผนที่
+                      </a>
+                    </>
+                  )}
+                  {!r.pos && !r.met && myRole !== r.side && ' · อีกฝ่ายยังไม่ได้แชร์ตำแหน่ง'}
+                </div>
+              )}
             </div>
           ))}
         </div>
-        {depositStage && (
-          <p style={{ fontSize: 12.5, color: 'var(--amber-500)', marginTop: 12 }}>⚠️ โอนเข้าบัญชี บริษัท คนกลาง จำกัด — ติดต่อทีมงานเพื่อรับข้อมูลการโอน แล้วอัปสลิปของฝ่ายตัวเอง</p>
-        )}
+        {/* กล่องชำระเงิน: เด้ง QR/บัญชีบริษัทก่อน แล้วค่อยปุ่มอัปสลิป */}
+        {depositStage && payOpen && isParty && !md.pendingDeposit && !!md.deposit && (() => {
+          const myFee = myRole === 'buyer' ? (md.buyerFee || 0) : (md.sellerFee || 0);
+          const mySlip = myRole === 'buyer' ? md.buyerSlip : md.sellerSlip;
+          if (mySlip) return null;
+          return (
+            <div style={{ marginTop: 12 }}>
+              <PaymentMethods
+                amount={depositEach + myFee}
+                note={`เงินประกัน ฿${depositEach.toLocaleString()} + ค่าธรรมเนียม ฿${myFee.toLocaleString()} — มาตามนัดได้เงินประกันคืน ฿${depositEach.toLocaleString()} เต็มจำนวน`}
+              />
+              <label className="btn btn-green btn-block" style={{ cursor: 'pointer', marginTop: 10 }}>
+                📎 โอนแล้ว — อัปโหลดสลิปวางประกัน
+                <input type="file" accept="image/*,.pdf" style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadMeetupSlip(f); e.target.value = ''; }} />
+              </label>
+            </div>
+          );
+        })()}
         {meetStage && (
           <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 12 }}>✅ เงินประกันครบทั้งสองฝ่าย — นัดเจอกันที่ {md.meetProvince} เมื่อเจอกันแล้วให้กดยืนยันทั้งคู่</p>
         )}
@@ -682,10 +767,17 @@ export default function DealRoom() {
       <div className="dr-card dr-pay-card">
         <div className="dr-card-title">💳 ชำระเงินค่าสินค้า</div>
         <div className="dr-pay-amount">฿{deal!.price.toLocaleString()}</div>
-        <div className="dr-pay-to">โอนให้คนกลาง — {deal!.middlemanName}</div>
-        <div style={{ fontSize: 12.5, color: 'var(--amber-500)' }}>⚠️ ติดต่อคนกลางเพื่อรับข้อมูลการชำระเงิน (PromptPay/บัญชี)</div>
         {deal!.status === 'payment_pending' && myRole === 'buyer' && (
-          <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 14 }}>📎 อัปโหลดสลิปหลังโอน</button>
+          <>
+            <PaymentMethods
+              amount={deal!.price}
+              note={`เงินจะพักไว้กับ บริษัท คนกลาง จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`}
+            />
+            <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
+          </>
+        )}
+        {deal!.status === 'payment_pending' && myRole !== 'buyer' && (
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>รอผู้ซื้อโอนเงินเข้าระบบพักเงินของบริษัท</div>
         )}
         {deal!.status === 'payment_uploaded' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — รอคนกลางยืนยัน</div>}
         <input ref={evidInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }}
@@ -763,6 +855,7 @@ export default function DealRoom() {
   // ─── Main render ─────────────────────────────────────────────────────────
   return (
     <div className="dr-root">
+      <InAppBanner />
       <header className="dr-header">
         <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
         <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{STEP_LABEL[deal.status]} · ฿{deal.price.toLocaleString()}</div></div>

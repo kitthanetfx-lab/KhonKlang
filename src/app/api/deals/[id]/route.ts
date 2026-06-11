@@ -260,6 +260,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
         break;
       }
+      case 'meetup_depart': {
+        // กดเริ่มออกเดินทาง — แจ้งอีกฝ่ายทันที (โอนเสร็จไม่ได้แปลว่าออกเดินทางเลย)
+        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (deal.status !== 'meetup_ready') return NextResponse.json({ error: 'ต้องวางเงินประกันครบทั้งสองฝ่ายก่อน' }, { status: 400 });
+        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
+        if (isBuyer) md.buyerDepartedAt = new Date().toISOString();
+        else md.sellerDepartedAt = new Date().toISOString();
+        updates.meetupData = JSON.stringify(md);
+        systemMsg = `🚗 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เริ่มออกเดินทางแล้ว — มุ่งหน้าสู่จุดนัดพบ`;
+        break;
+      }
+      case 'meetup_position': {
+        // อัปเดตตำแหน่งระหว่างเดินทาง (เงียบ — ไม่ลงแชท ไม่แจ้งเตือน อีกฝ่ายเห็นในแผงนัดรับ)
+        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const lat = Number(body.lat), lng = Number(body.lng);
+        if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180)
+          return NextResponse.json({ error: 'พิกัดไม่ถูกต้อง' }, { status: 400 });
+        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
+        const pos = { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5, at: new Date().toISOString() };
+        if (isBuyer) md.buyerPos = pos; else md.sellerPos = pos;
+        updates.meetupData = JSON.stringify(md);
+        // ไม่ตั้ง systemMsg — อัปเดตเงียบ
+        break;
+      }
       case 'meetup_met': {
         if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

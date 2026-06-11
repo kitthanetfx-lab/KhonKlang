@@ -1848,6 +1848,51 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 /* ---- Address picker (ต/อ/จ) ---- */
 .addr-grid { display: grid; gap: 8px; grid-template-columns: 1fr 1fr 1fr; }
 @media (max-width: 640px){ .addr-grid { grid-template-columns: 1fr; } }
-.addr-grid select { width: 100%; font-family: var(--font-body); font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; }
-.addr-grid select:disabled { opacity: .5; }
-.addr-grid select:focus { outline: none; box-shadow: var(--ring); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.addr-grid select { width: 100%; font-family: var(--font-body); fo
+/* ============================================================
+   Payment methods box (QR พร้อมเพย์ + บัญชีบริษัท)
+   ============================================================ */
+.pm-box { background: var(--surface); border: 1.5px solid color-mix(in srgb, var(--green-500) 35%, var(--line)); border-radius: var(--r-md); padding: 14px 16px; }
+.pm-head { font-family: var(--font-display); font-weight: 700; font-size: 14.5px; color: var(--ink); margin-bottom: 4px; }
+.pm-amount { font-size: 13.5px; color: var(--ink-2); margin-bottom: 12px; }
+.pm-amount b { font-family: var(--font-display); font-size: 18px; color: var(--green-600); }
+.pm-qr-wrap { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; padding: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.pm-qr { width: 150px; height: 150px; max-width: 100%; border-radius: 8px; background: #fff; border: 1px solid var(--line); flex: 0 0 auto; }
+.pm-qr-acts { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 8px; }
+.pm-label { font-size: 12px; font-weight: 700; color: var(--muted); font-family: var(--font-display); letter-spacing: .02em; }
+.pm-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--ink-2); }
+.pm-num { font-weight: 700; font-size: 15px; color: var(--ink); overflow-wrap: anywhere; }
+.pm-bank { margin-top: 12px; padding: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 6px; }
+.pm-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin-top: 10px; }
+
+/* ============================================================
+   Mobile overflow fixes — กันตัวหนังสือ/วัตถุล้นขอบจอ
+   ============================================================ */
+html, body { overflow-x: hidden; max-width: 100%; }
+.dr-root, .sub-page, .page-body, .dm-shell { overflow-x: clip; }
+.dr-card, .csr-card, .od-card, .wt-card, .prose-card, .mu-result, .mu-note, .mu-side,
+.svc-card, .dr-sys-msg, .nb-tx, .dm-bubble, .dr-bubble, .pm-box, .rv-row, .contact-card,
+.faq-item, .csr-hit, .dr-tl-label { overflow-wrap: anywhere; min-width: 0; }
+.dr-inner > *, .dr-card > * { min-width: 0; }
+.dr-header-info { min-width: 0; flex: 1; }
+.dr-htitle, .dr-hsub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.dr-hctas { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+@media (max-width: 640px) {
+  /* ปุ่มข้อความยาว (เช่น ข้อเสนอจุดนัด/อัปสลิป) ห้ามดันจอ — ให้ตัดบรรทัดแทน */
+  .btn { white-space: normal; line-height: 1.4; }
+  .nav-link, .chip, .svc-chip, .cs-tab, .dm-bar button { white-space: nowrap; } /* ตัวสั้นคงเดิม */
+  .svc-who-chips { flex-wrap: wrap; }
+  .ef-float-1 { left: 2px; } .ef-float-2 { right: 2px; }
+  .ef-head { padding: 10px 12px; }
+  .wt-card-head, .od-head, .csr-hit-head { row-gap: 5px; }
+  .mu-deposit-band, .dr-call-banner { row-gap: 4px; }
+  .pm-qr { margin: 0 auto; }
+}
+
+/* ---- In-app browser banner (LINE/Messenger WebView) ---- */
+.iab-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 9px 14px; background: #fef5e3; border-bottom: 1px solid #fbe6bf; font-size: 12.5px; color: #9a6209; line-height: 1.5; }
+.iab-tx { flex: 1; min-width: 200px; overflow-wrap: anywhere; }
+.iab-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.iab-hint { font-size: 11.5px; color: #b97608; }
+.iab-btn { border: 1px solid #fbe6bf; background: #fff; color: #9a6209; border-radius: var(--r-pill); padding: 6px 13px; font-family: var(--font-display); font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.iab-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }

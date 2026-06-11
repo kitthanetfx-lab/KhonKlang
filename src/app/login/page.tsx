@@ -5,6 +5,8 @@ import { OAuthProvider } from 'appwrite';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { InAppBanner } from '@/components/InAppBanner';
+import { detectInApp } from '@/lib/inApp';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -19,6 +21,11 @@ function LoginForm() {
   const returnTo = searchParams.get('returnTo') || '/register';
 
   const handleLogin = async (provider: 'google' | 'facebook') => {
+    // Google ปฏิเสธ OAuth ในเบราว์เซอร์ภายในแอป (LINE/Messenger) — แนะนำ LINE login หรือเปิดเบราว์เซอร์หลัก
+    if (provider === 'google' && detectInApp()) {
+      alert('Google ไม่อนุญาตให้ล็อกอินผ่านเบราว์เซอร์ใน LINE/Messenger\n\nแนะนำ: เข้าสู่ระบบด้วย LINE (ใช้ได้เลย) หรือกด "เปิดในเบราว์เซอร์" จากแถบด้านบน');
+      return;
+    }
     try {
       const authProvider = provider === 'google' ? OAuthProvider.Google : OAuthProvider.Facebook;
       account.createOAuth2Session(
@@ -32,6 +39,8 @@ function LoginForm() {
   };
 
   return (
+    <>
+    <InAppBanner />
     <main className="login-page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div className="login-card">
         <div style={{ position: 'relative', zIndex: 1 }}>
@@ -96,6 +105,7 @@ function LoginForm() {
         </div>
       </div>
     </main>
+    </>
   );
 }
 

@@ -50,6 +50,7 @@ export async function PATCH(req: NextRequest) {
       phone:     phone.trim(),
       address:   address || '',
       displayName,
+      profileUpdatedAt: new Date().toISOString(), // ใช้ตัดสินว่าโปรไฟล์บัญชีไหนใหม่สุดตอน sync ข้ามช่องทาง login
     };
 
     // Update Appwrite account name + prefs

@@ -33,7 +33,22 @@ export function useUser() {
   useEffect(() => {
     hydratePersistedSession();
     account.get()
-      .then((u) => setUser(u as AppUser))
+      .then(async (u) => {
+        setUser(u as AppUser);
+        // Sync โปรไฟล์ข้ามช่องทาง login (อีเมลเดียวกัน = สมาชิกเดียวกัน) — ครั้งเดียวต่อ session
+        try {
+          if (!sessionStorage.getItem('kk.psync')) {
+            sessionStorage.setItem('kk.psync', '1');
+            const jwt = (await account.createJWT()).jwt;
+            const r = await fetch('/api/profile/sync', { method: 'POST', headers: { 'x-session-jwt': jwt } });
+            const d = await r.json().catch(() => ({} as { updated?: boolean }));
+            if (d?.updated) {
+              const fresh = await account.get();
+              setUser(fresh as AppUser);
+            }
+          }
+        } catch { /* sync ล้มเหลวไม่กระทบการใช้งาน */ }
+      })
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
