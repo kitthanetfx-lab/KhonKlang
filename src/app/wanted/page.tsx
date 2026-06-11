@@ -258,6 +258,11 @@ export default function WantedPage() {
                       </button>
                     )}
                     {!mine && (
+                      <Link className="btn btn-soft btn-sm" href={`/service/meetup?step=2&role=seller&title=${encodeURIComponent(p.title)}&wantedId=${p.$id}&inviteUserId=${p.userId}`}>
+                        🚗 นัดรับขาย
+                      </Link>
+                    )}
+                    {!mine && (
                       <Link className="btn btn-ghost btn-sm" href={`/messages?to=${p.userId}&name=${encodeURIComponent(p.userName || 'สมาชิก')}`}>
                         <Icon name="message" size={15} /> ส่งข้อความ
                       </Link>

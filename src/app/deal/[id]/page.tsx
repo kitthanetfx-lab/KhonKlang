@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { ReviewPanel } from '@/components/ReviewPanel';
 import { NotifyBell } from '@/components/NotifyBell';
+import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
+import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -106,9 +108,12 @@ interface Deal {
 
 /** ข้อมูลรับประกันเดินทาง (เก็บเป็น JSON ใน deal.meetupData) */
 interface MeetupData {
-  buyerProvince?: string; sellerProvince?: string; meetProvince?: string;
+  v?: number;
+  buyerLoc?: ThaiAddress; sellerLoc?: ThaiAddress; // ที่อยู่ระดับ ต/อ/จ ของแต่ละฝ่าย (v2)
+  meetLabel?: string; pendingMeetLabel?: string;   // จุดนัดพบที่ตกลง/ที่เสนอ
+  buyerProvince?: string; sellerProvince?: string; meetProvince?: string; // ดีลเก่า v1
   buyerKm?: number; sellerKm?: number; ratePerKm?: number;
-  deposit?: number; // เงินประกันเท่ากันทั้งสองฝ่าย (ต่อรองได้)
+  deposit?: number; // เงินประกันเท่ากันทั้งสองฝ่าย (ตกลงกันในห้องดีล)
   pendingDeposit?: number; pendingBy?: 'buyer' | 'seller'; // ข้อเสนอที่รออีกฝ่ายยอมรับ
   buyerDeposit?: number; sellerDeposit?: number; // รองรับดีลเก่า
   fee?: number; feeWho?: string; buyerFee?: number; sellerFee?: number;
@@ -181,6 +186,7 @@ export default function DealRoom() {
   const [dealError, setDealError] = useState('');
   const [showSelectMM, setShowSelectMM] = useState(false);
   const [uploadPreview, setUploadPreview] = useState<{ url: string; name: string } | null>(null);
+  const [meetAddr, setMeetAddr] = useState<ThaiAddress>(EMPTY_ADDRESS); // ที่อยู่ของฉัน (ดีลนัดรับ)
   const [mmFilter, setMmFilter] = useState({ q: '', province: '', tier: '', minRating: 0, need: '' });
   const [mmLoading, setMmLoading] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());
@@ -518,41 +524,102 @@ export default function DealRoom() {
     const noSlipsYet = !md.buyerSlip && !md.sellerSlip;
     const canNegotiate = isParty && noSlipsYet && ['posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending', 'payment_pending'].includes(s);
 
-    function proposeDeposit() {
-      const v = prompt(`เสนอยอดเงินประกันใหม่ (บาท/ฝ่าย)\nยอดปัจจุบัน: ฿${depositEach.toLocaleString()}`, String(depositEach));
+    function proposeDeposit(meetLabel?: string, suggested?: number) {
+      const v = prompt(
+        `${meetLabel ? `จุดนัด: ${meetLabel}\n` : ''}เสนอยอดเงินประกัน (บาท/ฝ่าย — เท่ากันทั้งคู่)`,
+        String(suggested || depositEach || 500),
+      );
       if (v === null) return;
       const amount = Math.round(Number(v));
       if (!(amount >= 50)) { alert('กรอกตัวเลขขั้นต่ำ ฿50'); return; }
-      doAction('meetup_propose', { amount });
+      doAction('meetup_propose', meetLabel ? { amount, meetLabel } : { amount });
     }
+
+    // ข้อมูลที่อยู่สองฝ่าย + ตัวเลขแนะนำ (จากระยะระดับจังหวัด — ของจริงตกลงกันเอง)
+    const myLoc = myRole === 'buyer' ? md.buyerLoc : myRole === 'seller' ? md.sellerLoc : undefined;
+    const bothLocs = !!(md.buyerLoc?.province && md.sellerLoc?.province);
+    const provDist = bothLocs ? distanceKm(md.buyerLoc!.province, md.sellerLoc!.province) : 0;
+    const suggestAmount = Math.max(100, Math.ceil((provDist * 2 * (md.ratePerKm || 5)) / 50) * 50);
+    const meetOptions = bothLocs ? [
+      { label: `ผู้ซื้อเดินทางไปหาผู้ขาย (${addressLabel(md.sellerLoc)})`, sub: 'ผู้ขายไม่ต้องเดินทาง' },
+      { label: `ผู้ขายเดินทางมาหาผู้ซื้อ (${addressLabel(md.buyerLoc)})`, sub: 'ผู้ซื้อไม่ต้องเดินทาง' },
+      { label: `เจอกันครึ่งทาง (~จ.${midpointProvince(md.buyerLoc!.province, md.sellerLoc!.province)})`, sub: 'แบ่งกันเดินทางคนละครึ่ง' },
+    ] : [];
 
     return (
       <div className="dr-card">
         <div className="dr-card-title">🚗 รับประกันเดินทาง (ไม่ใช้คนกลาง)</div>
-        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
-          📍 จุดนัดพบ: <b style={{ color: 'var(--ink)' }}>{md.meetProvince || '-'}</b> · รวมไป-กลับ {(((md.buyerKm || 0) + (md.sellerKm || 0)) * 2).toLocaleString()} กม. × ฿{md.ratePerKm || 5}
-        </div>
-
-        {/* ยอดประกันปัจจุบัน + ต่อรอง */}
+        {/* สรุปข้อตกลงปัจจุบัน */}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
-          <span style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>เงินประกัน <b>เท่ากันทั้งสองฝ่าย</b>:</span>
-          <b style={{ fontSize: 17, color: 'var(--accent-strong)', fontFamily: 'var(--font-display)' }}>฿{depositEach.toLocaleString()} / ฝ่าย</b>
-          {canNegotiate && !md.pendingDeposit && (
-            <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={proposeDeposit}>✏️ ขอเปลี่ยนยอด</button>
+          {md.deposit ? (
+            <>
+              <span style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>📍 <b>{md.meetLabel || md.meetProvince || 'จุดนัดตามตกลง'}</b> · เงินประกัน<b>เท่ากันทั้งคู่</b>:</span>
+              <b style={{ fontSize: 17, color: 'var(--accent-strong)', fontFamily: 'var(--font-display)' }}>฿{depositEach.toLocaleString()} / ฝ่าย</b>
+              {canNegotiate && !md.pendingDeposit && (
+                <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => proposeDeposit()}>✏️ ขอเปลี่ยนยอด</button>
+              )}
+            </>
+          ) : (
+            <span style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>⏳ <b>ยังไม่ตกลงจุดนัดพบและยอดประกัน</b> — ระบุที่อยู่ทั้งสองฝ่าย แล้วเสนอข้อตกลงด้านล่าง (คุยรายละเอียดในแชทได้)</span>
           )}
         </div>
+
+        {/* ที่อยู่ของสองฝ่าย (ต/อ/จ) */}
+        <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+          {([['buyer', '🛍️ ผู้ซื้อ', md.buyerLoc], ['seller', '🛒 ผู้ขาย', md.sellerLoc]] as const).map(([side, label, loc]) => (
+            <div key={side} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 13 }}>
+              <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{label}:</b>
+              {loc?.province
+                ? <span style={{ color: 'var(--green-600)' }}>📍 {addressLabel(loc)}</span>
+                : <span style={{ color: 'var(--faint)' }}>ยังไม่ระบุที่อยู่</span>}
+            </div>
+          ))}
+        </div>
+        {isParty && !myLoc?.province && !md.buyerSlip && !md.sellerSlip && (
+          <div style={{ border: '1.5px dashed color-mix(in srgb, var(--accent) 40%, var(--line))', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 12, background: 'var(--surface-2)' }}>
+            <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)', marginBottom: 8 }}>📍 ระบุที่อยู่ของคุณ (ถึงระดับตำบล)</p>
+            <AddressPicker value={meetAddr} onChange={setMeetAddr} compact />
+            <button type="button" className="btn btn-primary btn-sm btn-block" style={{ marginTop: 10 }}
+              disabled={acting || !meetAddr.tambon}
+              onClick={() => doAction('meetup_set_location', { loc: meetAddr })}>
+              บันทึกที่อยู่ของฉัน
+            </button>
+          </div>
+        )}
+
+        {/* ข้อเสนอจุดนัด + ยอดประกัน (เมื่อรู้ที่อยู่ครบสองฝ่าย) */}
+        {bothLocs && !md.deposit && !md.pendingDeposit && canNegotiate && (
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)', fontFamily: 'var(--font-display)', marginBottom: 8 }}>
+              เสนอข้อตกลง (ระยะห่างโดยประมาณ ~{provDist.toLocaleString()} กม. · แนะนำ ฿{suggestAmount.toLocaleString()}/ฝ่าย — แก้ตัวเลขได้)
+            </p>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {meetOptions.map(o => (
+                <button key={o.label} type="button" className="btn btn-ghost btn-sm" style={{ justifyContent: 'space-between', textAlign: 'left' }}
+                  onClick={() => proposeDeposit(o.label, suggestAmount)}>
+                  <span>{o.label}<br /><small style={{ color: 'var(--muted)', fontWeight: 400 }}>{o.sub}</small></span>
+                  <span style={{ color: 'var(--accent-strong)', fontWeight: 700 }}>เสนอ →</span>
+                </button>
+              ))}
+              <button type="button" className="btn btn-soft btn-sm" onClick={() => {
+                const place = prompt('ระบุจุดนัดพบเอง เช่น "ปั๊ม ปตท. อ.วังน้อย" หรือ "ห้างเซ็นทรัล อยุธยา"');
+                if (place && place.trim()) proposeDeposit(`นัดเจอที่ ${place.trim()}`, suggestAmount);
+              }}>📌 กำหนดจุดนัดพบเอง</button>
+            </div>
+          </div>
+        )}
 
         {/* ข้อเสนอที่รอการตอบรับ — เด้งให้อีกฝ่ายกดยอมรับ/ไม่ยอมรับ */}
         {md.pendingDeposit && (
           md.pendingBy === myRole ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, background: '#fef5e3', border: '1px solid #fbe6bf', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12, fontSize: 13.5, color: '#9a6209' }}>
-              ⏳ คุณเสนอเปลี่ยนเงินประกันเป็น <b>฿{Number(md.pendingDeposit).toLocaleString()}/ฝ่าย</b> — รออีกฝ่ายตอบรับ
+              ⏳ คุณเสนอ{md.pendingMeetLabel ? <>จุดนัด <b>{md.pendingMeetLabel}</b> + </> : 'เปลี่ยน'}เงินประกัน <b>฿{Number(md.pendingDeposit).toLocaleString()}/ฝ่าย</b> — รออีกฝ่ายตอบรับ
               <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>ยกเลิกข้อเสนอ</button>
             </div>
           ) : isParty ? (
             <div style={{ background: '#fef5e3', border: '1.5px solid var(--amber-400)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 12 }}>
               <p style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 600, fontFamily: 'var(--font-display)' }}>
-                💰 {md.pendingBy === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ขอเปลี่ยนเงินประกันเป็น ฿{Number(md.pendingDeposit).toLocaleString()}/ฝ่าย
+                💰 {md.pendingBy === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}เสนอ{md.pendingMeetLabel ? `จุดนัด "${md.pendingMeetLabel}" + ` : 'เปลี่ยน'}เงินประกัน ฿{Number(md.pendingDeposit).toLocaleString()}/ฝ่าย
               </p>
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <button type="button" className="btn btn-green btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: true })}>✅ ยอมรับ</button>
@@ -577,7 +644,7 @@ export default function DealRoom() {
                   {r.slip ? '✅ วางเงินประกันแล้ว' : '⏳ ยังไม่วางเงินประกัน'}
                   {meetStage || s === 'completed' ? (r.met ? ' · ✅ ยืนยันเจอแล้ว' : ' · ⏳ ยังไม่ยืนยันนัดเจอ') : ''}
                 </span>
-                {depositStage && myRole === r.side && !r.slip && !md.pendingDeposit && (
+                {depositStage && myRole === r.side && !r.slip && !md.pendingDeposit && !!md.deposit && (
                   <label className="btn btn-green btn-sm" style={{ cursor: 'pointer' }}>
                     📎 อัปสลิปวางประกัน ฿{(depositEach + (r.fee || 0)).toLocaleString()}
                     <input type="file" accept="image/*,.pdf" style={{ display: 'none' }}

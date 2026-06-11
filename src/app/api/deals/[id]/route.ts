@@ -186,6 +186,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         systemMsg = `📹 ${currentUser.name || 'ผู้ใช้'}${isParty ? '' : ' (ผู้สนใจจากลิงก์แชร์)'} เข้าร่วมวิดีโอคอล — กดเข้าร่วมได้เลย`;
         break;
       }
+      case 'meetup_set_location': {
+        // แต่ละฝ่ายระบุที่อยู่ของตัวเอง (ตำบล/อำเภอ/จังหวัด) — ใช้ตกลงจุดนัดพบ
+        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const loc = body.loc || {};
+        const clean = {
+          province: String(loc.province || '').slice(0, 60),
+          amphoe: String(loc.amphoe || '').slice(0, 80),
+          tambon: String(loc.tambon || '').slice(0, 80),
+        };
+        if (!clean.province || !clean.amphoe || !clean.tambon)
+          return NextResponse.json({ error: 'กรุณาเลือกที่อยู่ให้ครบถึงระดับตำบล' }, { status: 400 });
+        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
+        if (md.buyerSlip || md.sellerSlip) return NextResponse.json({ error: 'วางเงินประกันแล้ว แก้ที่อยู่ไม่ได้' }, { status: 400 });
+        if (isBuyer) md.buyerLoc = clean; else md.sellerLoc = clean;
+        updates.meetupData = JSON.stringify(md);
+        systemMsg = `📍 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}ระบุที่อยู่แล้ว: ต.${clean.tambon} อ.${clean.amphoe} จ.${clean.province}`;
+        break;
+      }
       case 'meetup_propose': {
         // ต่อรองยอดประกัน: ฝ่ายหนึ่งเสนอยอดใหม่ → อีกฝ่ายต้องกดยอมรับจึงมีผล
         if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
@@ -196,8 +215,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (md.buyerSlip || md.sellerSlip) return NextResponse.json({ error: 'มีการวางเงินประกันแล้ว เปลี่ยนยอดไม่ได้ — ติดต่อทีมงานหากจำเป็น' }, { status: 400 });
         md.pendingDeposit = amount;
         md.pendingBy = isBuyer ? 'buyer' : 'seller';
+        // ข้อเสนออาจพ่วงจุดนัดพบมาด้วย เช่น "ผู้ขายเดินทางไปหาผู้ซื้อ" หรือ "เจอกันที่ปั๊ม ปตท. วังน้อย"
+        if (body.meetLabel) md.pendingMeetLabel = String(body.meetLabel).slice(0, 200);
         updates.meetupData = JSON.stringify(md);
-        systemMsg = `💰 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}ขอเปลี่ยนเงินประกันเป็น ฿${amount.toLocaleString()}/ฝ่าย — รออีกฝ่ายกดยอมรับ`;
+        systemMsg = `💰 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เสนอ${md.pendingMeetLabel ? `จุดนัด "${md.pendingMeetLabel}" + ` : 'เปลี่ยน'}เงินประกัน ฿${amount.toLocaleString()}/ฝ่าย — รออีกฝ่ายกดยอมรับ`;
         break;
       }
       case 'meetup_respond': {
@@ -209,14 +230,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (body.accept) {
           if (md.pendingBy === meSide) return NextResponse.json({ error: 'ผู้เสนอกดยอมรับเองไม่ได้ — ต้องให้อีกฝ่ายยอมรับ' }, { status: 400 });
           md.deposit = md.pendingDeposit;
-          systemMsg = `✅ ทั้งสองฝ่ายตกลงเงินประกันใหม่ ฿${Number(md.pendingDeposit).toLocaleString()}/ฝ่าย`;
+          if (md.pendingMeetLabel) md.meetLabel = md.pendingMeetLabel;
+          systemMsg = `✅ ตกลงกันแล้ว${md.meetLabel ? `: ${md.meetLabel}` : ''} — เงินประกัน ฿${Number(md.pendingDeposit).toLocaleString()}/ฝ่าย วางเงินได้เลย`;
         } else {
           systemMsg = md.pendingBy === meSide
-            ? `↩️ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ยกเลิกข้อเสนอเปลี่ยนเงินประกัน`
-            : `❌ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ปฏิเสธข้อเสนอเงินประกัน ฿${Number(md.pendingDeposit).toLocaleString()}`;
+            ? `↩️ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ยกเลิกข้อเสนอ`
+            : `❌ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ปฏิเสธข้อเสนอ ฿${Number(md.pendingDeposit).toLocaleString()} — เสนอใหม่หรือคุยกันในแชทได้`;
         }
         delete md.pendingDeposit;
         delete md.pendingBy;
+        delete md.pendingMeetLabel;
         updates.meetupData = JSON.stringify(md);
         break;
       }
@@ -226,6 +249,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
         const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
+        if (!md.deposit) return NextResponse.json({ error: 'ต้องตกลงจุดนัดพบและยอดประกันกับอีกฝ่ายก่อนวางเงิน' }, { status: 400 });
         if (isBuyer) md.buyerSlip = body.fileId; else md.sellerSlip = body.fileId;
         updates.meetupData = JSON.stringify(md);
         if (md.buyerSlip && md.sellerSlip) {

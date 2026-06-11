@@ -248,6 +248,15 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
+    // ถูกชวนแบบเจาะจง (เช่น กดนัดรับจากหน้าสินค้า — รู้ตัวผู้ขายอยู่แล้ว) → แจ้งคนนั้นทันที
+    if (body.inviteUserId && typeof body.inviteUserId === 'string' && body.inviteUserId !== currentUser.$id) {
+      await notifyUsers(databases, [body.inviteUserId], {
+        title: '🚗 คุณถูกชวนทำดีลนัดรับ',
+        body: `${currentUser.name || 'สมาชิก'} ชวนคุณนัดรับ "${title}" — เข้าไประบุที่อยู่ของคุณและตกลงจุดนัดพบได้เลย`,
+        link: `/deal/${doc.$id}`,
+      });
+    }
+
     // ดีลนี้ถูกสร้างเพื่อเสนอขายตาม "ประกาศหาสินค้า" → แจ้งเจ้าของประกาศทันที
     if (body.wantedId && typeof body.wantedId === 'string') {
       try {
