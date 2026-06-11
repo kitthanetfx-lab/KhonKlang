@@ -131,6 +131,13 @@ export function Nav({ active }: { active?: string }) {
   const isAct = (p: string) => pathname === p || pathname.startsWith(p + '/');
   const [drawer, setDrawer] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const profileCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openProfile = () => { if (profileCloseTimer.current) clearTimeout(profileCloseTimer.current); setProfileOpen(true); };
+  const closeProfileDelayed = () => {
+    if (profileCloseTimer.current) clearTimeout(profileCloseTimer.current);
+    profileCloseTimer.current = setTimeout(() => setProfileOpen(false), 300);
+  };
+  useEffect(() => () => { if (profileCloseTimer.current) clearTimeout(profileCloseTimer.current); }, []);
   const { user, loading, logout } = useUser();
   useEffect(() => {
     document.body.style.overflow = drawer ? 'hidden' : '';
@@ -172,8 +179,8 @@ export function Nav({ active }: { active?: string }) {
             <>
               <div
                 className={`dropdown ${profileOpen ? 'open' : ''}`}
-                onMouseEnter={() => setProfileOpen(true)}
-                onMouseLeave={() => setProfileOpen(false)}
+                onMouseEnter={openProfile}
+                onMouseLeave={closeProfileDelayed}
               >
                 <button type="button" className="btn btn-ghost btn-sm profile-trigger" aria-haspopup="true" aria-expanded={profileOpen} onClick={() => setProfileOpen(v => !v)}>
                   <Icon name="user" size={16} /> {shortName} <Icon name="chevronDown" size={16} />

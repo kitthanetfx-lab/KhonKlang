@@ -243,10 +243,14 @@ button.nav-link { background: none; border: none; }
   position:absolute; top:calc(100% + 8px); left:0; min-width: 248px;
   background: var(--surface); border:1px solid var(--line); border-radius: var(--r-md);
   box-shadow: var(--sh-lg); padding: 8px; opacity:0; transform: translateY(6px) scale(.98);
-  pointer-events:none; transition: opacity .18s, transform .18s var(--ease-out); transform-origin: top left; z-index: 70;
+  visibility:hidden; transform-origin: top left; z-index: 70;
+  /* close grace period: stays visible & clickable .3s after mouse leaves */
+  transition: opacity .18s .3s, transform .18s var(--ease-out) .3s, visibility 0s linear .48s;
 }
 .dropdown-menu-right { left: auto; right: 0; transform-origin: top right; }
-.dropdown:hover .dropdown-menu, .dropdown:focus-within .dropdown-menu, .dropdown.open .dropdown-menu { opacity:1; transform: none; pointer-events:auto; }
+.dropdown:hover .dropdown-menu, .dropdown:focus-within .dropdown-menu, .dropdown.open .dropdown-menu {
+  opacity:1; transform: none; visibility:visible; transition-delay: 0s, 0s, 0s;
+}
 .dropdown-item { display:flex; gap:12px; align-items:flex-start; padding:11px 12px; border-radius: var(--r-sm); transition: background .15s; }
 .dropdown-item:hover { background: var(--surface-2); }
 .dropdown-item .icon-tile { width:38px;height:38px; border-radius:10px; }
