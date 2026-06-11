@@ -101,6 +101,21 @@ interface Deal {
   sellerAcceptedTerms: boolean; middlemanAcceptedTerms: boolean; buyerAcceptedTerms: boolean;
   middlemanConfirmedPayment: boolean; buyerConfirmedCheck: boolean;
   paymentSlipFileId: string; evidenceData: string; trackingToMiddleman: string; trackingToBuyer: string;
+  dealType?: string; meetupData?: string;
+}
+
+/** ข้อมูลรับประกันเดินทาง (เก็บเป็น JSON ใน deal.meetupData) */
+interface MeetupData {
+  buyerProvince?: string; sellerProvince?: string; meetProvince?: string;
+  buyerKm?: number; sellerKm?: number; ratePerKm?: number;
+  deposit?: number; // เงินประกันเท่ากันทั้งสองฝ่าย (ต่อรองได้)
+  pendingDeposit?: number; pendingBy?: 'buyer' | 'seller'; // ข้อเสนอที่รออีกฝ่ายยอมรับ
+  buyerDeposit?: number; sellerDeposit?: number; // รองรับดีลเก่า
+  fee?: number; feeWho?: string; buyerFee?: number; sellerFee?: number;
+  buyerSlip?: string; sellerSlip?: string; buyerMet?: boolean; sellerMet?: boolean;
+}
+function parseMeetup(s?: string): MeetupData {
+  try { return JSON.parse(s || '{}'); } catch { return {}; }
 }
 interface Msg { $id: string; senderId: string; senderName: string; role: string; type: string; content: string; fileId: string; fileName: string; createdAt: string; }
 interface Middleman { userId: string; code: string; name: string; tier: string; workProvince: string; phone: string; categories?: string; reviewScore: number; reviewCount: number; }
@@ -116,8 +131,15 @@ const STEP_LABEL: Record<string, string> = {
   packing: 'ผู้ขายแพ็คของ', shipped_to_middleman: 'รอคนกลางรับ', middleman_received: 'คนกลางรับแล้ว',
   middleman_checking: 'คนกลางตรวจ', shipped_to_buyer: 'จัดส่งให้ผู้ซื้อ', delivered: 'รอยืนยันรับ',
   completed: 'เสร็จสมบูรณ์', cancelled: 'ยกเลิก', disputed: 'มีปัญหา',
+  meetup_ready: 'พร้อมนัดเจอ',
 };
-const STEP_ORDER = ['posted', 'buyer_joined', 'terms_pending', 'payment_pending', 'payment_uploaded', 'packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered', 'completed'];
+const STEP_ORDER = ['posted', 'buyer_joined', 'terms_pending', 'payment_pending', 'payment_uploaded', 'packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered', 'meetup_ready', 'completed'];
+const MEETUP_TIMELINE = [
+  { key: 'terms_pending', label: 'ยอมรับเงื่อนไข' },
+  { key: 'payment_pending', label: 'วางเงินประกันทั้งสองฝ่าย' },
+  { key: 'meetup_ready', label: 'นัดเจอกันตามนัด' },
+  { key: 'completed', label: 'คืนเงินประกัน + เสร็จสมบูรณ์' },
+];
 const TIMELINE = [
   { key: 'terms_pending', label: 'รอยอมรับเงื่อนไข' }, { key: 'payment_pending', label: 'รอโอนเงิน' },
   { key: 'payment_uploaded', label: 'รอยืนยันเงิน' }, { key: 'packing', label: 'ผู้ขายแพ็คของ' },
@@ -347,6 +369,7 @@ export default function DealRoom() {
   );
 
   const jitsiRoom = `khonklang-${dealId.slice(0, 10)}`;
+  const isMeetup = deal.dealType === 'meetup';
   const myRole: DealRole = !deal || !myId
     ? (myId ? 'guest' : '')
     : deal.sellerId === myId
@@ -465,8 +488,128 @@ export default function DealRoom() {
     );
   }
 
+  // ─── Meetup guarantee panel (รับประกันเดินทาง — ไม่ใช้คนกลาง) ─────────────
+  async function uploadMeetupSlip(f: File) {
+    const purl = beginUploadPreview(f);
+    try {
+      const j = await getJwt();
+      const prepared = await compressImage(f);
+      const form = new FormData(); form.append('file', prepared);
+      const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form });
+      const d = await r.json();
+      if (r.ok) await doAction('meetup_deposit', { fileId: d.fileId });
+      else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ');
+    } finally { endUploadPreview(purl); }
+  }
+
+  function renderMeetupPanel() {
+    if (deal!.dealType !== 'meetup') return null;
+    const md = parseMeetup(deal!.meetupData);
+    // เงินประกันเท่ากันทั้งสองฝ่าย (fallback รองรับดีลเก่าที่แยกยอด)
+    const depositEach = md.deposit ?? Math.max(md.buyerDeposit || 0, md.sellerDeposit || 0);
+    const rows: { side: 'buyer' | 'seller'; label: string; prov?: string; km?: number; fee?: number; slip?: string; met?: boolean }[] = [
+      { side: 'buyer', label: '🛍️ ผู้ซื้อ', prov: md.buyerProvince, km: md.buyerKm, fee: md.buyerFee, slip: md.buyerSlip, met: md.buyerMet },
+      { side: 'seller', label: '🛒 ผู้ขาย', prov: md.sellerProvince, km: md.sellerKm, fee: md.sellerFee, slip: md.sellerSlip, met: md.sellerMet },
+    ];
+    const s = deal!.status;
+    const depositStage = s === 'payment_pending';
+    const meetStage = s === 'meetup_ready';
+    const isParty = myRole === 'buyer' || myRole === 'seller';
+    const noSlipsYet = !md.buyerSlip && !md.sellerSlip;
+    const canNegotiate = isParty && noSlipsYet && ['posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending', 'payment_pending'].includes(s);
+
+    function proposeDeposit() {
+      const v = prompt(`เสนอยอดเงินประกันใหม่ (บาท/ฝ่าย)\nยอดปัจจุบัน: ฿${depositEach.toLocaleString()}`, String(depositEach));
+      if (v === null) return;
+      const amount = Math.round(Number(v));
+      if (!(amount >= 50)) { alert('กรอกตัวเลขขั้นต่ำ ฿50'); return; }
+      doAction('meetup_propose', { amount });
+    }
+
+    return (
+      <div className="dr-card">
+        <div className="dr-card-title">🚗 รับประกันเดินทาง (ไม่ใช้คนกลาง)</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
+          📍 จุดนัดพบ: <b style={{ color: 'var(--ink)' }}>{md.meetProvince || '-'}</b> · รวมไป-กลับ {(((md.buyerKm || 0) + (md.sellerKm || 0)) * 2).toLocaleString()} กม. × ฿{md.ratePerKm || 5}
+        </div>
+
+        {/* ยอดประกันปัจจุบัน + ต่อรอง */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
+          <span style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>เงินประกัน <b>เท่ากันทั้งสองฝ่าย</b>:</span>
+          <b style={{ fontSize: 17, color: 'var(--accent-strong)', fontFamily: 'var(--font-display)' }}>฿{depositEach.toLocaleString()} / ฝ่าย</b>
+          {canNegotiate && !md.pendingDeposit && (
+            <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={proposeDeposit}>✏️ ขอเปลี่ยนยอด</button>
+          )}
+        </div>
+
+        {/* ข้อเสนอที่รอการตอบรับ — เด้งให้อีกฝ่ายกดยอมรับ/ไม่ยอมรับ */}
+        {md.pendingDeposit && (
+          md.pendingBy === myRole ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, background: '#fef5e3', border: '1px solid #fbe6bf', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12, fontSize: 13.5, color: '#9a6209' }}>
+              ⏳ คุณเสนอเปลี่ยนเงินประกันเป็น <b>฿{Number(md.pendingDeposit).toLocaleString()}/ฝ่าย</b> — รออีกฝ่ายตอบรับ
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>ยกเลิกข้อเสนอ</button>
+            </div>
+          ) : isParty ? (
+            <div style={{ background: '#fef5e3', border: '1.5px solid var(--amber-400)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 12 }}>
+              <p style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 600, fontFamily: 'var(--font-display)' }}>
+                💰 {md.pendingBy === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ขอเปลี่ยนเงินประกันเป็น ฿{Number(md.pendingDeposit).toLocaleString()}/ฝ่าย
+              </p>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button type="button" className="btn btn-green btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: true })}>✅ ยอมรับ</button>
+                <button type="button" className="btn btn-danger btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>❌ ไม่ยอมรับ</button>
+              </div>
+            </div>
+          ) : null
+        )}
+        <div style={{ display: 'grid', gap: 10 }}>
+          {rows.map(r => (
+            <div key={r.side} style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 14px', background: 'var(--surface-2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, fontSize: 13.5 }}>
+                <b style={{ color: 'var(--ink)' }}>{r.label} ({r.prov || '-'})</b>
+                <span style={{ color: 'var(--muted)' }}>ไป-กลับ {((r.km || 0) * 2).toLocaleString()} กม.</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginTop: 6 }}>
+                <span style={{ color: 'var(--muted)' }}>เงินประกัน (ได้คืน) + ค่าธรรมเนียม</span>
+                <b style={{ color: 'var(--green-600)' }}>฿{depositEach.toLocaleString()} + ฿{(r.fee || 0).toLocaleString()}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, color: r.slip ? 'var(--green-600)' : 'var(--faint)' }}>
+                  {r.slip ? '✅ วางเงินประกันแล้ว' : '⏳ ยังไม่วางเงินประกัน'}
+                  {meetStage || s === 'completed' ? (r.met ? ' · ✅ ยืนยันเจอแล้ว' : ' · ⏳ ยังไม่ยืนยันนัดเจอ') : ''}
+                </span>
+                {depositStage && myRole === r.side && !r.slip && !md.pendingDeposit && (
+                  <label className="btn btn-green btn-sm" style={{ cursor: 'pointer' }}>
+                    📎 อัปสลิปวางประกัน ฿{(depositEach + (r.fee || 0)).toLocaleString()}
+                    <input type="file" accept="image/*,.pdf" style={{ display: 'none' }}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadMeetupSlip(f); e.target.value = ''; }} />
+                  </label>
+                )}
+                {meetStage && myRole === r.side && !r.met && (
+                  <button className="btn btn-green btn-sm" disabled={acting} onClick={() => { if (confirm('ยืนยันว่านัดเจอกันสำเร็จแล้ว?')) doAction('meetup_met'); }}>
+                    ✅ ยืนยันนัดเจอสำเร็จ
+                  </button>
+                )}
+                {r.slip && <a href={fileUrl(r.slip)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--accent-strong)', textDecoration: 'underline' }}>ดูสลิป</a>}
+              </div>
+            </div>
+          ))}
+        </div>
+        {depositStage && (
+          <p style={{ fontSize: 12.5, color: 'var(--amber-500)', marginTop: 12 }}>⚠️ โอนเข้าบัญชี บริษัท คนกลาง จำกัด — ติดต่อทีมงานเพื่อรับข้อมูลการโอน แล้วอัปสลิปของฝ่ายตัวเอง</p>
+        )}
+        {meetStage && (
+          <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 12 }}>✅ เงินประกันครบทั้งสองฝ่าย — นัดเจอกันที่ {md.meetProvince} เมื่อเจอกันแล้วให้กดยืนยันทั้งคู่</p>
+        )}
+        {s === 'completed' && (
+          <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 12 }}>🎉 นัดเจอสำเร็จ — บริษัท คนกลาง จำกัด จะโอนเงินประกันคืนทั้งสองฝ่ายเต็มจำนวน (เก็บเฉพาะค่าธรรมเนียม)</p>
+        )}
+      </div>
+    );
+  }
+
   // ─── Payment section ─────────────────────────────────────────────────────
   function renderPaymentSection() {
+    if (deal!.dealType === 'meetup') return null;
     if (!['payment_pending', 'payment_uploaded'].includes(deal!.status)) return null;
     return (
       <div className="dr-card dr-pay-card">
@@ -500,7 +643,7 @@ export default function DealRoom() {
     if (s === 'middleman_checking' && myRole === 'buyer' && !deal!.buyerConfirmedCheck) btns.push({ label: '✅ ยืนยันสินค้าไม่มีปัญหา', cls: 'btn-green', fn: () => doAction('buyer_confirm_check') });
     if (s === 'middleman_checking' && myRole === 'middleman' && deal!.buyerConfirmedCheck) btns.push({ label: '🚚 จัดส่งให้ผู้ซื้อแล้ว', cls: 'btn-primary', fn: () => { if (trackingInput) doAction('middleman_ship_to_buyer', { trackingNumber: trackingInput }); else alert('กรอกเลขพัสดุ'); } });
     if (s === 'shipped_to_buyer' && myRole === 'buyer') btns.push({ label: '🎉 ได้รับสินค้าแล้ว — ดีลเสร็จสมบูรณ์', cls: 'btn-green', fn: () => doAction('buyer_received') });
-    if (myRole === 'buyer' && s === 'buyer_joined' && !deal!.middlemanId) btns.push({ label: showSelectMM ? 'ซ่อนการเลือกคนกลาง' : '🔎 เลือกคนกลาง', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
+    if (myRole === 'buyer' && s === 'buyer_joined' && !deal!.middlemanId && deal!.dealType !== 'meetup') btns.push({ label: showSelectMM ? 'ซ่อนการเลือกคนกลาง' : '🔎 เลือกคนกลาง', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
     if (myRole === 'buyer' && deal!.middlemanId && ['terms_pending', 'payment_pending'].includes(s)) btns.push({ label: showSelectMM ? 'ซ่อนรายการคนกลาง' : '🔄 เลือกคนกลางใหม่', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
     if (!isFinished && myRole !== 'guest') btns.push({ label: '❌ ยกเลิก', cls: 'btn-danger', fn: () => { const r = prompt('เหตุผล'); doAction('cancel', { reason: r || '' }); } });
 
@@ -605,13 +748,13 @@ export default function DealRoom() {
                     {[
                       ['ผู้ขาย', deal.sellerName || '(รอผู้ขาย)'],
                       ['ผู้ซื้อ', deal.buyerName || '(รอผู้ซื้อ)'],
-                      ['คนกลาง', deal.middlemanName || '(ยังไม่ได้เลือก)'],
+                      ['คนกลาง', isMeetup ? 'ไม่ต้องใช้ (รับประกันเดินทาง)' : (deal.middlemanName || '(ยังไม่ได้เลือก)')],
                       ['ศูนย์กลาง', 'บริษัท คนกลาง จำกัด'],
                     ].map(([l, v]) => (
                       <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--line-2)', fontSize: 14 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ fontWeight: 600, color: 'var(--ink)' }}>{v}</span></div>
                     ))}
                   </div>
-                  {myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && (
+                  {!isMeetup && myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && (
                     <div style={{ marginTop: 14 }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => setShowSelectMM(v => !v)}>
                         {showSelectMM ? 'ซ่อนแผงเลือกคนกลาง' : deal.middlemanId ? 'เปลี่ยนคนกลาง' : 'เลือกคนกลาง'}
@@ -620,7 +763,7 @@ export default function DealRoom() {
                   )}
                 </div>
 
-                {myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && showSelectMM && renderMiddlemanPickerPanel()}
+                {!isMeetup && myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && showSelectMM && renderMiddlemanPickerPanel()}
 
                 {(deal.sellerAcceptedTerms || deal.buyerAcceptedTerms || deal.middlemanAcceptedTerms) && (
                   <div className="dr-card">
@@ -633,9 +776,9 @@ export default function DealRoom() {
 
                 {/* Timeline */}
                 <div className="dr-card">
-                  <div className="dr-card-title">ขั้นตอน Escrow</div>
+                  <div className="dr-card-title">{isMeetup ? 'ขั้นตอนรับประกันเดินทาง' : 'ขั้นตอน Escrow'}</div>
                   <div className="dr-timeline">
-                    {TIMELINE.map(st => {
+                    {(isMeetup ? MEETUP_TIMELINE : TIMELINE).map(st => {
                       const si = STEP_ORDER.indexOf(deal.status);
                       const ti = STEP_ORDER.indexOf(st.key);
                       const d = ti < si, a = ti === si;
@@ -650,6 +793,7 @@ export default function DealRoom() {
                   </div>
                 </div>
 
+                {renderMeetupPanel()}
                 {renderPaymentSection()}
 
                 {deal.paymentSlipFileId && (
@@ -663,7 +807,7 @@ export default function DealRoom() {
 
                 {deal.status === 'completed' && (
                   <>
-                    <div className="dr-card dr-done-card"><div className="dr-done-emoji">🎉</div><div className="dr-done-title">ดีลเสร็จสมบูรณ์!</div><div className="dr-done-sub">เงินถูกโอนให้ผู้ขายเรียบร้อยแล้ว</div></div>
+                    <div className="dr-card dr-done-card"><div className="dr-done-emoji">🎉</div><div className="dr-done-title">ดีลเสร็จสมบูรณ์!</div><div className="dr-done-sub">{isMeetup ? 'บริษัท คนกลาง จำกัด จะโอนเงินประกันคืนทั้งสองฝ่าย' : 'เงินถูกโอนให้ผู้ขายเรียบร้อยแล้ว'}</div></div>
                     <ReviewPanel deal={deal} myRole={myRole as 'buyer' | 'seller' | 'middleman'} jwt={jwt} />
                   </>
                 )}

@@ -1,6 +1,6 @@
 # Business Model Canvas และ Business Proposal: Khonklang
 
-วันที่จัดทำ: 10 มิถุนายน 2569
+วันที่จัดทำ: 11 มิถุนายน 2569
 
 ## 1. Executive Summary
 
@@ -23,6 +23,8 @@ Khonklang คือแพลตฟอร์มซื้อขายออนไ�
 เป้าหมายเชิงธุรกิจควรเป็นการครองตลาด "ซื้อขายปลอดภัย" ไม่ใช่แข่งกับ marketplace ทั่วไปโดยตรง แต่ทำตัวเป็นชั้นความไว้ใจที่เสียบเข้ากับการซื้อขายบน Facebook, LINE, marketplace อื่น และหน้าร้านจริงได้
 
 แนวทางปฏิบัติการควรเป็น automation-first: ให้ระบบอัตโนมัติจัดการงานส่วนใหญ่ เช่น สร้างดีล, ตรวจสถานะ, แจ้งเตือน, คำนวณค่าธรรมเนียม, เก็บหลักฐาน, คัดกรองเบื้องต้น และให้ทีมงานเข้าตรวจสอบขั้นสุดท้ายเฉพาะกรณีเสี่ยงสูง กรณีเอกสารไม่ชัด กรณี dispute หรือธุรกรรมมูลค่าสูง วิธีนี้ทำให้รองรับ volume จาก community ขนาดใหญ่ได้โดยไม่ต้องเพิ่มคนแบบเส้นตรง
+
+สถานะจริงของตัวเว็บในปัจจุบันควรประเมินว่าอยู่ประมาณ 60-70% สำหรับการนำไปทดสอบกับ use case จริงแล้ว เพราะระบบหลักจำนวนมากมีอยู่แล้ว เหลือการทดสอบ end-to-end, เก็บ feedback จากดีลจริง, ปรับ UX, ตรวจ edge case และเพิ่ม automation/เครื่องมือ admin ให้แน่นขึ้น ดังนั้นต้นทุนช่วงแรกไม่ควรถูกมองแบบสร้างแพลตฟอร์มจากศูนย์ แต่ควรมองเป็น "ทดสอบและ harden ระบบที่มีอยู่" ด้วยต้นทุนต่ำตามแนวทาง AI-first
 
 ## 2. สิ่งที่มีอยู่แล้วในโปรเจกต์
 
@@ -243,7 +245,9 @@ Tier ในระบบสมัคร:
 
 ### 3.6 Key Resources
 
-- ระบบ Next.js + Appwrite backend
+- ระบบ Next.js ที่พัฒนาไปแล้วประมาณ 60-70% สำหรับ pilot
+- Backend/cloud stack แบบ pay-as-you-grow เช่น Appwrite, Supabase และ Vercel
+- AI-assisted development และ automation tooling ที่ทำให้ทีมเล็กสร้าง/แก้ระบบได้เร็ว
 - ฐานข้อมูลดีล, ผู้ขาย, คนกลาง, รีวิว, scam reports
 - หมอกฤษณ์คอนเฟิร์มในฐานะ distribution/support partner
 - ฐานผู้ติดตามและกลุ่มซื้อขายรวมระดับหลายล้านคน
@@ -281,13 +285,14 @@ Tier ในระบบสมัคร:
 
 ### 3.9 Cost Structure
 
-ต้นทุนคงที่:
+ต้นทุนคงที่ช่วงเริ่มต้นควรถูกออกแบบให้ต่ำที่สุด เพราะเว็บหลักมีอยู่แล้วและ cloud stack สามารถเริ่มจาก free/low-tier แล้วอัปเกรดเมื่อมีผู้ใช้จริง:
 
-- Cloud hosting, database, storage, bandwidth
-- ค่าเครื่องมือ dev, monitoring, domain, email/SMS/LINE notification
-- เงินเดือนทีม product, engineer, support, admin KYC
-- กฎหมาย บัญชี ภาษี PDPA compliance
-- Marketing base content และ community management
+- Cloud hosting/database/storage เช่น Vercel, Appwrite, Supabase: เริ่มจากหลักร้อยถึงหลักพันต้น ๆ ต่อเดือน และอัปเป็น Pro plan เมื่อ traffic เพิ่ม
+- Domain, email, monitoring, logging, backup: หลักร้อยถึงหลักพันต่อเดือนในช่วง pilot
+- AI/dev tools สำหรับเร่งงานพัฒนาและตรวจงาน: หลักร้อยถึงหลักพันต่อเดือน
+- Payment gateway/บัญชี/กฎหมาย: เป็นค่าใช้จ่ายเฉพาะจุดก่อนเปิดเงินจริง ไม่ใช่ค่า burn รายเดือนขนาดใหญ่ตั้งแต่วันแรก
+- ทีมงานช่วง pilot: founder-led + ผู้ช่วย admin/ops เท่าที่จำเป็น ใช้ automation ให้มากที่สุด
+- Marketing: ใช้ owned media ของหมอกฤษณ์คอนเฟิร์มและกลุ่มซื้อขายเป็นหลัก ไม่ต้องซื้อ ads หนักช่วงแรก
 
 ต้นทุนผันแปร:
 
@@ -299,6 +304,7 @@ Tier ในระบบสมัคร:
 - ค่าคอมมิชชันคนกลาง/ผู้เชี่ยวชาญ
 - ค่า affiliate/referral
 - ค่าเดินทาง/ตรวจ onsite หากบริษัทรับเอง
+- ค่า AI/OCR/automation ต่อปริมาณงาน หากใช้ API เพิ่มขึ้น
 
 ## 4. Pricing Strategy
 
@@ -420,36 +426,58 @@ Scam Database:
 
 ### 5.4 ค่าใช้จ่ายต่อเดือนโดยประมาณ
 
-MVP/Base:
+ตัวเลขค่าใช้จ่ายควรแบ่งตาม stage ไม่ควรรวมเป็นงบก้อนใหญ่ตั้งแต่วันแรก เพราะสถานะเว็บปัจจุบันทำไปแล้วประมาณ 60-70% และงานที่เหลือหลัก ๆ คือการทดสอบกับ use case จริง, harden ระบบ, เพิ่ม automation และจัด payment/compliance ให้พร้อมเมื่อจะเปิดเงินจริง
 
-- Cloud/Appwrite/storage/bandwidth: 10,000-40,000 บาท
-- Payment gateway และค่าโอน: 1-3% ของเงินผ่านระบบ หรือ 10,000-60,000 บาทตาม volume
-- Support/admin/KYC 2-4 คน: 60,000-160,000 บาท
-- Marketing/content/community: 30,000-150,000 บาท
-- Legal/accounting/compliance: 10,000-50,000 บาท
-- Tools/LINE/SMS/email: 5,000-30,000 บาท
-- Buffer สำหรับ refund/dispute/fraud ops: 20,000-100,000 บาท
+Closed Pilot: 0-100 ดีลแรก
 
-รวมค่าใช้จ่าย Base: 135,000-590,000 บาทต่อเดือน ขึ้นกับทีมและการตลาด
+- Cloud/Appwrite/Supabase/Vercel/storage: 0-3,000 บาท/เดือน หากยังอยู่ใน free/low-tier หรือ Pro plan เริ่มต้น
+- Domain/email/basic monitoring: 300-2,000 บาท/เดือน
+- AI/dev tools/automation tools: 1,000-5,000 บาท/เดือน
+- LINE/email notification: 0-3,000 บาท/เดือน ตามปริมาณแจ้งเตือน
+- Payment/manual reconciliation test: 0-5,000 บาท/เดือน หรือจ่ายตาม transaction จริง
+- Legal/accounting consult เฉพาะจุด: 10,000-50,000 บาท เป็นครั้ง ๆ ก่อนเปิดเงินจริง
+- Ops/admin: founder-led หรือ 0-1 คน 0-25,000 บาท/เดือน
+- Marketing: ใช้ owned media/group network เป็นหลัก 0-10,000 บาท/เดือน
 
-Growth:
+รวม Closed Pilot โดยประมาณ: 1,300-48,000 บาท/เดือน ไม่รวมค่าที่ปรึกษากฎหมาย/บัญชีแบบครั้งคราว
 
-- ทีม ops/support/KYC/dispute 8-15 คน
-- Engineering/product 3-6 คน
-- Marketing performance/community/influencer
-- Insurance/legal/compliance สูงขึ้น
+Semi-public Pilot: 100-2,000 ดีล/เดือน
 
-รวมค่าใช้จ่าย Growth: 700,000-2,500,000 บาทต่อเดือน
+- Cloud/Appwrite/Supabase/Vercel Pro/Storage: 2,000-15,000 บาท/เดือน
+- Monitoring/logging/backup/security tools: 1,000-8,000 บาท/เดือน
+- AI/OCR/fraud pre-screen/support automation: 3,000-20,000 บาท/เดือน
+- LINE/email/SMS notification: 2,000-20,000 บาท/เดือน
+- Payment gateway และค่าโอน: จ่ายตาม transaction จริง โดยควรผลักเป็น transaction cost ไม่ใช่ fixed burn
+- Ops/KYC/dispute 1-3 คน เฉพาะ exception: 20,000-90,000 บาท/เดือน
+- Legal/accounting/compliance retainer เบื้องต้น: 10,000-40,000 บาท/เดือน เมื่อเริ่มรับเงินจริง
+- Marketing/community: 10,000-50,000 บาท/เดือน โดยเน้น content จากเคสจริงและกลุ่มเดิม ไม่ใช่ subsidy
+- Buffer dispute/fraud ops: 10,000-50,000 บาท/เดือน
+
+รวม Semi-public Pilot โดยประมาณ: 58,000-293,000 บาท/เดือน ขึ้นกับ volume และระดับ manual review
+
+Scale-ready: 2,000+ ดีล/เดือน
+
+- Cloud/DB/storage/CDN/backup: 15,000-80,000 บาท/เดือน
+- Automation/AI/OCR/risk scoring: 20,000-120,000 บาท/เดือน
+- Ops/KYC/dispute/support 3-8 คน: 90,000-320,000 บาท/เดือน
+- Legal/accounting/compliance/payment ops: 30,000-150,000 บาท/เดือน
+- Marketing/community/partner activation: 50,000-300,000 บาท/เดือน
+- Buffer dispute/fraud/chargeback: 50,000-300,000 บาท/เดือน
+
+รวม Scale-ready โดยประมาณ: 255,000-1,270,000 บาท/เดือน เฉพาะเมื่อ transaction จริงพิสูจน์แล้วว่าคุ้มขยาย
 
 ผลของ automation-first:
 
 - หากระบบจัดการ 80-90% ของ flow ได้อัตโนมัติ และทีมงานตรวจเฉพาะเคส KYC, dispute, high-risk, high-value หรือเอกสารผิดปกติ ต้นทุน support ต่อดีลจะลดลงมาก
 - ค่าใช้จ่ายจะไม่โตตามจำนวนดีลแบบเส้นตรง ทำให้ gross margin ดีขึ้นเมื่อ volume จาก community เพิ่ม
 - จุดที่ต้องลงทุนหนักคือ rule engine, fraud scoring, admin dashboard, payment reconciliation, notification และ evidence workflow
+- ค่า infra ไม่ควรถูกขยายก่อนมี load จริง ควรใช้แนวทาง upgrade plan ตามจำนวนผู้ใช้ เช่น Vercel/Appwrite/Supabase Pro เมื่อถึง threshold
 
 ### 5.5 จุดคุ้มทุนโดยคร่าว
 
-ถ้าค่าใช้จ่ายเดือนละ 350,000 บาท และรายได้เฉลี่ยต่อ completed transaction รวมทุกบริการอยู่ที่ 120 บาท ต้องมีประมาณ 2,917 paid transactions ต่อเดือน หรือประมาณ 97 paid transactions ต่อวัน
+ถ้าเป็น Closed Pilot ค่าใช้จ่ายประจำอาจอยู่เพียง 10,000-50,000 บาทต่อเดือน หากรายได้เฉลี่ยต่อ completed transaction รวมทุกบริการอยู่ที่ 80-120 บาท จุดคุ้มทุนจะอยู่ประมาณ 84-625 paid transactions ต่อเดือน หรือประมาณ 3-21 transactions ต่อวัน
+
+ถ้าเป็น Semi-public Pilot ค่าใช้จ่ายอยู่ที่ 60,000-300,000 บาทต่อเดือน และรายได้เฉลี่ยต่อ completed transaction อยู่ที่ 100-150 บาท จุดคุ้มทุนจะอยู่ประมาณ 400-3,000 paid transactions ต่อเดือน หรือประมาณ 14-100 transactions ต่อวัน
 
 สูตร:
 
@@ -461,6 +489,26 @@ Growth:
 - เพิ่ม subscription ผู้ขาย/คนกลาง
 - ลดต้นทุน support ด้วย automation
 - เลือก vertical ที่มูลค่าดีลสูงและ pain ชัด เช่น มือถือ แบรนด์เนม รถ พระ เครื่องจักร
+- ใช้ owned community ของหมอกฤษณ์คอนเฟิร์มลด CAC แทนการซื้อโฆษณาหนัก
+
+### 5.6 AI-First Cost Advantage
+
+ยุค AI ทำให้ต้นทุนการสร้างและทดสอบแพลตฟอร์มลดลงอย่างมาก สิ่งที่เมื่อก่อนต้องใช้ทีมใหญ่และเวลาหลายเดือน ปัจจุบันสามารถทำด้วยทีมเล็กได้เร็วขึ้น โดยเฉพาะโปรเจกต์นี้ที่ตัวเว็บหลักพัฒนาไปแล้วประมาณ 60-70% และเหลืองานเชิงทดสอบ/ปรับระบบมากกว่าสร้างใหม่ทั้งหมด
+
+งานที่ควรให้ AI/automation ช่วยเพื่อลดค่าใช้จ่าย:
+
+- เขียนและแก้โค้ด frontend/backend
+- สร้าง test case และ checklist สำหรับดีลแต่ละประเภท
+- สรุป dispute จากหลักฐาน รูป วิดีโอ และแชท
+- OCR สลิป บัตร เอกสาร KYC และเลขบัญชี
+- ตรวจ scam report ซ้ำและจัดหมวดความเสี่ยง
+- สร้าง risk score เบื้องต้นจากพฤติกรรมดีล
+- สรุปข้อมูลให้ admin ตรวจขั้นสุดท้าย
+- ตอบ support tier 1 และแนะนำขั้นตอนให้ผู้ใช้
+- สร้างข้อความประกาศ/คำอธิบายสินค้า/เทมเพลตโพสต์กลุ่ม
+- ทำรายงาน GMV, conversion และ dispute แยกตามกลุ่ม
+
+หลักการสำคัญคือ AI ไม่ควรเป็นผู้ตัดสินสุดท้ายในเรื่องเงิน ข้อพิพาท หรือการกล่าวหาคนโกง แต่ควรเป็นผู้ช่วยคัดกรองและสรุป เพื่อให้คนตรวจเฉพาะเคสที่ต้องใช้ judgment จริง วิธีนี้ทำให้ต้นทุนต่อดีลต่ำลงและทำให้ทีมเล็กดูแล volume ได้มากขึ้น
 
 ## 6. Go-To-Market Strategy
 

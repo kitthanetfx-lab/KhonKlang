@@ -186,6 +186,71 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         systemMsg = `📹 ${currentUser.name || 'ผู้ใช้'}${isParty ? '' : ' (ผู้สนใจจากลิงก์แชร์)'} เข้าร่วมวิดีโอคอล — กดเข้าร่วมได้เลย`;
         break;
       }
+      case 'meetup_propose': {
+        // ต่อรองยอดประกัน: ฝ่ายหนึ่งเสนอยอดใหม่ → อีกฝ่ายต้องกดยอมรับจึงมีผล
+        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const amount = Math.round(Number(body.amount));
+        if (!(amount >= 50 && amount <= 999999999)) return NextResponse.json({ error: 'ยอดประกันไม่ถูกต้อง (ขั้นต่ำ ฿50)' }, { status: 400 });
+        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
+        if (md.buyerSlip || md.sellerSlip) return NextResponse.json({ error: 'มีการวางเงินประกันแล้ว เปลี่ยนยอดไม่ได้ — ติดต่อทีมงานหากจำเป็น' }, { status: 400 });
+        md.pendingDeposit = amount;
+        md.pendingBy = isBuyer ? 'buyer' : 'seller';
+        updates.meetupData = JSON.stringify(md);
+        systemMsg = `💰 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}ขอเปลี่ยนเงินประกันเป็น ฿${amount.toLocaleString()}/ฝ่าย — รออีกฝ่ายกดยอมรับ`;
+        break;
+      }
+      case 'meetup_respond': {
+        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
+        if (!md.pendingDeposit) return NextResponse.json({ error: 'ไม่มีข้อเสนอที่รอการตอบรับ' }, { status: 400 });
+        const meSide = isBuyer ? 'buyer' : 'seller';
+        if (body.accept) {
+          if (md.pendingBy === meSide) return NextResponse.json({ error: 'ผู้เสนอกดยอมรับเองไม่ได้ — ต้องให้อีกฝ่ายยอมรับ' }, { status: 400 });
+          md.deposit = md.pendingDeposit;
+          systemMsg = `✅ ทั้งสองฝ่ายตกลงเงินประกันใหม่ ฿${Number(md.pendingDeposit).toLocaleString()}/ฝ่าย`;
+        } else {
+          systemMsg = md.pendingBy === meSide
+            ? `↩️ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ยกเลิกข้อเสนอเปลี่ยนเงินประกัน`
+            : `❌ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ปฏิเสธข้อเสนอเงินประกัน ฿${Number(md.pendingDeposit).toLocaleString()}`;
+        }
+        delete md.pendingDeposit;
+        delete md.pendingBy;
+        updates.meetupData = JSON.stringify(md);
+        break;
+      }
+      case 'meetup_deposit': {
+        // รับประกันเดินทาง: แต่ละฝ่ายอัปสลิปวางเงินประกัน+ค่าบริการ
+        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
+        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
+        if (isBuyer) md.buyerSlip = body.fileId; else md.sellerSlip = body.fileId;
+        updates.meetupData = JSON.stringify(md);
+        if (md.buyerSlip && md.sellerSlip) {
+          updates.status = 'meetup_ready';
+          systemMsg = '✅ ทั้งสองฝ่ายวางเงินประกันแล้ว — นัดเจอกันได้เลย เมื่อเจอกันสำเร็จกดยืนยันทั้งคู่เพื่อรับเงินประกันคืน';
+        } else {
+          systemMsg = `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}วางเงินประกันเดินทางแล้ว — รออีกฝ่าย`;
+        }
+        break;
+      }
+      case 'meetup_met': {
+        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (deal.status !== 'meetup_ready') return NextResponse.json({ error: 'ต้องวางเงินประกันครบทั้งสองฝ่ายก่อน' }, { status: 400 });
+        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
+        if (isBuyer) md.buyerMet = true; else md.sellerMet = true;
+        updates.meetupData = JSON.stringify(md);
+        if (md.buyerMet && md.sellerMet) {
+          updates.status = 'completed';
+          systemMsg = '🎉 นัดเจอสำเร็จทั้งสองฝ่าย! บริษัท คนกลาง จำกัด จะโอนเงินประกันคืนให้ทั้งคู่เต็มจำนวน (หักเฉพาะค่าบริการ)';
+        } else {
+          systemMsg = `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}ยืนยันว่านัดเจอสำเร็จ — รออีกฝ่ายยืนยัน`;
+        }
+        break;
+      }
       case 'visit': {
         // มีคนเปิดห้องดีล (รวมคนคลิกลิงก์แชร์) → แจ้งผู้ร่วมดีลคนอื่น ไม่ลงข้อความในแชท
         const roleLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : isMiddleman ? 'คนกลาง' : 'ผู้สนใจจากลิงก์แชร์';

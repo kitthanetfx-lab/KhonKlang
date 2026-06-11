@@ -76,6 +76,9 @@ async function ensureExtraAttributes(databases: Databases) {
     ensureAttributeReady(databases, 'imageFileIds', () => databases.createStringAttribute(DB_ID, COL_ID, 'imageFileIds', 2000, false, '[]')),
     // source: 'listing' = ประกาศขายสาธารณะ (โชว์ในตลาด) / 'private' = ดีลส่วนตัว (แชร์ลิงก์เอง)
     ensureAttributeReady(databases, 'source', () => databases.createStringAttribute(DB_ID, COL_ID, 'source', 20, false, '')),
+    // dealType: '' = ปกติ / 'meetup' = รับประกันเดินทาง (ไม่ใช้คนกลาง) + meetupData เก็บรายละเอียดการคำนวณ
+    ensureAttributeReady(databases, 'dealType', () => databases.createStringAttribute(DB_ID, COL_ID, 'dealType', 20, false, '')),
+    ensureAttributeReady(databases, 'meetupData', () => databases.createStringAttribute(DB_ID, COL_ID, 'meetupData', 2000, false, '')),
   ]);
 }
 
@@ -211,7 +214,7 @@ export async function POST(req: NextRequest) {
     if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const currentUser = await getUser(jwt);
     const body = await req.json();
-    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source } = body;
+    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isBuyer = creatorRole === 'buyer';
     const prefs = ((currentUser.prefs || {}) as Record<string, string>);
@@ -234,6 +237,8 @@ export async function POST(req: NextRequest) {
       location: location || '',
       sellingMode: sellingMode || 'normal',
       source: source === 'listing' ? 'listing' : 'private',
+      dealType: dealType === 'meetup' ? 'meetup' : '',
+      meetupData: dealType === 'meetup' ? String(meetupData || '').slice(0, 2000) : '',
       imageFileIds: JSON.stringify(imageFileIds || []),
       status: isBuyer ? 'waiting_seller' : 'posted',
       sellerAcceptedTerms: false, middlemanAcceptedTerms: false, buyerAcceptedTerms: false,
