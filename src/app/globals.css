@@ -1842,7 +1842,9 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .mu-note { font-size: 12.5px; color: var(--muted); line-height: 1.7; margin-top: 14px; background: var(--green-50); border: 1px solid var(--green-100); border-radius: var(--r-sm); padding: 10px 14px; }
 
 /* ---- Shared deposit band (meetup guarantee) ---- */
-.mu-deposit-band { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 28%, tr
+.mu-deposit-band { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); border-radius: var(--r-md); padding: 12px 16px; margin-bottom: 14px; font-size: 14px; color: var(--ink-2); }
+.mu-deposit-val { font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--accent-strong); }
+.mu-deposit-band small { flex-basis: 100%; font-size: 12px; color: var(--muted); }
 /* ---- Address picker (ต/อ/จ) ---- */
 .addr-grid { display: grid; gap: 8px; grid-template-columns: 1fr 1fr 1fr; }
 @media (max-width: 640px){ .addr-grid { grid-template-columns: 1fr; } }
