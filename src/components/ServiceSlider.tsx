@@ -3,7 +3,34 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { Icon } from './Icon';
 
-interface Slide { key: string; tint: string; icon: string; tag: string; pain: string; title: string; solution: string; benefits: string[]; forWho: string; stat: { v: string; l: string }; cta: string; href: string; }
+interface Slide { key: string; tint: string; icon: string; tag: string; pain: string; title: string; solution: string; benefits: string[]; forWho: string; cta: string; href: string; }
+
+/** สถิติจริงจาก /api/stats — ไม่มีตัวเลขตัวอย่าง แสดงเฉพาะค่าจริงเท่านั้น */
+export interface SliderStats {
+  protectedValue?: number; completedDeals?: number; meetupDeals?: number;
+  middlemen?: number; scamRecords?: number; middlemanRating?: number; middlemanReviews?: number;
+}
+
+function fmtBaht(v: number) {
+  if (v >= 1_000_000) return `฿${(Math.round(v / 100_000) / 10).toLocaleString()} ล้าน`;
+  return `฿${v.toLocaleString()}`;
+}
+
+/** เลือกสถิติจริงต่อสไลด์ — ระหว่างโหลดแสดง "—" */
+function realStat(key: string, s: SliderStats | null): { v: string; l: string } {
+  if (!s) return { v: '—', l: 'กำลังโหลดสถิติ…' };
+  switch (key) {
+    case 'escrow': return { v: fmtBaht(s.protectedValue || 0), l: 'มูลค่าที่คุ้มครองแล้ว (ค่าจริง)' };
+    case 'meet':   return { v: (s.meetupDeals || 0).toLocaleString(), l: 'ดีลนัดรับผ่านระบบ' };
+    case 'consign':
+      return (s.middlemanReviews || 0) > 0
+        ? { v: `${s.middlemanRating}/5`, l: `คะแนนรีวิวคนกลาง (${(s.middlemanReviews || 0).toLocaleString()} รีวิว)` }
+        : { v: (s.middlemen || 0).toLocaleString(), l: 'คนกลางพร้อมรับฝากขาย' };
+    case 'onsite': return { v: (s.middlemen || 0).toLocaleString(), l: 'คนกลาง/ผู้เชี่ยวชาญที่ผ่านการรับรอง' };
+    case 'scam':   return { v: (s.scamRecords || 0).toLocaleString(), l: 'รายชื่อในฐานข้อมูลคนโกง' };
+    default:       return { v: (s.completedDeals || 0).toLocaleString(), l: 'ดีลสำเร็จ' };
+  }
+}
 
 const SS_SLIDES: Slide[] = [
   { key: 'escrow', tint: 'blue', icon: 'shieldCheck', tag: 'นิยมที่สุด',
@@ -12,7 +39,6 @@ const SS_SLIDES: Slide[] = [
     solution: 'พักเงินไว้กับระบบคนกลาง ผู้ขายจะได้รับเงินก็ต่อเมื่อคุณกดยืนยันว่าได้ของจริง ตรงปก',
     benefits: ['เงินปลอดภัย 100% จนกว่าจะรับของ', 'ได้ของไม่ตรง คืนเงินเต็มจำนวน', 'มีหลักฐานครบทุกขั้นตอน'],
     forWho: 'มือถือ ไอที · แบรนด์เนม · ไอดีเกม · ของสะสม',
-    stat: { v: '฿120M+', l: 'มูลค่าที่คุ้มครองแล้ว' },
     cta: 'เริ่มซื้อขายผ่านกลาง', href: '/service/trade' },
   { key: 'meet', tint: 'green', icon: 'mapPin', tag: '',
     pain: 'นัดเจอซื้อของมือสอง กลัวเจอของปลอม โดนสับเปลี่ยน หรือไม่ปลอดภัย',
@@ -20,7 +46,6 @@ const SS_SLIDES: Slide[] = [
     solution: 'นัดส่งมอบในจุดปลอดภัย (Safe Zone) ที่มีคนกลางคอยตรวจสอบสินค้าและดูแลการแลกเปลี่ยนให้',
     benefits: ['จุดนัดพบที่คัดกรองและปลอดภัย', 'คนกลางช่วยตรวจของก่อนจ่ายเงิน', 'มีกล้องและพยานทุกการนัด'],
     forWho: 'รถมือสอง · นาฬิกา/พระเครื่อง · สินค้าชิ้นใหญ่',
-    stat: { v: '300+', l: 'จุดนัดปลอดภัยทั่วประเทศ' },
     cta: 'หาจุดนัดใกล้ฉัน', href: '/service/meetup' },
   { key: 'consign', tint: 'violet', icon: 'store', tag: '',
     pain: 'อยากขายของแต่ไม่มีเวลาถ่ายรูป ลงประกาศ ตอบแชต และต่อราคา',
@@ -28,7 +53,6 @@ const SS_SLIDES: Slide[] = [
     solution: 'ส่งของให้คนกลางมืออาชีพช่วยถ่ายรูป ลงขาย ปิดการขาย และส่งมอบแทนคุณจนจบดีล',
     benefits: ['มืออาชีพดูแลให้ตั้งแต่ต้นจนจบ', 'เข้าถึงฐานผู้ซื้อที่พร้อมจ่าย', 'รู้สถานะและยอดขายแบบเรียลไทม์'],
     forWho: 'พ่อค้าแม่ค้าออนไลน์ · ของสะสม · สินค้าแบรนด์',
-    stat: { v: '4.9/5', l: 'คะแนนความพึงพอใจผู้ฝากขาย' },
     cta: 'ฝากขายกับคนกลาง', href: '/service/consign' },
   { key: 'onsite', tint: 'amber', icon: 'user', tag: 'ใหม่',
     pain: 'จะซื้อรถ เครื่องจักร หรือมือถือมือสอง แต่ดูเองไม่เป็น กลัวเจอของมีปัญหา',
@@ -36,7 +60,6 @@ const SS_SLIDES: Slide[] = [
     solution: 'เรียกช่างหรือผู้เชี่ยวชาญเฉพาะทางไปตรวจสอบสินค้าถึงที่ พร้อมรายงานผลก่อนคุณตัดสินใจซื้อ',
     benefits: ['ช่างผู้เชี่ยวชาญตรวจให้ถึงที่', 'รายงานสภาพจริงพร้อมรูปถ่าย', 'ตัดสินใจซื้อได้อย่างมั่นใจ'],
     forWho: 'รถ/ยานพาหนะ · เครื่องจักรหนัก · ไอที',
-    stat: { v: '500+', l: 'ช่างผู้เชี่ยวชาญพร้อมรับงาน' },
     cta: 'เรียกช่างตรวจสอบ', href: '/service/onsite' },
   { key: 'scam', tint: 'rose', icon: 'search', tag: '',
     pain: 'ไม่แน่ใจว่าคนที่กำลังจะคุยด้วย เคยมีประวัติโกงคนอื่นมาก่อนหรือเปล่า',
@@ -44,11 +67,10 @@ const SS_SLIDES: Slide[] = [
     solution: 'ค้นหาชื่อ เลขบัญชี หรือเบอร์โทรศัพท์จากฐานข้อมูลแบล็กลิสต์ เพื่อกรองความเสี่ยงก่อนทำธุรกรรม',
     benefits: ['ค้นจากฐานข้อมูลคนโกงล่าสุด', 'รู้ผลทันทีก่อนโอนเงิน', 'ช่วยกันรายงานเพื่อเตือนคนอื่น'],
     forWho: 'ทุกคนที่ซื้อขายออนไลน์',
-    stat: { v: '50K+', l: 'รายการตรวจสอบต่อเดือน' },
     cta: 'ตรวจสอบคนโกง', href: '/check-scam' },
 ];
 
-export function ServiceSlider() {
+export function ServiceSlider({ stats = null }: { stats?: SliderStats | null }) {
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
   const n = SS_SLIDES.length;
@@ -80,7 +102,9 @@ export function ServiceSlider() {
         <button className="ss-arrow ss-next" onClick={() => go(1)} aria-label="ถัดไป"><Icon name="chevronRight" size={22} /></button>
         <div className="ss-viewport" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
           <div className="ss-track" style={{ transform: `translateX(calc(${-i * 100}% + ${dx}px))` }}>
-            {SS_SLIDES.map((sl) => (
+            {SS_SLIDES.map((sl) => {
+              const st = realStat(sl.key, stats);
+              return (
               <article key={sl.key} className={`ss-slide tint-${sl.tint}`}>
                 <div className="ss-copy">
                   <div className="ss-pain">
@@ -108,8 +132,8 @@ export function ServiceSlider() {
                   </ul>
                   <div className="ss-panel-foot">
                     <div className="ss-stat">
-                      <div className="ss-stat-v">{sl.stat.v}</div>
-                      <div className="ss-stat-l">{sl.stat.l}</div>
+                      <div className="ss-stat-v">{st.v}</div>
+                      <div className="ss-stat-l">{st.l}</div>
                     </div>
                     <div className="ss-for">
                       <span className="ss-for-lb"><Icon name="users" size={13} /> เหมาะกับ</span>
@@ -118,7 +142,8 @@ export function ServiceSlider() {
                   </div>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -135,5 +160,3 @@ export function ServiceSlider() {
     </div>
   );
 }
-
-export default ServiceSlider;

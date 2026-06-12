@@ -71,6 +71,14 @@ export default function Marketplace() {
 
   useReveal();
 
+  // รับหมวดจากการ์ดหน้าแรก เช่น /marketplace?cat=ยานพาหนะ
+  useEffect(() => {
+    try {
+      const c = new URLSearchParams(window.location.search).get('cat');
+      if (c && CATS.includes(c)) setCat(c);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0');

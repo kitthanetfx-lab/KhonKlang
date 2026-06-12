@@ -7,7 +7,11 @@ import { Nav, Footer, CountUp, useReveal, useTilt } from '@/components/Site';
 import { EscrowStage } from '@/components/EscrowStage';
 import { ServiceSlider } from '@/components/ServiceSlider';
 
-interface SiteStats { completedDeals: number; protectedValue: number; middlemen: number; satisfaction: number; reviewCount: number; }
+interface SiteStats {
+  completedDeals: number; protectedValue: number; middlemen: number; satisfaction: number; reviewCount: number;
+  categories?: Record<string, number>; listingTotal?: number; meetupDeals?: number;
+  scamRecords?: number; middlemanRating?: number; middlemanReviews?: number;
+}
 
 /** สถิติจริงจากระบบ — ดึงจาก /api/stats (นับจากดีลที่เสร็จสมบูรณ์, คนกลางที่อนุมัติ, รีวิวจริง) */
 function useSiteStats() {
@@ -43,16 +47,15 @@ const TRUST = [
   { icon: 'zap', tint: 'violet', t: 'ปล่อยเงินอัตโนมัติ', d: 'เมื่อตรวจรับครบเงื่อนไข ระบบโอนเงินให้ผู้ขายให้ทันที' },
 ];
 
+// หมวดหมู่จริงที่ใช้ลงประกาศ — จำนวนประกาศดึงค่าจริงจาก /api/stats เท่านั้น
 const CATEGORIES = [
-  { icon: 'smartphone', t: 'มือถือ & ไอที', n: '2,480' },
-  { icon: 'gem', t: 'แบรนด์เนม', n: '1,120' },
-  { icon: 'car', t: 'รถ & ยานพาหนะ', n: '640' },
-  { icon: 'gamepad', t: 'ไอดีเกม & ดิจิทัล', n: '3,210' },
-  { icon: 'sparkles', t: 'พระเครื่อง', n: '980' },
-  { icon: 'box', t: 'อาร์ตทอย & ของสะสม', n: '1,540' },
-  { icon: 'sprout', t: 'เหมาสวน & เกษตร', n: '410' },
-  { icon: 'factory', t: 'ค้าส่ง & OEM โรงงาน', n: '290' },
-  { icon: 'building', t: 'เครื่องจักร & อสังหาฯ', n: '150' },
+  { icon: 'box', t: 'สินค้าทั่วไป' },
+  { icon: 'smartphone', t: 'อิเล็กทรอนิกส์' },
+  { icon: 'sparkles', t: 'เสื้อผ้า' },
+  { icon: 'car', t: 'ยานพาหนะ' },
+  { icon: 'building', t: 'อสังหาริมทรัพย์' },
+  { icon: 'handCoins', t: 'บริการ' },
+  { icon: 'package', t: 'อื่นๆ' },
 ];
 
 function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: string; lead?: string; center?: boolean }) {
@@ -164,7 +167,7 @@ export default function HomePage() {
       <section className="section" style={{ background: 'var(--surface)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="container">
           <SectionHead kicker="บริการผ่านคนกลาง" title="ทุกปัญหาการซื้อขาย เรามีทางแก้ให้" lead="เลื่อนดูบริการที่ออกแบบมาแก้ปัญหาที่คนซื้อ–ขายเจอบ่อยที่สุด พร้อมข้อดีที่คุณจะได้รับ" center />
-          <div className="reveal"><ServiceSlider /></div>
+          <div className="reveal"><ServiceSlider stats={stats} /></div>
         </div>
       </section>
 
@@ -178,16 +181,19 @@ export default function HomePage() {
             <Link className="btn btn-soft" href="/marketplace">ดูตลาดทั้งหมด <Icon name="arrowRight" size={16} /></Link>
           </div>
           <div className="cat-grid">
-            {CATEGORIES.map((c, i) => (
-              <Link key={c.t} href="/marketplace" className="cat-card reveal" style={{ ['--d' as string]: i * 40 + 'ms' }}>
-                <span className="icon-tile"><Icon name={c.icon} /></span>
-                <div>
-                  <div className="cat-t">{c.t}</div>
-                  <div className="cat-n">{c.n} ประกาศ</div>
-                </div>
-                <Icon name="chevronRight" size={18} className="cat-arrow" />
-              </Link>
-            ))}
+            {CATEGORIES.map((c, i) => {
+              const cnt = stats?.categories?.[c.t] ?? 0;
+              return (
+                <Link key={c.t} href={`/marketplace?cat=${encodeURIComponent(c.t)}`} className="cat-card reveal" style={{ ['--d' as string]: i * 40 + 'ms' }}>
+                  <span className="icon-tile"><Icon name={c.icon} /></span>
+                  <div>
+                    <div className="cat-t">{c.t}</div>
+                    <div className="cat-n">{cnt > 0 ? `${cnt.toLocaleString()} ประกาศ` : 'ยังไม่มีประกาศ'}</div>
+                  </div>
+                  <Icon name="chevronRight" size={18} className="cat-arrow" />
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
