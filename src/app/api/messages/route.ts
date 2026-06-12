@@ -41,17 +41,32 @@ function getUser(jwt: string) {
   return new Account(c).get();
 }
 
+/** อ่าน/โพสต์แชทได้เฉพาะผู้ร่วมดีล — กันคนสุ่ม dealId มาอ่าน/ยิงข้อความดีลคนอื่น */
+async function assertDealParty(db: Databases, dealId: string, userId: string): Promise<NextResponse | null> {
+  try {
+    const deal = await db.getDocument(DB_ID, 'deals', dealId);
+    if (![deal.buyerId, deal.sellerId, deal.middlemanId].includes(userId))
+      return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึงแชทของดีลนี้' }, { status: 403 });
+    return null;
+  } catch {
+    return NextResponse.json({ error: 'ไม่พบดีล' }, { status: 404 });
+  }
+}
+
 // GET /api/messages?dealId=xxx&after=isoDate
 export async function GET(req: NextRequest) {
   try {
     const jwt = req.headers.get('x-session-jwt');
     if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    await getUser(jwt);
+    const me = await getUser(jwt);
     const dealId = req.nextUrl.searchParams.get('dealId');
     const after  = req.nextUrl.searchParams.get('after');
     if (!dealId) return NextResponse.json({ error: 'Missing dealId' }, { status: 400 });
 
     const db = getAdminClient();
+    const denied = await assertDealParty(db, dealId, me.$id);
+    if (denied) return denied;
+
     const queries = [Query.equal('dealId', dealId), Query.orderAsc('createdAt'), Query.limit(200)];
     if (after) queries.push(Query.greaterThan('createdAt', after));
 
@@ -74,6 +89,9 @@ export async function POST(req: NextRequest) {
 
     const db = getAdminClient();
     await ensureCollection(db);
+    const denied = await assertDealParty(db, dealId, user.$id);
+    if (denied) return denied;
+
     const msg = await db.createDocument(DB_ID, COL, ID.unique(), {
       dealId,
       senderId:   user.$id,

@@ -292,6 +292,18 @@ function ProfilePage() {
         </div>
 
         <button className="pf-logout" onClick={logout}><Icon name="logout" size={16} /> ออกจากระบบ</button>
+
+        {/* PDPA: สิทธิ์ขอลบข้อมูลส่วนบุคคล */}
+        <button
+          onClick={() => {
+            const subject = encodeURIComponent('ขอลบข้อมูลส่วนบุคคล (PDPA)');
+            const body = encodeURIComponent('ข้าพเจ้าขอใช้สิทธิ์ลบข้อมูลส่วนบุคคลตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล\nอีเมลบัญชี: ');
+            window.location.href = `mailto:runandyaow002@gmail.com?subject=${subject}&body=${body}`;
+          }}
+          style={{ width: '100%', marginTop: 10, padding: '11px', borderRadius: 'var(--r-md)', border: '1px solid var(--line)', background: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}
+        >
+          🗑️ ขอลบข้อมูลส่วนบุคคลของฉัน (สิทธิ์ตาม PDPA)
+        </button>
       </div>
     </div>
   );

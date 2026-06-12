@@ -6,13 +6,16 @@ import Link from 'next/link';
 import { account, clearPersistedSession } from '@/lib/appwrite';
 import {
   LayoutDashboard, Store, Shield, Users, Settings,
-  LogOut, Menu, ChevronRight, Bell,
+  LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff,
 } from 'lucide-react';
 
 const NAV = [
   { href: '/admin',             icon: LayoutDashboard, label: 'ภาพรวม' },
   { href: '/admin/sellers',     icon: Store,           label: 'ผู้ขาย' },
   { href: '/admin/middlemen',   icon: Shield,          label: 'คนกลาง' },
+  { href: '/admin/scam-reports',icon: ShieldAlert,     label: 'รายงานคนโกง' },
+  { href: '/admin/deals',       icon: Handshake,       label: 'ดีล & ข้อพิพาท' },
+  { href: '/admin/moderate',    icon: EyeOff,          label: 'ตรวจสอบเนื้อหา' },
   { href: '/admin/users',       icon: Users,           label: 'ผู้ใช้ทั้งหมด' },
   { href: '/admin/settings',    icon: Settings,        label: 'ตั้งค่า' },
 ];
@@ -25,7 +28,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // หน้า setup ไม่ต้องผ่าน guard
     if (pathname === '/admin/setup') return;
     account.get()
       .then(u => {
@@ -51,7 +53,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
 
-      {/* ── Sidebar ── */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-56 flex flex-col
         bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
@@ -59,12 +60,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:relative lg:translate-x-0
       `}>
-        {/* Logo */}
         <div className="h-14 flex items-center px-5 border-b border-gray-200 dark:border-gray-800 shrink-0">
           <span className="font-bold text-base tracking-tight">🛡️ คนกลาง Admin</span>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
           {NAV.map(n => {
             const isActive = n.href === '/admin' ? pathname === '/admin' : pathname.startsWith(n.href);
@@ -83,7 +82,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        {/* User footer */}
         <div className="shrink-0 border-t border-gray-200 dark:border-gray-800 p-3">
           <div className="flex items-center gap-2.5 px-2">
             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
@@ -111,22 +109,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* ── Main area ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-        {/* Top bar */}
         <header className="h-14 shrink-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center px-4 gap-3">
           <button className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             onClick={() => setSidebarOpen(true)}>
             <Menu size={20} />
           </button>
 
-          {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 text-sm min-w-0">
             <Link href="/admin" className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors shrink-0">
               Admin
@@ -144,13 +138,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className="text-xs text-gray-400 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
               ดูหน้าเว็บ ↗
             </Link>
-            <button className="relative p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <button className="relative p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" aria-label="การแจ้งเตือน">
               <Bell size={18} className="text-gray-400" />
             </button>
           </div>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 overflow-auto p-5">
           {children}
         </main>

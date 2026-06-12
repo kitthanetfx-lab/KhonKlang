@@ -100,6 +100,7 @@ function MiddlemanForm() {
   const [step, setStep]       = useState(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [pdpaConsent, setPdpaConsent] = useState(false);
   const [error, setError]     = useState('');
   const [done, setDone]       = useState(false);
   const [copied, setCopied]   = useState<'acct' | 'pp' | null>(null);
@@ -611,7 +612,11 @@ function MiddlemanForm() {
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-              <button onClick={handleSubmit} disabled={submitting || !slipFile}
+              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 cursor-pointer text-sm">
+                <input type="checkbox" checked={pdpaConsent} onChange={e => setPdpaConsent(e.target.checked)} className="mt-0.5 w-4 h-4 accent-blue-600 shrink-0" />
+                <span className="text-gray-600 dark:text-gray-300 leading-relaxed">ข้าพเจ้ายินยอมให้ บริษัท คนกลาง จำกัด เก็บและใช้ข้อมูลส่วนบุคคล (รวมถึงบัตรประชาชน บัญชีธนาคาร) เพื่อยืนยันตัวตนและให้บริการ ตาม<a href="/privacy" target="_blank" className="text-blue-600 underline">นโยบายความเป็นส่วนตัว</a></span>
+              </label>
+              <button onClick={handleSubmit} disabled={submitting || !slipFile || !pdpaConsent}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2">
                 {submitting ? 'กำลังส่งใบสมัคร...' : <>ยืนยันการสมัครและแนบสลิปแล้ว <CheckCircle2 className="w-5 h-5" /></>}
               </button>

@@ -185,7 +185,7 @@ function MessagesInner() {
                       <Icon name="arrowRight" size={17} />
                     </button>
                   </div>
-                  <p className="dm-safety">⚠️ อย่าโอนเงินนอกระบบเด็ดขาด — ชวนคู่สนทนา<Link href="/deal/create">เปิดดีลผ่านคนกลาง</Link>เพื่อความปลอดภัย</p>
+                  <p className="dm-safety">⚠️ อย่าโอนเงินนอกระบบ และอย่ากดลิงก์/เปิดไฟล์แปลกปลอมจากคู่สนทนา — ชวนกัน<Link href="/deal/create">เปิดดีลผ่านคนกลาง</Link>เพื่อความปลอดภัย</p>
                 </>
               )}
             </section>

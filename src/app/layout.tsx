@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-page-custom-font */
 import type { Metadata } from "next";
 import "./globals.css";
+import { CookieConsent } from "@/components/CookieConsent";
+import { DialogProvider } from "@/components/Dialog";
 
 export const metadata: Metadata = {
   title: "คนกลาง — ซื้อขายปลอดภัยผ่านคนกลาง",
@@ -20,7 +22,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body><DialogProvider>{children}<CookieConsent /></DialogProvider></body>
     </html>
   );
 }
