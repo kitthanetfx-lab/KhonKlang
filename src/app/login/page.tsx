@@ -16,6 +16,7 @@ function LoginForm() {
   const errorMessages: Record<string, string> = {
     line_cancelled: 'ยกเลิกการเข้าสู่ระบบด้วย LINE',
     line_failed: `LINE login ล้มเหลว${msg ? ': ' + decodeURIComponent(msg) : ''}`,
+    oauth_failed: `เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่${msg ? ' (' + decodeURIComponent(msg) + ')' : ''}`,
   };
 
   const returnTo = searchParams.get('returnTo') || '/register';
@@ -28,10 +29,13 @@ function LoginForm() {
     }
     try {
       const authProvider = provider === 'google' ? OAuthProvider.Google : OAuthProvider.Facebook;
-      account.createOAuth2Session(
+      // ใช้ token flow (ไม่ใช่ session flow) — session flow ฝาก cookie ไว้ที่โดเมน Appwrite
+      // ซึ่งมือถือ/แท็บเล็ต (Safari, Chrome) บล็อก third-party cookie ทำให้ login แล้วเด้งออกตลอด
+      const safeReturn = returnTo.startsWith('/') ? returnTo : '/register';
+      account.createOAuth2Token(
         authProvider,
-        `${window.location.origin}${returnTo.startsWith('/') ? returnTo : '/register'}`,
-        `${window.location.origin}/`
+        `${window.location.origin}/auth/oauth/complete?returnTo=${encodeURIComponent(safeReturn)}`,
+        `${window.location.origin}/login?error=oauth_failed`
       );
     } catch (e) {
       console.error('Error logging in:', e);
