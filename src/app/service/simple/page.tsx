@@ -38,7 +38,7 @@ export default function ServiceSimplePage() {
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 20 }}>
           ⚠️ สำคัญ: ผู้ซื้อต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะไม่สามารถเรียกร้องกับผู้ขายได้ และจะถือว่าสินค้าถูกต้องตามที่ตกลง
         </div>
-        <Link href="/deal/create" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>เริ่มสร้างดีล →</Link>
+        <Link href="/deal/create?type=simple" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>เริ่มสร้างดีล →</Link>
       </div>
     </div>
   );

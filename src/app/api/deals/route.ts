@@ -237,7 +237,7 @@ export async function POST(req: NextRequest) {
       location: location || '',
       sellingMode: sellingMode || 'normal',
       source: source === 'listing' ? 'listing' : 'private',
-      dealType: dealType === 'meetup' ? 'meetup' : '',
+      dealType: dealType === 'meetup' ? 'meetup' : dealType === 'simple' ? 'simple' : '',
       meetupData: dealType === 'meetup' ? String(meetupData || '').slice(0, 2000) : '',
       imageFileIds: JSON.stringify(imageFileIds || []),
       status: isBuyer ? 'waiting_seller' : 'posted',

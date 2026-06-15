@@ -139,8 +139,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'seller_done_packing': {
         if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        updates = { status: 'shipped_to_middleman', trackingToMiddleman: body.trackingNumber || '' };
-        systemMsg = `ผู้ขายจัดส่งสินค้าแล้ว (เลขพัสดุ: ${body.trackingNumber || '-'})`;
+        if (deal.dealType === 'simple') {
+          // โหมดง่าย: ผู้ขายส่งตรงถึงผู้ซื้อ ไม่ผ่านคนกลางบุคคล
+          updates = { status: 'shipped_to_buyer', trackingToBuyer: body.trackingNumber || '' };
+          systemMsg = `ผู้ขายจัดส่งสินค้าให้ผู้ซื้อโดยตรงแล้ว (เลขพัสดุ: ${body.trackingNumber || '-'}) — ผู้ซื้ออย่าลืมถ่ายวิดีโอก่อนแกะกล่อง`;
+        } else {
+          updates = { status: 'shipped_to_middleman', trackingToMiddleman: body.trackingNumber || '' };
+          systemMsg = `ผู้ขายจัดส่งสินค้าแล้ว (เลขพัสดุ: ${body.trackingNumber || '-'})`;
+        }
         break;
       }
       case 'middleman_received': {

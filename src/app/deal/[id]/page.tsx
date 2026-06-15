@@ -157,6 +157,20 @@ const TIMELINE = [
   { key: 'middleman_checking', label: 'คนกลางตรวจสอบ' }, { key: 'shipped_to_buyer', label: 'จัดส่งให้ผู้ซื้อ' },
   { key: 'delivered', label: 'รอยืนยันรับ' }, { key: 'completed', label: 'เสร็จสมบูรณ์' },
 ];
+// โหมดง่าย: ไม่มีคนกลางบุคคล ผู้ขายส่งตรงถึงผู้ซื้อ
+const SIMPLE_TIMELINE = [
+  { key: 'terms_pending', label: 'รอยอมรับเงื่อนไข' }, { key: 'payment_pending', label: 'ผู้ซื้อโอนเงินเข้าศูนย์กลาง' },
+  { key: 'payment_uploaded', label: 'รอศูนย์กลางยืนยันรับเงิน' }, { key: 'packing', label: 'ผู้ขายแพ็ค+ถ่ายวิดีโอ' },
+  { key: 'shipped_to_buyer', label: 'ส่งตรงถึงผู้ซื้อ' }, { key: 'completed', label: 'ผู้ซื้อรับของ → ศูนย์กลางโอนเงิน' },
+];
+// ป้ายสถานะที่ต่างจากปกติเมื่อเป็นโหมดง่าย
+const SIMPLE_STATUS_LABEL: Record<string, string> = {
+  buyer_joined: 'รอยอมรับเงื่อนไข', payment_uploaded: 'รอศูนย์กลางยืนยัน', packing: 'ผู้ขายแพ็ค+ส่งตรง', shipped_to_buyer: 'จัดส่งถึงผู้ซื้อ',
+};
+function statusText(d: { status: string; dealType?: string }) {
+  if (d.dealType === 'simple' && SIMPLE_STATUS_LABEL[d.status]) return SIMPLE_STATUS_LABEL[d.status];
+  return STEP_LABEL[d.status];
+}
 
 type DealTab = 'steps' | 'chat' | 'evidence';
 type DealRole = 'seller' | 'middleman' | 'buyer' | 'guest' | '';
@@ -237,6 +251,7 @@ export default function DealRoom() {
   const callNotifyAt = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const evidInputRef = useRef<HTMLInputElement>(null);
+  const buyerEvidInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const r = document.documentElement;
@@ -366,7 +381,7 @@ export default function DealRoom() {
     setUploadPreview(null);
   }
 
-  async function uploadFile(file: File, isEvidence = false) {
+  async function uploadFile(file: File, isEvidence = false, evidenceTypeOverride?: string) {
     const purl = beginUploadPreview(file);
     try {
       const j = await getJwt();
@@ -375,7 +390,7 @@ export default function DealRoom() {
       const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form });
       const d = await r.json();
       if (!r.ok) { alert(d.error || 'Upload failed'); return; }
-      if (isEvidence) await doAction('add_evidence', { evidenceType, fileId: d.fileId, fileName: d.fileName });
+      if (isEvidence) await doAction('add_evidence', { evidenceType: evidenceTypeOverride || evidenceType, fileId: d.fileId, fileName: d.fileName });
       else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', d.fileId, d.fileName);
     } finally { endUploadPreview(purl); }
   }
@@ -420,6 +435,7 @@ export default function DealRoom() {
 
   const jitsiRoom = `khonklang-${dealId.slice(0, 10)}`;
   const isMeetup = deal.dealType === 'meetup';
+  const isSimple = deal.dealType === 'simple';
   const myRole: DealRole = !deal || !myId
     ? (myId ? 'guest' : '')
     : deal.sellerId === myId
@@ -783,7 +799,7 @@ export default function DealRoom() {
         {deal!.status === 'payment_pending' && myRole !== 'buyer' && (
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>รอผู้ซื้อโอนเงินเข้าระบบพักเงินของบริษัท</div>
         )}
-        {deal!.status === 'payment_uploaded' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — รอคนกลางยืนยัน</div>}
+        {deal!.status === 'payment_uploaded' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — {isSimple ? 'รอศูนย์กลางยืนยันรับเงิน' : 'รอคนกลางยืนยัน'}</div>}
         <input ref={evidInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }}
           onChange={async e => { const f = e.target.files?.[0]; if (!f) return; const purl = beginUploadPreview(f); try { const j = await getJwt(); const prepared = await compressImage(f); const form = new FormData(); form.append('file', prepared); const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form }); const d = await r.json(); if (r.ok) await doAction('upload_payment', { fileId: d.fileId }); else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ'); } finally { endUploadPreview(purl); } e.target.value = ''; }} />
       </div>
@@ -801,13 +817,13 @@ export default function DealRoom() {
       else return <p style={{ color: 'var(--green-600)', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>✅ คุณยอมรับเงื่อนไขแล้ว — รอฝ่ายอื่น</p>;
     }
     if (s === 'payment_uploaded' && myRole === 'middleman') btns.push({ label: '✅ ยืนยันรับเงิน — เริ่มขั้นตอนแพ็คของ', cls: 'btn-green', fn: () => doAction('confirm_payment') });
-    if (s === 'packing' && myRole === 'seller') btns.push({ label: '📦 แพ็คของเสร็จ — จัดส่งให้คนกลาง', cls: 'btn-primary', fn: () => { if (trackingInput) doAction('seller_done_packing', { trackingNumber: trackingInput }); else alert('กรอกเลขพัสดุ'); } });
+    if (s === 'packing' && myRole === 'seller') btns.push({ label: isSimple ? '📦 แพ็คเสร็จ — จัดส่งให้ผู้ซื้อโดยตรง' : '📦 แพ็คของเสร็จ — จัดส่งให้คนกลาง', cls: 'btn-primary', fn: () => { if (trackingInput) doAction('seller_done_packing', { trackingNumber: trackingInput }); else alert('กรอกเลขพัสดุ'); } });
     if (s === 'shipped_to_middleman' && myRole === 'middleman') btns.push({ label: '📬 รับสินค้าแล้ว', cls: 'btn-primary', fn: () => doAction('middleman_received') });
     if (s === 'middleman_checking' && myRole === 'buyer' && !deal!.buyerConfirmedCheck) btns.push({ label: '✅ ยืนยันสินค้าไม่มีปัญหา', cls: 'btn-green', fn: () => doAction('buyer_confirm_check') });
     if (s === 'middleman_checking' && myRole === 'middleman' && deal!.buyerConfirmedCheck) btns.push({ label: '🚚 จัดส่งให้ผู้ซื้อแล้ว', cls: 'btn-primary', fn: () => { if (trackingInput) doAction('middleman_ship_to_buyer', { trackingNumber: trackingInput }); else alert('กรอกเลขพัสดุ'); } });
     if (s === 'shipped_to_buyer' && myRole === 'buyer') btns.push({ label: '🎉 ได้รับสินค้าแล้ว — ดีลเสร็จสมบูรณ์', cls: 'btn-green', fn: () => doAction('buyer_received') });
-    if (myRole === 'buyer' && s === 'buyer_joined' && !deal!.middlemanId && deal!.dealType !== 'meetup') btns.push({ label: showSelectMM ? 'ซ่อนการเลือกคนกลาง' : '🔎 เลือกคนกลาง', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
-    if (myRole === 'buyer' && deal!.middlemanId && ['terms_pending', 'payment_pending'].includes(s)) btns.push({ label: showSelectMM ? 'ซ่อนรายการคนกลาง' : '🔄 เลือกคนกลางใหม่', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
+    if (myRole === 'buyer' && s === 'buyer_joined' && !deal!.middlemanId && !isMeetup && !isSimple) btns.push({ label: showSelectMM ? 'ซ่อนการเลือกคนกลาง' : '🔎 เลือกคนกลาง', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
+    if (myRole === 'buyer' && !isSimple && deal!.middlemanId && ['terms_pending', 'payment_pending'].includes(s)) btns.push({ label: showSelectMM ? 'ซ่อนรายการคนกลาง' : '🔄 เลือกคนกลางใหม่', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
     if (!isFinished && myRole !== 'guest') btns.push({ label: '❌ ยกเลิก', cls: 'btn-danger', fn: () => { const r = prompt('เหตุผล'); doAction('cancel', { reason: r || '' }); } });
 
     if (btns.length === 0) return <p style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>ไม่มีการกระทำในขั้นตอนนี้</p>;
@@ -824,10 +840,25 @@ export default function DealRoom() {
   // ─── Evidence panel ──────────────────────────────────────────────────────
   function renderEvidencePanel() {
     const canUp = (myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status)) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
-    const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)' };
+    // โหมดง่าย: ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่องเมื่อของมาถึง
+    const canBuyerUnbox = isSimple && myRole === 'buyer' && deal!.status === 'shipped_to_buyer';
+    const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: isSimple ? '📬 วิดีโอก่อนแกะกล่อง (ผู้ซื้อ)' : '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)' };
     const items: { type: string; fileId: string; fileName: string }[] = (() => { try { return JSON.parse(deal!.evidenceData || '[]'); } catch { return []; } })();
     return (
       <div className="dr-evid-inner">
+        {isSimple && myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status) && (
+          <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
+            <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6 }}>⚡ ถ่ายวิดีโอทุกขั้นตอน เก็บจุดสำคัญ เช่น Serial Number และเลขชิป หากมีผลเทสต้องถ่ายประกอบ และเลขซีเรียลบนตัวสินค้ากับกล่อง/เอกสารต้องตรงกัน</div>
+          </div>
+        )}
+        {canBuyerUnbox && (
+          <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
+            <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
+            <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
+            <button onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดวิดีโอก่อนแกะ</button>
+            <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
+          </div>
+        )}
         {canUp && (
           <div className="dr-card">
             <div className="dr-card-title">อัปโหลดหลักฐาน</div>
@@ -862,7 +893,7 @@ export default function DealRoom() {
       <InAppBanner />
       <header className="dr-header">
         <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
-        <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{STEP_LABEL[deal.status]} · ฿{deal.price.toLocaleString()}</div></div>
+        <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{statusText(deal)} · ฿{deal.price.toLocaleString()}</div></div>
         <div className="dr-hctas">
           {myId && <NotifyBell />}
           <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
@@ -891,7 +922,7 @@ export default function DealRoom() {
             </div>
           )}
           <div className="dr-progress-wrap">
-            <div className="dr-prog-meta"><span className="dr-prog-status">{STEP_LABEL[deal.status]}</span><span className="dr-prog-pct">{pct}%</span></div>
+            <div className="dr-prog-meta"><span className="dr-prog-status">{statusText(deal)}</span><span className="dr-prog-pct">{pct}%</span></div>
             <div className="dr-prog-track"><div className="dr-prog-fill" style={{ width: `${pct}%`, background: deal.status === 'completed' ? 'var(--green-500)' : 'var(--accent)' }} /></div>
           </div>
 
@@ -912,13 +943,13 @@ export default function DealRoom() {
                     {[
                       ['ผู้ขาย', deal.sellerName || '(รอผู้ขาย)'],
                       ['ผู้ซื้อ', deal.buyerName || '(รอผู้ซื้อ)'],
-                      ['คนกลาง', isMeetup ? 'ไม่ต้องใช้ (รับประกันเดินทาง)' : (deal.middlemanName || '(ยังไม่ได้เลือก)')],
+                      ['คนกลาง', isMeetup ? 'ไม่ต้องใช้ (รับประกันเดินทาง)' : isSimple ? 'ไม่ต้องใช้ (ศูนย์กลางดูแลเอง)' : (deal.middlemanName || '(ยังไม่ได้เลือก)')],
                       ['ศูนย์กลาง', 'บริษัท คนกลาง จำกัด'],
                     ].map(([l, v]) => (
                       <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--line-2)', fontSize: 14 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ fontWeight: 600, color: 'var(--ink)' }}>{v}</span></div>
                     ))}
                   </div>
-                  {!isMeetup && myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && (
+                  {!isMeetup && !isSimple && myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && (
                     <div style={{ marginTop: 14 }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => setShowSelectMM(v => !v)}>
                         {showSelectMM ? 'ซ่อนแผงเลือกคนกลาง' : deal.middlemanId ? 'เปลี่ยนคนกลาง' : 'เลือกคนกลาง'}
@@ -927,7 +958,7 @@ export default function DealRoom() {
                   )}
                 </div>
 
-                {!isMeetup && myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && showSelectMM && renderMiddlemanPickerPanel()}
+                {!isMeetup && !isSimple && myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && showSelectMM && renderMiddlemanPickerPanel()}
 
                 {(deal.sellerAcceptedTerms || deal.buyerAcceptedTerms || deal.middlemanAcceptedTerms) && (
                   <div className="dr-card">
@@ -940,9 +971,9 @@ export default function DealRoom() {
 
                 {/* Timeline */}
                 <div className="dr-card">
-                  <div className="dr-card-title">{isMeetup ? 'ขั้นตอนรับประกันเดินทาง' : 'ขั้นตอน Escrow'}</div>
+                  <div className="dr-card-title">{isMeetup ? 'ขั้นตอนรับประกันเดินทาง' : isSimple ? 'ขั้นตอน Escrow (ส่งตรง)' : 'ขั้นตอน Escrow'}</div>
                   <div className="dr-timeline">
-                    {(isMeetup ? MEETUP_TIMELINE : TIMELINE).map(st => {
+                    {(isMeetup ? MEETUP_TIMELINE : isSimple ? SIMPLE_TIMELINE : TIMELINE).map(st => {
                       const si = STEP_ORDER.indexOf(deal.status);
                       const ti = STEP_ORDER.indexOf(st.key);
                       const d = ti < si, a = ti === si;
@@ -967,11 +998,11 @@ export default function DealRoom() {
                   </div>
                 )}
                 {deal.trackingToMiddleman && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ ผู้ขาย → คนกลาง</div><div className="dr-track-code">{deal.trackingToMiddleman}</div></div>}
-                {deal.trackingToBuyer && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ คนกลาง → ผู้ซื้อ</div><div className="dr-track-code">{deal.trackingToBuyer}</div></div>}
+                {deal.trackingToBuyer && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ {isSimple ? 'ผู้ขาย' : 'คนกลาง'} → ผู้ซื้อ</div><div className="dr-track-code">{deal.trackingToBuyer}</div></div>}
 
                 {deal.status === 'completed' && (
                   <>
-                    <div className="dr-card dr-done-card"><div className="dr-done-emoji">🎉</div><div className="dr-done-title">ดีลเสร็จสมบูรณ์!</div><div className="dr-done-sub">{isMeetup ? 'บริษัท คนกลาง จำกัด จะโอนเงินประกันคืนทั้งสองฝ่าย' : 'เงินถูกโอนให้ผู้ขายเรียบร้อยแล้ว'}</div></div>
+                    <div className="dr-card dr-done-card"><div className="dr-done-emoji">🎉</div><div className="dr-done-title">ดีลเสร็จสมบูรณ์!</div><div className="dr-done-sub">{isMeetup ? 'บริษัท คนกลาง จำกัด จะโอนเงินประกันคืนทั้งสองฝ่าย' : isSimple ? 'ศูนย์กลางจะโอนเงินให้ผู้ขายเรียบร้อยแล้ว (ดำเนินการโดยทีมงาน)' : 'เงินถูกโอนให้ผู้ขายเรียบร้อยแล้ว'}</div></div>
                     <ReviewPanel deal={deal} myRole={myRole as 'buyer' | 'seller' | 'middleman'} jwt={jwt} />
                   </>
                 )}

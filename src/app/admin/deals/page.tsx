@@ -17,10 +17,12 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   cancelled:  { label: 'ยกเลิก', cls: 'bg-gray-100 text-gray-600' },
   meetup_ready: { label: 'พร้อมนัดเจอ', cls: 'bg-blue-100 text-blue-700' },
   payment_pending: { label: 'รอโอนเงิน', cls: 'bg-amber-100 text-amber-700' },
+  payment_uploaded: { label: 'รอศูนย์กลางยืนยันรับเงิน', cls: 'bg-amber-100 text-amber-700' },
 };
 
 const TABS = [
   { k: 'disputed', label: '⚠️ ข้อพิพาท' },
+  { k: 'simple_pay', label: '⚡ ยืนยันรับเงิน (แบบง่าย)' },
   { k: 'meetup_refund', label: '💸 คืนเงินประกัน' },
   { k: 'active', label: 'กำลังดำเนินการ' },
   { k: 'completed', label: 'สำเร็จ' },
@@ -102,6 +104,7 @@ export default function AdminDeals() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.label}</span>
                     {d.dealType === 'meetup' && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">นัดรับ</span>}
+                    {d.dealType === 'simple' && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">แบบง่าย</span>}
                     <span className="font-mono text-sm font-bold text-green-600">฿{Number(d.price || 0).toLocaleString()}</span>
                   </div>
                   <p className="font-semibold mt-1 text-gray-900 dark:text-gray-100">{d.title}</p>
@@ -133,6 +136,12 @@ export default function AdminDeals() {
                       <RotateCcw size={14} /> ยกเลิก + คืนเงินผู้ซื้อ
                     </button>
                   </>
+                )}
+                {d.dealType === 'simple' && d.status === 'payment_uploaded' && (
+                  <button onClick={() => act(d.$id, 'confirm_simple_payment', 'หมายเหตุ (เช่น เลขอ้างอิงสลิป) — เว้นว่างได้:')} disabled={!!acting}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
+                    {acting === d.$id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ยืนยันรับเงิน — เริ่มแพ็ค
+                  </button>
                 )}
                 {refund && !refund.refundedAt && (
                   <button onClick={() => act(d.$id, 'mark_refunded', 'หมายเหตุการคืนเงิน (เช่น เลขอ้างอิงการโอน):')} disabled={!!acting}

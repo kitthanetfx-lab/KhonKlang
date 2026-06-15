@@ -11,6 +11,7 @@ function CreateDealForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // prefill จากหน้าอื่น เช่น /wanted ("เสนอขายผ่านคนกลาง")
+  const isSimple = searchParams.get('type') === 'simple';
   const [role, setRole] = useState<'seller' | 'buyer'>(searchParams.get('role') === 'buyer' ? 'buyer' : 'seller');
   const [title, setTitle] = useState(searchParams.get('title') || '');
   const [description, setDesc] = useState('');
@@ -32,7 +33,7 @@ function CreateDealForm() {
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, price: Number(price), category, creatorRole: role, source: 'private', wantedId: searchParams.get('wantedId') || '' }),
+        body: JSON.stringify({ title, description, price: Number(price), category, creatorRole: role, source: 'private', wantedId: searchParams.get('wantedId') || '', dealType: isSimple ? 'simple' : '' }),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || 'เกิดข้อผิดพลาด'); return; }
@@ -45,19 +46,28 @@ function CreateDealForm() {
     <div className="sub-page">
       <header className="sub-header">
         <Link href="/" className="sub-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
-        <span className="sub-htitle">สร้างดีลใหม่</span>
+        <span className="sub-htitle">{isSimple ? 'สร้างดีลแบบง่าย' : 'สร้างดีลใหม่'}</span>
       </header>
 
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px 80px' }}>
         <div className="deal-form">
           <h2 className="deal-form-title">รายละเอียดดีล</h2>
-          <p className="deal-form-sub">สร้างดีล Escrow แล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม</p>
+          <p className="deal-form-sub">{isSimple ? 'ซื้อขายผ่านกลางแบบง่าย — พักเงินกับศูนย์กลาง ผู้ขายส่งตรงถึงผู้ซื้อ ไม่ต้องใช้คนกลางบุคคล' : 'สร้างดีล Escrow แล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม'}</p>
+
+          {isSimple && (
+            <div style={{ background: '#fff3e0', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '10px 14px', fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 16 }}>
+              ⚡ โหมดง่าย: เงินพักไว้กับศูนย์กลาง · ผู้ขายส่งตรงพร้อมถ่ายวิดีโอ Serial/เลขชิป · ผู้ซื้อถ่ายวิดีโอก่อนแกะกล่อง แล้วศูนย์กลางจึงโอนเงินให้ผู้ขาย
+            </div>
+          )}
 
           {/* Role */}
           <div className="deal-field">
             <label>คุณเป็น...</label>
             <div className="svc-pick-grid">
-              {([['seller', 'ผู้ขาย 🛒', 'สร้างดีล → ส่งลิงก์ให้ผู้ซื้อ → ผู้ซื้อเลือกคนกลาง'], ['buyer', 'ผู้ซื้อ 🛍️', 'สร้างดีล → ส่งลิงก์ให้ผู้ขาย → เลือกคนกลางเอง']] as const).map(([k, l, d]) => (
+              {(isSimple
+                ? [['seller', 'ผู้ขาย 🛒', 'สร้างดีล → ส่งลิงก์ให้ผู้ซื้อ → ผู้ซื้อโอนเงินเข้าศูนย์กลาง'], ['buyer', 'ผู้ซื้อ 🛍️', 'สร้างดีล → ส่งลิงก์ให้ผู้ขาย → โอนเงินเข้าศูนย์กลาง']] as const
+                : [['seller', 'ผู้ขาย 🛒', 'สร้างดีล → ส่งลิงก์ให้ผู้ซื้อ → ผู้ซื้อเลือกคนกลาง'], ['buyer', 'ผู้ซื้อ 🛍️', 'สร้างดีล → ส่งลิงก์ให้ผู้ขาย → เลือกคนกลางเอง']] as const
+              ).map(([k, l, d]) => (
                 <button key={k} type="button" className={`svc-pick-card${role === k ? ' sel' : ''}`} onClick={() => setRole(k)} style={{ flexDirection: 'column', gap: 6 }}>
                   <span className="spc-t">{l}</span>
                   <span className="spc-d">{d}</span>
