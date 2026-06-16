@@ -986,7 +986,7 @@ export default function DealRoom() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,.4)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>📹 วิดีโอคอล กำลังดำเนินการ...</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <CallRecorder dealId={dealId} onSaveEvidence={myRole !== 'guest' ? saveCallEvidence : undefined} />
+              <CallRecorder dealId={dealId} onSaveEvidence={saveCallEvidence} />
               <button onClick={() => setShowJitsi(false)} className="btn btn-danger btn-sm">✕ วางสาย</button>
             </div>
           </div>
@@ -1110,7 +1110,7 @@ export default function DealRoom() {
                           </div>
                           <span className="dr-bubble-t">
                             {new Date(m.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                            {myRole !== 'guest' && myRole !== '' && (m.content || m.fileId) && (
+                            {(m.content || m.fileId) && (
                               <button type="button" onClick={() => saveMsgEvidence(m)} disabled={acting}
                                 style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                                 title="เก็บข้อความ/ไฟล์นี้เป็นหลักฐาน">📌 เก็บเป็นหลักฐาน</button>
