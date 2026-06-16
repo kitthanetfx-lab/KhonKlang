@@ -1,7 +1,8 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { account } from '@/lib/appwrite';
+import { account, storage } from '@/lib/appwrite';
+import { ID, Permission, Role } from 'appwrite';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
@@ -52,21 +53,53 @@ function CallRecorder({ dealId, onSaveEvidence }: { dealId: string; onSaveEviden
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const displayStreamRef = useRef<MediaStream | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
-  useEffect(() => () => { try { recRef.current?.stop(); } catch {} if (timerRef.current) clearInterval(timerRef.current); }, []);
+  function cleanupStreams() {
+    try { displayStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
+    try { micStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
+    try { audioCtxRef.current?.close(); } catch {}
+    displayStreamRef.current = null; micStreamRef.current = null; audioCtxRef.current = null;
+  }
+
+  useEffect(() => () => { try { recRef.current?.stop(); } catch {} cleanupStreams(); if (timerRef.current) clearInterval(timerRef.current); }, []);
 
   async function start() {
     try {
       const md = navigator.mediaDevices as MediaDevices & { getDisplayMedia?: (c: MediaStreamConstraints) => Promise<MediaStream> };
       if (!md.getDisplayMedia) { alert('เบราว์เซอร์นี้ไม่รองรับการบันทึกหน้าจอ — แนะนำ Chrome/Edge บนคอมพิวเตอร์ (มือถือใช้ปุ่มอัดหน้าจอของเครื่องแทน)'); return; }
-      const stream = await md.getDisplayMedia({ video: true, audio: true });
+      const display = await md.getDisplayMedia({ video: true, audio: true });
+      displayStreamRef.current = display;
+
+      // ผสมเสียงไมโครโฟน (เสียงเรา) เข้ากับเสียงหน้าจอ/แท็บ (เสียงอีกฝ่าย) ด้วย Web Audio API
+      // มิฉะนั้นวิดีโอที่อัดจะไม่มีเสียงเราเอง หรือเงียบทั้งหมดหากไม่ได้แชร์เสียงแท็บ
+      let mixedAudio: MediaStreamTrack[] = display.getAudioTracks();
+      try {
+        const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        micStreamRef.current = mic;
+        const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const ctx = new AC();
+        audioCtxRef.current = ctx;
+        const dest = ctx.createMediaStreamDestination();
+        if (display.getAudioTracks().length) ctx.createMediaStreamSource(display).connect(dest);
+        ctx.createMediaStreamSource(mic).connect(dest);
+        mixedAudio = dest.stream.getAudioTracks();
+      } catch { /* ไม่มีไมค์/ไม่ให้สิทธิ์ → ใช้เฉพาะเสียงหน้าจอเท่าที่มี */ }
+
+      if (mixedAudio.length === 0) {
+        alert('⚠️ ไม่พบเสียงสำหรับบันทึก — ตอนเลือกหน้าจอโปรดเลือก "แท็บ Chrome" และติ๊ก "แชร์เสียงแท็บ" และอนุญาตให้ใช้ไมโครโฟน เพื่อให้วิดีโอมีเสียง');
+      }
+
+      const stream = new MediaStream([...display.getVideoTracks(), ...mixedAudio]);
       const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus'
         : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '';
       const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       chunksRef.current = [];
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
+        cleanupStreams();
         if (timerRef.current) clearInterval(timerRef.current);
         setRecording(false); setSec(0);
         const blob = new Blob(chunksRef.current, { type: 'video/webm' });
@@ -97,7 +130,7 @@ function CallRecorder({ dealId, onSaveEvidence }: { dealId: string; onSaveEviden
   const ss = String(sec % 60).padStart(2, '0');
   return (
     <button type="button" className={`rec-btn ${recording ? 'on' : ''}`} onClick={recording ? stop : start}
-      title={recording ? 'หยุดและบันทึกลงเครื่อง' : 'อัดวิดีโอคอลเก็บไว้เป็นหลักฐาน (เลือกแท็บนี้ + แชร์เสียงแท็บ)'}>
+      title={recording ? 'หยุดและบันทึกลงเครื่อง' : 'อัดวิดีโอคอลเก็บเป็นหลักฐาน — เลือก "แท็บ Chrome" + ติ๊กแชร์เสียงแท็บ และอนุญาตไมโครโฟน เพื่อให้มีเสียงครบ'}>
       {recording ? <><span className="rec-dot" /> {mm}:{ss} หยุด & เซฟ</> : <>⏺ บันทึกวิดีโอ</>}
     </button>
   );
@@ -302,6 +335,8 @@ export default function DealRoom() {
   const evidInputRef = useRef<HTMLInputElement>(null);
   const buyerEvidInputRef = useRef<HTMLInputElement>(null);
   const [showTerms, setShowTerms] = useState(false);
+  const [callChatOpen, setCallChatOpen] = useState(true);
+  const callFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const r = document.documentElement;
@@ -434,14 +469,26 @@ export default function DealRoom() {
   async function uploadFile(file: File, isEvidence = false, evidenceTypeOverride?: string) {
     const purl = beginUploadPreview(file);
     try {
-      const j = await getJwt();
-      const prepared = await compressImage(file); // บีบอัดเฉพาะรูป — วิดีโอ/PDF ส่งตามเดิม
-      const form = new FormData(); form.append('file', prepared);
-      const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form });
-      const d = await r.json();
-      if (!r.ok) { alert(d.error || 'Upload failed'); return; }
-      if (isEvidence) await doAction('add_evidence', { evidenceType: evidenceTypeOverride || evidenceType, fileId: d.fileId, fileName: d.fileName });
-      else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', d.fileId, d.fileName);
+      let fileId = '', fileName = file.name;
+      if (file.type.startsWith('video/')) {
+        // วิดีโอมักใหญ่เกินลิมิต body ของ API route บน Vercel (~4.5MB) → อัปโหลดตรงเข้า Appwrite Storage
+        await fetch('/api/storage/ensure-deal-bucket', { method: 'POST' }).catch(() => {});
+        const perms = myId
+          ? [Permission.read(Role.any()), Permission.update(Role.user(myId)), Permission.delete(Role.user(myId))]
+          : [Permission.read(Role.any())];
+        const created = await storage.createFile(BUCKET, ID.unique(), file, perms);
+        fileId = created.$id;
+      } else {
+        const j = await getJwt();
+        const prepared = await compressImage(file); // บีบอัดเฉพาะรูป
+        const form = new FormData(); form.append('file', prepared);
+        const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form });
+        const d = await r.json();
+        if (!r.ok) { alert(d.error || 'Upload failed'); return; }
+        fileId = d.fileId; fileName = d.fileName;
+      }
+      if (isEvidence) await doAction('add_evidence', { evidenceType: evidenceTypeOverride || evidenceType, fileId, fileName });
+      else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', fileId, fileName);
     } finally { endUploadPreview(purl); }
   }
 
@@ -454,19 +501,11 @@ export default function DealRoom() {
     }
   }
 
-  // อัปโหลดวิดีโอคอลที่บันทึกไว้แล้วเก็บเป็นหลักฐาน
+  // เก็บวิดีโอคอลที่บันทึกไว้เป็นหลักฐาน (อัปโหลดตรงเข้า Storage ผ่าน uploadFile)
   async function saveCallEvidence(blob: Blob) {
-    const purl = beginUploadPreview(new File([blob], 'call.webm', { type: 'video/webm' }));
-    try {
-      const j = await getJwt();
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-      const file = new File([blob], `call-${dealId.slice(0, 8)}-${stamp}.webm`, { type: 'video/webm' });
-      const form = new FormData(); form.append('file', file);
-      const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form });
-      const d = await r.json();
-      if (!r.ok) { alert(d.error || 'บันทึกวิดีโอคอลเป็นหลักฐานไม่สำเร็จ'); return; }
-      await doAction('add_evidence', { evidenceType: 'call', fileId: d.fileId, fileName: d.fileName });
-    } finally { endUploadPreview(purl); }
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    const file = new File([blob], `call-${dealId.slice(0, 8)}-${stamp}.webm`, { type: 'video/webm' });
+    await uploadFile(file, true, 'call');
   }
 
   // ลิงก์แชร์พ่วง openExternalBrowser=1 — ผู้รับที่เปิดจาก LINE จะเด้งไปเบราว์เซอร์หลักอัตโนมัติ
@@ -991,6 +1030,42 @@ export default function DealRoom() {
             </div>
           </div>
           <div style={{ flex: 1, minHeight: '60vh' }}><JitsiMeet roomName={jitsiRoom} displayName={myName || 'ผู้ใช้'} /></div>
+          {/* กล่องแชทลอยซ้อนบนวิดีโอคอล (ย่อ/ขยายได้) */}
+          {callChatOpen ? (
+            <div style={{ position: 'fixed', right: 16, bottom: 16, width: 320, maxWidth: '90vw', height: '55vh', maxHeight: 460, background: 'var(--surface)', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,.4)', display: 'flex', flexDirection: 'column', zIndex: 60, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--accent)', color: '#fff' }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>💬 แชทระหว่างคอล</span>
+                <button onClick={() => setCallChatOpen(false)} title="ย่อ" style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>—</button>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {msgs.filter(m => m.role !== 'system').length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12, marginTop: 12 }}>ยังไม่มีข้อความ</p>}
+                {msgs.filter(m => m.role !== 'system').map(m => {
+                  const isMe = m.senderId === myId;
+                  return (
+                    <div key={m.$id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
+                      {!isMe && <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2 }}>{m.senderName}</div>}
+                      <div style={{ background: isMe ? 'var(--accent)' : 'var(--surface-2)', color: isMe ? '#fff' : 'var(--ink)', padding: '6px 10px', borderRadius: 10, fontSize: 13, wordBreak: 'break-word' }}>
+                        {m.type === 'image' ? <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer"><img src={fileUrl(m.fileId)} alt={m.fileName} style={{ maxWidth: 160, borderRadius: 8 }} /></a>
+                          : m.type === 'file' ? <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.fileName}</a>
+                          : m.content}
+                      </div>
+                      {myRole !== 'guest' && myRole !== '' && (m.content || m.fileId) && (
+                        <button onClick={() => saveMsgEvidence(m)} disabled={acting} style={{ fontSize: 10, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2 }}>📌 เก็บเป็นหลักฐาน</button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 6, padding: 8, borderTop: '1px solid var(--line)' }}>
+                <button className="dr-attach" onClick={() => callFileInputRef.current?.click()} disabled={sending} title="ส่งรูป/ไฟล์">🖼️</button>
+                <input ref={callFileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; if (f.size > 10 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 10MB'); return; } await uploadFile(f); }} />
+                <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="พิมพ์ข้อความ..." onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) sendMsg(chatInput); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px', fontSize: 13, minWidth: 0 }} />
+                <button onClick={() => { if (chatInput.trim()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending} className="btn btn-primary btn-sm">ส่ง</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setCallChatOpen(true)} style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 60, borderRadius: 24, padding: '10px 16px', background: 'var(--accent)', color: '#fff', border: 'none', boxShadow: '0 6px 20px rgba(0,0,0,.4)', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>💬 แชท ({msgs.filter(m => m.role !== 'system').length})</button>
+          )}
         </div>
       ) : (
         <>
@@ -1151,7 +1226,7 @@ export default function DealRoom() {
             <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 18 }}>
               📹 สำคัญ: โปรดเข้าหน้าแชทและวิดีโอคอล เพื่อพูดคุย ดูสภาพสินค้า และตกลงรายละเอียดให้เรียบร้อยก่อน — บันทึกบทสนทนา / วิดีโอคอล / รูปภาพไว้เป็นหลักฐาน โดยกดปุ่ม “📌 เก็บเป็นหลักฐาน” ที่แต่ละข้อความ
             </div>
-            <button className="btn btn-primary btn-block" onClick={() => { setShowTerms(false); doAction('accept_terms'); }}>✅ ยอมรับข้อตกลงและดำเนินการต่อ</button>
+            <button className="btn btn-primary btn-block" onClick={() => { setShowTerms(false); setTab('chat'); doAction('accept_terms'); }}>✅ ยอมรับข้อตกลงและดำเนินการต่อ</button>
             <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => setShowTerms(false)}>ยกเลิก</button>
           </div>
         </div>
