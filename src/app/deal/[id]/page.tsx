@@ -1049,7 +1049,7 @@ export default function DealRoom() {
                           : m.type === 'file' ? <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.fileName}</a>
                           : m.content}
                       </div>
-                      {myRole !== 'guest' && myRole !== '' && (m.content || m.fileId) && (
+                      {(m.content || m.fileId) && (
                         <button onClick={() => saveMsgEvidence(m)} disabled={acting} style={{ fontSize: 10, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2 }}>📌 เก็บเป็นหลักฐาน</button>
                       )}
                     </div>
