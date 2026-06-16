@@ -8,6 +8,12 @@ export async function GET(req: NextRequest) {
     await verifyAdmin(req);
     const db = new Databases(getAdminClient());
     const type = req.nextUrl.searchParams.get('type') || 'wanted';
+    if (type === 'listings') {
+      // ประกาศขายในตลาด = ดีลที่ source='listing'
+      const res = await db.listDocuments(DB_ID, 'deals', [Query.equal('source', 'listing'), Query.orderDesc('createdAt'), Query.limit(200)])
+        .catch(() => ({ documents: [], total: 0 }));
+      return NextResponse.json(res);
+    }
     const col = type === 'reviews' ? 'reviews' : 'wanted_posts';
     const res = await db.listDocuments(DB_ID, col, [Query.orderDesc('createdAt'), Query.limit(200)])
       .catch(() => ({ documents: [], total: 0 }));
@@ -35,6 +41,17 @@ export async function PATCH(req: NextRequest) {
     if (type === 'reviews') {
       if (action === 'delete') {
         await db.deleteDocument(DB_ID, 'reviews', id);
+        return NextResponse.json({ ok: true });
+      }
+    }
+    if (type === 'listings') {
+      // ถอดประกาศ = ตั้งสถานะดีลเป็น cancelled (ตลาดแสดงเฉพาะ status='posted') / คืนประกาศ = posted
+      if (action === 'remove') {
+        await db.updateDocument(DB_ID, 'deals', id, { status: 'cancelled', rejectReason: '[แอดมินถอดประกาศจากตลาด]' });
+        return NextResponse.json({ ok: true });
+      }
+      if (action === 'restore') {
+        await db.updateDocument(DB_ID, 'deals', id, { status: 'posted', rejectReason: '' });
         return NextResponse.json({ ok: true });
       }
     }

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { account, clearPersistedSession } from '@/lib/appwrite';
 import {
   LayoutDashboard, Store, Shield, Users, Settings,
-  LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff,
+  LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, MapPin,
 } from 'lucide-react';
 
 const NAV = [
@@ -15,6 +15,7 @@ const NAV = [
   { href: '/admin/middlemen',   icon: Shield,          label: 'คนกลาง' },
   { href: '/admin/scam-reports',icon: ShieldAlert,     label: 'รายงานคนโกง' },
   { href: '/admin/deals',       icon: Handshake,       label: 'ดีล & ข้อพิพาท' },
+  { href: '/admin/onsite-jobs', icon: MapPin,          label: 'งานนัดออนไซต์' },
   { href: '/admin/moderate',    icon: EyeOff,          label: 'ตรวจสอบเนื้อหา' },
   { href: '/admin/users',       icon: Users,           label: 'ผู้ใช้ทั้งหมด' },
   { href: '/admin/settings',    icon: Settings,        label: 'ตั้งค่า' },

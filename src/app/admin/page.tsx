@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { account } from '@/lib/appwrite';
-import { Users, Store, Shield, Clock, CheckCircle2, TrendingUp, ArrowRight } from 'lucide-react';
+import { Users, Store, Shield, Clock, CheckCircle2, TrendingUp, ArrowRight, MapPin } from 'lucide-react';
 
 interface Stats {
   totalUsers: number;
@@ -12,6 +12,9 @@ interface Stats {
   approvedSellers: number;
   pendingMiddlemen: number;
   approvedMiddlemen: number;
+  onsiteOpen?: number;
+  onsiteActive?: number;
+  onsiteTotal?: number;
   recentSellers: Application[];
   recentMiddlemen: Application[];
 }
@@ -124,6 +127,11 @@ export default function AdminDashboard() {
           label="อนุมัติแล้วรวม"
           value={stats.approvedSellers + stats.approvedMiddlemen}
           color="bg-teal-50 dark:bg-teal-900/20" />
+        <StatCard icon={<MapPin size={22} className="text-orange-600" />}
+          label="งานนัดออนไซต์"
+          value={stats.onsiteTotal ?? 0}
+          sub={`เปิด ${stats.onsiteOpen ?? 0} | กำลังทำ ${stats.onsiteActive ?? 0}`}
+          color="bg-orange-50 dark:bg-orange-900/20" href="/admin/onsite-jobs" />
       </div>
 
       {/* Pending alert */}
