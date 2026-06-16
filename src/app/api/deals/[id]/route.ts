@@ -124,17 +124,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'add_evidence': {
-        const { evidenceType, fileId, fileName } = body;
+        const { evidenceType, fileId, fileName, content } = body;
         const existing = (() => { try { return JSON.parse(deal.evidenceData || '[]'); } catch { return []; } })();
-        existing.push({ type: evidenceType, fileId, fileName, uploadedBy: uid, at: new Date().toISOString() });
+        existing.push({
+          type: evidenceType,
+          fileId: fileId || '',
+          fileName: fileName || '',
+          content: content ? String(content).slice(0, 200) : '',
+          uploadedBy: uid,
+          uploaderName: currentUser.name || '',
+          at: new Date().toISOString(),
+        });
         // Trim to last 20 evidence items to avoid field size overflow
         const trimmed = existing.slice(-20);
         updates.evidenceData = JSON.stringify(trimmed);
         const label: Record<string, string> = {
           packing: 'วิดีโอแพ็คของ', testing: 'วิดีโอทดสอบสินค้า',
           receive: 'วิดีโอรับสินค้า', check: 'วิดีโอตรวจสินค้า',
+          chat: 'หลักฐานจากแชท', chat_text: 'ข้อความแชท', call: 'วิดีโอคอลที่บันทึก',
         };
-        systemMsg = `อัปโหลด${label[evidenceType] || evidenceType}แล้ว`;
+        systemMsg = `เก็บ${label[evidenceType] || evidenceType}เป็นหลักฐานแล้ว`;
         break;
       }
       case 'seller_done_packing': {

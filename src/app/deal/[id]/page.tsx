@@ -46,7 +46,7 @@ function JitsiMeet({ roomName, displayName }: { roomName: string; displayName: s
 }
 
 // ─── บันทึกวิดีโอคอล (อัดหน้าจอ+เสียงแท็บ แล้วเซฟลงเครื่องเป็น .webm) ───────
-function CallRecorder({ dealId }: { dealId: string }) {
+function CallRecorder({ dealId, onSaveEvidence }: { dealId: string; onSaveEvidence?: (blob: Blob) => Promise<void> }) {
   const [recording, setRecording] = useState(false);
   const [sec, setSec] = useState(0);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -77,6 +77,10 @@ function CallRecorder({ dealId }: { dealId: string }) {
         a.href = url; a.download = `khonklang-call-${dealId.slice(0, 8)}-${stamp}.webm`;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 5000);
+        // เก็บวิดีโอคอลนี้เป็นหลักฐานในระบบด้วยหรือไม่
+        if (onSaveEvidence && window.confirm('บันทึกวิดีโอคอลนี้เป็นหลักฐานในดีลด้วยไหม? (จะแสดงในแท็บหลักฐาน)')) {
+          onSaveEvidence(blob).catch(() => alert('เก็บวิดีโอคอลเป็นหลักฐานไม่สำเร็จ'));
+        }
       };
       // ผู้ใช้กด "หยุดแชร์" ของเบราว์เซอร์ → หยุดบันทึกและเซฟให้เลย
       stream.getVideoTracks()[0]?.addEventListener('ended', () => { if (mr.state !== 'inactive') mr.stop(); });
@@ -172,6 +176,51 @@ function statusText(d: { status: string; dealType?: string }) {
   return STEP_LABEL[d.status];
 }
 
+// ข้อตกลงความคุ้มครองของแต่ละบริการ — แสดงในป๊อปอัพก่อนยอมรับเงื่อนไข
+const SERVICE_TERMS: Record<string, { name: string; covers: string[]; excludes: string[] }> = {
+  simple: {
+    name: 'ซื้อขายผ่านกลางแบบง่าย (ส่งตรง)',
+    covers: [
+      'ผู้ขายไม่ส่งสินค้า — ผู้ซื้อได้รับเงินคืนเต็มจำนวน',
+      'ส่งของไม่ตรงปก / ผิดรุ่น / ผิดสเปกจากที่ตกลงกันไว้',
+      'สินค้าเสียหายชัดเจน ที่เห็นได้จากวิดีโอตอนผู้ซื้อแกะกล่อง',
+    ],
+    excludes: [
+      'สินค้าที่ต้องตรวจเชิงลึก เช่น ชิ้นส่วนภายใน หรือความสมบูรณ์เชิงเทคนิคที่ไม่เห็นจากภายนอก',
+      'ปัญหาที่ผู้ซื้อไม่ได้ถ่ายวิดีโอก่อนแกะกล่อง',
+      'ความเสียหายหรือความผิดปกติที่เกิดหลังผู้ซื้อรับและใช้งานสินค้า',
+    ],
+  },
+  '': {
+    name: 'ซื้อขายผ่านกลาง (ออนไลน์)',
+    covers: [
+      'ผู้ขายไม่ส่งสินค้า — ผู้ซื้อได้รับเงินคืนเต็มจำนวน',
+      'คนกลางตรวจสอบสินค้าก่อนส่งต่อให้ผู้ซื้อ',
+      'ของไม่ตรงปก / ชำรุด / ของปลอม ที่คนกลางตรวจพบก่อนส่ง',
+      'มีคนกลางเป็นพยานกลาง และถ่ายวิดีโอหลักฐานทุกขั้นตอน',
+    ],
+    excludes: [
+      'ตำหนิเล็กน้อยที่ทั้งสองฝ่ายตกลงรับได้ไว้ก่อนหน้า',
+      'ความเสียหายที่เกิดหลังผู้ซื้อรับและใช้งานสินค้า',
+    ],
+  },
+  meetup: {
+    name: 'รับประกันเดินทาง (นัดเจอ)',
+    covers: [
+      'คุ้มครองการผิดนัด — ฝ่ายที่ไม่มาตามนัดถูกหักเงินประกัน',
+      'วางเงินประกันทั้งสองฝ่าย คืนเต็มจำนวนเมื่อเจอกันสำเร็จ',
+      'ผู้ซื้อตรวจสินค้าต่อหน้า ณ จุดนัดพบก่อนตัดสินใจ',
+    ],
+    excludes: [
+      'คุณภาพสินค้าหลังตกลงซื้อต่อหน้า (ผู้ซื้อต้องตรวจให้พอใจ ณ จุดนัด)',
+      'เหตุสุดวิสัยหรือข้อตกลงพิเศษที่คุยกันเอง',
+    ],
+  },
+};
+function termsFor(dealType?: string) {
+  return SERVICE_TERMS[dealType === 'meetup' ? 'meetup' : dealType === 'simple' ? 'simple' : ''];
+}
+
 type DealTab = 'steps' | 'chat' | 'evidence';
 type DealRole = 'seller' | 'middleman' | 'buyer' | 'guest' | '';
 
@@ -252,6 +301,7 @@ export default function DealRoom() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const evidInputRef = useRef<HTMLInputElement>(null);
   const buyerEvidInputRef = useRef<HTMLInputElement>(null);
+  const [showTerms, setShowTerms] = useState(false);
 
   useEffect(() => {
     const r = document.documentElement;
@@ -392,6 +442,30 @@ export default function DealRoom() {
       if (!r.ok) { alert(d.error || 'Upload failed'); return; }
       if (isEvidence) await doAction('add_evidence', { evidenceType: evidenceTypeOverride || evidenceType, fileId: d.fileId, fileName: d.fileName });
       else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', d.fileId, d.fileName);
+    } finally { endUploadPreview(purl); }
+  }
+
+  // เก็บข้อความ/รูป/ไฟล์จากแชทเป็นหลักฐาน (บันทึกลงดีลใน database และแสดงในแท็บหลักฐาน)
+  async function saveMsgEvidence(m: Msg) {
+    if (m.type === 'image' || m.type === 'file') {
+      await doAction('add_evidence', { evidenceType: 'chat', fileId: m.fileId, fileName: m.fileName, content: m.senderName ? `จาก ${m.senderName}` : '' });
+    } else {
+      await doAction('add_evidence', { evidenceType: 'chat_text', content: `${m.senderName || ''}: ${m.content}` });
+    }
+  }
+
+  // อัปโหลดวิดีโอคอลที่บันทึกไว้แล้วเก็บเป็นหลักฐาน
+  async function saveCallEvidence(blob: Blob) {
+    const purl = beginUploadPreview(new File([blob], 'call.webm', { type: 'video/webm' }));
+    try {
+      const j = await getJwt();
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+      const file = new File([blob], `call-${dealId.slice(0, 8)}-${stamp}.webm`, { type: 'video/webm' });
+      const form = new FormData(); form.append('file', file);
+      const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form });
+      const d = await r.json();
+      if (!r.ok) { alert(d.error || 'บันทึกวิดีโอคอลเป็นหลักฐานไม่สำเร็จ'); return; }
+      await doAction('add_evidence', { evidenceType: 'call', fileId: d.fileId, fileName: d.fileName });
     } finally { endUploadPreview(purl); }
   }
 
@@ -813,7 +887,7 @@ export default function DealRoom() {
     const btns: { label: string; cls: string; fn: () => void }[] = [];
     if (['buyer_joined', 'terms_pending'].includes(s)) {
       const accepted = (myRole === 'seller' && deal!.sellerAcceptedTerms) || (myRole === 'middleman' && deal!.middlemanAcceptedTerms) || (myRole === 'buyer' && deal!.buyerAcceptedTerms);
-      if (!accepted) btns.push({ label: '✅ ยอมรับเงื่อนไขข้อตกลง', cls: 'btn-primary', fn: () => doAction('accept_terms') });
+      if (!accepted) btns.push({ label: '✅ ยอมรับเงื่อนไขข้อตกลง', cls: 'btn-primary', fn: () => setShowTerms(true) });
       else return <p style={{ color: 'var(--green-600)', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>✅ คุณยอมรับเงื่อนไขแล้ว — รอฝ่ายอื่น</p>;
     }
     if (s === 'payment_uploaded' && myRole === 'middleman') btns.push({ label: '✅ ยืนยันรับเงิน — เริ่มขั้นตอนแพ็คของ', cls: 'btn-green', fn: () => doAction('confirm_payment') });
@@ -842,8 +916,8 @@ export default function DealRoom() {
     const canUp = (myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status)) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
     // โหมดง่าย: ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่องเมื่อของมาถึง
     const canBuyerUnbox = isSimple && myRole === 'buyer' && deal!.status === 'shipped_to_buyer';
-    const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: isSimple ? '📬 วิดีโอก่อนแกะกล่อง (ผู้ซื้อ)' : '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)' };
-    const items: { type: string; fileId: string; fileName: string }[] = (() => { try { return JSON.parse(deal!.evidenceData || '[]'); } catch { return []; } })();
+    const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: isSimple ? '📬 วิดีโอก่อนแกะกล่อง (ผู้ซื้อ)' : '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)', chat: '💬 หลักฐานจากแชท', chat_text: '💬 ข้อความแชท', call: '📹 วิดีโอคอลที่บันทึก' };
+    const items: { type: string; fileId: string; fileName: string; content?: string; uploaderName?: string }[] = (() => { try { return JSON.parse(deal!.evidenceData || '[]'); } catch { return []; } })();
     return (
       <div className="dr-evid-inner">
         {isSimple && myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status) && (
@@ -873,12 +947,18 @@ export default function DealRoom() {
         {items.length === 0 && !canUp && <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '32px 0' }}>ยังไม่มีหลักฐาน</p>}
         <div className="dr-evid-list">
           {items.map((item, i) => {
-            const url = fileUrl(item.fileId);
+            const url = item.fileId ? fileUrl(item.fileId) : '';
             const isVid = item.fileName?.match(/\.(mp4|mov|avi|webm)$/i);
+            const isImg = item.fileName?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
             return (
               <div key={i} className="dr-card" style={{ padding: 12 }}>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{typeLabel[item.type] || item.type}</div>
-                {isVid ? <video src={url} controls style={{ width: '100%', maxHeight: 220, borderRadius: 'var(--r-md)', background: '#000' }} /> : <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.fileName} style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 'var(--r-md)' }} /></a>}
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{typeLabel[item.type] || item.type}{item.uploaderName ? ` · ${item.uploaderName}` : ''}</div>
+                {!item.fileId
+                  ? <div style={{ fontSize: 14, color: 'var(--ink)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.content || '(ไม่มีข้อความ)'}</div>
+                  : isVid ? <video src={url} controls style={{ width: '100%', maxHeight: 220, borderRadius: 'var(--r-md)', background: '#000' }} />
+                  : isImg ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.fileName} style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 'var(--r-md)' }} /></a>
+                  : <a href={url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', fontSize: 14 }}>📎 {item.fileName || 'เปิดไฟล์'}</a>}
+                {item.fileId && item.content ? <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>{item.content}</div> : null}
               </div>
             );
           })}
@@ -906,7 +986,7 @@ export default function DealRoom() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,.4)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>📹 วิดีโอคอล กำลังดำเนินการ...</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <CallRecorder dealId={dealId} />
+              <CallRecorder dealId={dealId} onSaveEvidence={myRole !== 'guest' ? saveCallEvidence : undefined} />
               <button onClick={() => setShowJitsi(false)} className="btn btn-danger btn-sm">✕ วางสาย</button>
             </div>
           </div>
@@ -1028,7 +1108,14 @@ export default function DealRoom() {
                               : m.type === 'file' ? <a href={fileUrl(m.fileId)} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', fontSize: 14 }}>📎 {m.fileName}</a>
                                 : m.content}
                           </div>
-                          <span className="dr-bubble-t">{new Date(m.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="dr-bubble-t">
+                            {new Date(m.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                            {myRole !== 'guest' && myRole !== '' && (m.content || m.fileId) && (
+                              <button type="button" onClick={() => saveMsgEvidence(m)} disabled={acting}
+                                style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                title="เก็บข้อความ/ไฟล์นี้เป็นหลักฐาน">📌 เก็บเป็นหลักฐาน</button>
+                            )}
+                          </span>
                         </div>
                       </div>
                     );
@@ -1048,6 +1135,27 @@ export default function DealRoom() {
           </main>
         </>
       )}
+      {showTerms && (() => { const t = termsFor(deal.dealType); return (
+        <div onClick={() => setShowTerms(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 100 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 'var(--r-lg)', maxWidth: 460, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: '22px 20px' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, color: 'var(--ink)', marginBottom: 4 }}>📋 ข้อตกลงบริการ</div>
+            <div style={{ fontSize: 13.5, color: 'var(--muted)', marginBottom: 16 }}>{t.name}</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--green-600)', marginBottom: 8 }}>✅ บริการนี้ครอบคลุม</div>
+            <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 13.5, lineHeight: 1.7, color: 'var(--ink)' }}>
+              {t.covers.map((c, i) => <li key={i}>{c}</li>)}
+            </ul>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#b22441', marginBottom: 8 }}>⚠️ ไม่ครอบคลุม</div>
+            <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 13.5, lineHeight: 1.7, color: 'var(--muted)' }}>
+              {t.excludes.map((c, i) => <li key={i}>{c}</li>)}
+            </ul>
+            <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 18 }}>
+              📹 สำคัญ: โปรดเข้าหน้าแชทและวิดีโอคอล เพื่อพูดคุย ดูสภาพสินค้า และตกลงรายละเอียดให้เรียบร้อยก่อน — บันทึกบทสนทนา / วิดีโอคอล / รูปภาพไว้เป็นหลักฐาน โดยกดปุ่ม “📌 เก็บเป็นหลักฐาน” ที่แต่ละข้อความ
+            </div>
+            <button className="btn btn-primary btn-block" onClick={() => { setShowTerms(false); doAction('accept_terms'); }}>✅ ยอมรับข้อตกลงและดำเนินการต่อ</button>
+            <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => setShowTerms(false)}>ยกเลิก</button>
+          </div>
+        </div>
+      ); })()}
       {uploadPreview && (
         <div className="up-toast" role="status" aria-live="polite">
           {uploadPreview.url

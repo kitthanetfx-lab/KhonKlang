@@ -20,9 +20,18 @@ function getUserFromJwt(jwt: string) {
   return new Account(client).get();
 }
 
+const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi', 'webm', 'pdf'];
+
 async function ensureBucket(storage: Storage) {
   try {
-    await storage.getBucket(BUCKET_ID);
+    const bucket = await storage.getBucket(BUCKET_ID) as unknown as { allowedFileExtensions?: string[] };
+    // เปิดให้รองรับ .webm (วิดีโอคอลที่บันทึก) หากบัคเก็ตเดิมยังไม่อนุญาต
+    const exts = bucket.allowedFileExtensions || [];
+    if (exts.length && !exts.includes('webm')) {
+      try {
+        await storage.updateBucket(BUCKET_ID, 'Deal Files', [Permission.read(Role.any()), Permission.create(Role.users())], false, true, 30 * 1024 * 1024, Array.from(new Set([...exts, 'webm'])));
+      } catch { /* ไม่มีสิทธิ์แก้บัคเก็ตก็ข้ามไป */ }
+    }
     return;
   } catch {
     try {
@@ -36,7 +45,7 @@ async function ensureBucket(storage: Storage) {
         false,
         true,
         30 * 1024 * 1024,
-        ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi', 'pdf'],
+        ALLOWED_EXT,
       );
       return;
     } catch (createErr) {
