@@ -4,6 +4,7 @@ import { account } from '@/lib/appwrite';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
+import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 
 const CATS = ['สินค้าทั่วไป', 'อิเล็กทรอนิกส์', 'เสื้อผ้า', 'ยานพาหนะ', 'อสังหาริมทรัพย์', 'บริการ', 'อื่นๆ'];
 
@@ -19,11 +20,15 @@ function CreateDealForm() {
   const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fees, setFees] = useState<FeeConfig>(FEE_DEFAULTS);
 
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
+    fetch('/api/fees').then(r => r.json()).then(d => { if (d.fees) setFees(d.fees); }).catch(() => {});
   }, []);
+
+  const feeBreakdown = computeDealFees(fees, Number(price) || 0, isSimple ? 'simple' : '');
 
   async function handleCreate() {
     if (!title || !price) { setError('กรุณากรอกชื่อและราคา'); return; }
@@ -99,6 +104,21 @@ function CreateDealForm() {
               </select>
             </div>
           </div>
+
+          {Number(price) > 0 && (
+            <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 4 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>💸 ค่าบริการโดยประมาณ ({isSimple ? 'ซื้อขายแบบง่าย' : 'ซื้อขายผ่านกลาง'})</div>
+              {feeBreakdown.lines.map(l => (
+                <div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', padding: '2px 0' }}>
+                  <span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid #d7e3ff', marginTop: 6, paddingTop: 6 }}>
+                <span>รวมค่าบริการ</span><span>฿{feeBreakdown.total.toLocaleString()}</span>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>* {feeBreakdown.note} · อัตราตามที่ระบบกำหนด แสดงให้ทราบก่อนเริ่มดีล</div>
+            </div>
+          )}
 
           {error && <p style={{ color: '#b22441', fontSize: 14, marginTop: 4 }}>⚠️ {error}</p>}
 

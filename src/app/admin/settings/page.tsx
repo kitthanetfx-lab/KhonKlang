@@ -2,21 +2,31 @@
 
 import { useState, useEffect } from 'react';
 import { account } from '@/lib/appwrite';
-import { Settings, Loader2, CheckCircle2, ShoppingCart, Zap, Search, Package, MapPin, Car } from 'lucide-react';
+import { Settings, Loader2, CheckCircle2, ShoppingCart, Zap, Search, MapPin, Car, Shield, RotateCcw, Wallet } from 'lucide-react';
 
 interface FeeConfig {
   escrowFeePercent: number; escrowFeeMin: number;
+  middlemanFeePercent: number; middlemanFeeMin: number; platformCutPercent: number;
   simpleFeePercent: number; simpleFeeMin: number;
   inspectionFee: number; packingFee: number;
+  depositBronze: number; depositSilver: number; depositGold: number; depositPlatinum: number;
+  failedDealFee: number;
   onsiteBaseFee: number; onsitePerKm: number;
   meetupFeePercent: number; meetupFeeMin: number;
+  sellerRegFee: number; middlemanRegFee: number;
+  returnShippingBy: 'buyer' | 'seller' | 'split';
 }
 
+type NumKey = Exclude<keyof FeeConfig, 'returnShippingBy'>;
+
 // กลุ่มฟิลด์สำหรับแสดงผล: [key, label, หน่วย]
-const GROUPS: { title: string; icon: React.ReactNode; fields: [keyof FeeConfig, string, string][] }[] = [
-  { title: 'ซื้อขายผ่านกลาง (ออนไลน์)', icon: <ShoppingCart size={16} className="text-blue-600" />, fields: [
-    ['escrowFeePercent', 'ค่าธรรมเนียม', '% ของราคา'],
+const GROUPS: { title: string; icon: React.ReactNode; fields: [NumKey, string, string][] }[] = [
+  { title: 'ซื้อขายผ่านกลาง (ออนไลน์) — มีคนกลางตรวจสอบ', icon: <ShoppingCart size={16} className="text-blue-600" />, fields: [
+    ['escrowFeePercent', 'ค่าธรรมเนียมระบบ', '% ของราคา'],
     ['escrowFeeMin', 'ขั้นต่ำ', 'บาท'],
+    ['middlemanFeePercent', 'ค่าบริการคนกลาง', '% ของราคา'],
+    ['middlemanFeeMin', 'ค่าคนกลางขั้นต่ำ', 'บาท'],
+    ['platformCutPercent', 'ส่วนแบ่งแพลตฟอร์มจากค่าคนกลาง', '%'],
   ] },
   { title: 'ซื้อขายผ่านกลางแบบง่าย (ส่งตรง)', icon: <Zap size={16} className="text-orange-600" />, fields: [
     ['simpleFeePercent', 'ค่าธรรมเนียม', '% ของราคา'],
@@ -26,6 +36,15 @@ const GROUPS: { title: string; icon: React.ReactNode; fields: [keyof FeeConfig, 
     ['inspectionFee', 'ค่าตรวจสอบสินค้า', 'บาท'],
     ['packingFee', 'ค่าแพ็คสินค้า', 'บาท'],
   ] },
+  { title: 'เครดิตประกันคนกลาง (ตามเทียร์)', icon: <Shield size={16} className="text-emerald-600" />, fields: [
+    ['depositBronze', 'Bronze', 'บาท'],
+    ['depositSilver', 'Silver', 'บาท'],
+    ['depositGold', 'Gold', 'บาท'],
+    ['depositPlatinum', 'Platinum', 'บาท'],
+  ] },
+  { title: 'เมื่อดีลไม่สำเร็จ / ตีกลับ', icon: <RotateCcw size={16} className="text-rose-600" />, fields: [
+    ['failedDealFee', 'ค่าจัดการดีลไม่สำเร็จ', 'บาท'],
+  ] },
   { title: 'บริการนัดออนไซต์', icon: <MapPin size={16} className="text-amber-600" />, fields: [
     ['onsiteBaseFee', 'ค่าบริการฐาน', 'บาท'],
     ['onsitePerKm', 'ค่าเดินทาง', 'บาท/กม.'],
@@ -33,6 +52,10 @@ const GROUPS: { title: string; icon: React.ReactNode; fields: [keyof FeeConfig, 
   { title: 'รับประกันเดินทาง (นัดเจอ)', icon: <Car size={16} className="text-violet-600" />, fields: [
     ['meetupFeePercent', 'ค่าธรรมเนียม', '% ของมูลค่า'],
     ['meetupFeeMin', 'ค่าบริการขั้นต่ำ', 'บาท'],
+  ] },
+  { title: 'ค่าสมัครสมาชิก', icon: <Wallet size={16} className="text-green-600" />, fields: [
+    ['sellerRegFee', 'ค่าสมัครผู้ขาย', 'บาท'],
+    ['middlemanRegFee', 'ค่าสมัครคนกลาง', 'บาท'],
   ] },
 ];
 
@@ -54,7 +77,7 @@ export default function SettingsPage() {
     })();
   }, []);
 
-  function setField(k: keyof FeeConfig, v: string) {
+  function setField(k: NumKey, v: string) {
     setFees(f => f ? { ...f, [k]: v === '' ? 0 : Number(v) } : f);
     setSaved(false);
   }
@@ -107,6 +130,19 @@ export default function SettingsPage() {
               </div>
             </div>
           ))}
+
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
+            <h2 className="font-semibold text-sm flex items-center gap-2 mb-4"><RotateCcw size={16} className="text-rose-600" /> ผู้รับผิดชอบค่าส่งคืน (เมื่อตีกลับผู้ขาย)</h2>
+            <div className="flex gap-2 flex-wrap">
+              {([['buyer', 'ผู้ซื้อ'], ['seller', 'ผู้ขาย'], ['split', 'หารครึ่ง']] as const).map(([val, lbl]) => (
+                <button key={val} type="button"
+                  onClick={() => { setFees(f => f ? { ...f, returnShippingBy: val } : f); setSaved(false); }}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${fees.returnShippingBy === val ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'}`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="flex items-center gap-3 sticky bottom-4">
             <button onClick={save} disabled={saving}

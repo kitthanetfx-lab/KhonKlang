@@ -14,6 +14,7 @@ import { InAppBanner } from '@/components/InAppBanner';
 import { withExternalBrowserParam } from '@/lib/inApp';
 import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
+import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -336,6 +337,7 @@ export default function DealRoom() {
   const buyerEvidInputRef = useRef<HTMLInputElement>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [callChatOpen, setCallChatOpen] = useState(true);
+  const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
   const callFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -428,6 +430,7 @@ export default function DealRoom() {
   }, [jwt, showSelectMM, loadMiddlemen]);
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
+  useEffect(() => { fetch('/api/fees').then(r => r.json()).then(d => { if (d.fees) setFeeConfig(d.fees); }).catch(() => {}); }, []);
   useEffect(() => {
     const timer = window.setInterval(() => setNowTs(Date.now()), 15000);
     return () => window.clearInterval(timer);
@@ -1223,6 +1226,20 @@ export default function DealRoom() {
             <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 13.5, lineHeight: 1.7, color: 'var(--muted)' }}>
               {t.excludes.map((c, i) => <li key={i}>{c}</li>)}
             </ul>
+            {(() => { const fb = computeDealFees(feeConfig, deal.price, deal.dealType); return (
+              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 16 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)', marginBottom: 8 }}>💸 ค่าบริการของดีลนี้ (มูลค่า ฿{deal.price.toLocaleString()})</div>
+                {fb.lines.map(l => (
+                  <div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', padding: '2px 0' }}>
+                    <span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
+                  <span>รวมค่าบริการ</span><span>฿{fb.total.toLocaleString()}</span>
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>* {fb.note}</div>
+              </div>
+            ); })()}
             <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 18 }}>
               📹 สำคัญ: โปรดเข้าหน้าแชทและวิดีโอคอล เพื่อพูดคุย ดูสภาพสินค้า และตกลงรายละเอียดให้เรียบร้อยก่อน — บันทึกบทสนทนา / วิดีโอคอล / รูปภาพไว้เป็นหลักฐาน โดยกดปุ่ม “📌 เก็บเป็นหลักฐาน” ที่แต่ละข้อความ
             </div>
