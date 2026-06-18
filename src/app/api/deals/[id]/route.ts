@@ -40,6 +40,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // Public GET — no auth required so anyone with the link can view
     const databases = getAdminClient();
     const deal = await databases.getDocument(DB_ID, COL_DEALS, id);
+    // Self-heal: ทั้งสองฝ่าย (และคนกลางถ้ามี) ยอมรับครบแล้วแต่สถานะค้างที่ขั้นยอมรับ
+    // (เกิดได้จาก race ตอนสองฝ่ายกดยอมรับพร้อมกัน) → ดันไปขั้นโอนเงินให้อัตโนมัติ
+    if (['buyer_joined', 'terms_pending'].includes(String(deal.status))
+      && deal.sellerAcceptedTerms && deal.buyerAcceptedTerms
+      && (!deal.middlemanId || deal.middlemanAcceptedTerms)) {
+      try {
+        const fixed = await databases.updateDocument(DB_ID, COL_DEALS, id, { status: 'payment_pending' });
+        return NextResponse.json({ deal: fixed });
+      } catch { /* ถ้าแก้ไม่ได้ก็คืนค่าเดิม */ }
+    }
     return NextResponse.json({ deal });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
@@ -339,9 +349,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
 
-    const updated = Object.keys(updates).length > 0
+    let updated = Object.keys(updates).length > 0
       ? await databases.updateDocument(DB_ID, COL_DEALS, id, updates)
       : deal;
+
+    // กัน race ตอนยอมรับเงื่อนไข: ถ้าหลังอัปเดตแล้วทุกฝ่ายยอมรับครบแต่สถานะยังค้าง → ดันไปขั้นโอนเงินทันที
+    if (['buyer_joined', 'terms_pending'].includes(String(updated.status))
+      && updated.sellerAcceptedTerms && updated.buyerAcceptedTerms
+      && (!updated.middlemanId || updated.middlemanAcceptedTerms)) {
+      try {
+        updated = await databases.updateDocument(DB_ID, COL_DEALS, id, { status: 'payment_pending' });
+        if (!systemMsg || /ยอมรับเงื่อนไขแล้ว$/.test(systemMsg)) systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — รอผู้ซื้อโอนเงิน';
+      } catch { /* ปล่อยผ่าน */ }
+    }
 
     if (systemMsg) {
       if (writeChatMsg) {
