@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Databases, ID } from 'node-appwrite';
+import { Client, Account, Databases, ID, Users, Query } from 'node-appwrite';
 import { notifyUsers } from '../../_lib/notify';
 
 const DB_ID  = 'khonklang_db';
@@ -12,6 +12,18 @@ function getAdminClient() {
     .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
     .setKey(process.env.APPWRITE_API_KEY!);
   return new Databases(client);
+}
+
+// หา user id ของแอดมินทั้งหมด (prefs.role === 'admin') เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
+async function getAdminIds(): Promise<string[]> {
+  try {
+    const c = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.APPWRITE_API_KEY!);
+    const res = await new Users(c).list([Query.limit(100)]);
+    return res.users.filter(u => (u.prefs as Record<string, unknown> | undefined)?.role === 'admin').map(u => u.$id);
+  } catch { return []; }
 }
 
 function getUserFromJwt(jwt: string) {
@@ -364,6 +376,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           body: `ดีล "${updated.title || 'ไม่มีชื่อ'}" มูลค่า ฿${Number(updated.price || 0).toLocaleString()} — เข้าไปยอมรับเงื่อนไขเพื่อเริ่มงานได้เลย`,
           link: `/deal/${id}`,
         });
+      }
+
+      // แจ้งเตือนแอดมินเมื่อมีเงินเข้า/ข้อพิพาท — ให้รู้ทันทีว่าต้องเข้าไปตรวจ
+      if (action === 'upload_payment' || action === 'dispute') {
+        const admins = await getAdminIds();
+        if (admins.length) {
+          const isPay = action === 'upload_payment';
+          await notifyUsers(databases, admins, {
+            title: isPay ? `💰 มีการโอนเงินรอตรวจสอบ: ${updated.title || 'ดีล'}` : `⚠️ มีข้อพิพาท: ${updated.title || 'ดีล'}`,
+            body: isPay
+              ? `ผู้ซื้อโอนเงิน ฿${Number(updated.price || 0).toLocaleString()} แล้ว — เข้าไปตรวจสอบและอนุมัติที่หน้าการเงิน`
+              : `${systemMsg} — เข้าไปจัดการที่หน้าดีล & ข้อพิพาท`,
+            link: isPay ? '/admin/finance' : '/admin/deals',
+          });
+        }
       }
     }
 

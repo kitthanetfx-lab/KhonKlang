@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     if (filter === 'disputed') queries.push(Query.equal('status', 'disputed'));
     else if (filter === 'completed') queries.push(Query.equal('status', 'completed'));
     else if (filter === 'meetup_refund') queries.push(Query.equal('dealType', 'meetup'), Query.equal('status', 'completed'));
-    else if (filter === 'simple_pay') queries.push(Query.equal('dealType', 'simple'), Query.equal('status', 'payment_uploaded'));
+    else if (filter === 'confirm_pay') queries.push(Query.equal('status', 'payment_uploaded'));
     else if (filter === 'active') queries.push(Query.notEqual('status', 'completed'));
     const res = await db.listDocuments(DB_ID, COL, queries).catch(() => ({ documents: [], total: 0 }));
     return NextResponse.json(res);
@@ -60,16 +60,21 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ deal: updated });
     }
 
-    if (action === 'confirm_simple_payment') {
-      // ศูนย์กลางยืนยันรับเงินสำหรับดีลแบบง่าย (ไม่มีคนกลางบุคคล) → ผู้ขายเริ่มแพ็ค+ส่งตรง
-      if (deal.dealType !== 'simple' || deal.status !== 'payment_uploaded')
-        return NextResponse.json({ error: 'ดีลนี้ไม่อยู่ในสถานะรอศูนย์กลางยืนยันรับเงิน' }, { status: 400 });
+    // ศูนย์กลางยืนยันรับเงิน — ครอบคลุมทุกบริการ (ปกติ/แบบง่าย) ไม่ใช่แค่แบบง่าย
+    if (action === 'confirm_payment' || action === 'confirm_simple_payment') {
+      if (deal.status !== 'payment_uploaded')
+        return NextResponse.json({ error: 'ดีลนี้ไม่อยู่ในสถานะรอยืนยันรับเงิน' }, { status: 400 });
       const updated = await db.updateDocument(DB_ID, COL, id, {
         status: 'packing',
         middlemanConfirmedPayment: true,
         rejectReason: note ? `[ศูนย์กลางยืนยันรับเงิน] ${String(note).slice(0, 200)}` : deal.rejectReason || '',
       });
       return NextResponse.json({ deal: updated });
+    }
+
+    if (action === 'delete_deal') {
+      await db.deleteDocument(DB_ID, COL, id);
+      return NextResponse.json({ ok: true, deleted: true });
     }
 
     return NextResponse.json({ error: 'unknown action' }, { status: 400 });

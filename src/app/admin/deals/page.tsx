@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { account } from '@/lib/appwrite';
-import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw } from 'lucide-react';
+import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2 } from 'lucide-react';
 
 interface Deal {
   $id: string; title: string; price: number; status: string; dealType?: string;
@@ -21,15 +21,15 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
 };
 
 const TABS = [
-  { k: 'disputed', label: '⚠️ ข้อพิพาท' },
-  { k: 'simple_pay', label: '⚡ ยืนยันรับเงิน (แบบง่าย)' },
-  { k: 'meetup_refund', label: '💸 คืนเงินประกัน' },
   { k: 'active', label: 'กำลังดำเนินการ' },
+  { k: 'confirm_pay', label: '⚡ ยืนยันรับเงิน' },
+  { k: 'meetup_refund', label: '💸 คืนเงินประกัน' },
+  { k: 'disputed', label: '⚠️ ข้อพิพาท' },
   { k: 'completed', label: 'สำเร็จ' },
 ];
 
 export default function AdminDeals() {
-  const [tab, setTab] = useState('disputed');
+  const [tab, setTab] = useState('active');
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [acting, setActing] = useState('');
 
@@ -137,8 +137,8 @@ export default function AdminDeals() {
                     </button>
                   </>
                 )}
-                {d.dealType === 'simple' && d.status === 'payment_uploaded' && (
-                  <button onClick={() => act(d.$id, 'confirm_simple_payment', 'หมายเหตุ (เช่น เลขอ้างอิงสลิป) — เว้นว่างได้:')} disabled={!!acting}
+                {d.status === 'payment_uploaded' && (
+                  <button onClick={() => act(d.$id, 'confirm_payment', 'หมายเหตุ (เช่น เลขอ้างอิงสลิป) — เว้นว่างได้:')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
                     {acting === d.$id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ยืนยันรับเงิน — เริ่มแพ็ค
                   </button>
@@ -149,6 +149,10 @@ export default function AdminDeals() {
                     {acting === d.$id ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />} ยืนยันคืนเงินประกันแล้ว
                   </button>
                 )}
+                <button onClick={() => { if (window.confirm(`ลบดีล "${d.title}" ถาวร? (ใช้เฉพาะกรณีดีลทดสอบ/สแปม — กู้คืนไม่ได้)`)) act(d.$id, 'delete_deal'); }} disabled={!!acting}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 disabled:opacity-50 ml-auto">
+                  <Trash2 size={14} /> ลบดีล
+                </button>
               </div>
             </div>
           );
