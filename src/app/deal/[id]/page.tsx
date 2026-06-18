@@ -1084,6 +1084,29 @@ export default function DealRoom() {
             <div className="dr-prog-track"><div className="dr-prog-fill" style={{ width: `${pct}%`, background: deal.status === 'completed' ? 'var(--green-500)' : 'var(--accent)' }} /></div>
           </div>
 
+          {/* แถบ "ถึงตาคุณ" — เด้งไปแท็บขั้นตอนเมื่อมีงานรอผู้ใช้คนนี้ทำ (กันหลงว่าไม่มีปุ่มให้ไปต่อ) */}
+          {(() => {
+            const s = deal.status;
+            let label: string | null = null;
+            if (['buyer_joined', 'terms_pending'].includes(s)) {
+              const accepted = (myRole === 'seller' && deal.sellerAcceptedTerms) || (myRole === 'middleman' && deal.middlemanAcceptedTerms) || (myRole === 'buyer' && deal.buyerAcceptedTerms);
+              if (!accepted) label = 'ยอมรับเงื่อนไขข้อตกลง';
+            } else if (s === 'payment_pending' && myRole === 'buyer') label = 'ชำระเงิน — โอน + อัปโหลดสลิป';
+            else if (s === 'payment_uploaded' && myRole === 'middleman') label = 'ยืนยันรับเงิน';
+            else if (s === 'packing' && myRole === 'seller') label = 'แพ็ค + จัดส่งสินค้า';
+            else if (s === 'shipped_to_middleman' && myRole === 'middleman') label = 'รับสินค้า';
+            else if (s === 'middleman_checking' && myRole === 'buyer' && !deal.buyerConfirmedCheck) label = 'ยืนยันสินค้าไม่มีปัญหา';
+            else if (s === 'middleman_checking' && myRole === 'middleman' && deal.buyerConfirmedCheck) label = 'จัดส่งให้ผู้ซื้อ';
+            else if (s === 'shipped_to_buyer' && myRole === 'buyer') label = 'ยืนยันรับสินค้า';
+            if (!label || tab === 'steps') return null;
+            return (
+              <button onClick={() => setTab('steps')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--r-md)', padding: '11px 14px', margin: '4px 0 8px', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
+                <span>👉 ถึงตาคุณ: {label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, opacity: .95 }}>ไปที่ขั้นตอน →</span>
+              </button>
+            );
+          })()}
+
           <nav className="dr-tabs">
             {(['steps', 'chat', 'evidence'] as const).map(k => (
               <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
