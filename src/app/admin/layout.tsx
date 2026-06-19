@@ -6,11 +6,12 @@ import Link from 'next/link';
 import { account, clearPersistedSession } from '@/lib/appwrite';
 import {
   LayoutDashboard, Store, Shield, Users, Settings,
-  LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, MapPin, Wallet,
+  LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, MapPin, Wallet, MessageCircle,
 } from 'lucide-react';
 
 const NAV = [
   { href: '/admin',             icon: LayoutDashboard, label: 'ภาพรวม' },
+  { href: '/admin/support',     icon: MessageCircle,   label: 'แชทลูกค้า' },
   { href: '/admin/sellers',     icon: Store,           label: 'ผู้ขาย' },
   { href: '/admin/middlemen',   icon: Shield,          label: 'คนกลาง' },
   { href: '/admin/scam-reports',icon: ShieldAlert,     label: 'รายงานคนโกง' },
