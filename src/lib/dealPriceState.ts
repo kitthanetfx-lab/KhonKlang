@@ -4,6 +4,7 @@ export interface DealPriceState {
   proposedPrice?: number;
   proposedFeePayer?: 'buyer' | 'seller' | 'split';
   proposedBy?: 'seller' | 'buyer' | 'middleman';
+  proposalKind?: 'current' | 'reprice';
   agreed?: boolean;
   sellerAgreed?: boolean;
   buyerAgreed?: boolean;
@@ -47,6 +48,7 @@ function normalizeDealPriceState(value: JsonRecord): DealPriceState {
     proposedPrice: asNumber(value.proposedPrice),
     proposedFeePayer: asStringUnion(value.proposedFeePayer, ['buyer', 'seller', 'split'] as const),
     proposedBy: asStringUnion(value.proposedBy, ['seller', 'buyer', 'middleman'] as const),
+    proposalKind: asStringUnion(value.proposalKind, ['current', 'reprice'] as const),
     agreed: asBoolean(value.agreed),
     sellerAgreed: asBoolean(value.sellerAgreed),
     buyerAgreed: asBoolean(value.buyerAgreed),

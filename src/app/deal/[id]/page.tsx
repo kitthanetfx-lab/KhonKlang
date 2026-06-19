@@ -342,6 +342,7 @@ export default function DealRoom() {
   const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
   const [priceInput, setPriceInput] = useState('');
   const [feePayerInput, setFeePayerInput] = useState<'buyer' | 'seller' | 'split'>('buyer');
+  const [showPriceProposal, setShowPriceProposal] = useState(false);
   const callFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -909,17 +910,21 @@ export default function DealRoom() {
     const hasMm = !!deal!.middlemanId;
     const fpName = (fp?: string) => fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
     const meAgreed = (myRole === 'seller' && pd.sellerAgreed) || (myRole === 'buyer' && pd.buyerAgreed) || (myRole === 'middleman' && pd.middlemanAgreed);
+    const canProposeNewPrice = myRole === 'buyer' || myRole === 'seller';
+    const isRepriceFlow = pd.proposalKind === 'reprice' && !!pd.proposedPrice;
+    const currentFeePayer = pd.proposedFeePayer || pd.feePayer || deal!.feePayer || 'buyer';
+    const proposerLabel = pd.proposedBy === 'buyer' ? 'ผู้ซื้อ' : pd.proposedBy === 'seller' ? 'ผู้ขาย' : pd.proposedBy === 'middleman' ? 'คนกลาง' : 'มีผู้เสนอ';
     return (
       <div className="dr-card">
         <div className="dr-card-title">💬 ตกลงราคา & ค่าบริการ</div>
         {pd.agreed ? (
           <div style={{ fontSize: 14, color: 'var(--green-700)', background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-md)', padding: '10px 14px' }}>
-            ✅ ตกลงราคาแล้ว <b>฿{Number(pd.proposedPrice || deal!.price).toLocaleString()}</b> · ค่าบริการ: {fpName(pd.feePayer)}
+            ✅ ตกลงราคาแล้ว <b>฿{Number(pd.proposedPrice || deal!.price).toLocaleString()}</b> · ค่าบริการ: {fpName(pd.feePayer || currentFeePayer)}
             {hasMm && pd.mmDepositHeld ? ` · คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()}` : ''}
           </div>
-        ) : pd.proposedPrice ? (
+        ) : isRepriceFlow ? (
           <div>
-            <div style={{ fontSize: 14, marginBottom: 8 }}>ข้อเสนอ: <b>฿{Number(pd.proposedPrice).toLocaleString()}</b> · ค่าบริการ: {fpName(pd.proposedFeePayer)}</div>
+            <div style={{ fontSize: 14, marginBottom: 8 }}>{proposerLabel}เสนอราคาใหม่: <b>฿{Number(pd.proposedPrice).toLocaleString()}</b> · ค่าบริการ: {fpName(pd.proposedFeePayer)}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
               {[['ผู้ขาย', pd.sellerAgreed], ['ผู้ซื้อ', pd.buyerAgreed], ...(hasMm ? [['คนกลาง', pd.middlemanAgreed] as [string, boolean]] : [])].map(([l, ok]) => (
                 <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ตกลงแล้ว' : '⏳ รอ'}</span></div>
@@ -933,21 +938,51 @@ export default function DealRoom() {
             {meAgreed && <p style={{ fontSize: 13, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณตกลงแล้ว — รอฝ่ายอื่น</p>}
           </div>
         ) : (
-          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>เสนอราคาและเลือกผู้รับผิดชอบค่าบริการ ทุกฝ่ายต้องกดตกลงก่อนเริ่มชำระเงิน</p>
-        )}
-
-        {!pd.agreed && (
-          <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>{pd.proposedPrice ? 'เสนอราคาใหม่' : 'เสนอราคา'}</div>
-            <input type="number" className="dr-select" value={priceInput} onChange={e => setPriceInput(e.target.value)} placeholder={`ราคา (บาท) — ปัจจุบัน ฿${deal!.price.toLocaleString()}`} style={{ marginBottom: 8 }} />
-            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-              {(['buyer', 'seller', 'split'] as const).map(fp => (
-                <button key={fp} type="button" onClick={() => setFeePayerInput(fp)} className={`btn btn-sm ${feePayerInput === fp ? 'btn-primary' : 'btn-ghost'}`}>{fpName(fp)}</button>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ fontSize: 14, color: 'var(--ink)', background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px' }}>
+              ใช้ราคาเดิมจากสินค้านี้: <b>฿{deal!.price.toLocaleString()}</b> · ค่าบริการ: {fpName(currentFeePayer)}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {[['ผู้ขาย', pd.sellerAgreed], ['ผู้ซื้อ', pd.buyerAgreed], ...(hasMm ? [['คนกลาง', pd.middlemanAgreed] as [string, boolean]] : [])].map(([l, ok]) => (
+                <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ รับรู้/ยืนยันแล้ว' : '⏳ รอ'}</span></div>
               ))}
             </div>
-            <button className="btn btn-primary btn-block" disabled={acting} onClick={() => { const p = Math.round(Number(priceInput)); if (!(p >= 1)) { alert('กรอกราคาให้ถูกต้อง'); return; } doAction('price_propose', { price: p, feePayer: feePayerInput }); setPriceInput(''); }}>
-              💬 เสนอราคา ค่าบริการ: {fpName(feePayerInput)}
-            </button>
+            {!meAgreed ? (
+              <button className="btn btn-green btn-block" disabled={acting} onClick={() => doAction('price_agree')}>
+                {myRole === 'middleman' ? '✅ รับรู้ราคาเดิมและอนุมัติดีล' : '✅ ใช้ราคาเดิมนี้'}
+              </button>
+            ) : (
+              <p style={{ fontSize: 13, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันราคาเดิมแล้ว — รอฝ่ายอื่น</p>
+            )}
+            <p style={{ fontSize: 12.5, color: 'var(--muted)' }}>ถ้าไม่มีใครกดเสนอราคาใหม่ ระบบจะใช้ราคานี้เป็นราคาปัจจุบันของดีล</p>
+          </div>
+        )}
+
+        {!pd.agreed && canProposeNewPrice && (
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+            {!showPriceProposal ? (
+              <button type="button" className="btn btn-ghost btn-block" onClick={() => { setShowPriceProposal(true); setPriceInput(String(deal!.price || '')); setFeePayerInput((deal!.feePayer === 'seller' || deal!.feePayer === 'split') ? deal!.feePayer : 'buyer'); }}>
+                💬 เสนอราคาใหม่
+              </button>
+            ) : (
+              <>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>เสนอราคาใหม่ (ผู้ซื้อหรือผู้ขายเป็นผู้เสนอได้)</div>
+                <input type="number" className="dr-select" value={priceInput} onChange={e => setPriceInput(e.target.value)} placeholder={`ราคา (บาท) — ปัจจุบัน ฿${deal!.price.toLocaleString()}`} style={{ marginBottom: 8 }} />
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                  {(['buyer', 'seller', 'split'] as const).map(fp => (
+                    <button key={fp} type="button" onClick={() => setFeePayerInput(fp)} className={`btn btn-sm ${feePayerInput === fp ? 'btn-primary' : 'btn-ghost'}`}>{fpName(fp)}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <button className="btn btn-primary btn-block" disabled={acting} onClick={() => { const p = Math.round(Number(priceInput)); if (!(p >= 1)) { alert('กรอกราคาให้ถูกต้อง'); return; } doAction('price_propose', { price: p, feePayer: feePayerInput }); setShowPriceProposal(false); setPriceInput(''); }}>
+                    💬 เสนอราคาใหม่ ค่าบริการ: {fpName(feePayerInput)}
+                  </button>
+                  <button type="button" className="btn btn-ghost btn-block" onClick={() => { setShowPriceProposal(false); setPriceInput(''); }}>
+                    ปิดการเสนอราคาใหม่
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

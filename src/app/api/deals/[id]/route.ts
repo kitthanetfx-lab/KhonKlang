@@ -380,7 +380,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'price_propose': {
         // เสนอราคาสินค้า + ผู้จ่ายค่าบริการ → รีเซ็ต รอทุกฝ่ายกดตกลงใหม่ (เปลี่ยนได้ก่อนชำระเงิน)
-        if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (!isSeller && !isBuyer) return NextResponse.json({ error: 'เฉพาะผู้ซื้อหรือผู้ขายที่เสนอราคาใหม่ได้' }, { status: 403 });
         if (!['posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status))
           return NextResponse.json({ error: 'ดีลเลยขั้นตอนตกลงราคาแล้ว' }, { status: 400 });
         const price = Math.round(Number(body.price));
@@ -388,7 +388,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!(price >= 1 && price <= 999999999)) return NextResponse.json({ error: 'ราคาไม่ถูกต้อง' }, { status: 400 });
         const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
         const who = isSeller ? 'seller' : isBuyer ? 'buyer' : 'middleman';
-        pd.proposedPrice = price; pd.proposedFeePayer = feePayer; pd.proposedBy = who; pd.agreed = false;
+        pd.proposedPrice = price; pd.proposedFeePayer = feePayer; pd.proposedBy = who; pd.proposalKind = 'reprice'; pd.agreed = false;
         pd.sellerAgreed = isSeller; pd.buyerAgreed = isBuyer; pd.middlemanAgreed = isMiddleman;
         syncPriceState(pd);
         const fpLabel = feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
@@ -398,7 +398,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'price_agree': {
         if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
-        if (!pd.proposedPrice) return NextResponse.json({ error: 'ยังไม่มีข้อเสนอราคาให้ตกลง' }, { status: 400 });
+        if (!pd.proposedPrice) {
+          pd.proposedPrice = Number(deal.price) || 0;
+          pd.proposedFeePayer = deal.feePayer === 'seller' || deal.feePayer === 'split' ? deal.feePayer : 'buyer';
+          pd.proposalKind = 'current';
+        }
         if (isSeller) pd.sellerAgreed = true;
         if (isBuyer) pd.buyerAgreed = true;
         if (isMiddleman) pd.middlemanAgreed = true;
@@ -410,10 +414,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           if (supportsFeePayer) updates.feePayer = pd.proposedFeePayer;
           if (hasMm) pd.mmDepositHeld = await getMmDeposit(String(deal.middlemanId));
           const fpLabel = pd.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : pd.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
-          systemMsg = `✅ ทุกฝ่ายตกลงราคา ฿${Number(pd.proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()})` : ''}`;
+          systemMsg = pd.proposalKind === 'reprice'
+            ? `✅ ทุกฝ่ายตกลงราคา ฿${Number(pd.proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()})` : ''}`
+            : `✅ ทุกฝ่ายยืนยันใช้ราคาเดิม ฿${Number(pd.proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()})` : ''}`;
         } else {
           const who = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
-          systemMsg = `${who}${isMiddleman ? ' อนุมัติดีล + วางเครดิตประกัน' : ' ตกลงราคา'}แล้ว — รอฝ่ายอื่น`;
+          systemMsg = pd.proposalKind === 'reprice'
+            ? `${who}${isMiddleman ? ' อนุมัติดีล + วางเครดิตประกัน' : ' ตกลงราคานี้'}แล้ว — รอฝ่ายอื่น`
+            : `${who}${isMiddleman ? ' รับรู้ราคาเดิม + อนุมัติดีล' : ' ยืนยันใช้ราคาเดิม'}แล้ว — รอฝ่ายอื่น`;
         }
         syncPriceState(pd);
         break;
