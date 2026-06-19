@@ -14,6 +14,7 @@ import { InAppBanner } from '@/components/InAppBanner';
 import { withExternalBrowserParam } from '@/lib/inApp';
 import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
+import { readDealPriceState } from '@/lib/dealPriceState';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -904,7 +905,7 @@ export default function DealRoom() {
     // แสดงเฉพาะช่วงก่อนชำระเงิน
     if (!['posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending', 'payment_pending'].includes(deal!.status)) return null;
     if (myRole === 'guest' || myRole === '') return null;
-    const pd = (() => { try { return JSON.parse(deal!.priceData || '{}'); } catch { return {} as Record<string, unknown>; } })();
+    const pd = readDealPriceState({ priceData: deal!.priceData, meetupData: deal!.meetupData });
     const hasMm = !!deal!.middlemanId;
     const fpName = (fp?: string) => fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
     const meAgreed = (myRole === 'seller' && pd.sellerAgreed) || (myRole === 'buyer' && pd.buyerAgreed) || (myRole === 'middleman' && pd.middlemanAgreed);
@@ -958,7 +959,7 @@ export default function DealRoom() {
     if (deal!.dealType === 'meetup') return null;
     if (!['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal!.status)) return null;
     if (myRole === 'guest' || myRole === '') return null;
-    const pd = (() => { try { return JSON.parse(deal!.priceData || '{}'); } catch { return {} as Record<string, unknown>; } })();
+    const pd = readDealPriceState({ priceData: deal!.priceData, meetupData: deal!.meetupData });
     if (!pd.agreed) return null; // ต้องตกลงราคาก่อน
     const hasMm = !!deal!.middlemanId;
     const allDone = !!(pd.evidenceDoneBuyer && pd.evidenceDoneSeller && (!hasMm || pd.evidenceDoneMiddleman));
@@ -989,7 +990,7 @@ export default function DealRoom() {
         <div className="dr-card-title">💳 ชำระเงินค่าสินค้า</div>
         <div className="dr-pay-amount">฿{deal!.price.toLocaleString()}</div>
         {(() => {
-          const pd = (() => { try { return JSON.parse(deal!.priceData || '{}'); } catch { return {} as Record<string, unknown>; } })();
+          const pd = readDealPriceState({ priceData: deal!.priceData, meetupData: deal!.meetupData });
           const fb = computeDealFees(feeConfig, deal!.price, deal!.dealType);
           const fp = String(deal!.feePayer || pd.feePayer || 'buyer');
           const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;

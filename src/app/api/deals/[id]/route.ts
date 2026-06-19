@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, ID, Users, Query } from 'node-appwrite';
 import { notifyUsers } from '../../_lib/notify';
+import { DealPriceState, readDealPriceState, writeDealPriceState } from '@/lib/dealPriceState';
 
 const DB_ID  = 'khonklang_db';
 const COL_DEALS = 'deals';
@@ -48,6 +49,15 @@ function getUserFromJwt(jwt: string) {
   return new Account(c).get();
 }
 
+async function hasDealAttribute(databases: Databases, key: string) {
+  try {
+    const attr = await databases.getAttribute(DB_ID, COL_DEALS, key);
+    return attr.status === 'available';
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -81,7 +91,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { action } = body;
 
     const databases = getAdminClient();
-    const deal = await databases.getDocument(DB_ID, COL_DEALS, id);
+    const [deal, supportsPriceData, supportsFeePayer] = await Promise.all([
+      databases.getDocument(DB_ID, COL_DEALS, id),
+      hasDealAttribute(databases, 'priceData'),
+      hasDealAttribute(databases, 'feePayer'),
+    ]);
 
     const isSeller    = deal.sellerId    === uid;
     const isMiddleman = deal.middlemanId === uid;
@@ -90,6 +104,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let updates: Record<string, unknown> = {};
     let systemMsg = '';
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
+    const syncPriceState = (priceState: DealPriceState) => {
+      const serialized = writeDealPriceState(priceState, String(deal.meetupData || ''));
+      if (supportsPriceData) updates.priceData = serialized.priceData;
+      else updates.meetupData = serialized.meetupDataFallback;
+    };
 
     switch (action) {
       case 'join_as_buyer': {
@@ -367,18 +386,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const price = Math.round(Number(body.price));
         const feePayer = ['buyer', 'seller', 'split'].includes(body.feePayer) ? body.feePayer : 'buyer';
         if (!(price >= 1 && price <= 999999999)) return NextResponse.json({ error: 'ราคาไม่ถูกต้อง' }, { status: 400 });
-        const pd = (() => { try { return JSON.parse(deal.priceData || '{}'); } catch { return {}; } })();
+        const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
         const who = isSeller ? 'seller' : isBuyer ? 'buyer' : 'middleman';
         pd.proposedPrice = price; pd.proposedFeePayer = feePayer; pd.proposedBy = who; pd.agreed = false;
         pd.sellerAgreed = isSeller; pd.buyerAgreed = isBuyer; pd.middlemanAgreed = isMiddleman;
-        updates.priceData = JSON.stringify(pd);
+        syncPriceState(pd);
         const fpLabel = feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
         systemMsg = `💬 ${who === 'seller' ? 'ผู้ขาย' : who === 'buyer' ? 'ผู้ซื้อ' : 'คนกลาง'}เสนอราคา ฿${price.toLocaleString()} · ค่าบริการ: ${fpLabel} — รอทุกฝ่ายกดตกลง`;
         break;
       }
       case 'price_agree': {
         if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        const pd = (() => { try { return JSON.parse(deal.priceData || '{}'); } catch { return {}; } })();
+        const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
         if (!pd.proposedPrice) return NextResponse.json({ error: 'ยังไม่มีข้อเสนอราคาให้ตกลง' }, { status: 400 });
         if (isSeller) pd.sellerAgreed = true;
         if (isBuyer) pd.buyerAgreed = true;
@@ -388,7 +407,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (allAgreed) {
           pd.agreed = true; pd.feePayer = pd.proposedFeePayer;
           updates.price = pd.proposedPrice;
-          updates.feePayer = pd.proposedFeePayer;
+          if (supportsFeePayer) updates.feePayer = pd.proposedFeePayer;
           if (hasMm) pd.mmDepositHeld = await getMmDeposit(String(deal.middlemanId));
           const fpLabel = pd.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : pd.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
           systemMsg = `✅ ทุกฝ่ายตกลงราคา ฿${Number(pd.proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()})` : ''}`;
@@ -396,19 +415,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           const who = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
           systemMsg = `${who}${isMiddleman ? ' อนุมัติดีล + วางเครดิตประกัน' : ' ตกลงราคา'}แล้ว — รอฝ่ายอื่น`;
         }
-        updates.priceData = JSON.stringify(pd);
+        syncPriceState(pd);
         break;
       }
       case 'evidence_done': {
         // แต่ละฝ่ายยืนยันว่าเก็บหลักฐาน (แชต/วิดีโอคอล/รูป) เรียบร้อยแล้ว ก่อนเข้าขั้นโอนเงิน
         if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        const pd = (() => { try { return JSON.parse(deal.priceData || '{}'); } catch { return {}; } })();
+        const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
         if (isSeller) pd.evidenceDoneSeller = true;
         if (isBuyer) pd.evidenceDoneBuyer = true;
         if (isMiddleman) pd.evidenceDoneMiddleman = true;
         const hasMm = !!deal.middlemanId;
         const allDone = pd.evidenceDoneSeller && pd.evidenceDoneBuyer && (!hasMm || pd.evidenceDoneMiddleman);
-        updates.priceData = JSON.stringify(pd);
+        syncPriceState(pd);
         systemMsg = allDone ? '📁 ทุกฝ่ายยืนยันเก็บหลักฐานเรียบร้อย — เข้าสู่ขั้นตอนโอนเงินได้' : `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ยืนยันเก็บหลักฐานแล้ว — รอฝ่ายอื่น`;
         break;
       }
@@ -416,9 +435,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // ผู้ขายโอนค่าบริการส่วนของตัวเองทันที (แยกจากยอดสินค้า) แล้วอัปสลิป
         if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
-        const pd = (() => { try { return JSON.parse(deal.priceData || '{}'); } catch { return {}; } })();
+        const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
         pd.sellerFeeSlip = String(body.fileId);
-        updates.priceData = JSON.stringify(pd);
+        syncPriceState(pd);
         systemMsg = 'ผู้ขายโอนค่าบริการส่วนของตนแล้ว — รอศูนย์กลางตรวจสอบ';
         break;
       }

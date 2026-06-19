@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Databases, Query, ID } from 'node-appwrite';
 import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
 import { notifyUsers } from '../../_lib/notify';
+import { readDealPriceState } from '@/lib/dealPriceState';
 import { FEE_DEFAULTS, computeDealFees, FeeConfig } from '@/lib/fees';
 import { verifySlipByUrl } from '@/lib/slipok';
 
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
         });
       }
       // 1b) ค่าบริการส่วนของผู้ขาย — ผู้ขายโอนแยก
-      const pd = (() => { try { return JSON.parse(String(d.priceData || '{}')); } catch { return {} as Record<string, unknown>; } })();
+      const pd = readDealPriceState({ priceData: String(d.priceData || ''), meetupData: String(d.meetupData || '') });
       if (pd.sellerFeeSlip && !['completed', 'cancelled'].includes(String(d.status))) {
         const sh = feeShares(Number(d.price) || 0, String(d.dealType || ''), String(d.feePayer || 'buyer'));
         if (sh.sellerShare > 0) incoming.push({
