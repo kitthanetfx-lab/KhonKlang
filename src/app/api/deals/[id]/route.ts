@@ -16,6 +16,7 @@ function getAdminClient() {
 }
 
 // หา user id ของแอดมินทั้งหมด (prefs.role === 'admin') เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
+// sync-touch
 async function getAdminIds(): Promise<string[]> {
   try {
     const c = new Client()
@@ -58,6 +59,24 @@ async function hasDealAttribute(databases: Databases, key: string) {
   }
 }
 
+// ดึงเลขบัญชี/ธนาคารของผู้ใช้จาก prefs — ใช้แสดงในดีลเพื่อสรุปว่าต้องโอนคืนเข้าบัญชีไหน
+async function getBankInfo(uid?: string): Promise<{ bankName: string; bankAcct: string; bankOwner: string } | null> {
+  if (!uid) return null;
+  try {
+    const c = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.APPWRITE_API_KEY!);
+    const u = await new Users(c).get(uid);
+    const p = (u.prefs || {}) as Record<string, string>;
+    const bankName = p.bankName || '';
+    const bankAcct = p.bankAcct || p.accountNumber || '';
+    const bankOwner = p.bankOwner || p.bankAccountName || u.name || '';
+    if (!bankName && !bankAcct) return null;
+    return { bankName, bankAcct, bankOwner };
+  } catch { return null; }
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -71,10 +90,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       && (!deal.middlemanId || deal.middlemanAcceptedTerms)) {
       try {
         const fixed = await databases.updateDocument(DB_ID, COL_DEALS, id, { status: 'payment_pending' });
-        return NextResponse.json({ deal: fixed });
+        const [buyerBank, sellerBank, middlemanBank] = await Promise.all([
+          getBankInfo(fixed.buyerId as string), getBankInfo(fixed.sellerId as string), getBankInfo(fixed.middlemanId as string),
+        ]);
+        return NextResponse.json({ deal: { ...fixed, buyerBank, sellerBank, middlemanBank } });
       } catch { /* ถ้าแก้ไม่ได้ก็คืนค่าเดิม */ }
     }
-    return NextResponse.json({ deal });
+    const [buyerBank, sellerBank, middlemanBank] = await Promise.all([
+      getBankInfo(deal.buyerId as string), getBankInfo(deal.sellerId as string), getBankInfo(deal.middlemanId as string),
+    ]);
+    return NextResponse.json({ deal: { ...deal, buyerBank, sellerBank, middlemanBank } });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

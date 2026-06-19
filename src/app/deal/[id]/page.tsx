@@ -16,10 +16,11 @@ import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
 import { readDealPriceState } from '@/lib/dealPriceState';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
+import { dealCode } from '@/lib/dealNumber';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// ─── Jitsi Meet via External API ──────────────────────────────────────────
+// ─── Jitsi Meet via External API ─────────────────────────────────────────
 function JitsiMeet({ roomName, displayName }: { roomName: string; displayName: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
@@ -146,6 +147,13 @@ interface Deal {
   middlemanConfirmedPayment: boolean; buyerConfirmedCheck: boolean;
   paymentSlipFileId: string; evidenceData: string; trackingToMiddleman: string; trackingToBuyer: string;
   dealType?: string; meetupData?: string; priceData?: string; feePayer?: string;
+  buyerBank?: BankInfo | null; sellerBank?: BankInfo | null; middlemanBank?: BankInfo | null;
+}
+
+interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
+function bankLine(b?: BankInfo | null) {
+  if (!b || (!b.bankName && !b.bankAcct)) return 'ยังไม่ได้บันทึกบัญชีรับเงิน';
+  return `${b.bankName || '-'} · ${b.bankAcct || '-'} · ${b.bankOwner || '-'}`;
 }
 
 /** ข้อมูลรับประกันเดินทาง (เก็บเป็น JSON ใน deal.meetupData) */
@@ -1103,6 +1111,80 @@ export default function DealRoom() {
     );
   }
 
+  // ─── สลิปทั้งหมดในดีล — ทุกฝ่าย (ผู้ซื้อ/ผู้ขาย/คนกลาง/แอดมิน) ต้องเห็นเหมือนกัน ───
+  function renderAllSlipsCard() {
+    const md = parseMeetup(deal!.meetupData);
+    const pd = readDealPriceState({ priceData: deal!.priceData, meetupData: deal!.meetupData });
+    const slips: { label: string; fileId: string }[] = [];
+    if (deal!.paymentSlipFileId) slips.push({ label: 'สลิปโอนเงินค่าสินค้า (ผู้ซื้อ)', fileId: deal!.paymentSlipFileId });
+    if (pd.sellerFeeSlip) slips.push({ label: 'สลิปค่าบริการ (ผู้ขาย)', fileId: pd.sellerFeeSlip });
+    if (md.buyerSlip) slips.push({ label: 'สลิปเงินประกันนัดเจอ (ผู้ซื้อ)', fileId: md.buyerSlip });
+    if (md.sellerSlip) slips.push({ label: 'สลิปเงินประกันนัดเจอ (ผู้ขาย)', fileId: md.sellerSlip });
+    if (slips.length === 0) return null;
+    return (
+      <div className="dr-card">
+        <div className="dr-card-title">📎 สลิปทั้งหมดในดีล (ผู้ซื้อ/ผู้ขาย/คนกลาง/แอดมินเห็นเหมือนกัน)</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {slips.map(s => (
+            <div key={s.label}>
+              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 4 }}>{s.label}</div>
+              <a href={fileUrl(s.fileId)} target="_blank" rel="noreferrer">
+                <img src={fileUrl(s.fileId)} alt={s.label} style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} />
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── สรุปการเงิน: เลขดีล + บัญชีรับเงินทุกฝ่าย + ยอดที่ต้องคืน/โอนเมื่อจบดีล ──
+  function renderFinanceSummaryCard() {
+    const pd = readDealPriceState({ priceData: deal!.priceData, meetupData: deal!.meetupData });
+    const md = parseMeetup(deal!.meetupData);
+    const isMt = deal!.dealType === 'meetup';
+    const fb = computeDealFees(feeConfig, deal!.price, deal!.dealType);
+    const fp = String(deal!.feePayer || pd.feePayer || 'split');
+    const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+    const buyerShare = fb.total - sellerShare;
+    const sellerNet = Math.max(deal!.price - sellerShare, 0);
+    const finished = deal!.status === 'completed';
+
+    const rows: { who: string; bank?: BankInfo | null; note: string }[] = [
+      { who: 'ผู้ขาย', bank: deal!.sellerBank, note: isMt
+          ? `รับเงินประกันคืน ฿${Number(md.deposit || 0).toLocaleString()} เมื่อนัดเจอสำเร็จ`
+          : finished ? `ได้รับแล้ว ฿${sellerNet.toLocaleString()}` : `จะได้รับสุทธิ ฿${sellerNet.toLocaleString()} เมื่อดีลสำเร็จ` },
+      { who: 'ผู้ซื้อ', bank: deal!.buyerBank, note: isMt
+          ? `รับเงินประกันคืน ฿${Number(md.deposit || 0).toLocaleString()} เมื่อนัดเจอสำเร็จ`
+          : 'ผู้โอนเงินเข้าระบบ (ไม่มีเงินคืน เว้นแต่ยกเลิก/ข้อพิพาท)' },
+    ];
+    if (deal!.middlemanId) rows.push({ who: 'คนกลาง', bank: deal!.middlemanBank, note: 'รับค่าบริการคนกลางตามรอบจ่ายของระบบ' });
+
+    return (
+      <div className="dr-card">
+        <div className="dr-card-title">🧾 สรุปการเงิน — เลขดีล {dealCode(deal!.$id)}</div>
+        {!isMt && (
+          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 10, fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}><span>ราคาสินค้า</span><span>฿{deal!.price.toLocaleString()}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}><span>ค่าบริการรวม</span><span>฿{fb.total.toLocaleString()}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}><span>ผู้ขายได้รับสุทธิ{finished ? '' : ' (เมื่อดีลสำเร็จ)'}</span><span>฿{sellerNet.toLocaleString()}</span></div>
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {rows.map(r => (
+            <div key={r.who} style={{ padding: '9px 0', borderBottom: '1px solid var(--line-2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                <span style={{ color: 'var(--muted)' }}>{r.who}</span>
+                <span style={{ fontWeight: 600, color: 'var(--ink)', textAlign: 'right' }}>{bankLine(r.bank)}</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{r.note}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   // ─── Action panel ────────────────────────────────────────────────────────
   function renderActionPanel() {
     if (acting) return <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0', fontSize: 13 }}>กำลังดำเนินการ...</div>;
@@ -1196,7 +1278,7 @@ export default function DealRoom() {
       <InAppBanner />
       <header className="dr-header">
         <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
-        <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{statusText(deal)} · ฿{deal.price.toLocaleString()}</div></div>
+        <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{dealCode(deal.$id)} · {statusText(deal)} · ฿{deal.price.toLocaleString()}</div></div>
         <div className="dr-hctas">
           {myId && <NotifyBell />}
           <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
@@ -1355,12 +1437,9 @@ export default function DealRoom() {
                 {renderEvidenceDonePanel()}
                 {renderPaymentSection()}
 
-                {deal.paymentSlipFileId && (
-                  <div className="dr-card">
-                    <div className="dr-card-title">หลักฐานการโอนเงิน</div>
-                    <a href={fileUrl(deal.paymentSlipFileId)} target="_blank" rel="noreferrer"><img src={fileUrl(deal.paymentSlipFileId)} alt="slip" style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 'var(--r-md)' }} /></a>
-                  </div>
-                )}
+                {renderAllSlipsCard()}
+                {renderFinanceSummaryCard()}
+
                 {deal.trackingToMiddleman && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ ผู้ขาย → คนกลาง</div><div className="dr-track-code">{deal.trackingToMiddleman}</div></div>}
                 {deal.trackingToBuyer && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ {isSimple ? 'ผู้ขาย' : 'คนกลาง'} → ผู้ซื้อ</div><div className="dr-track-code">{deal.trackingToBuyer}</div></div>}
 

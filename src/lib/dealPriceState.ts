@@ -15,6 +15,11 @@ export interface DealPriceState {
   evidenceDoneBuyer?: boolean;
   evidenceDoneMiddleman?: boolean;
   sellerFeeSlip?: string;
+  // บัญชี/สถานะการโอนเงิน "ออก" จากศูนย์กลาง — จ่ายคืนผู้ขายเมื่อจบดีล / คืนเงินผู้ซื้อเมื่อยกเลิก
+  payoutSentAt?: string;
+  payoutNote?: string;
+  refundSentAt?: string;
+  refundNote?: string;
 }
 
 function isJsonRecord(value: unknown): value is JsonRecord {
@@ -59,6 +64,10 @@ function normalizeDealPriceState(value: JsonRecord): DealPriceState {
     evidenceDoneBuyer: asBoolean(value.evidenceDoneBuyer),
     evidenceDoneMiddleman: asBoolean(value.evidenceDoneMiddleman),
     sellerFeeSlip: typeof value.sellerFeeSlip === 'string' ? value.sellerFeeSlip : undefined,
+    payoutSentAt: typeof value.payoutSentAt === 'string' ? value.payoutSentAt : undefined,
+    payoutNote: typeof value.payoutNote === 'string' ? value.payoutNote : undefined,
+    refundSentAt: typeof value.refundSentAt === 'string' ? value.refundSentAt : undefined,
+    refundNote: typeof value.refundNote === 'string' ? value.refundNote : undefined,
   };
 }
 

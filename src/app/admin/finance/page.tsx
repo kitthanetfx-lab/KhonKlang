@@ -11,17 +11,26 @@ const fileUrl = (bucket: string, id: string) => `${ENDPOINT}/storage/buckets/${b
 const baht = (n: number) => '฿' + Math.round(n).toLocaleString();
 
 interface FeeLine { label: string; amount: number; }
+type TxnStatus = 'pending' | 'confirmed' | 'refund_pending' | 'refunded';
 interface Incoming {
-  key: string; source: string; refId: string; title: string;
+  key: string; source: string; refId: string; dealNumber?: string; title: string;
   payer: string; payerName: string; purpose: string; expected: number;
   fileId: string; bucket: string; status: string; dealType?: string;
+  txnStatus?: TxnStatus; note?: string;
   fees?: { lines: FeeLine[]; total: number; note?: string };
   canApprove?: boolean; approveLink?: string;
 }
 interface Summary {
   incomingCount: number; escrowPendingCount: number; heldEscrow: number;
   heldMeetupDeposit: number; completedVolume: number; completedCount: number; estRevenue: number;
+  outgoingCount?: number; pendingPayoutAmount?: number; pendingRefundAmount?: number;
 }
+const TXN_BADGE: Record<TxnStatus, { label: string; cls: string }> = {
+  pending:         { label: 'รอตรวจ',        cls: 'bg-amber-50 text-amber-700' },
+  confirmed:       { label: 'ยืนยันแล้ว',     cls: 'bg-green-50 text-green-700' },
+  refund_pending:  { label: 'รอคืนเงิน',      cls: 'bg-orange-50 text-orange-700' },
+  refunded:        { label: 'คืนเงินแล้ว',    cls: 'bg-teal-50 text-teal-700' },
+};
 interface SlipInfo { amount: number; transRef: string; transTime?: string; transDate?: string; senderName?: string; receiverName?: string; receiverAccount?: string; }
 interface SlipCheck {
   result: { ok: boolean; code: string; message: string; slip?: SlipInfo; duplicate?: boolean; wrongReceiver?: boolean };
@@ -33,6 +42,9 @@ const SOURCE_BADGE: Record<string, { label: string; cls: string }> = {
   meetup:        { label: 'เงินประกัน (นัดเจอ)', cls: 'bg-violet-100 text-violet-700' },
   seller_app:    { label: 'ค่าสมัครผู้ขาย', cls: 'bg-green-100 text-green-700' },
   middleman_app: { label: 'ค่าสมัครคนกลาง', cls: 'bg-emerald-100 text-emerald-700' },
+  payout:        { label: 'จ่ายคืนผู้ขาย', cls: 'bg-rose-100 text-rose-700' },
+  refund:        { label: 'คืนเงินผู้ซื้อ', cls: 'bg-orange-100 text-orange-700' },
+  meetup_refund: { label: 'คืนเงินประกัน', cls: 'bg-fuchsia-100 text-fuchsia-700' },
 };
 const FILTERS = [
   { k: 'all', label: 'ทั้งหมด' },
@@ -42,9 +54,10 @@ const FILTERS = [
 ];
 
 export default function AdminFinance() {
-  const [tab, setTab] = useState<'incoming' | 'summary'>('incoming');
+  const [tab, setTab] = useState<'incoming' | 'outgoing' | 'summary'>('incoming');
   const [filter, setFilter] = useState('all');
   const [incoming, setIncoming] = useState<Incoming[] | null>(null);
+  const [outgoing, setOutgoing] = useState<Incoming[] | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [acting, setActing] = useState('');
   const [verifying, setVerifying] = useState('');
@@ -57,8 +70,9 @@ export default function AdminFinance() {
       const r = await fetch('/api/admin/finance', { headers: { 'x-session-jwt': jwt } });
       const d = await r.json();
       setIncoming(d.incoming || []);
+      setOutgoing(d.outgoing || []);
       setSummary(d.summary || null);
-    } catch { setIncoming([]); }
+    } catch { setIncoming([]); setOutgoing([]); }
   }, []);
 
   useEffect(() => { const t = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(t); }, [load]);
@@ -67,6 +81,14 @@ export default function AdminFinance() {
     let note = '';
     if (action === 'reject_payment') {
       const v = window.prompt('เหตุผลที่ปฏิเสธหลักฐานการโอน (ผู้ซื้อจะเห็นและต้องอัปสลิปใหม่):');
+      if (v === null) return;
+      note = v;
+    } else if (action === 'mark_payout_sent') {
+      const v = window.prompt('โอนเงินคืนผู้ขายแล้ว — ใส่บันทึกช่วยจำ (เช่น เลขอ้างอิงการโอน) ได้ถ้าต้องการ:', '');
+      if (v === null) return;
+      note = v;
+    } else if (action === 'mark_refund_sent') {
+      const v = window.prompt('คืนเงินผู้ซื้อแล้ว — ใส่บันทึกช่วยจำ (เช่น เลขอ้างอิงการโอน) ได้ถ้าต้องการ:', '');
       if (v === null) return;
       note = v;
     } else if (!window.confirm('ยืนยันว่าได้รับเงินจริงตามยอด แล้วให้ผู้ขายเริ่มแพ็คสินค้า?')) return;
@@ -104,6 +126,7 @@ export default function AdminFinance() {
 
       <div className="flex gap-2 mb-4 flex-wrap">
         <button onClick={() => setTab('incoming')} className={`px-4 py-2 rounded-xl text-sm font-medium ${tab === 'incoming' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600'}`}>เงินเข้า {summary ? `(${summary.incomingCount})` : ''}</button>
+        <button onClick={() => setTab('outgoing')} className={`px-4 py-2 rounded-xl text-sm font-medium ${tab === 'outgoing' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600'}`}>เงินออก {summary?.outgoingCount != null ? `(${summary.outgoingCount})` : ''}</button>
         <button onClick={() => setTab('summary')} className={`px-4 py-2 rounded-xl text-sm font-medium ${tab === 'summary' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600'}`}>ภาพรวมการเงิน</button>
       </div>
 
@@ -115,7 +138,7 @@ export default function AdminFinance() {
         </div>
       )}
 
-      {incoming === null && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
+      {(tab === 'incoming' ? incoming === null : tab === 'outgoing' ? outgoing === null : false) && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
 
       {tab === 'incoming' && incoming !== null && (
         rows.length === 0 ? (
@@ -131,7 +154,8 @@ export default function AdminFinance() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sb.cls}`}>{sb.label}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">รอตรวจ</span>
+                        {(() => { const tb = TXN_BADGE[(d.txnStatus as TxnStatus) || 'pending']; return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tb.cls}`}>{tb.label}</span>; })()}
+                        {d.dealNumber && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">{d.dealNumber}</span>}
                       </div>
                       <p className="font-semibold mt-1">{d.title}</p>
                       <p className="text-xs text-gray-500 mt-1">{d.payer}: {d.payerName || '-'} · {d.purpose}</p>
@@ -212,6 +236,50 @@ export default function AdminFinance() {
         )
       )}
 
+      {tab === 'outgoing' && outgoing !== null && (
+        outgoing.length === 0 ? (
+          <div className="text-center py-16 text-gray-400"><CheckCircle2 size={36} className="mx-auto mb-2 opacity-40" /><p>ไม่มีรายการเงินออก</p></div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-400 -mt-1 mb-1">เงินที่ศูนย์กลางต้องโอน &quot;ออก&quot; — จ่ายคืนผู้ขายเมื่อปิดดีล / คืนเงินผู้ซื้อเมื่อยกเลิก / คืนเงินประกันนัดเจอ ทำเครื่องหมายเมื่อโอนจริงแล้วเพื่อบันทึกสถานะ</p>
+            {outgoing.map(d => {
+              const sb = SOURCE_BADGE[d.source] || { label: d.source, cls: 'bg-gray-100 text-gray-600' };
+              const tb = TXN_BADGE[(d.txnStatus as TxnStatus) || 'pending'];
+              const canMark = (d.source === 'payout' || d.source === 'refund') && d.txnStatus === 'pending';
+              return (
+                <div key={d.key} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sb.cls}`}>{sb.label}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tb.cls}`}>{tb.label}</span>
+                        {d.dealNumber && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">{d.dealNumber}</span>}
+                      </div>
+                      <p className="font-semibold mt-1">{d.title}</p>
+                      <p className="text-xs text-gray-500 mt-1">{d.purpose} · ผู้รับ: {d.payerName || '-'}</p>
+                      {d.note && <p className="text-xs text-gray-400 mt-1">บันทึก: {d.note}</p>}
+                    </div>
+                    <Link href={d.approveLink ? d.approveLink : `/deal/${d.refId}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0"><ExternalLink size={12} /> {d.approveLink ? 'ไปหน้าจัดการ' : 'เปิดดีล'}</Link>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 mt-3">
+                    <div className="flex justify-between text-sm font-bold"><span>ยอดที่ต้องโอนออก</span><span className="text-rose-600">{baht(d.expected)}</span></div>
+                  </div>
+                  {canMark && (
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      <button onClick={() => act(d.refId, d.source === 'payout' ? 'mark_payout_sent' : 'mark_refund_sent')} disabled={!!acting}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-600 text-white hover:bg-rose-700 flex items-center gap-1 disabled:opacity-50">
+                        {acting === d.refId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} โอนแล้ว — บันทึกสถานะ
+                      </button>
+                    </div>
+                  )}
+                  {d.source === 'meetup_refund' && <p className="text-xs text-gray-400 mt-2">* จัดการคืนเงินประกันนัดเจอที่หน้าจัดการดีล (ปุ่ม &quot;ไปหน้าจัดการ&quot;)</p>}
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
       {tab === 'summary' && summary && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -220,8 +288,10 @@ export default function AdminFinance() {
             <SumCard icon={<ShieldCheck size={22} className="text-violet-600" />} color="bg-violet-50 dark:bg-violet-900/20" label="เงินประกันถือไว้ (นัดเจอ)" value={baht(summary.heldMeetupDeposit)} sub="คืนเมื่อเจอกันสำเร็จ" />
             <SumCard icon={<CheckCircle2 size={22} className="text-teal-600" />} color="bg-teal-50 dark:bg-teal-900/20" label="ยอดซื้อขายสำเร็จสะสม" value={baht(summary.completedVolume)} sub={`${summary.completedCount} ดีล`} />
             <SumCard icon={<TrendingUp size={22} className="text-green-600" />} color="bg-green-50 dark:bg-green-900/20" label="รายได้ค่าบริการ (ประมาณ)" value={baht(summary.estRevenue)} sub="จากดีลที่สำเร็จ ตามอัตราปัจจุบัน" />
+            <SumCard icon={<AlertTriangle size={22} className="text-rose-600" />} color="bg-rose-50 dark:bg-rose-900/20" label="รอโอนคืนผู้ขาย" value={baht(summary.pendingPayoutAmount || 0)} sub="ดีลปิดแล้ว ยังไม่บันทึกว่าโอนออก" />
+            <SumCard icon={<AlertTriangle size={22} className="text-orange-600" />} color="bg-orange-50 dark:bg-orange-900/20" label="รอคืนเงินผู้ซื้อ/เงินประกัน" value={baht(summary.pendingRefundAmount || 0)} sub="ยกเลิก/จบนัดเจอแล้ว ยังไม่คืน" />
           </div>
-          <p className="text-xs text-gray-400 mt-4">* รายได้เป็นยอดประมาณการจากอัตราค่าธรรมเนียมที่ตั้งไว้ × ดีลที่สำเร็จ (ยังไม่ได้บันทึกยอดจริงต่อดีล)</p>
+          <p className="text-xs text-gray-400 mt-4">* รายได้เป็นยอดประมาณการจากอัตราค่าธรรมเนียมที่ตั้งไว้ × ดีลที่สำเร็จ (ยังไม่ได้บันทึกยอดจริงต่อดีล) · เงินเข้า/ออกทุกรายการมีสถานะติดตามได้ที่แท็บ &quot;เงินเข้า&quot;/&quot;เงินออก&quot;</p>
         </>
       )}
     </div>

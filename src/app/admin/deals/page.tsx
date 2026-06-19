@@ -4,11 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { account } from '@/lib/appwrite';
 import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2 } from 'lucide-react';
+import { dealCode } from '@/lib/dealNumber';
+import { readDealPriceState } from '@/lib/dealPriceState';
+
+const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
+const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
+const fileUrl = (id: string) => `${ENDPOINT}/storage/buckets/deal_files/files/${id}/view?project=${PROJECT}`;
 
 interface Deal {
   $id: string; title: string; price: number; status: string; dealType?: string;
   buyerName: string; sellerName: string; middlemanName: string;
-  rejectReason: string; meetupData?: string; createdAt: string;
+  rejectReason: string; meetupData?: string; priceData?: string; createdAt: string;
+  paymentSlipFileId?: string;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -71,6 +78,22 @@ export default function AdminDeals() {
     } catch { return null; }
   }
 
+  // รวมสลิปทุกใบของดีล — ทุกฝ่าย (ผู้ซื้อ/ผู้ขาย/คนกลาง/แอดมิน) ต้องเห็นได้ที่นี่เช่นกัน
+  function slipsOf(d: Deal): { label: string; fileId: string }[] {
+    const slips: { label: string; fileId: string }[] = [];
+    if (d.paymentSlipFileId) slips.push({ label: 'สลิปผู้ซื้อ (ค่าสินค้า)', fileId: d.paymentSlipFileId });
+    const pd = readDealPriceState({ priceData: d.priceData || '', meetupData: d.meetupData || '' });
+    if (pd.sellerFeeSlip) slips.push({ label: 'สลิปผู้ขาย (ค่าบริการ)', fileId: pd.sellerFeeSlip });
+    if (d.dealType === 'meetup') {
+      try {
+        const md = JSON.parse(d.meetupData || '{}');
+        if (md.buyerSlip) slips.push({ label: 'สลิปผู้ซื้อ (เงินประกัน)', fileId: md.buyerSlip });
+        if (md.sellerSlip) slips.push({ label: 'สลิปผู้ขาย (เงินประกัน)', fileId: md.sellerSlip });
+      } catch {}
+    }
+    return slips;
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center gap-2 mb-1">
@@ -97,11 +120,13 @@ export default function AdminDeals() {
         {(deals || []).map(d => {
           const st = STATUS_LABEL[d.status] || { label: d.status, cls: 'bg-gray-100 text-gray-600' };
           const refund = refundInfo(d);
+          const slips = slipsOf(d);
           return (
             <div key={d.$id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">{dealCode(d.$id)}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.label}</span>
                     {d.dealType === 'meetup' && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">นัดรับ</span>}
                     {d.dealType === 'simple' && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">แบบง่าย</span>}
@@ -123,6 +148,17 @@ export default function AdminDeals() {
                   <ExternalLink size={12} /> เปิดดีล
                 </Link>
               </div>
+
+              {slips.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {slips.map(s => (
+                    <a key={s.fileId} href={fileUrl(s.fileId)} target="_blank" rel="noreferrer" className="block">
+                      <img src={fileUrl(s.fileId)} alt={s.label} className="w-full h-20 object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+                      <p className="text-[10px] text-gray-400 mt-0.5 truncate">{s.label}</p>
+                    </a>
+                  ))}
+                </div>
+              )}
 
               <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {d.status === 'disputed' && (
