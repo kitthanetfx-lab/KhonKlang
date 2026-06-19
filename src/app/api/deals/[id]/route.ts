@@ -399,8 +399,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
         if (!pd.proposedPrice) {
+          const feePayer = ['buyer', 'seller', 'split'].includes(body.feePayer) ? body.feePayer : (deal.feePayer === 'seller' || deal.feePayer === 'split' ? deal.feePayer : 'buyer');
           pd.proposedPrice = Number(deal.price) || 0;
-          pd.proposedFeePayer = deal.feePayer === 'seller' || deal.feePayer === 'split' ? deal.feePayer : 'buyer';
+          pd.proposedFeePayer = feePayer;
           pd.proposalKind = 'current';
         }
         if (isSeller) pd.sellerAgreed = true;
