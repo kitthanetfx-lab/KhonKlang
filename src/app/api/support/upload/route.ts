@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Client, Storage, Account, ID, Permission, Role } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 
-const BUCKET_ID = 'support_files';
-const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+/**
+ * ใช้บัคเก็ต `deal_files` ที่มีอยู่แล้วร่วมกับฟีเจอร์อื่น (ไม่สร้างบัคเก็ตใหม่ `support_files`)
+ * เพราะแพลน Appwrite ปัจจุบันจำกัดจำนวนบัคเก็ตสูงสุดไว้ และ project ใช้ครบโควต้าแล้ว
+ * ("The maximum number of buckets allowed for the selected plan has reached")
+ */
+const BUCKET_ID = 'deal_files';
 const MAX_SIZE = 8 * 1024 * 1024;
 
 function getStorage() {
@@ -22,37 +26,6 @@ function getUserFromJwt(jwt: string) {
   return new Account(client).get();
 }
 
-async function ensureBucket(storage: Storage) {
-  try {
-    await storage.getBucket(BUCKET_ID);
-    return;
-  } catch {
-    try {
-      await storage.createBucket(
-        BUCKET_ID,
-        'Support Chat Images',
-        [Permission.read(Role.users()), Permission.create(Role.users())],
-        false,
-        true,
-        MAX_SIZE,
-        ALLOWED_EXT,
-      );
-      return;
-    } catch (createErr) {
-      try {
-        await storage.getBucket(BUCKET_ID);
-        return;
-      } catch {
-        const msg = createErr instanceof Error ? createErr.message : String(createErr);
-        if (msg.includes('buckets.write')) {
-          throw new Error('ยังอัปโหลดรูปแชทไม่ได้ เพราะ production ยังไม่มี bucket `support_files` และ API key ปัจจุบันไม่มีสิทธิ์สร้าง bucket อัตโนมัติ กรุณาสร้าง bucket นี้ใน Appwrite Console หรือเพิ่ม scope `buckets.write`');
-        }
-        throw new Error(`ไม่พบบัคเก็ตรูปแชทและสร้างอัตโนมัติไม่สำเร็จ: ${msg}`);
-      }
-    }
-  }
-}
-
 /** POST — อัปโหลดรูปสำหรับแชทศูนย์ช่วยเหลือ (ทั้งฝั่งลูกค้าและพนักงานใช้ endpoint เดียวกัน) */
 export async function POST(req: NextRequest) {
   try {
@@ -67,7 +40,6 @@ export async function POST(req: NextRequest) {
     if (file.size > MAX_SIZE) return NextResponse.json({ error: 'ไฟล์ใหญ่เกิน 8MB' }, { status: 400 });
 
     const storage = getStorage();
-    await ensureBucket(storage);
 
     const buf = Buffer.from(await file.arrayBuffer());
     const result = await storage.createFile(
@@ -75,7 +47,7 @@ export async function POST(req: NextRequest) {
       ID.unique(),
       InputFile.fromBuffer(buf, file.name),
       [
-        Permission.read(Role.users()),
+        Permission.read(Role.any()),
         Permission.update(Role.user(currentUser.$id)),
         Permission.delete(Role.user(currentUser.$id)),
       ],
