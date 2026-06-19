@@ -1,10 +1,15 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { account, clearPersistedSession } from '@/lib/appwrite';
 import { Icon } from '@/components/Icon';
+
+const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
+const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
+const qrUrl = (id: string) => `${ENDPOINT}/storage/buckets/deal_files/files/${id}/view?project=${PROJECT}`;
 
 const PROVINCES = ['กระบี่','กรุงเทพมหานคร','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
@@ -56,6 +61,11 @@ function ProfilePage() {
   const [editLast, setEditLast] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAddr, setEditAddr] = useState({ houseNo: '', moo: '', road: '', provinceName: '', amphoreName: '', tambonName: '', postalCode: '' });
+  const [editBankName, setEditBankName] = useState('');
+  const [editBankAcct, setEditBankAcct] = useState('');
+  const [editBankOwner, setEditBankOwner] = useState('');
+  const [editBankQr, setEditBankQr] = useState('');
+  const [qrUploading, setQrUploading] = useState(false);
   const [amphoes, setAmphoes] = useState<string[]>([]);
   const [tambons, setTambons] = useState<[string, string][]>([]);
   const [loadingAmph, setLoadingAmph] = useState(false);
@@ -97,8 +107,23 @@ function ProfilePage() {
   const openEdit = () => {
     setEditFirst(prefs.firstName || ''); setEditLast(prefs.lastName || '');
     setEditPhone(prefs.phone || ''); setEditAddr(parseAddress(prefs.address || ''));
+    setEditBankName(prefs.bankName || ''); setEditBankAcct(prefs.bankAcct || '');
+    setEditBankOwner(prefs.bankOwner || ''); setEditBankQr(prefs.bankQrFileId || '');
     setError(''); setSaveOk(false); setEditing(true);
   };
+
+  async function uploadBankQr(file: File) {
+    setQrUploading(true);
+    try {
+      const jwt = (await account.createJWT()).jwt;
+      const form = new FormData(); form.append('file', file);
+      const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: form });
+      const d = await r.json();
+      if (r.ok && d.fileId) setEditBankQr(d.fileId);
+      else setError(d.error || 'อัปโหลด QR ไม่สำเร็จ');
+    } catch { setError('อัปโหลด QR ไม่สำเร็จ'); }
+    finally { setQrUploading(false); }
+  }
   const cancelEdit = () => { setEditing(false); setError(''); };
 
   useEffect(() => {
@@ -139,10 +164,10 @@ function ProfilePage() {
       const res = await fetch('/api/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
-        body: JSON.stringify({ firstName: editFirst, lastName: editLast, phone: editPhone, address }),
+        body: JSON.stringify({ firstName: editFirst, lastName: editLast, phone: editPhone, address, bankName: editBankName, bankAcct: editBankAcct, bankOwner: editBankOwner, bankQrFileId: editBankQr }),
       });
       if (!res.ok) { const d = await res.json(); setError(d.error || 'เกิดข้อผิดพลาด'); return; }
-      const newPrefs = { ...prefs, firstName: editFirst, lastName: editLast, phone: editPhone, address, displayName: `${editFirst} ${editLast}`.trim() };
+      const newPrefs = { ...prefs, firstName: editFirst, lastName: editLast, phone: editPhone, address, displayName: `${editFirst} ${editLast}`.trim(), bankName: editBankName, bankAcct: editBankAcct, bankOwner: editBankOwner, bankQrFileId: editBankQr };
       setPrefs(newPrefs); setDisplayName(`${editFirst} ${editLast}`.trim()); setSaveOk(true);
       setTimeout(() => { setEditing(false); setSaveOk(false); }, 1200);
     } catch { setError('เกิดข้อผิดพลาด กรุณาลองใหม่'); } finally { setSaving(false); }
@@ -249,15 +274,36 @@ function ProfilePage() {
           </div>
         )}
 
-        {/* Bank info */}
-        {(prefs.bankAcct || prefs.bankName) && (
-          <div className="pf-card">
-            <div className="pf-card-title">บัญชีธนาคาร</div>
-            {prefs.bankName && <div className="pf-row"><span className="pf-row-lbl">ธนาคาร</span><span className="pf-row-val">{prefs.bankName}</span></div>}
-            {prefs.bankAcct && <div className="pf-row"><span className="pf-row-lbl">เลขที่บัญชี</span><span className="pf-row-val mono">{prefs.bankAcct}</span></div>}
-            {prefs.bankOwner && <div className="pf-row"><span className="pf-row-lbl">ชื่อบัญชี</span><span className="pf-row-val">{prefs.bankOwner}</span></div>}
-          </div>
-        )}
+        {/* Bank info — บัญชีรับเงินของผู้ใช้ (แก้ไขได้ทุก role) */}
+        <div className="pf-card">
+          <div className="pf-card-title">บัญชีธนาคาร (สำหรับรับเงิน)</div>
+          {editing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input className="pf-edit-input" value={editBankName} onChange={e => setEditBankName(e.target.value)} placeholder="ธนาคาร เช่น ธนาคารกรุงเทพ (BBL)" />
+              <input className="pf-edit-input" value={editBankAcct} onChange={e => setEditBankAcct(e.target.value)} placeholder="เลขที่บัญชี" />
+              <input className="pf-edit-input" value={editBankOwner} onChange={e => setEditBankOwner(e.target.value)} placeholder="ชื่อบัญชี" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                {editBankQr && <img src={qrUrl(editBankQr)} alt="QR" style={{ width: 80, height: 80, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />}
+                <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer' }}>
+                  {qrUploading ? 'กำลังอัปโหลด...' : editBankQr ? '🖼️ เปลี่ยนรูป QR' : '🖼️ อัปโหลดรูป QR (พร้อมเพย์)'}
+                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadBankQr(f); e.target.value = ''; }} />
+                </label>
+                {editBankQr && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditBankQr('')}>ลบรูป</button>}
+              </div>
+            </div>
+          ) : (
+            (prefs.bankAcct || prefs.bankName || prefs.bankQrFileId) ? (
+              <>
+                {prefs.bankName && <div className="pf-row"><span className="pf-row-lbl">ธนาคาร</span><span className="pf-row-val">{prefs.bankName}</span></div>}
+                {prefs.bankAcct && <div className="pf-row"><span className="pf-row-lbl">เลขที่บัญชี</span><span className="pf-row-val mono">{prefs.bankAcct}</span></div>}
+                {prefs.bankOwner && <div className="pf-row"><span className="pf-row-lbl">ชื่อบัญชี</span><span className="pf-row-val">{prefs.bankOwner}</span></div>}
+                {prefs.bankQrFileId && <div style={{ marginTop: 10 }}><img src={qrUrl(prefs.bankQrFileId)} alt="QR พร้อมเพย์" style={{ width: 120, height: 120, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} /></div>}
+              </>
+            ) : (
+              <p style={{ color: 'var(--muted)', fontSize: 13 }}>ยังไม่ได้กรอกบัญชีรับเงิน — กด &quot;แก้ไข&quot; เพื่อเพิ่มบัญชีและรูป QR สำหรับรับเงิน</p>
+            )
+          )}
+        </div>
 
         {/* Quick links / upgrade */}
         <div className="pf-links">

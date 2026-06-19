@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest) {
     const currentUser = await getUserFromJwt(jwt);
     const userId      = currentUser.$id;
 
-    const { firstName, lastName, phone, address } = await req.json();
+    const { firstName, lastName, phone, address, bankName, bankAcct, bankOwner, bankQrFileId } = await req.json();
     if (!firstName?.trim() || !lastName?.trim()) {
       return NextResponse.json({ error: 'กรุณากรอกชื่อ-นามสกุล' }, { status: 400 });
     }
@@ -51,6 +51,11 @@ export async function PATCH(req: NextRequest) {
       address:   address || '',
       displayName,
       profileUpdatedAt: new Date().toISOString(), // ใช้ตัดสินว่าโปรไฟล์บัญชีไหนใหม่สุดตอน sync ข้ามช่องทาง login
+      // บัญชีธนาคารสำหรับรับเงิน (อัปเดตเฉพาะเมื่อส่งมา)
+      ...(bankName     !== undefined ? { bankName:     String(bankName).slice(0, 100) } : {}),
+      ...(bankAcct     !== undefined ? { bankAcct:     String(bankAcct).slice(0, 50) } : {}),
+      ...(bankOwner    !== undefined ? { bankOwner:    String(bankOwner).slice(0, 100) } : {}),
+      ...(bankQrFileId !== undefined ? { bankQrFileId: String(bankQrFileId).slice(0, 255) } : {}),
     };
 
     // Update Appwrite account name + prefs

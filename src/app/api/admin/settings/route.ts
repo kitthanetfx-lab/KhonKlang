@@ -32,9 +32,14 @@ const NUM_DEFAULTS = {
 const STR_DEFAULTS = {
   returnShippingBy: 'buyer' as 'buyer' | 'seller' | 'split', // ผู้รับผิดชอบค่าส่งคืนเมื่อตีกลับ
 };
-const DEFAULTS = { ...NUM_DEFAULTS, ...STR_DEFAULTS };
+// บัญชีรับเงินของบริษัท (free text) — ลูกค้าโอนเข้าตรงนี้
+const COMPANY_DEFAULTS = {
+  companyPromptPay: '', companyBankName: '', companyBankAcct: '', companyBankHolder: '', companyQrFileId: '',
+};
+const DEFAULTS = { ...NUM_DEFAULTS, ...STR_DEFAULTS, ...COMPANY_DEFAULTS };
 type FeeConfig = typeof DEFAULTS;
 const NUM_KEYS = Object.keys(NUM_DEFAULTS) as (keyof typeof NUM_DEFAULTS)[];
+const COMPANY_KEYS = Object.keys(COMPANY_DEFAULTS) as (keyof typeof COMPANY_DEFAULTS)[];
 const RETURN_OPTIONS = ['buyer', 'seller', 'split'];
 
 async function ensureConfig(db: Databases) {
@@ -81,6 +86,7 @@ export async function PATCH(req: NextRequest) {
       clean[k] = (isFinite(v) && v >= 0) ? v : NUM_DEFAULTS[k];
     }
     clean.returnShippingBy = RETURN_OPTIONS.includes(body.returnShippingBy) ? body.returnShippingBy : STR_DEFAULTS.returnShippingBy;
+    for (const k of COMPANY_KEYS) clean[k] = String(body[k] ?? '').slice(0, 200);
     const data = JSON.stringify(clean).slice(0, 3900);
 
     await ensureConfig(db);

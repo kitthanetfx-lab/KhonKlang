@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect } from 'react';
 import { account } from '@/lib/appwrite';
@@ -15,9 +16,14 @@ interface FeeConfig {
   meetupFeePercent: number; meetupFeeMin: number;
   sellerRegFee: number; middlemanRegFee: number;
   returnShippingBy: 'buyer' | 'seller' | 'split';
+  companyPromptPay: string; companyBankName: string; companyBankAcct: string; companyBankHolder: string; companyQrFileId: string;
 }
 
-type NumKey = Exclude<keyof FeeConfig, 'returnShippingBy'>;
+type StrKey = 'returnShippingBy' | 'companyPromptPay' | 'companyBankName' | 'companyBankAcct' | 'companyBankHolder' | 'companyQrFileId';
+type NumKey = Exclude<keyof FeeConfig, StrKey>;
+const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
+const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
+const qrUrl = (id: string) => `${ENDPOINT}/storage/buckets/deal_files/files/${id}/view?project=${PROJECT}`;
 
 // กลุ่มฟิลด์สำหรับแสดงผล: [key, label, หน่วย]
 const GROUPS: { title: string; icon: React.ReactNode; fields: [NumKey, string, string][] }[] = [
@@ -82,6 +88,25 @@ export default function SettingsPage() {
     setSaved(false);
   }
 
+  function setStr(k: StrKey, v: string) {
+    setFees(f => f ? { ...f, [k]: v } : f);
+    setSaved(false);
+  }
+
+  const [qrUploading, setQrUploading] = useState(false);
+  async function uploadQr(file: File) {
+    setQrUploading(true);
+    try {
+      const jwt = (await account.createJWT()).jwt;
+      const form = new FormData(); form.append('file', file);
+      const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: form });
+      const d = await r.json();
+      if (r.ok && d.fileId) setStr('companyQrFileId', d.fileId);
+      else setError(d.error || 'อัปโหลด QR ไม่สำเร็จ');
+    } catch { setError('อัปโหลด QR ไม่สำเร็จ'); }
+    finally { setQrUploading(false); }
+  }
+
   async function save() {
     if (!fees) return;
     setSaving(true); setError(''); setSaved(false);
@@ -141,6 +166,38 @@ export default function SettingsPage() {
                   {lbl}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* บัญชีรับเงินของบริษัท — ลูกค้าโอนเข้าตรงนี้ (แสดงในหน้าชำระเงิน) */}
+          <div className="bg-white dark:bg-gray-900 border-2 border-green-200 dark:border-green-900 rounded-2xl p-5">
+            <h2 className="font-semibold text-sm flex items-center gap-2 mb-1"><Wallet size={16} className="text-green-600" /> บัญชีรับเงินของบริษัท (ลูกค้าโอนเข้าตรงนี้)</h2>
+            <p className="text-xs text-gray-500 mb-4">ค่านี้จะแสดงในหน้าชำระเงินของลูกค้า — ต้องตั้งให้ถูกต้อง มิฉะนั้นลูกค้าโอนเงินไม่ได้</p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">พร้อมเพย์ (เบอร์/เลขผู้เสียภาษี)</span>
+                <input value={fees.companyPromptPay} onChange={e => setStr('companyPromptPay', e.target.value)} placeholder="0812345678"
+                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
+              <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">ธนาคาร</span>
+                <input value={fees.companyBankName} onChange={e => setStr('companyBankName', e.target.value)} placeholder="ธนาคารกสิกรไทย (KBANK)"
+                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
+              <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">เลขที่บัญชี</span>
+                <input value={fees.companyBankAcct} onChange={e => setStr('companyBankAcct', e.target.value)} placeholder="123-4-56789-0"
+                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
+              <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">ชื่อบัญชี</span>
+                <input value={fees.companyBankHolder} onChange={e => setStr('companyBankHolder', e.target.value)} placeholder="บริษัท คนกลาง จำกัด"
+                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
+            </div>
+            <div className="mt-4">
+              <span className="text-sm text-gray-600 dark:text-gray-300">รูป QR Code (ถ้ามี QR คงที่ของร้าน)</span>
+              <div className="mt-2 flex items-center gap-3 flex-wrap">
+                {fees.companyQrFileId && <img src={qrUrl(fees.companyQrFileId)} alt="QR" className="w-24 h-24 object-contain rounded-lg border border-gray-200 dark:border-gray-700" />}
+                <label className="px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-200 inline-flex items-center gap-1">
+                  {qrUploading ? <Loader2 size={14} className="animate-spin" /> : '🖼️'} {fees.companyQrFileId ? 'เปลี่ยนรูป QR' : 'อัปโหลดรูป QR'}
+                  <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadQr(f); e.target.value = ''; }} />
+                </label>
+                {fees.companyQrFileId && <button type="button" onClick={() => setStr('companyQrFileId', '')} className="text-xs text-red-500 hover:underline">ลบรูป</button>}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">* ถ้าไม่อัปโหลด QR ระบบจะสร้าง QR พร้อมเพย์พร้อมยอดให้อัตโนมัติจากเลขพร้อมเพย์ด้านบน</p>
             </div>
           </div>
 

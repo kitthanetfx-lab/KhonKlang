@@ -12,6 +12,8 @@ export interface FeeConfig {
   meetupFeePercent: number; meetupFeeMin: number;
   sellerRegFee: number; middlemanRegFee: number;
   returnShippingBy: 'buyer' | 'seller' | 'split';
+  // บัญชีรับเงินของบริษัท (ลูกค้าโอนเข้าตรงนี้)
+  companyPromptPay: string; companyBankName: string; companyBankAcct: string; companyBankHolder: string; companyQrFileId: string;
 }
 
 export const FEE_DEFAULTS: FeeConfig = {
@@ -25,6 +27,7 @@ export const FEE_DEFAULTS: FeeConfig = {
   meetupFeePercent: 0, meetupFeeMin: 50,
   sellerRegFee: 0, middlemanRegFee: 0,
   returnShippingBy: 'buyer',
+  companyPromptPay: '', companyBankName: '', companyBankAcct: '', companyBankHolder: '', companyQrFileId: '',
 };
 
 export interface FeeLine { label: string; amount: number; }
