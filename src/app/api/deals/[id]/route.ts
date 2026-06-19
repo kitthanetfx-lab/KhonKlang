@@ -384,9 +384,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!['posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status))
           return NextResponse.json({ error: 'ดีลเลยขั้นตอนตกลงราคาแล้ว' }, { status: 400 });
         const price = Math.round(Number(body.price));
-        const feePayer = ['buyer', 'seller', 'split'].includes(body.feePayer) ? body.feePayer : 'buyer';
         if (!(price >= 1 && price <= 999999999)) return NextResponse.json({ error: 'ราคาไม่ถูกต้อง' }, { status: 400 });
         const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
+        const feePayer = ['buyer', 'seller', 'split'].includes(body.feePayer)
+          ? body.feePayer
+          : (pd.proposedFeePayer || pd.feePayer || (deal.feePayer === 'buyer' || deal.feePayer === 'seller' || deal.feePayer === 'split' ? deal.feePayer : 'split'));
         const who = isSeller ? 'seller' : isBuyer ? 'buyer' : 'middleman';
         pd.proposedPrice = price; pd.proposedFeePayer = feePayer; pd.proposedBy = who; pd.proposalKind = 'reprice'; pd.agreed = false;
         pd.sellerAgreed = isSeller; pd.buyerAgreed = isBuyer; pd.middlemanAgreed = isMiddleman;
@@ -398,11 +400,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'price_agree': {
         if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
+        const who = isSeller ? 'seller' : isBuyer ? 'buyer' : 'middleman';
+        const requestedFeePayer = ['buyer', 'seller', 'split'].includes(body.feePayer) ? body.feePayer : undefined;
         if (!pd.proposedPrice) {
-          const feePayer = ['buyer', 'seller', 'split'].includes(body.feePayer) ? body.feePayer : (deal.feePayer === 'seller' || deal.feePayer === 'split' ? deal.feePayer : 'buyer');
+          const feePayer = requestedFeePayer || (deal.feePayer === 'buyer' || deal.feePayer === 'seller' || deal.feePayer === 'split' ? deal.feePayer : 'split');
           pd.proposedPrice = Number(deal.price) || 0;
           pd.proposedFeePayer = feePayer;
           pd.proposalKind = 'current';
+          pd.proposedBy = who;
+        } else if (requestedFeePayer && requestedFeePayer !== pd.proposedFeePayer) {
+          pd.proposedFeePayer = requestedFeePayer;
+          pd.proposedBy = who;
+          pd.agreed = false;
+          pd.sellerAgreed = isSeller;
+          pd.buyerAgreed = isBuyer;
+          pd.middlemanAgreed = isMiddleman;
+          syncPriceState(pd);
+          const fpLabel = requestedFeePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : requestedFeePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
+          systemMsg = `🔁 ${who === 'seller' ? 'ผู้ขาย' : who === 'buyer' ? 'ผู้ซื้อ' : 'คนกลาง'}เปลี่ยนผู้จ่ายค่าบริการเป็น ${fpLabel} — ต้องรอทุกฝ่ายยอมรับใหม่`;
+          break;
         }
         if (isSeller) pd.sellerAgreed = true;
         if (isBuyer) pd.buyerAgreed = true;
@@ -419,10 +435,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             ? `✅ ทุกฝ่ายตกลงราคา ฿${Number(pd.proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()})` : ''}`
             : `✅ ทุกฝ่ายยืนยันใช้ราคาเดิม ฿${Number(pd.proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()})` : ''}`;
         } else {
-          const who = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
+          const whoLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
           systemMsg = pd.proposalKind === 'reprice'
-            ? `${who}${isMiddleman ? ' อนุมัติดีล + วางเครดิตประกัน' : ' ตกลงราคานี้'}แล้ว — รอฝ่ายอื่น`
-            : `${who}${isMiddleman ? ' รับรู้ราคาเดิม + อนุมัติดีล' : ' ยืนยันใช้ราคาเดิม'}แล้ว — รอฝ่ายอื่น`;
+            ? `${whoLabel}${isMiddleman ? ' อนุมัติดีล + วางเครดิตประกัน' : ' ตกลงราคานี้'}แล้ว — รอฝ่ายอื่น`
+            : `${whoLabel}${isMiddleman ? ' รับรู้ราคาเดิม + อนุมัติดีล' : ' ยืนยันใช้ราคาเดิม'}แล้ว — รอฝ่ายอื่น`;
         }
         syncPriceState(pd);
         break;
