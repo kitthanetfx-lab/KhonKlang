@@ -4,6 +4,7 @@ import "./globals.css";
 import { CookieConsent } from "@/components/CookieConsent";
 import { DialogProvider } from "@/components/Dialog";
 import { SupportWidget } from "@/components/SupportWidget";
+import { HomeButton } from "@/components/HomeButton";
 
 export const metadata: Metadata = {
   title: "คนกลาง — ซื้อขายปลอดภัยผ่านคนกลาง",
@@ -23,7 +24,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body><DialogProvider>{children}<SupportWidget /><CookieConsent /></DialogProvider></body>
+      <body><DialogProvider>{children}<HomeButton /><SupportWidget /><CookieConsent /></DialogProvider></body>
     </html>
   );
 }

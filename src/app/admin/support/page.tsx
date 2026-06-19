@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { account } from '@/lib/appwrite';
+import { compressImage } from '@/lib/imageCompress';
 import {
   MessageCircle, Phone, PhoneOff, PhoneCall, Mic, MicOff, Send,
   Loader2, User, Search, Inbox, Image as ImageIcon,
@@ -162,16 +163,19 @@ export default function AdminSupportPage() {
     setUploading(true);
     try {
       const jwt = jwtRef.current || await getJwt();
+      const prepared = await compressImage(file); // บีบอัดรูปก่อนส่ง กันไฟล์ใหญ่เกินลิมิต body ของ API route บน Vercel
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', prepared);
       const up = await fetch('/api/support/upload', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd });
       const upData = await up.json().catch(() => ({}));
-      if (!up.ok || !upData.url) return;
+      if (!up.ok || !upData.url) { alert(upData.error || 'อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
       const r = await fetch('/api/admin/support', {
         method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
         body: JSON.stringify({ customerId: selected, content: '', imageUrl: upData.url, mimeType: upData.mimeType }),
       });
       if (r.ok) { void loadThread(selected); void loadThreads(); }
+    } catch {
+      alert('อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง');
     } finally { setUploading(false); }
   }
 
