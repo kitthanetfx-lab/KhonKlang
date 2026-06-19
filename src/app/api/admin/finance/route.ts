@@ -6,6 +6,7 @@ import { readDealPriceState, writeDealPriceState, DealPriceState } from '@/lib/d
 import { FEE_DEFAULTS, computeDealFees, FeeConfig } from '@/lib/fees';
 import { verifySlipByUrl } from '@/lib/slipok';
 import { dealCode } from '@/lib/dealNumber';
+import { getBankInfoMap, BankInfo } from '@/lib/bankInfo';
 
 const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
 const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
@@ -58,12 +59,18 @@ export async function GET(req: NextRequest) {
     ]);
     const deals = dealsRes.documents as Row[];
 
+    // ดึงเลขบัญชี/คิวอาร์โค๊ดของผู้ใช้ทุกคนที่เกี่ยวกับดีลล่วงหน้า (จากหน้าโปรไฟล์ ถ้ามีกรอกไว้)
+    // เพื่อให้รู้ว่าต้องโอนเงินคืน/จ่ายเข้าบัญชีไหน โดยไม่ต้องไปเปิดหาเอง
+    const bankIds = deals.flatMap(d => [String(d.buyerId || ''), String(d.sellerId || ''), String(d.middlemanId || '')]);
+    const bankMap = await getBankInfoMap(bankIds);
+    const bankOf = (uid: unknown): BankInfo | null => bankMap[String(uid || '')] ?? null;
+
     const incoming: Row[] = [];
 
     // คำนวณส่วนค่าบริการของผู้ซื้อ/ผู้ขายตามผู้รับผิดชอบ
     const feeShares = (price: number, dealType: string, feePayer: string) => {
       const fb = computeDealFees(fees, price, dealType);
-      const fp = feePayer || 'buyer';
+      const fp = feePayer || 'split';
       const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
       return { total: fb.total, buyerShare: fb.total - sellerShare, sellerShare, lines: fb.lines };
     };
@@ -76,7 +83,7 @@ export async function GET(req: NextRequest) {
       const pd = readDealPriceState({ priceData: String(d.priceData || ''), meetupData: String(d.meetupData || '') });
 
       if (d.paymentSlipFileId && (dStatus === 'payment_uploaded' || CONFIRMED_STATUSES.has(dStatus))) {
-        const sh = feeShares(Number(d.price) || 0, String(d.dealType || ''), String(d.feePayer || 'buyer'));
+        const sh = feeShares(Number(d.price) || 0, String(d.dealType || ''), String(d.feePayer || pd.feePayer || 'split'));
         const txnStatus = dStatus === 'payment_uploaded' ? 'pending' : 'confirmed';
         incoming.push({
           key: 'escrow_' + d.$id, source: 'escrow', refId: String(d.$id), dealNumber: dealCode(String(d.$id)), title: String(d.title || ''),
@@ -90,12 +97,13 @@ export async function GET(req: NextRequest) {
             total: (Number(d.price) || 0) + sh.buyerShare,
           },
           canApprove: dStatus === 'payment_uploaded',
+          bank: bankOf(d.buyerId),
         });
       }
 
       // 1b) ค่าบริการส่วนของผู้ขาย — ผู้ขายโอนแยก
       if (pd.sellerFeeSlip) {
-        const sh = feeShares(Number(d.price) || 0, String(d.dealType || ''), String(d.feePayer || 'buyer'));
+        const sh = feeShares(Number(d.price) || 0, String(d.dealType || ''), String(d.feePayer || pd.feePayer || 'split'));
         if (sh.sellerShare > 0) {
           const txnStatus = dStatus === 'cancelled'
             ? (pd.refundSentAt ? 'refunded' : 'refund_pending')
@@ -106,6 +114,7 @@ export async function GET(req: NextRequest) {
             expected: sh.sellerShare, fileId: String(pd.sellerFeeSlip), bucket: 'deal_files',
             status: dStatus, dealType: String(d.dealType || ''), txnStatus,
             fees: { lines: [{ label: 'ค่าบริการ (ส่วนผู้ขาย)', amount: sh.sellerShare }], total: sh.sellerShare },
+            bank: bankOf(d.sellerId),
           });
         }
       }
@@ -113,13 +122,14 @@ export async function GET(req: NextRequest) {
       // 1c) จ่ายคืนผู้ขายเมื่อปิดดีลสำเร็จ / คืนเงินผู้ซื้อเมื่อยกเลิกดีลที่จ่ายเงินไปแล้ว — เงินออก
       if (String(d.dealType || '') !== 'meetup') {
         if (dStatus === 'completed') {
-          const sh = feeShares(Number(d.price) || 0, String(d.dealType || ''), String(d.feePayer || 'buyer'));
+          const sh = feeShares(Number(d.price) || 0, String(d.dealType || ''), String(d.feePayer || pd.feePayer || 'split'));
           const sellerNet = Math.max((Number(d.price) || 0) - sh.sellerShare, 0);
           outgoing.push({
             key: 'payout_' + d.$id, source: 'payout', refId: String(d.$id), dealNumber: dealCode(String(d.$id)), title: String(d.title || ''),
             payer: 'ศูนย์กลาง', payerName: String(d.sellerName || ''), purpose: 'จ่ายคืนผู้ขาย (ปิดดีล)',
             expected: sellerNet, fileId: '', bucket: '', status: dStatus, dealType: String(d.dealType || ''),
             txnStatus: pd.payoutSentAt ? 'confirmed' : 'pending', note: pd.payoutNote || '',
+            bank: bankOf(d.sellerId),
           });
         } else if (dStatus === 'cancelled' && d.paymentSlipFileId) {
           outgoing.push({
@@ -127,6 +137,7 @@ export async function GET(req: NextRequest) {
             payer: 'ศูนย์กลาง', payerName: String(d.buyerName || ''), purpose: 'คืนเงินผู้ซื้อ (ยกเลิกดีล)',
             expected: Number(d.price) || 0, fileId: '', bucket: '', status: dStatus, dealType: String(d.dealType || ''),
             txnStatus: pd.refundSentAt ? 'confirmed' : 'pending', note: pd.refundNote || '',
+            bank: bankOf(d.buyerId),
           });
         }
       }
@@ -141,8 +152,8 @@ export async function GET(req: NextRequest) {
         const dep = Number(md.deposit) || 0;
         const finished = dStatus === 'completed' || dStatus === 'cancelled';
         const txnStatus = finished ? (md.refundedAt ? 'refunded' : 'refund_pending') : 'confirmed';
-        if (md.buyerSlip) incoming.push({ key: 'mtb_' + d.$id, source: 'meetup', refId: String(d.$id), dealNumber: dealCode(String(d.$id)), title: String(d.title || ''), payer: 'ผู้ซื้อ', payerName: String(d.buyerName || ''), purpose: 'เงินประกัน (นัดเจอ)', expected: dep, fileId: String(md.buyerSlip), bucket: 'deal_files', status: dStatus, txnStatus, fees: { lines: [{ label: 'เงินประกัน', amount: dep }], total: dep } });
-        if (md.sellerSlip) incoming.push({ key: 'mts_' + d.$id, source: 'meetup', refId: String(d.$id), dealNumber: dealCode(String(d.$id)), title: String(d.title || ''), payer: 'ผู้ขาย', payerName: String(d.sellerName || ''), purpose: 'เงินประกัน (นัดเจอ)', expected: dep, fileId: String(md.sellerSlip), bucket: 'deal_files', status: dStatus, txnStatus, fees: { lines: [{ label: 'เงินประกัน', amount: dep }], total: dep } });
+        if (md.buyerSlip) incoming.push({ key: 'mtb_' + d.$id, source: 'meetup', refId: String(d.$id), dealNumber: dealCode(String(d.$id)), title: String(d.title || ''), payer: 'ผู้ซื้อ', payerName: String(d.buyerName || ''), purpose: 'เงินประกัน (นัดเจอ)', expected: dep, fileId: String(md.buyerSlip), bucket: 'deal_files', status: dStatus, txnStatus, fees: { lines: [{ label: 'เงินประกัน', amount: dep }], total: dep }, bank: bankOf(d.buyerId) });
+        if (md.sellerSlip) incoming.push({ key: 'mts_' + d.$id, source: 'meetup', refId: String(d.$id), dealNumber: dealCode(String(d.$id)), title: String(d.title || ''), payer: 'ผู้ขาย', payerName: String(d.sellerName || ''), purpose: 'เงินประกัน (นัดเจอ)', expected: dep, fileId: String(md.sellerSlip), bucket: 'deal_files', status: dStatus, txnStatus, fees: { lines: [{ label: 'เงินประกัน', amount: dep }], total: dep }, bank: bankOf(d.sellerId) });
 
         if (finished && (md.buyerSlip || md.sellerSlip)) {
           outgoing.push({

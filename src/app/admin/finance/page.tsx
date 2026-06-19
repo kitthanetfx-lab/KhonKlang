@@ -12,6 +12,7 @@ const baht = (n: number) => '฿' + Math.round(n).toLocaleString();
 
 interface FeeLine { label: string; amount: number; }
 type TxnStatus = 'pending' | 'confirmed' | 'refund_pending' | 'refunded';
+interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; bankQrFileId?: string; }
 interface Incoming {
   key: string; source: string; refId: string; dealNumber?: string; title: string;
   payer: string; payerName: string; purpose: string; expected: number;
@@ -19,6 +20,7 @@ interface Incoming {
   txnStatus?: TxnStatus; note?: string;
   fees?: { lines: FeeLine[]; total: number; note?: string };
   canApprove?: boolean; approveLink?: string;
+  bank?: BankInfo | null;
 }
 interface Summary {
   incomingCount: number; escrowPendingCount: number; heldEscrow: number;
@@ -170,7 +172,7 @@ export default function AdminFinance() {
                         <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                           <p className="text-xs text-gray-400 mb-1">ค่าจัดการในยอดนี้</p>
                           {d.fees.lines.map(l => (<div key={l.label} className="flex justify-between text-xs text-gray-500 py-0.5"><span>{l.label}</span><span>{baht(l.amount)}</span></div>))}
-                          <div className="flex justify-between text-xs font-semibold mt-1 pt-1 border-t border-gray-200 dark:border-gray-700"><span>รวมค่าบริการ</span><span>{baht(d.fees.total)}</span></div>
+                          <div className="flex justify-between text-xs font-semibold mt-1 pt-1 border-t border-gray-200 dark:border-gray-700"><span>ยอดรวมที่ต้องโอน</span><span>{baht(d.fees.total)}</span></div>
                         </div>
                       )}
                     </div>
@@ -183,6 +185,7 @@ export default function AdminFinance() {
                       ) : <p className="text-xs text-gray-400">ไม่มีสลิป</p>}
                     </div>
                   </div>
+                  <BankInfoBox bank={d.bank} label={`บัญชีของ${d.payer || 'ผู้โอน'}`} />
 
                   {sc && (() => { const s = sc.result.slip; const good = sc.result.ok && sc.amountMatch !== false;
                     return (
@@ -264,6 +267,7 @@ export default function AdminFinance() {
                   <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 mt-3">
                     <div className="flex justify-between text-sm font-bold"><span>ยอดที่ต้องโอนออก</span><span className="text-rose-600">{baht(d.expected)}</span></div>
                   </div>
+                  <BankInfoBox bank={d.bank} label={`บัญชีรับเงิน — ${d.payerName || 'ผู้รับ'}`} />
                   {canMark && (
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
                       <button onClick={() => act(d.refId, d.source === 'payout' ? 'mark_payout_sent' : 'mark_refund_sent')} disabled={!!acting}
@@ -293,6 +297,31 @@ export default function AdminFinance() {
           </div>
           <p className="text-xs text-gray-400 mt-4">* รายได้เป็นยอดประมาณการจากอัตราค่าธรรมเนียมที่ตั้งไว้ × ดีลที่สำเร็จ (ยังไม่ได้บันทึกยอดจริงต่อดีล) · เงินเข้า/ออกทุกรายการมีสถานะติดตามได้ที่แท็บ &quot;เงินเข้า&quot;/&quot;เงินออก&quot;</p>
         </>
+      )}
+    </div>
+  );
+}
+
+function BankInfoBox({ bank, label }: { bank?: BankInfo | null; label: string }) {
+  if (!bank) {
+    return (
+      <div className="mt-3 rounded-xl p-3 border border-amber-200 bg-amber-50 text-xs text-amber-700">
+        ⚠️ ยังไม่มีข้อมูลบัญชี/คิวอาร์โค๊ดในหน้าโปรไฟล์ของผู้ใช้นี้ — ต้องสอบถามลูกค้าเองก่อนโอน
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-xl p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-start justify-between gap-3 flex-wrap">
+      <div className="text-xs space-y-0.5">
+        <p className="text-gray-400 mb-1">{label}</p>
+        <p><span className="text-gray-400">ธนาคาร:</span> {bank.bankName || '-'}</p>
+        <p><span className="text-gray-400">เลขบัญชี:</span> <span className="font-mono">{bank.bankAcct || '-'}</span></p>
+        <p><span className="text-gray-400">ชื่อบัญชี:</span> {bank.bankOwner || '-'}</p>
+      </div>
+      {bank.bankQrFileId && (
+        <a href={fileUrl('deal_files', bank.bankQrFileId)} target="_blank" rel="noreferrer" className="shrink-0">
+          <img src={fileUrl('deal_files', bank.bankQrFileId)} alt="QR" className="w-20 h-20 object-contain rounded-lg border border-gray-200 dark:border-gray-700" />
+        </a>
       )}
     </div>
   );
