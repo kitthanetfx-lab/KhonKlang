@@ -79,6 +79,9 @@ async function ensureExtraAttributes(databases: Databases) {
     // dealType: '' = ปกติ / 'meetup' = รับประกันเดินทาง (ไม่ใช้คนกลาง) + meetupData เก็บรายละเอียดการคำนวณ
     ensureAttributeReady(databases, 'dealType', () => databases.createStringAttribute(DB_ID, COL_ID, 'dealType', 20, false, '')),
     ensureAttributeReady(databases, 'meetupData', () => databases.createStringAttribute(DB_ID, COL_ID, 'meetupData', 2000, false, '')),
+    // ตกลงราคา + ผู้จ่ายค่าบริการ (เก็บสถานะการต่อรอง/ตกลงเป็น JSON)
+    ensureAttributeReady(databases, 'priceData', () => databases.createStringAttribute(DB_ID, COL_ID, 'priceData', 2000, false, '')),
+    ensureAttributeReady(databases, 'feePayer', () => databases.createStringAttribute(DB_ID, COL_ID, 'feePayer', 20, false, '')),
   ]);
 }
 

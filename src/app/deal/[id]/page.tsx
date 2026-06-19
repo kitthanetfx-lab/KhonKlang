@@ -144,7 +144,7 @@ interface Deal {
   sellerAcceptedTerms: boolean; middlemanAcceptedTerms: boolean; buyerAcceptedTerms: boolean;
   middlemanConfirmedPayment: boolean; buyerConfirmedCheck: boolean;
   paymentSlipFileId: string; evidenceData: string; trackingToMiddleman: string; trackingToBuyer: string;
-  dealType?: string; meetupData?: string;
+  dealType?: string; meetupData?: string; priceData?: string; feePayer?: string;
 }
 
 /** ข้อมูลรับประกันเดินทาง (เก็บเป็น JSON ใน deal.meetupData) */
@@ -335,9 +335,12 @@ export default function DealRoom() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const evidInputRef = useRef<HTMLInputElement>(null);
   const buyerEvidInputRef = useRef<HTMLInputElement>(null);
+  const sellerFeeInputRef = useRef<HTMLInputElement>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [callChatOpen, setCallChatOpen] = useState(true);
   const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
+  const [priceInput, setPriceInput] = useState('');
+  const [feePayerInput, setFeePayerInput] = useState<'buyer' | 'seller' | 'split'>('buyer');
   const callFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -895,6 +898,88 @@ export default function DealRoom() {
     );
   }
 
+  // ─── Price + fee-payer agreement ─────────────────────────────────────────
+  function renderPricePanel() {
+    if (deal!.dealType === 'meetup') return null;
+    // แสดงเฉพาะช่วงก่อนชำระเงิน
+    if (!['posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending', 'payment_pending'].includes(deal!.status)) return null;
+    if (myRole === 'guest' || myRole === '') return null;
+    const pd = (() => { try { return JSON.parse(deal!.priceData || '{}'); } catch { return {} as Record<string, unknown>; } })();
+    const hasMm = !!deal!.middlemanId;
+    const fpName = (fp?: string) => fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
+    const meAgreed = (myRole === 'seller' && pd.sellerAgreed) || (myRole === 'buyer' && pd.buyerAgreed) || (myRole === 'middleman' && pd.middlemanAgreed);
+    return (
+      <div className="dr-card">
+        <div className="dr-card-title">💬 ตกลงราคา & ค่าบริการ</div>
+        {pd.agreed ? (
+          <div style={{ fontSize: 14, color: 'var(--green-700)', background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-md)', padding: '10px 14px' }}>
+            ✅ ตกลงราคาแล้ว <b>฿{Number(pd.proposedPrice || deal!.price).toLocaleString()}</b> · ค่าบริการ: {fpName(pd.feePayer)}
+            {hasMm && pd.mmDepositHeld ? ` · คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()}` : ''}
+          </div>
+        ) : pd.proposedPrice ? (
+          <div>
+            <div style={{ fontSize: 14, marginBottom: 8 }}>ข้อเสนอ: <b>฿{Number(pd.proposedPrice).toLocaleString()}</b> · ค่าบริการ: {fpName(pd.proposedFeePayer)}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+              {[['ผู้ขาย', pd.sellerAgreed], ['ผู้ซื้อ', pd.buyerAgreed], ...(hasMm ? [['คนกลาง', pd.middlemanAgreed] as [string, boolean]] : [])].map(([l, ok]) => (
+                <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ตกลงแล้ว' : '⏳ รอ'}</span></div>
+              ))}
+            </div>
+            {!meAgreed && (
+              <button className="btn btn-green btn-block" disabled={acting} onClick={() => doAction('price_agree')}>
+                {myRole === 'middleman' ? '✅ อนุมัติดีล + วางเครดิตประกัน' : '✅ ตกลงราคานี้'}
+              </button>
+            )}
+            {meAgreed && <p style={{ fontSize: 13, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณตกลงแล้ว — รอฝ่ายอื่น</p>}
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>เสนอราคาและเลือกผู้รับผิดชอบค่าบริการ ทุกฝ่ายต้องกดตกลงก่อนเริ่มชำระเงิน</p>
+        )}
+
+        {!pd.agreed && (
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>{pd.proposedPrice ? 'เสนอราคาใหม่' : 'เสนอราคา'}</div>
+            <input type="number" className="dr-select" value={priceInput} onChange={e => setPriceInput(e.target.value)} placeholder={`ราคา (บาท) — ปัจจุบัน ฿${deal!.price.toLocaleString()}`} style={{ marginBottom: 8 }} />
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              {(['buyer', 'seller', 'split'] as const).map(fp => (
+                <button key={fp} type="button" onClick={() => setFeePayerInput(fp)} className={`btn btn-sm ${feePayerInput === fp ? 'btn-primary' : 'btn-ghost'}`}>{fpName(fp)}</button>
+              ))}
+            </div>
+            <button className="btn btn-primary btn-block" disabled={acting} onClick={() => { const p = Math.round(Number(priceInput)); if (!(p >= 1)) { alert('กรอกราคาให้ถูกต้อง'); return; } doAction('price_propose', { price: p, feePayer: feePayerInput }); setPriceInput(''); }}>
+              💬 เสนอราคา ค่าบริการ: {fpName(feePayerInput)}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── Evidence-done step (ก่อนโอนเงิน) ────────────────────────────────────
+  function renderEvidenceDonePanel() {
+    if (deal!.dealType === 'meetup') return null;
+    if (!['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal!.status)) return null;
+    if (myRole === 'guest' || myRole === '') return null;
+    const pd = (() => { try { return JSON.parse(deal!.priceData || '{}'); } catch { return {} as Record<string, unknown>; } })();
+    if (!pd.agreed) return null; // ต้องตกลงราคาก่อน
+    const hasMm = !!deal!.middlemanId;
+    const allDone = !!(pd.evidenceDoneBuyer && pd.evidenceDoneSeller && (!hasMm || pd.evidenceDoneMiddleman));
+    if (allDone) return null;
+    const meDone = (myRole === 'seller' && pd.evidenceDoneSeller) || (myRole === 'buyer' && pd.evidenceDoneBuyer) || (myRole === 'middleman' && pd.evidenceDoneMiddleman);
+    return (
+      <div className="dr-card">
+        <div className="dr-card-title">📁 เก็บหลักฐานก่อนโอนเงิน</div>
+        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>คุยรายละเอียด ดูสินค้า เก็บหลักฐานในแชต/วิดีโอคอลให้เรียบร้อย แล้วกดยืนยัน — ทุกฝ่ายต้องยืนยันก่อนเข้าขั้นโอนเงิน</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+          {[['ผู้ขาย', pd.evidenceDoneSeller], ['ผู้ซื้อ', pd.evidenceDoneBuyer], ...(hasMm ? [['คนกลาง', pd.evidenceDoneMiddleman] as [string, boolean]] : [])].map(([l, ok]) => (
+            <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ เก็บหลักฐานแล้ว' : '⏳ รอ'}</span></div>
+          ))}
+        </div>
+        {!meDone
+          ? <button className="btn btn-primary btn-block" disabled={acting} onClick={() => doAction('evidence_done')}>✅ เก็บหลักฐานเสร็จสิ้น</button>
+          : <p style={{ fontSize: 13, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันแล้ว — รอฝ่ายอื่น</p>}
+      </div>
+    );
+  }
+
   // ─── Payment section ─────────────────────────────────────────────────────
   function renderPaymentSection() {
     if (deal!.dealType === 'meetup') return null;
@@ -903,21 +988,58 @@ export default function DealRoom() {
       <div className="dr-card dr-pay-card">
         <div className="dr-card-title">💳 ชำระเงินค่าสินค้า</div>
         <div className="dr-pay-amount">฿{deal!.price.toLocaleString()}</div>
-        {deal!.status === 'payment_pending' && myRole === 'buyer' && (
-          <>
-            <PaymentMethods
-              amount={deal!.price}
-              note={`เงินจะพักไว้กับ บริษัท คนกลาง จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`}
-            />
-            <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
-          </>
-        )}
-        {deal!.status === 'payment_pending' && myRole !== 'buyer' && (
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>รอผู้ซื้อโอนเงินเข้าระบบพักเงินของบริษัท</div>
-        )}
-        {deal!.status === 'payment_uploaded' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — {isSimple ? 'รอศูนย์กลางยืนยันรับเงิน' : 'รอคนกลางยืนยัน'}</div>}
+        {(() => {
+          const pd = (() => { try { return JSON.parse(deal!.priceData || '{}'); } catch { return {} as Record<string, unknown>; } })();
+          const fb = computeDealFees(feeConfig, deal!.price, deal!.dealType);
+          const fp = String(deal!.feePayer || pd.feePayer || 'buyer');
+          const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+          const buyerShare = fb.total - sellerShare;
+          const buyerTotal = deal!.price + buyerShare;
+          const priceAgreed = !!pd.agreed;
+          const hasMm = !!deal!.middlemanId;
+          const evidenceDone = !!(pd.evidenceDoneBuyer && pd.evidenceDoneSeller && (!hasMm || pd.evidenceDoneMiddleman));
+          const fpName = fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
+          return (
+            <>
+              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', margin: '4px 0 12px', fontSize: 13 }}>
+                <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 สรุปยอด · ค่าบริการ: {fpName}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ราคาสินค้า</span><span>฿{deal!.price.toLocaleString()}</span></div>
+                {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}><span>ผู้ซื้อต้องโอน</span><span>฿{buyerTotal.toLocaleString()}</span></div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>= ราคาสินค้า ฿{deal!.price.toLocaleString()} + ค่าบริการส่วนผู้ซื้อ ฿{buyerShare.toLocaleString()}</div>
+                {sellerShare > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8a5a00', marginTop: 4 }}><span>ผู้ขายโอนค่าบริการ (แยกทันที)</span><span>฿{sellerShare.toLocaleString()}</span></div>}
+              </div>
+
+              {deal!.status === 'payment_pending' && myRole === 'buyer' && (
+                !priceAgreed ? <p style={{ fontSize: 13, color: '#b22441' }}>⚠️ ต้องตกลงราคาในขั้นตอน &quot;ตกลงราคา&quot; ให้ครบทุกฝ่ายก่อน จึงจะโอนเงินได้</p>
+                : !evidenceDone ? <p style={{ fontSize: 13, color: '#b22441' }}>⚠️ ทุกฝ่ายต้องกด &quot;เก็บหลักฐานเสร็จสิ้น&quot; ก่อน จึงจะโอนเงินได้</p>
+                : (<>
+                    <PaymentMethods amount={buyerTotal} note={`เงินจะพักไว้กับ บริษัท คนกลาง จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`} />
+                    <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
+                  </>)
+              )}
+              {deal!.status === 'payment_pending' && myRole !== 'buyer' && myRole !== 'seller' && (
+                <div style={{ fontSize: 13, color: 'var(--muted)' }}>รอผู้ซื้อโอนเงินเข้าระบบพักเงินของบริษัท</div>
+              )}
+
+              {/* ผู้ขายโอนค่าบริการส่วนของตน — ทันที แยกจากยอดสินค้า */}
+              {myRole === 'seller' && sellerShare > 0 && priceAgreed && ['payment_pending', 'payment_uploaded'].includes(deal!.status) && (
+                pd.sellerFeeSlip
+                  ? <div className="dr-slip-status">✅ คุณโอนค่าบริการ ฿{sellerShare.toLocaleString()} แล้ว — รอศูนย์กลางตรวจสอบ</div>
+                  : <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
+                      <div style={{ fontWeight: 700, color: '#8a5a00', marginBottom: 6 }}>⚡ ค่าบริการส่วนของคุณ ฿{sellerShare.toLocaleString()} — โอนทันที</div>
+                      <PaymentMethods amount={sellerShare} note="โอนค่าบริการส่วนของผู้ขายเข้าศูนย์กลาง แล้วอัปโหลดสลิป (แยกจากยอดสินค้า)" />
+                      <button onClick={() => sellerFeeInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนค่าบริการแล้ว — อัปโหลดสลิป</button>
+                    </div>
+              )}
+              {deal!.status === 'payment_uploaded' && myRole === 'buyer' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — {isSimple ? 'รอศูนย์กลางยืนยันรับเงิน' : 'รอคนกลางยืนยัน'}</div>}
+            </>
+          );
+        })()}
         <input ref={evidInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }}
           onChange={async e => { const f = e.target.files?.[0]; if (!f) return; const purl = beginUploadPreview(f); try { const j = await getJwt(); const prepared = await compressImage(f); const form = new FormData(); form.append('file', prepared); const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form }); const d = await r.json(); if (r.ok) await doAction('upload_payment', { fileId: d.fileId }); else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ'); } finally { endUploadPreview(purl); } e.target.value = ''; }} />
+        <input ref={sellerFeeInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }}
+          onChange={async e => { const f = e.target.files?.[0]; if (!f) return; const purl = beginUploadPreview(f); try { const j = await getJwt(); const prepared = await compressImage(f); const form = new FormData(); form.append('file', prepared); const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': j }, body: form }); const d = await r.json(); if (r.ok) await doAction('seller_fee_paid', { fileId: d.fileId }); else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ'); } finally { endUploadPreview(purl); } e.target.value = ''; }} />
       </div>
     );
   }
@@ -1170,6 +1292,8 @@ export default function DealRoom() {
                 </div>
 
                 {renderMeetupPanel()}
+                {renderPricePanel()}
+                {renderEvidenceDonePanel()}
                 {renderPaymentSection()}
 
                 {deal.paymentSlipFileId && (

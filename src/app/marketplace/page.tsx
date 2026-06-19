@@ -64,20 +64,20 @@ export default function Marketplace() {
   const [myId,     setMyId]     = useState('');
 
   const [search,     setSearch]     = useState('');
-  const [cat,        setCat]        = useState('ทั้งหมด');
+  const [cat,        setCat]        = useState(() => {
+    if (typeof window === 'undefined') return 'ทั้งหมด';
+    try {
+      const c = new URLSearchParams(window.location.search).get('cat');
+      return c && CATS.includes(c) ? c : 'ทั้งหมด';
+    } catch {
+      return 'ทั้งหมด';
+    }
+  });
   const [province,   setProvince]   = useState('');
   const [certified,  setCertified]  = useState(false);
   const [sort,       setSort]       = useState('ล่าสุด');
 
   useReveal();
-
-  // รับหมวดจากการ์ดหน้าแรก เช่น /marketplace?cat=ยานพาหนะ
-  useEffect(() => {
-    try {
-      const c = new URLSearchParams(window.location.search).get('cat');
-      if (c && CATS.includes(c)) setCat(c);
-    } catch {}
-  }, []);
 
   useEffect(() => {
     const r = document.documentElement;

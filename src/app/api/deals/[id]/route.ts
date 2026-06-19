@@ -26,6 +26,20 @@ async function getAdminIds(): Promise<string[]> {
   } catch { return []; }
 }
 
+// เครดิตประกันคนกลางตามเทียร์ (วางตอนคนกลางอนุมัติดีล)
+async function getMmDeposit(uid: string): Promise<number> {
+  try {
+    const c = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.APPWRITE_API_KEY!);
+    const u = await new Users(c).get(uid);
+    const tier = String((u.prefs as Record<string, unknown> | undefined)?.middlemanTierIntent || 'Bronze');
+    const d: Record<string, number> = { Bronze: 1000, Silver: 5000, Gold: 20000, Platinum: 50000 };
+    return d[tier] || 1000;
+  } catch { return 1000; }
+}
+
 function getUserFromJwt(jwt: string) {
   const c = new Client()
     .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
@@ -343,6 +357,69 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const roleLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : isMiddleman ? 'คนกลาง' : 'ผู้สนใจจากลิงก์แชร์';
         systemMsg = `👀 ${currentUser.name || 'ผู้ใช้'} (${roleLabel}) เข้ามาดูห้องดีล`;
         writeChatMsg = false;
+        break;
+      }
+      case 'price_propose': {
+        // เสนอราคาสินค้า + ผู้จ่ายค่าบริการ → รีเซ็ต รอทุกฝ่ายกดตกลงใหม่ (เปลี่ยนได้ก่อนชำระเงิน)
+        if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (!['posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status))
+          return NextResponse.json({ error: 'ดีลเลยขั้นตอนตกลงราคาแล้ว' }, { status: 400 });
+        const price = Math.round(Number(body.price));
+        const feePayer = ['buyer', 'seller', 'split'].includes(body.feePayer) ? body.feePayer : 'buyer';
+        if (!(price >= 1 && price <= 999999999)) return NextResponse.json({ error: 'ราคาไม่ถูกต้อง' }, { status: 400 });
+        const pd = (() => { try { return JSON.parse(deal.priceData || '{}'); } catch { return {}; } })();
+        const who = isSeller ? 'seller' : isBuyer ? 'buyer' : 'middleman';
+        pd.proposedPrice = price; pd.proposedFeePayer = feePayer; pd.proposedBy = who; pd.agreed = false;
+        pd.sellerAgreed = isSeller; pd.buyerAgreed = isBuyer; pd.middlemanAgreed = isMiddleman;
+        updates.priceData = JSON.stringify(pd);
+        const fpLabel = feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
+        systemMsg = `💬 ${who === 'seller' ? 'ผู้ขาย' : who === 'buyer' ? 'ผู้ซื้อ' : 'คนกลาง'}เสนอราคา ฿${price.toLocaleString()} · ค่าบริการ: ${fpLabel} — รอทุกฝ่ายกดตกลง`;
+        break;
+      }
+      case 'price_agree': {
+        if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const pd = (() => { try { return JSON.parse(deal.priceData || '{}'); } catch { return {}; } })();
+        if (!pd.proposedPrice) return NextResponse.json({ error: 'ยังไม่มีข้อเสนอราคาให้ตกลง' }, { status: 400 });
+        if (isSeller) pd.sellerAgreed = true;
+        if (isBuyer) pd.buyerAgreed = true;
+        if (isMiddleman) pd.middlemanAgreed = true;
+        const hasMm = !!deal.middlemanId;
+        const allAgreed = pd.sellerAgreed && pd.buyerAgreed && (!hasMm || pd.middlemanAgreed);
+        if (allAgreed) {
+          pd.agreed = true; pd.feePayer = pd.proposedFeePayer;
+          updates.price = pd.proposedPrice;
+          updates.feePayer = pd.proposedFeePayer;
+          if (hasMm) pd.mmDepositHeld = await getMmDeposit(String(deal.middlemanId));
+          const fpLabel = pd.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : pd.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
+          systemMsg = `✅ ทุกฝ่ายตกลงราคา ฿${Number(pd.proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()})` : ''}`;
+        } else {
+          const who = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
+          systemMsg = `${who}${isMiddleman ? ' อนุมัติดีล + วางเครดิตประกัน' : ' ตกลงราคา'}แล้ว — รอฝ่ายอื่น`;
+        }
+        updates.priceData = JSON.stringify(pd);
+        break;
+      }
+      case 'evidence_done': {
+        // แต่ละฝ่ายยืนยันว่าเก็บหลักฐาน (แชต/วิดีโอคอล/รูป) เรียบร้อยแล้ว ก่อนเข้าขั้นโอนเงิน
+        if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const pd = (() => { try { return JSON.parse(deal.priceData || '{}'); } catch { return {}; } })();
+        if (isSeller) pd.evidenceDoneSeller = true;
+        if (isBuyer) pd.evidenceDoneBuyer = true;
+        if (isMiddleman) pd.evidenceDoneMiddleman = true;
+        const hasMm = !!deal.middlemanId;
+        const allDone = pd.evidenceDoneSeller && pd.evidenceDoneBuyer && (!hasMm || pd.evidenceDoneMiddleman);
+        updates.priceData = JSON.stringify(pd);
+        systemMsg = allDone ? '📁 ทุกฝ่ายยืนยันเก็บหลักฐานเรียบร้อย — เข้าสู่ขั้นตอนโอนเงินได้' : `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ยืนยันเก็บหลักฐานแล้ว — รอฝ่ายอื่น`;
+        break;
+      }
+      case 'seller_fee_paid': {
+        // ผู้ขายโอนค่าบริการส่วนของตัวเองทันที (แยกจากยอดสินค้า) แล้วอัปสลิป
+        if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
+        const pd = (() => { try { return JSON.parse(deal.priceData || '{}'); } catch { return {}; } })();
+        pd.sellerFeeSlip = String(body.fileId);
+        updates.priceData = JSON.stringify(pd);
+        systemMsg = 'ผู้ขายโอนค่าบริการส่วนของตนแล้ว — รอศูนย์กลางตรวจสอบ';
         break;
       }
       default:

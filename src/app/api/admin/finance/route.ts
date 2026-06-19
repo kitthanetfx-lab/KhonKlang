@@ -49,16 +49,41 @@ export async function GET(req: NextRequest) {
 
     const incoming: Row[] = [];
 
-    // 1) ค่าสินค้า escrow — ผู้ซื้อโอน รอตรวจ
+    // คำนวณส่วนค่าบริการของผู้ซื้อ/ผู้ขายตามผู้รับผิดชอบ
+    const feeShares = (price: number, dealType: string, feePayer: string) => {
+      const fb = computeDealFees(fees, price, dealType);
+      const fp = feePayer || 'buyer';
+      const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+      return { total: fb.total, buyerShare: fb.total - sellerShare, sellerShare, lines: fb.lines };
+    };
+
+    // 1) ค่าสินค้า escrow — ผู้ซื้อโอน (ราคา + ค่าบริการส่วนผู้ซื้อ)
     for (const d of deals) {
       if (d.status === 'payment_uploaded') {
+        const sh = feeShares(Number(d.price) || 0, String(d.dealType || ''), String(d.feePayer || 'buyer'));
         incoming.push({
           key: 'escrow_' + d.$id, source: 'escrow', refId: String(d.$id), title: String(d.title || ''),
           payer: 'ผู้ซื้อ', payerName: String(d.buyerName || ''), purpose: 'ค่าสินค้า',
-          expected: Number(d.price) || 0, fileId: String(d.paymentSlipFileId || ''), bucket: 'deal_files',
+          expected: (Number(d.price) || 0) + sh.buyerShare, fileId: String(d.paymentSlipFileId || ''), bucket: 'deal_files',
           status: String(d.status), dealType: String(d.dealType || ''),
-          fees: computeDealFees(fees, Number(d.price) || 0, String(d.dealType || '')),
+          fees: {
+            lines: sh.buyerShare > 0
+              ? [{ label: 'ราคาสินค้า', amount: Number(d.price) || 0 }, { label: 'ค่าบริการ (ส่วนผู้ซื้อ)', amount: sh.buyerShare }]
+              : [{ label: 'ราคาสินค้า', amount: Number(d.price) || 0 }],
+            total: (Number(d.price) || 0) + sh.buyerShare,
+          },
           canApprove: true,
+        });
+      }
+      // 1b) ค่าบริการส่วนของผู้ขาย — ผู้ขายโอนแยก
+      const pd = (() => { try { return JSON.parse(String(d.priceData || '{}')); } catch { return {} as Record<string, unknown>; } })();
+      if (pd.sellerFeeSlip && !['completed', 'cancelled'].includes(String(d.status))) {
+        const sh = feeShares(Number(d.price) || 0, String(d.dealType || ''), String(d.feePayer || 'buyer'));
+        if (sh.sellerShare > 0) incoming.push({
+          key: 'sellerfee_' + d.$id, source: 'escrow', refId: String(d.$id), title: `ค่าบริการ (ผู้ขาย): ${String(d.title || '')}`,
+          payer: 'ผู้ขาย', payerName: String(d.sellerName || ''), purpose: 'ค่าบริการส่วนผู้ขาย',
+          expected: sh.sellerShare, fileId: String(pd.sellerFeeSlip), bucket: 'deal_files',
+          status: String(d.status), dealType: String(d.dealType || ''),
         });
       }
     }
