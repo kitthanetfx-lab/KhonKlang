@@ -50,7 +50,9 @@ export async function POST(req: NextRequest) {
     const me = await getMe(req);
     const body = await req.json().catch(() => ({}));
     const content = String(body.content || '').trim().slice(0, 2000);
-    if (!content) return NextResponse.json({ error: 'กรุณากรอกข้อความ' }, { status: 400 });
+    const imageUrl = String(body.imageUrl || '').trim().slice(0, 500);
+    const mimeType = String(body.mimeType || '').trim().slice(0, 60);
+    if (!content && !imageUrl) return NextResponse.json({ error: 'กรุณากรอกข้อความหรือแนบรูป' }, { status: 400 });
 
     const db = getAdmin();
     await ensureSupportCollections(db);
@@ -60,10 +62,10 @@ export async function POST(req: NextRequest) {
     const now = new Date().toISOString();
     const msg = await db.createDocument(DB_ID, COL_MESSAGES, ID.unique(), {
       threadId: me.$id, senderId: me.$id, senderName: myName, senderRole: 'customer',
-      content, createdAt: now,
+      content, imageUrl, mimeType, createdAt: now,
     });
     await db.updateDocument(DB_ID, COL_THREADS, me.$id, {
-      customerName: myName, status: 'open', lastMessage: content, lastAt: now,
+      customerName: myName, status: 'open', lastMessage: content || 'ส่งรูปภาพ', lastAt: now,
       lastSender: 'customer', unreadStaff: true, updatedAt: now,
     }).catch(() => null);
 

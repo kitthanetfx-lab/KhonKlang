@@ -51,7 +51,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const customerId = String(body.customerId || '').trim();
     const content = String(body.content || '').trim().slice(0, 2000);
-    if (!customerId || !content) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
+    const imageUrl = String(body.imageUrl || '').trim().slice(0, 500);
+    const mimeType = String(body.mimeType || '').trim().slice(0, 60);
+    if (!customerId || (!content && !imageUrl)) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
 
     const db = new Databases(getAdminClient());
     await ensureSupportCollections(db);
@@ -60,10 +62,10 @@ export async function POST(req: NextRequest) {
 
     const msg = await db.createDocument(DB_ID, COL_MESSAGES, ID.unique(), {
       threadId: customerId, senderId: staffId, senderName: staffName, senderRole: 'staff',
-      content, createdAt: now,
+      content, imageUrl, mimeType, createdAt: now,
     });
     await db.updateDocument(DB_ID, COL_THREADS, customerId, {
-      lastMessage: content, lastAt: now, lastSender: 'staff', unreadCustomer: true,
+      lastMessage: content || 'ส่งรูปภาพ', lastAt: now, lastSender: 'staff', unreadCustomer: true,
       assignedStaffId: staffId, assignedStaffName: staffName, updatedAt: now,
     }).catch(() => null);
 

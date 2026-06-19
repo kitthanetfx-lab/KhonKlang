@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { account } from '@/lib/appwrite';
 import {
   MessageCircle, Phone, PhoneOff, PhoneCall, Mic, MicOff, Send,
-  Loader2, User, Search, Inbox,
+  Loader2, User, Search, Inbox, Image as ImageIcon,
 } from 'lucide-react';
 import { CallSession, type CallSessionState } from '@/lib/callSession';
 
@@ -15,7 +15,7 @@ interface ThreadRow {
   lastSender: string; unreadStaff: boolean; assignedStaffName: string;
   callStatus: CallStatus; callId: string; callInitiator: string; callStaffName: string;
 }
-interface Msg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; createdAt: string }
+interface Msg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string }
 
 function timeShort(iso: string) {
   if (!iso) return '';
@@ -35,6 +35,7 @@ export default function AdminSupportPage() {
   const [search, setSearch] = useState('');
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [callState, setCallState] = useState<CallSessionState | null>(null);
   const [muted, setMuted] = useState(false);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
@@ -43,6 +44,7 @@ export default function AdminSupportPage() {
   const jwtRef = useRef('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionRef = useRef<CallSession | null>(null);
   const handledCallIdRef = useRef('');
   const selectedRef = useRef('');
@@ -150,6 +152,27 @@ export default function AdminSupportPage() {
       });
       if (r.ok) { setInput(''); void loadThread(selected); void loadThreads(); }
     } finally { setSending(false); }
+  }
+
+  async function handleImagePick(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || uploading || !selected) return;
+    if (!file.type.startsWith('image/')) return;
+    setUploading(true);
+    try {
+      const jwt = jwtRef.current || await getJwt();
+      const fd = new FormData();
+      fd.append('file', file);
+      const up = await fetch('/api/support/upload', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd });
+      const upData = await up.json().catch(() => ({}));
+      if (!up.ok || !upData.url) return;
+      const r = await fetch('/api/admin/support', {
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: selected, content: '', imageUrl: upData.url, mimeType: upData.mimeType }),
+      });
+      if (r.ok) { void loadThread(selected); void loadThreads(); }
+    } finally { setUploading(false); }
   }
 
   async function callAction(action: string) {
@@ -319,8 +342,13 @@ export default function AdminSupportPage() {
                   }
                   return (
                     <div key={m.$id} className={`flex flex-col max-w-[78%] ${mine ? 'items-end ml-auto' : 'items-start'}`}>
-                      <div className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${mine ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-md'}`}>
-                        {m.content}
+                      <div className={`flex flex-col gap-1.5 px-3.5 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${mine ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-md'}`}>
+                        {m.imageUrl && (
+                          <a href={m.imageUrl} target="_blank" rel="noopener noreferrer">
+                            <img src={m.imageUrl} alt="รูปที่ส่งในแชท" className="max-w-[200px] max-h-[200px] rounded-lg object-cover" />
+                          </a>
+                        )}
+                        {m.content && <span>{m.content}</span>}
                       </div>
                       <small className="text-[10.5px] text-gray-400 mt-0.5">{mine ? m.senderName : ''} {timeShort(m.createdAt)}</small>
                     </div>
@@ -330,6 +358,11 @@ export default function AdminSupportPage() {
               </div>
 
               <div className="flex items-center gap-2 px-3 py-2.5 border-t border-gray-200 dark:border-gray-800">
+                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleImagePick} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} aria-label="แนบรูปภาพ"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                  <ImageIcon size={19} />
+                </button>
                 <input
                   value={input} onChange={e => setInput(e.target.value)}
                   placeholder="พิมพ์ข้อความถึงลูกค้า..." maxLength={2000}

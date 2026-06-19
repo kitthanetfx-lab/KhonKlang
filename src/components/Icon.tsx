@@ -64,6 +64,12 @@ export const ICON_PATHS: Record<string, React.ReactNode> = {
   mic: <><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M9 21h6"/></>,
   micOff: <><path d="M9 9V5a3 3 0 0 1 5.7-1.3M15 12.2V13a3 3 0 0 1-4.6 2.5"/><path d="M5.5 11a6.5 6.5 0 0 0 9.3 5.9"/><path d="M18.5 11a6.5 6.5 0 0 1-1 3.4"/><path d="M12 17.5V21M9 21h6M3 3l18 18"/></>,
   phoneOff: <><path d="M6 2.5h7"/><rect x="6" y="2.5" width="12" height="19" rx="2.6"/><path d="M3 3l18 18"/></>,
+  /* ไอคอนหูฟัง customer-care สำหรับปุ่มลอยติดต่อทีมงาน */
+  headset: <><path d="M4 13v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="13" width="4.4" height="7.2" rx="2.1"/><rect x="16.6" y="13" width="4.4" height="7.2" rx="2.1"/><path d="M19 17.6v1.6a3 3 0 0 1-3 3h-1.6"/></>,
+  /* หูโทรศัพท์แบบทึบ (filled) — ใช้กับปุ่มขอให้โทรกลับ ระบายสีเขียวผ่าน currentColor ของปุ่ม */
+  phoneCall: <path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.4 21 3 13.6 3 4.7c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z" fill="currentColor" stroke="none"/>,
+  /* รูปภาพ — ใช้กับปุ่มแนบรูป */
+  image: <><rect x="3" y="4" width="18" height="16" rx="2.2"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m3 16.5 5-5 3.5 3.5L17 9.5l4 4.5"/></>,
 };
 
 export interface IconProps {

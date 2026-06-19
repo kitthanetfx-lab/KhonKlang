@@ -6,7 +6,7 @@ import { account } from '@/lib/appwrite';
 import { Icon } from './Icon';
 import { CallSession, type CallSessionState } from '@/lib/callSession';
 
-interface SupportMsg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; createdAt: string }
+interface SupportMsg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string }
 interface SupportThread {
   $id: string; unreadCustomer: boolean;
   callStatus: 'idle' | 'customer_requesting' | 'staff_ringing' | 'connecting' | 'active' | 'ended';
@@ -28,6 +28,7 @@ export function SupportWidget() {
   const [msgs, setMsgs] = useState<SupportMsg[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [callState, setCallState] = useState<CallSessionState | null>(null);
   const [muted, setMuted] = useState(false);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
@@ -38,6 +39,7 @@ export function SupportWidget() {
   const closeRef = useRef<HTMLButtonElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionRef = useRef<CallSession | null>(null);
   const jwtRef = useRef('');
   const handledCallIdRef = useRef('');
@@ -145,6 +147,27 @@ export function SupportWidget() {
     } finally { setSending(false); }
   }
 
+  async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || uploading) return;
+    if (!file.type.startsWith('image/')) return;
+    setUploading(true);
+    try {
+      const jwt = jwtRef.current || await getJwt();
+      const fd = new FormData();
+      fd.append('file', file);
+      const up = await fetch('/api/support/upload', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd });
+      const upData = await up.json().catch(() => ({}));
+      if (!up.ok || !upData.url) return;
+      const r = await fetch('/api/support', {
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: '', imageUrl: upData.url, mimeType: upData.mimeType }),
+      });
+      if (r.ok) void loadThread(true);
+    } finally { setUploading(false); }
+  }
+
   async function callAction(action: string) {
     try {
       const jwt = jwtRef.current || await getJwt();
@@ -177,7 +200,7 @@ export function SupportWidget() {
         {open && (
           <div className="sw-panel" role="dialog" aria-modal="false" aria-label="แชทกับทีมงาน" ref={panelRef}>
             <div className="sw-head">
-              <span className="sw-head-tx"><Icon name="chat" size={18} /> ติดต่อทีมงาน</span>
+              <span className="sw-head-tx"><Icon name="headset" size={18} /> ติดต่อทีมงาน</span>
               <button type="button" className="sw-iconbtn" onClick={() => setOpen(false)} aria-label="ปิดหน้าต่างแชท" ref={closeRef}>
                 <Icon name="x" size={17} />
               </button>
@@ -206,7 +229,7 @@ export function SupportWidget() {
                   <div className="sw-callbar ring" role="alert">
                     <span><Icon name="phone" size={16} /> พนักงาน{thread?.callStaffName ? ` ${thread.callStaffName}` : ''}กำลังโทรเข้า</span>
                     <span className="sw-callbtns">
-                      <button type="button" className="sw-roundbtn accept" onClick={() => callAction('answer')} aria-label="รับสาย"><Icon name="phone" size={18} /></button>
+                      <button type="button" className="sw-roundbtn accept" onClick={() => callAction('answer')} aria-label="รับสาย"><Icon name="phoneCall" size={18} /></button>
                       <button type="button" className="sw-roundbtn decline" onClick={() => callAction('decline')} aria-label="ปฏิเสธสาย"><Icon name="phoneOff" size={18} /></button>
                     </span>
                   </div>
@@ -233,28 +256,49 @@ export function SupportWidget() {
                   {msgs.length === 0 && (
                     <p className="sw-empty">สวัสดีครับ/ค่ะ มีอะไรให้ทีมงานช่วยไหม? พิมพ์คำถามได้เลย หรือกดโทรศัพท์ด้านบนเพื่อขอให้พนักงานโทรกลับ</p>
                   )}
-                  {msgs.map(m => (
-                    <div key={m.$id} className={`sw-row ${m.senderId === myId ? 'mine' : ''} ${m.senderRole === 'system' ? 'sys' : ''}`}>
-                      {m.senderRole === 'system' ? (
-                        <div className="sw-sys">{m.content}</div>
-                      ) : (
-                        <>
-                          <div className={`sw-bubble ${m.senderId === myId ? 'mine' : ''}`}>{m.content}</div>
-                          <small>{m.senderRole === 'staff' ? `${m.senderName} · ` : ''}{timeShort(m.createdAt)}</small>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                  {msgs.map(m => {
+                    const mine = m.senderRole !== 'staff';
+                    return (
+                      <div key={m.$id} className={`sw-row ${mine ? 'mine' : ''} ${m.senderRole === 'system' ? 'sys' : ''}`}>
+                        {m.senderRole === 'system' ? (
+                          <div className="sw-sys">{m.content}</div>
+                        ) : (
+                          <>
+                            <div className={`sw-bubble ${mine ? 'mine' : ''}`}>
+                              {m.imageUrl && (
+                                <a href={m.imageUrl} target="_blank" rel="noopener noreferrer">
+                                  <img src={m.imageUrl} alt="รูปที่ส่งในแชท" className="sw-img" />
+                                </a>
+                              )}
+                              {m.content && <span>{m.content}</span>}
+                            </div>
+                            <small>{m.senderRole === 'staff' ? `${m.senderName} · ` : ''}{timeShort(m.createdAt)}</small>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                   <div ref={bottomRef} />
                 </div>
 
                 <div className="sw-bar">
+                  <input
+                    ref={fileInputRef} type="file" accept="image/*" hidden
+                    onChange={handleImagePick}
+                  />
                   <button
-                    type="button" className="sw-iconbtn" aria-label="ขอให้พนักงานโทรกลับ"
+                    type="button" className="sw-iconbtn" aria-label="แนบรูปภาพ"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Icon name="image" size={18} />
+                  </button>
+                  <button
+                    type="button" className="sw-iconbtn call" aria-label="ขอให้พนักงานโทรกลับ"
                     disabled={!!thread && thread.callStatus !== 'idle' && thread.callStatus !== 'ended'}
                     onClick={() => callAction('request')}
                   >
-                    <Icon name="phone" size={18} />
+                    <Icon name="phoneCall" size={18} />
                   </button>
                   <input
                     value={input} onChange={e => setInput(e.target.value)}
@@ -277,7 +321,7 @@ export function SupportWidget() {
           aria-expanded={open}
           onClick={() => setOpen(v => !v)}
         >
-          <Icon name={open ? 'x' : 'chat'} size={24} />
+          <Icon name={open ? 'x' : 'headset'} size={24} />
           {!open && (unread || ringing) && <span className="sw-fab-badge" aria-hidden="true" />}
         </button>
       </div>
