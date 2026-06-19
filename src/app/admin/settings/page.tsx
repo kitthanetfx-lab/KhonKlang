@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { account } from '@/lib/appwrite';
 import { Settings, Loader2, CheckCircle2, ShoppingCart, Zap, Search, MapPin, Car, Shield, RotateCcw, Wallet } from 'lucide-react';
+import { THAI_BANKS } from '@/lib/banks';
 
 interface FeeConfig {
   escrowFeePercent: number; escrowFeeMin: number;
@@ -178,8 +179,11 @@ export default function SettingsPage() {
                 <input value={fees.companyPromptPay} onChange={e => setStr('companyPromptPay', e.target.value)} placeholder="0812345678"
                   className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
               <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">ธนาคาร</span>
-                <input value={fees.companyBankName} onChange={e => setStr('companyBankName', e.target.value)} placeholder="ธนาคารกสิกรไทย (KBANK)"
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
+                <select value={fees.companyBankName} onChange={e => setStr('companyBankName', e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
+                  <option value="">เลือกธนาคาร</option>
+                  {THAI_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select></label>
               <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">เลขที่บัญชี</span>
                 <input value={fees.companyBankAcct} onChange={e => setStr('companyBankAcct', e.target.value)} placeholder="123-4-56789-0"
                   className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>

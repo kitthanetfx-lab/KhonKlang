@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { account, clearPersistedSession } from '@/lib/appwrite';
 import { Icon } from '@/components/Icon';
+import { THAI_BANKS } from '@/lib/banks';
 
 const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
 const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
@@ -279,7 +280,10 @@ function ProfilePage() {
           <div className="pf-card-title">บัญชีธนาคาร (สำหรับรับเงิน)</div>
           {editing ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <input className="pf-edit-input" value={editBankName} onChange={e => setEditBankName(e.target.value)} placeholder="ธนาคาร เช่น ธนาคารกรุงเทพ (BBL)" />
+              <select className="pf-edit-input" value={editBankName} onChange={e => setEditBankName(e.target.value)}>
+                <option value="">เลือกธนาคาร</option>
+                {THAI_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
               <input className="pf-edit-input" value={editBankAcct} onChange={e => setEditBankAcct(e.target.value)} placeholder="เลขที่บัญชี" />
               <input className="pf-edit-input" value={editBankOwner} onChange={e => setEditBankOwner(e.target.value)} placeholder="ชื่อบัญชี" />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
