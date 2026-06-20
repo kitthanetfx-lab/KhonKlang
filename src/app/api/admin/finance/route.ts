@@ -5,7 +5,14 @@ import { notifyUsers } from '../../_lib/notify';
 import { readDealPriceState, writeDealPriceState, type DealPriceState } from '@/lib/dealPriceState';
 import { verifySlipByUrl } from '@/lib/slipok';
 import { getBankInfoMap, type BankInfo } from '@/lib/bankInfo';
-import { readFeesConfig, syncDealLedger, syncFinanceProjection, type LedgerDoc } from '../../_lib/financeLedger';
+import {
+  FINANCE_LEDGER_COLLECTION_ID,
+  MIDDLEMAN_WALLET_COLLECTION_ID,
+  readFeesConfig,
+  syncDealLedger,
+  syncFinanceProjection,
+  type LedgerDoc,
+} from '../../_lib/financeLedger';
 
 const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
 const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
@@ -13,7 +20,7 @@ const slipUrl = (bucket: string, fileId: string) => `${ENDPOINT}/storage/buckets
 
 const COL_DEALS = 'deals';
 const COL_MSGS = 'messages';
-const COL_LEDGER = 'finance_ledger';
+const COL_LEDGER = FINANCE_LEDGER_COLLECTION_ID;
 
 type TxnStatus = 'pending' | 'confirmed' | 'refund_pending' | 'refunded';
 type Row = {
@@ -339,7 +346,7 @@ export async function GET(req: NextRequest) {
     const e = err as { status?: number; message?: string };
     if (debugDb && /Unknown attribute/i.test(String(e.message || ''))) {
       try {
-        const attrs = await debugDb.listAttributes(DB_ID, 'finance_ledger');
+        const attrs = await debugDb.listAttributes(DB_ID, FINANCE_LEDGER_COLLECTION_ID);
         debugInfo.ledgerAttributes = (attrs.attributes || []).map((attr: { key?: string; status?: string; type?: string }) => ({
           key: String(attr.key || ''),
           status: String(attr.status || ''),
@@ -349,7 +356,7 @@ export async function GET(req: NextRequest) {
         debugInfo.ledgerAttributesError = String(schemaErr || '');
       }
       try {
-        const walletAttrs = await debugDb.listAttributes(DB_ID, 'middleman_wallets');
+        const walletAttrs = await debugDb.listAttributes(DB_ID, MIDDLEMAN_WALLET_COLLECTION_ID);
         debugInfo.walletAttributes = (walletAttrs.attributes || []).map((attr: { key?: string; status?: string; type?: string }) => ({
           key: String(attr.key || ''),
           status: String(attr.status || ''),

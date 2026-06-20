@@ -83,3 +83,17 @@
 - Stop persisting `ownerType` into `finance_ledger` documents.
 - Derive owner role in admin finance reads from `entryType` and `ownerId` instead.
 - This preserves finance behavior while bypassing the broken validation path.
+
+## Latest Evidence 2
+- After removing `ownerType` from ledger payload, production error moved to `Unknown attribute: "amount"`.
+- `debugInfo.ledgerAttributes` still shows `amount` exists and is `available`.
+
+## Final Root Cause
+- The existing production collection `finance_ledger` is in a corrupted or drifted validation state.
+- Schema introspection and document validation disagree for multiple attributes, so patching field-by-field is not reliable.
+
+## Final Fix Chosen
+- Migrate runtime writes and reads to fresh collections:
+  - `finance_ledger_v2`
+  - `middleman_wallets_v2`
+- Let `syncFinanceProjection()` rebuild the ledger and wallet projection from source data into the new collections.

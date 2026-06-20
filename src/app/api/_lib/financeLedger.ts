@@ -17,8 +17,10 @@ import {
 import { readJsonConfig } from './appConfig';
 
 const COL_CFG = 'app_config';
-const COL_LEDGER = 'finance_ledger';
-const COL_WALLETS = 'middleman_wallets';
+export const FINANCE_LEDGER_COLLECTION_ID = 'finance_ledger_v2';
+export const MIDDLEMAN_WALLET_COLLECTION_ID = 'middleman_wallets_v2';
+const COL_LEDGER = FINANCE_LEDGER_COLLECTION_ID;
+const COL_WALLETS = MIDDLEMAN_WALLET_COLLECTION_ID;
 const COL_DEALS = 'deals';
 const COL_SELLER = 'seller_applications';
 const COL_MM = 'middleman_applications';
