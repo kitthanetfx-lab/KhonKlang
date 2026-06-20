@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Users, Databases, Query } from 'node-appwrite';
+import { getMiddlemanWallet, listLedgerEntriesForOwner } from '../_lib/financeLedger';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'profiles';
@@ -18,6 +19,33 @@ async function getUserFromJwt(jwt: string) {
     .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
     .setJWT(jwt);
   return new Account(client).get();
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const jwt = req.headers.get('x-session-jwt');
+    if (!jwt) return NextResponse.json({ error: 'ไม่ได้เข้าสู่ระบบ' }, { status: 401 });
+
+    const currentUser = await getUserFromJwt(jwt);
+    const userId = currentUser.$id;
+    const { users, databases } = getAdminClient();
+    const fullUser = await users.get(userId);
+    const prefs = (fullUser.prefs || {}) as Record<string, string>;
+
+    let wallet = null;
+    let ledger: Array<Record<string, unknown>> = [];
+    if (prefs.middlemanStatus === 'approved') {
+      wallet = await getMiddlemanWallet(databases, users, userId).catch(() => null);
+      ledger = await listLedgerEntriesForOwner(databases, userId)
+        .then(entries => entries.slice(0, 8) as unknown as Array<Record<string, unknown>>)
+        .catch(() => []);
+    }
+
+    return NextResponse.json({ userId, wallet, ledger });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 // ─── PATCH: update profile ────────────────────────────────────────────────────

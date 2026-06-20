@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, Users } from 'node-appwrite';
+import { syncOnsiteJobLedger } from '../../_lib/financeLedger';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'onsite_jobs';
@@ -119,6 +120,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const updated = await db.updateDocument(DB_ID, COL_ID, id, update);
+    await syncOnsiteJobLedger(db, usersApi, updated as unknown as Record<string, unknown>);
     return NextResponse.json({ job: updated });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

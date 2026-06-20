@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Users, Databases, ID, Permission, Role, Query } from 'node-appwrite';
 import { readServiceControlsConfig } from '../../_lib/appConfig';
+import { syncMiddlemanApplicationLedger } from '../../_lib/financeLedger';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'middleman_applications';
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'บัญชีนี้เคยยื่นสมัครคนกลางแล้ว กรุณารอผลตรวจสอบหรือดูสถานะในโปรไฟล์' }, { status: 409 });
     }
 
-    await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
+    const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
       userId,
       fullNameId, idNumber,
       depositIntent: depositIntent || 0,
@@ -154,6 +155,7 @@ export async function POST(req: NextRequest) {
       slipFileId:     slipFileId     || '',
       status: 'pending_review',
     });
+    await syncMiddlemanApplicationLedger(databases, users, doc as unknown as Record<string, unknown>);
 
     // Save bank info + doc names + status to prefs (visible in profile)
     const existingPrefs = (await users.get(userId)).prefs as Record<string, string>;

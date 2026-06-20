@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, ID, Users, Query } from 'node-appwrite';
 import { notifyUsers } from '../../_lib/notify';
 import { DealPriceState, readDealPriceState, writeDealPriceState } from '@/lib/dealPriceState';
+import { syncDealLedger } from '../../_lib/financeLedger';
 
 const DB_ID  = 'khonklang_db';
 const COL_DEALS = 'deals';
@@ -13,6 +14,14 @@ function getAdminClient() {
     .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
     .setKey(process.env.APPWRITE_API_KEY!);
   return new Databases(client);
+}
+
+function getAdminUsers() {
+  const client = new Client()
+    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+    .setKey(process.env.APPWRITE_API_KEY!);
+  return new Users(client);
 }
 
 // หา user id ของแอดมินทั้งหมด (prefs.role === 'admin') เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
@@ -560,6 +569,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
+    await syncDealLedger(databases, getAdminUsers(), updated as unknown as Record<string, unknown>).catch(() => {});
     return NextResponse.json({ deal: updated });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

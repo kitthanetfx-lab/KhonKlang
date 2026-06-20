@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { account } from '@/lib/appwrite';
-import { Wallet, Loader2, CheckCircle2, XCircle, ExternalLink, PiggyBank, ShieldCheck, TrendingUp, Clock, ScanLine, AlertTriangle } from 'lucide-react';
+import { Wallet, Loader2, CheckCircle2, XCircle, ExternalLink, PiggyBank, ShieldCheck, TrendingUp, Clock, ScanLine, AlertTriangle, Search } from 'lucide-react';
 
 const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
 const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
@@ -21,6 +21,16 @@ interface Incoming {
   fees?: { lines: FeeLine[]; total: number; note?: string };
   canApprove?: boolean; approveLink?: string;
   bank?: BankInfo | null;
+}
+interface FinanceGroup {
+  key: string;
+  referenceCode: string;
+  title: string;
+  subtitle: string;
+  rows: Incoming[];
+  totalExpected: number;
+  openHref: string;
+  searchText: string;
 }
 interface Summary {
   incomingCount: number; escrowPendingCount: number; heldEscrow: number;
@@ -44,9 +54,12 @@ const SOURCE_BADGE: Record<string, { label: string; cls: string }> = {
   meetup:        { label: 'เงินประกัน (นัดเจอ)', cls: 'bg-violet-100 text-violet-700' },
   seller_app:    { label: 'ค่าสมัครผู้ขาย', cls: 'bg-green-100 text-green-700' },
   middleman_app: { label: 'ค่าสมัครคนกลาง', cls: 'bg-emerald-100 text-emerald-700' },
+  platform_revenue: { label: 'รายได้แพลตฟอร์ม', cls: 'bg-cyan-100 text-cyan-700' },
   payout:        { label: 'จ่ายคืนผู้ขาย', cls: 'bg-rose-100 text-rose-700' },
   refund:        { label: 'คืนเงินผู้ซื้อ', cls: 'bg-orange-100 text-orange-700' },
   meetup_refund: { label: 'คืนเงินประกัน', cls: 'bg-fuchsia-100 text-fuchsia-700' },
+  middleman_fee: { label: 'จ่ายค่าคนกลาง', cls: 'bg-lime-100 text-lime-700' },
+  onsite_payout: { label: 'จ่ายงานออนไซต์', cls: 'bg-indigo-100 text-indigo-700' },
 };
 const FILTERS = [
   { k: 'all', label: 'ทั้งหมด' },
@@ -55,9 +68,50 @@ const FILTERS = [
   { k: 'reg', label: 'ค่าสมัคร' },
 ];
 
+function referenceCodeForRow(row: Incoming) {
+  if (row.dealNumber) return row.dealNumber;
+  if (row.source === 'seller_app') return `SELLER-${row.refId.slice(-8).toUpperCase()}`;
+  if (row.source === 'middleman_app') return `MM-${row.refId.slice(-8).toUpperCase()}`;
+  return `FIN-${row.refId.slice(-8).toUpperCase()}`;
+}
+
+function groupRowsByReference(rows: Incoming[]) {
+  const grouped = new Map<string, FinanceGroup>();
+
+  for (const row of rows) {
+    const referenceCode = referenceCodeForRow(row);
+    const key = row.dealNumber ? `deal:${row.refId}` : `${row.source}:${row.refId}`;
+    const subtitleParts = [
+      row.dealNumber ? 'อ้างอิงดีลเดียวกัน' : row.purpose,
+      row.payerName ? `เกี่ยวข้องกับ ${row.payerName}` : '',
+    ].filter(Boolean);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.rows.push(row);
+      existing.totalExpected += Number(row.expected) || 0;
+      existing.searchText += ` ${row.purpose} ${row.payer} ${row.payerName} ${row.title}`;
+      continue;
+    }
+
+    grouped.set(key, {
+      key,
+      referenceCode,
+      title: row.title,
+      subtitle: subtitleParts.join(' · '),
+      rows: [row],
+      totalExpected: Number(row.expected) || 0,
+      openHref: row.approveLink ? row.approveLink : `/deal/${row.refId}`,
+      searchText: `${referenceCode} ${row.dealNumber || ''} ${row.title} ${row.purpose} ${row.payer} ${row.payerName}`,
+    });
+  }
+
+  return Array.from(grouped.values());
+}
+
 export default function AdminFinance() {
   const [tab, setTab] = useState<'incoming' | 'outgoing' | 'summary'>('incoming');
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [incoming, setIncoming] = useState<Incoming[] | null>(null);
   const [outgoing, setOutgoing] = useState<Incoming[] | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -117,6 +171,16 @@ export default function AdminFinance() {
     filter === 'all' ? true :
     filter === 'reg' ? (r.source === 'seller_app' || r.source === 'middleman_app') :
     r.source === filter);
+  const incomingGroups = groupRowsByReference(rows).filter(group => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return group.searchText.toLowerCase().includes(q);
+  });
+  const outgoingGroups = groupRowsByReference(outgoing || []).filter(group => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return group.searchText.toLowerCase().includes(q);
+  });
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -132,6 +196,21 @@ export default function AdminFinance() {
         <button onClick={() => setTab('summary')} className={`px-4 py-2 rounded-xl text-sm font-medium ${tab === 'summary' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600'}`}>ภาพรวมการเงิน</button>
       </div>
 
+      {tab !== 'summary' && (
+        <div className="mb-4">
+          <label className="relative block">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="ค้นหาด้วยเลขดีล / รหัสการเงิน / ชื่อดีล / ชื่อผู้เกี่ยวข้อง"
+              className="w-full rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 pl-10 pr-4 py-3 text-sm"
+            />
+          </label>
+          <p className="text-xs text-gray-400 mt-1.5">รหัสดีลและรหัสการเงินของรายการที่อ้างอิงดีล จะใช้เลขเดียวกับดีล เช่น `KKL-XXXXXXXX`</p>
+        </div>
+      )}
+
       {tab === 'incoming' && (
         <div className="flex gap-2 mb-4 flex-wrap">
           {FILTERS.map(f => (
@@ -143,143 +222,190 @@ export default function AdminFinance() {
       {(tab === 'incoming' ? incoming === null : tab === 'outgoing' ? outgoing === null : false) && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
 
       {tab === 'incoming' && incoming !== null && (
-        rows.length === 0 ? (
+        incomingGroups.length === 0 ? (
           <div className="text-center py-16 text-gray-400"><CheckCircle2 size={36} className="mx-auto mb-2 opacity-40" /><p>ไม่มีรายการเงินเข้าในหมวดนี้</p></div>
         ) : (
           <div className="space-y-3">
-            {rows.map(d => {
-              const sb = SOURCE_BADGE[d.source] || { label: d.source, cls: 'bg-gray-100 text-gray-600' };
-              const sc = slipResults[d.key];
-              return (
-                <div key={d.key} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sb.cls}`}>{sb.label}</span>
-                        {(() => { const tb = TXN_BADGE[(d.txnStatus as TxnStatus) || 'pending']; return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tb.cls}`}>{tb.label}</span>; })()}
-                        {d.dealNumber && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">{d.dealNumber}</span>}
-                      </div>
-                      <p className="font-semibold mt-1">{d.title}</p>
-                      <p className="text-xs text-gray-500 mt-1">{d.payer}: {d.payerName || '-'} · {d.purpose}</p>
+            {incomingGroups.map(group => (
+              <div key={group.key} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 font-mono">{group.referenceCode}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">รวม {group.rows.length} รายการในบิลเดียวกัน</span>
                     </div>
-                    <Link href={d.approveLink ? d.approveLink : `/deal/${d.refId}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0"><ExternalLink size={12} /> {d.approveLink ? 'ไปหน้าอนุมัติ' : 'เปิดดีล'}</Link>
+                    <p className="font-semibold mt-1">{group.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">{group.subtitle}</p>
                   </div>
-
-                  <div className="grid sm:grid-cols-2 gap-3 mt-3">
-                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3">
-                      <div className="flex justify-between text-sm font-bold"><span>ยอดที่ควรได้รับ</span><span className="text-green-600">{d.expected > 0 ? baht(d.expected) : 'ยังไม่ตั้งยอด'}</span></div>
-                      {d.fees && (
-                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                          <p className="text-xs text-gray-400 mb-1">ค่าจัดการในยอดนี้</p>
-                          {d.fees.lines.map(l => (<div key={l.label} className="flex justify-between text-xs text-gray-500 py-0.5"><span>{l.label}</span><span>{baht(l.amount)}</span></div>))}
-                          <div className="flex justify-between text-xs font-semibold mt-1 pt-1 border-t border-gray-200 dark:border-gray-700"><span>ยอดรวมที่ต้องโอน</span><span>{baht(d.fees.total)}</span></div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3">
-                      <p className="text-xs text-gray-400 mb-2">หลักฐานการโอน</p>
-                      {d.fileId ? (
-                        <a href={fileUrl(d.bucket, d.fileId)} target="_blank" rel="noreferrer">
-                          <img src={fileUrl(d.bucket, d.fileId)} alt="slip" className="w-full max-h-40 object-contain rounded-lg border border-gray-200 dark:border-gray-700" />
-                        </a>
-                      ) : <p className="text-xs text-gray-400">ไม่มีสลิป</p>}
-                    </div>
-                  </div>
-                  <BankInfoBox bank={d.bank} label={`บัญชีของ${d.payer || 'ผู้โอน'}`} />
-
-                  {sc && (() => { const s = sc.result.slip; const good = sc.result.ok && sc.amountMatch !== false;
-                    return (
-                      <div className={`mt-3 rounded-xl p-3 border ${sc.result.ok ? (sc.amountMatch === false ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200') : 'bg-red-50 border-red-200'}`}>
-                        <div className="flex items-center gap-1.5 text-sm font-semibold">
-                          {good ? <CheckCircle2 size={15} className="text-green-600" /> : <AlertTriangle size={15} className="text-amber-600" />}
-                          <span className={sc.result.ok ? 'text-green-700' : 'text-red-700'}>{sc.result.ok ? 'สลิปจริง — ตรวจกับธนาคารผ่าน' : `ตรวจไม่ผ่าน: ${sc.result.message}`}</span>
-                        </div>
-                        {sc.result.duplicate && <p className="text-xs text-amber-700 mt-1">⚠️ สลิปซ้ำ — เคยถูกใช้มาก่อน</p>}
-                        {sc.result.wrongReceiver && <p className="text-xs text-red-700 mt-1">⚠️ บัญชีผู้รับไม่ตรงกับบัญชีหลักของร้าน</p>}
-                        {s && (
-                          <div className="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-0.5">
-                            <div className="flex justify-between"><span>ยอดในสลิป</span><span className={sc.amountMatch === false ? 'text-red-600 font-semibold' : 'text-green-700 font-semibold'}>{baht(s.amount)} {sc.amountMatch === false ? `(ควร ${baht(sc.expected)} ✗)` : sc.amountMatch ? '✓' : ''}</span></div>
-                            {(s.senderName || s.receiverName) && <div className="flex justify-between"><span>โอน</span><span>{s.senderName || '-'} → {s.receiverName || '-'}</span></div>}
-                            {s.receiverAccount && <div className="flex justify-between"><span>บัญชีผู้รับ</span><span>{s.receiverAccount}</span></div>}
-                            {s.transRef && <div className="flex justify-between"><span>เลขอ้างอิง</span><span className="font-mono">{s.transRef}</span></div>}
-                            {(s.transDate || s.transTime) && <div className="flex justify-between"><span>เวลาโอน</span><span>{s.transDate} {s.transTime}</span></div>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {d.canApprove && <p className="text-xs text-gray-400 mt-2">เมื่ออนุมัติ → ขั้นถัดไป: <b className="text-gray-600 dark:text-gray-300">ผู้ขายแพ็คของ</b></p>}
-                  {d.source === 'meetup' && <p className="text-xs text-gray-400 mt-2">* เงินประกันนัดเจอจะคืน/หักตามผลการนัดเจอโดยอัตโนมัติ — ใช้หน้านี้ตรวจสลิปเท่านั้น</p>}
-
-                  <div className="flex items-center gap-2 mt-3 flex-wrap">
-                    {d.fileId && (
-                      <button onClick={() => verifySlip(d)} disabled={verifying === d.key}
-                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1 disabled:opacity-50">
-                        {verifying === d.key ? <Loader2 size={14} className="animate-spin" /> : <ScanLine size={14} />} ตรวจสลิปอัตโนมัติ
-                      </button>
-                    )}
-                    {d.canApprove && (
-                      <>
-                        <button onClick={() => act(d.refId, 'approve_payment')} disabled={!!acting}
-                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
-                          {acting === d.refId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} อนุมัติ — เริ่มแพ็ค
-                        </button>
-                        <button onClick={() => act(d.refId, 'reject_payment')} disabled={!!acting}
-                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 disabled:opacity-50">
-                          <XCircle size={14} /> ปฏิเสธการโอน
-                        </button>
-                      </>
-                    )}
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-gray-400">ยอดรวมที่เกี่ยวข้องกับดีลนี้</p>
+                    <p className="text-lg font-bold text-green-600">{baht(group.totalExpected)}</p>
+                    <Link href={group.openHref} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 justify-end mt-1"><ExternalLink size={12} /> เปิดดีล/หน้าจัดการ</Link>
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="mt-4 space-y-3">
+                  {group.rows.map(d => {
+                    const sb = SOURCE_BADGE[d.source] || { label: d.source, cls: 'bg-gray-100 text-gray-600' };
+                    const sc = slipResults[d.key];
+                    return (
+                      <div key={d.key} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30 p-4">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sb.cls}`}>{sb.label}</span>
+                              {(() => { const tb = TXN_BADGE[(d.txnStatus as TxnStatus) || 'pending']; return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tb.cls}`}>{tb.label}</span>; })()}
+                            </div>
+                            <p className="font-semibold mt-1">{d.purpose}</p>
+                            <p className="text-xs text-gray-500 mt-1">{d.payer}: {d.payerName || '-'} · รหัสอ้างอิง {referenceCodeForRow(d)}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-xs text-gray-400">ยอดรายการนี้</p>
+                            <p className="text-sm font-bold text-green-600">{d.expected > 0 ? baht(d.expected) : 'ยังไม่ตั้งยอด'}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-3 mt-3">
+                          <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-700">
+                            <div className="flex justify-between text-sm font-bold"><span>ยอดที่ควรได้รับ</span><span className="text-green-600">{d.expected > 0 ? baht(d.expected) : 'ยังไม่ตั้งยอด'}</span></div>
+                            {d.fees && (
+                              <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-gray-400 mb-1">รายละเอียดบิลในดีลนี้</p>
+                                {d.fees.lines.map(l => (<div key={l.label} className="flex justify-between text-xs text-gray-500 py-0.5"><span>{l.label}</span><span>{baht(l.amount)}</span></div>))}
+                                <div className="flex justify-between text-xs font-semibold mt-1 pt-1 border-t border-gray-200 dark:border-gray-700"><span>ยอดรวมรายการ</span><span>{baht(d.fees.total)}</span></div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-700">
+                            <p className="text-xs text-gray-400 mb-2">หลักฐานการโอน</p>
+                            {d.fileId ? (
+                              <a href={fileUrl(d.bucket, d.fileId)} target="_blank" rel="noreferrer">
+                                <img src={fileUrl(d.bucket, d.fileId)} alt="slip" className="w-full max-h-40 object-contain rounded-lg border border-gray-200 dark:border-gray-700" />
+                              </a>
+                            ) : <p className="text-xs text-gray-400">ไม่มีสลิป</p>}
+                          </div>
+                        </div>
+                        <BankInfoBox bank={d.bank} label={`บัญชีของ${d.payer || 'ผู้โอน'}`} />
+
+                        {sc && (() => { const s = sc.result.slip; const good = sc.result.ok && sc.amountMatch !== false;
+                          return (
+                            <div className={`mt-3 rounded-xl p-3 border ${sc.result.ok ? (sc.amountMatch === false ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200') : 'bg-red-50 border-red-200'}`}>
+                              <div className="flex items-center gap-1.5 text-sm font-semibold">
+                                {good ? <CheckCircle2 size={15} className="text-green-600" /> : <AlertTriangle size={15} className="text-amber-600" />}
+                                <span className={sc.result.ok ? 'text-green-700' : 'text-red-700'}>{sc.result.ok ? 'สลิปจริง — ตรวจกับธนาคารผ่าน' : `ตรวจไม่ผ่าน: ${sc.result.message}`}</span>
+                              </div>
+                              {sc.result.duplicate && <p className="text-xs text-amber-700 mt-1">⚠️ สลิปซ้ำ — เคยถูกใช้มาก่อน</p>}
+                              {sc.result.wrongReceiver && <p className="text-xs text-red-700 mt-1">⚠️ บัญชีผู้รับไม่ตรงกับบัญชีหลักของร้าน</p>}
+                              {s && (
+                                <div className="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-0.5">
+                                  <div className="flex justify-between"><span>ยอดในสลิป</span><span className={sc.amountMatch === false ? 'text-red-600 font-semibold' : 'text-green-700 font-semibold'}>{baht(s.amount)} {sc.amountMatch === false ? `(ควร ${baht(sc.expected)} ✗)` : sc.amountMatch ? '✓' : ''}</span></div>
+                                  {(s.senderName || s.receiverName) && <div className="flex justify-between"><span>โอน</span><span>{s.senderName || '-'} → {s.receiverName || '-'}</span></div>}
+                                  {s.receiverAccount && <div className="flex justify-between"><span>บัญชีผู้รับ</span><span>{s.receiverAccount}</span></div>}
+                                  {s.transRef && <div className="flex justify-between"><span>เลขอ้างอิง</span><span className="font-mono">{s.transRef}</span></div>}
+                                  {(s.transDate || s.transTime) && <div className="flex justify-between"><span>เวลาโอน</span><span>{s.transDate} {s.transTime}</span></div>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {d.canApprove && <p className="text-xs text-gray-400 mt-2">เมื่ออนุมัติ → ขั้นถัดไป: <b className="text-gray-600 dark:text-gray-300">ผู้ขายแพ็คของ</b></p>}
+                        {d.source === 'meetup' && <p className="text-xs text-gray-400 mt-2">* เงินประกันนัดเจอจะคืน/หักตามผลการนัดเจอโดยอัตโนมัติ — ใช้หน้านี้ตรวจสลิปเท่านั้น</p>}
+
+                        <div className="flex items-center gap-2 mt-3 flex-wrap">
+                          {d.fileId && (
+                            <button onClick={() => verifySlip(d)} disabled={verifying === d.key}
+                              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1 disabled:opacity-50">
+                              {verifying === d.key ? <Loader2 size={14} className="animate-spin" /> : <ScanLine size={14} />} ตรวจสลิปอัตโนมัติ
+                            </button>
+                          )}
+                          {d.canApprove && (
+                            <>
+                              <button onClick={() => act(d.refId, 'approve_payment')} disabled={!!acting}
+                                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
+                                {acting === d.refId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} อนุมัติ — เริ่มแพ็ค
+                              </button>
+                              <button onClick={() => act(d.refId, 'reject_payment')} disabled={!!acting}
+                                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 disabled:opacity-50">
+                                <XCircle size={14} /> ปฏิเสธการโอน
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )
       )}
 
       {tab === 'outgoing' && outgoing !== null && (
-        outgoing.length === 0 ? (
+        outgoingGroups.length === 0 ? (
           <div className="text-center py-16 text-gray-400"><CheckCircle2 size={36} className="mx-auto mb-2 opacity-40" /><p>ไม่มีรายการเงินออก</p></div>
         ) : (
           <div className="space-y-3">
             <p className="text-xs text-gray-400 -mt-1 mb-1">เงินที่ศูนย์กลางต้องโอน &quot;ออก&quot; — จ่ายคืนผู้ขายเมื่อปิดดีล / คืนเงินผู้ซื้อเมื่อยกเลิก / คืนเงินประกันนัดเจอ ทำเครื่องหมายเมื่อโอนจริงแล้วเพื่อบันทึกสถานะ</p>
-            {outgoing.map(d => {
-              const sb = SOURCE_BADGE[d.source] || { label: d.source, cls: 'bg-gray-100 text-gray-600' };
-              const tb = TXN_BADGE[(d.txnStatus as TxnStatus) || 'pending'];
-              const canMark = (d.source === 'payout' || d.source === 'refund') && d.txnStatus === 'pending';
-              return (
-                <div key={d.key} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sb.cls}`}>{sb.label}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tb.cls}`}>{tb.label}</span>
-                        {d.dealNumber && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">{d.dealNumber}</span>}
-                      </div>
-                      <p className="font-semibold mt-1">{d.title}</p>
-                      <p className="text-xs text-gray-500 mt-1">{d.purpose} · ผู้รับ: {d.payerName || '-'}</p>
-                      {d.note && <p className="text-xs text-gray-400 mt-1">บันทึก: {d.note}</p>}
+            {outgoingGroups.map(group => (
+              <div key={group.key} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 font-mono">{group.referenceCode}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-rose-50 text-rose-700">รวม {group.rows.length} รายการเงินออกในดีลเดียวกัน</span>
                     </div>
-                    <Link href={d.approveLink ? d.approveLink : `/deal/${d.refId}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0"><ExternalLink size={12} /> {d.approveLink ? 'ไปหน้าจัดการ' : 'เปิดดีล'}</Link>
+                    <p className="font-semibold mt-1">{group.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">{group.subtitle}</p>
                   </div>
-                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 mt-3">
-                    <div className="flex justify-between text-sm font-bold"><span>ยอดที่ต้องโอนออก</span><span className="text-rose-600">{baht(d.expected)}</span></div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-gray-400">ยอดรวมที่ต้องโอนออก</p>
+                    <p className="text-lg font-bold text-rose-600">{baht(group.totalExpected)}</p>
+                    <Link href={group.openHref} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 justify-end mt-1"><ExternalLink size={12} /> เปิดดีล/หน้าจัดการ</Link>
                   </div>
-                  <BankInfoBox bank={d.bank} label={`บัญชีรับเงิน — ${d.payerName || 'ผู้รับ'}`} />
-                  {canMark && (
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      <button onClick={() => act(d.refId, d.source === 'payout' ? 'mark_payout_sent' : 'mark_refund_sent')} disabled={!!acting}
-                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-600 text-white hover:bg-rose-700 flex items-center gap-1 disabled:opacity-50">
-                        {acting === d.refId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} โอนแล้ว — บันทึกสถานะ
-                      </button>
-                    </div>
-                  )}
-                  {d.source === 'meetup_refund' && <p className="text-xs text-gray-400 mt-2">* จัดการคืนเงินประกันนัดเจอที่หน้าจัดการดีล (ปุ่ม &quot;ไปหน้าจัดการ&quot;)</p>}
                 </div>
-              );
-            })}
+                <div className="mt-4 space-y-3">
+                  {group.rows.map(d => {
+                    const sb = SOURCE_BADGE[d.source] || { label: d.source, cls: 'bg-gray-100 text-gray-600' };
+                    const tb = TXN_BADGE[(d.txnStatus as TxnStatus) || 'pending'];
+                    const canMark = (d.source === 'payout' || d.source === 'refund') && d.txnStatus === 'pending';
+                    return (
+                      <div key={d.key} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30 p-4">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sb.cls}`}>{sb.label}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tb.cls}`}>{tb.label}</span>
+                            </div>
+                            <p className="font-semibold mt-1">{d.purpose}</p>
+                            <p className="text-xs text-gray-500 mt-1">ผู้รับ: {d.payerName || '-'} · รหัสอ้างอิง {referenceCodeForRow(d)}</p>
+                            {d.note && <p className="text-xs text-gray-400 mt-1">บันทึก: {d.note}</p>}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-xs text-gray-400">ยอดรายการนี้</p>
+                            <p className="text-sm font-bold text-rose-600">{baht(d.expected)}</p>
+                          </div>
+                        </div>
+                        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 mt-3 border border-gray-200 dark:border-gray-700">
+                          <div className="flex justify-between text-sm font-bold"><span>ยอดที่ต้องโอนออก</span><span className="text-rose-600">{baht(d.expected)}</span></div>
+                        </div>
+                        <BankInfoBox bank={d.bank} label={`บัญชีรับเงิน — ${d.payerName || 'ผู้รับ'}`} />
+                        {canMark && (
+                          <div className="flex items-center gap-2 mt-3 flex-wrap">
+                            <button onClick={() => act(d.refId, d.source === 'payout' ? 'mark_payout_sent' : 'mark_refund_sent')} disabled={!!acting}
+                              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-600 text-white hover:bg-rose-700 flex items-center gap-1 disabled:opacity-50">
+                              {acting === d.refId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} โอนแล้ว — บันทึกสถานะ
+                            </button>
+                          </div>
+                        )}
+                        {d.source === 'meetup_refund' && <p className="text-xs text-gray-400 mt-2">* จัดการคืนเงินประกันนัดเจอที่หน้าจัดการดีล (ปุ่ม &quot;ไปหน้าจัดการ&quot;)</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )
       )}

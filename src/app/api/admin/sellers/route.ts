@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Databases, Users, Query } from 'node-appwrite';
 import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
+import { syncSellerApplicationLedger } from '../../_lib/financeLedger';
 
 const COL = 'seller_applications';
 
@@ -44,7 +45,7 @@ export async function PATCH(req: NextRequest) {
     const doc = await databases.getDocument(DB_ID, COL, docId);
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
-    await databases.updateDocument(DB_ID, COL, docId, {
+    const updatedDoc = await databases.updateDocument(DB_ID, COL, docId, {
       status: newStatus,
       ...(reason ? { rejectReason: reason } : {}),
     });
@@ -57,6 +58,8 @@ export async function PATCH(req: NextRequest) {
       if (action === 'approve') prefs.role = 'seller';
       await users.updatePrefs(doc.userId, prefs);
     } catch { /* user may not exist */ }
+
+    await syncSellerApplicationLedger(databases, updatedDoc as unknown as Record<string, unknown>);
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Users, Databases, ID, Permission, Role, Query } from 'node-appwrite';
 import { readServiceControlsConfig } from '../../_lib/appConfig';
+import { syncSellerApplicationLedger } from '../../_lib/financeLedger';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'seller_applications';
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'บัญชีนี้เคยยื่นสมัครผู้ขายแล้ว กรุณารอผลตรวจสอบหรือดูสถานะในโปรไฟล์' }, { status: 409 });
     }
 
-    await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
+    const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
       userId,
       sellerType, fullNameId, idNumber,
       province:           province            || '',
@@ -169,6 +170,7 @@ export async function POST(req: NextRequest) {
       status: 'pending_review',
       rejectReason: '',
     });
+    await syncSellerApplicationLedger(databases, doc as unknown as Record<string, unknown>);
 
     // Save bank info + doc names + status to prefs (visible in profile)
     const existingPrefs = (await users.get(userId)).prefs as Record<string, string>;

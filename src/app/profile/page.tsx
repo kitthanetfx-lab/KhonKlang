@@ -21,6 +21,38 @@ const ROLE_INFO: Record<string, { label: string; cls: string }> = {
   user:      { label: 'ผู้ใช้งาน', cls: 'pf-role-user' },
 };
 
+interface MiddlemanWallet {
+  tier: string;
+  creditLimit: number;
+  availableCredit: number;
+  heldCredit: number;
+  releasedCredit: number;
+  penaltyCredit: number;
+  activeDealCount: number;
+  updatedAt: string;
+}
+
+interface LedgerEntry {
+  entryKey: string;
+  purpose: string;
+  amount: number;
+  status: string;
+  dealNumber?: string;
+}
+
+const LEDGER_STATUS: Record<string, string> = {
+  expected: 'รอเริ่ม',
+  held: 'กำลัง hold',
+  released: 'ปลดแล้ว',
+  forfeited: 'ถูกหัก',
+  scheduled: 'รอจ่าย',
+  paid: 'จ่ายแล้ว',
+};
+
+function baht(amount: number) {
+  return `฿${Number(amount || 0).toLocaleString()}`;
+}
+
 function parseAddress(addr: string) {
   const postalM = addr.match(/\b(\d{5})\b/);
   const roadM   = addr.match(/ถ\.(\S+)/);
@@ -71,6 +103,8 @@ function ProfilePage() {
   const [tambons, setTambons] = useState<[string, string][]>([]);
   const [loadingAmph, setLoadingAmph] = useState(false);
   const [loadingTamb, setLoadingTamb] = useState(false);
+  const [wallet, setWallet] = useState<MiddlemanWallet | null>(null);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
 
   useEffect(() => {
     const r = document.documentElement;
@@ -89,16 +123,20 @@ function ProfilePage() {
         setPrefs(p);
         try {
           const jwt = (await account.createJWT()).jwt;
-          const [sellerRes, middlemanRes] = await Promise.all([
+          const [sellerRes, middlemanRes, profileRes] = await Promise.all([
             fetch('/api/register/seller', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
             fetch('/api/register/middleman', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
+            fetch('/api/profile', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
           ]);
           const sellerData = sellerRes?.ok ? await sellerRes.json() : null;
           const middlemanData = middlemanRes?.ok ? await middlemanRes.json() : null;
+          const profileData = profileRes?.ok ? await profileRes.json() : null;
           let synced = false;
           if (sellerData?.status && sellerData.status !== p.sellerStatus) { p = { ...p, sellerStatus: sellerData.status }; synced = true; }
           if (middlemanData?.status && middlemanData.status !== p.middlemanStatus) { p = { ...p, middlemanStatus: middlemanData.status }; synced = true; }
           if (synced) setPrefs(p);
+          setWallet(profileData?.wallet || null);
+          setLedger(profileData?.ledger || []);
         } catch { /* best-effort */ }
       })
       .catch(() => router.replace('/login'))
@@ -272,6 +310,36 @@ function ProfilePage() {
             <div className="pf-card-title">สถานะการสมัคร</div>
             {sellerStatus && <div className="pf-row"><span className="pf-row-lbl">ผู้ขาย 🛒</span><StatusBadge status={sellerStatus} /></div>}
             {middlemanStatus && <div className="pf-row"><span className="pf-row-lbl">คนกลาง 🤝</span><StatusBadge status={middlemanStatus} /></div>}
+          </div>
+        )}
+
+        {wallet && (
+          <div className="pf-card">
+            <div className="pf-card-title">Middleman Credit Wallet</div>
+            <div className="pf-row"><span className="pf-row-lbl">Tier</span><span className="pf-row-val">{wallet.tier}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">วงเงินเครดิต</span><span className="pf-row-val">{baht(wallet.creditLimit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">เครดิตคงเหลือ</span><span className="pf-row-val" style={{ color: 'var(--green-700)' }}>{baht(wallet.availableCredit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">เครดิตที่ hold</span><span className="pf-row-val">{baht(wallet.heldCredit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">เครดิตปลดแล้ว</span><span className="pf-row-val">{baht(wallet.releasedCredit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">เครดิตถูกหัก</span><span className="pf-row-val">{baht(wallet.penaltyCredit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">ดีล/งานที่ lock เครดิต</span><span className="pf-row-val">{wallet.activeDealCount}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">อัปเดตล่าสุด</span><span className="pf-row-val">{new Date(wallet.updatedAt).toLocaleString('th-TH')}</span></div>
+            {ledger.length > 0 && (
+              <div style={{ marginTop: 12, borderTop: '1px solid var(--line-2)', paddingTop: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, fontWeight: 700 }}>รายการเครดิตล่าสุด</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {ledger.slice(0, 4).map(item => (
+                    <div key={item.entryKey} className="pf-row" style={{ alignItems: 'flex-start' }}>
+                      <span className="pf-row-lbl">{item.dealNumber || 'รายการเครดิต'}</span>
+                      <span className="pf-row-val" style={{ maxWidth: '62%', textAlign: 'right' }}>
+                        <span style={{ display: 'block', fontWeight: 700 }}>{item.purpose}</span>
+                        <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>{baht(item.amount)} · {LEDGER_STATUS[item.status] || item.status}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

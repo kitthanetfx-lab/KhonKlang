@@ -16,6 +16,26 @@ interface Deal {
   status: string; createdAt: string;
 }
 
+interface MiddlemanWallet {
+  tier: string;
+  creditLimit: number;
+  availableCredit: number;
+  heldCredit: number;
+  releasedCredit: number;
+  penaltyCredit: number;
+  activeDealCount: number;
+  updatedAt: string;
+}
+
+interface LedgerEntry {
+  $id?: string;
+  entryKey: string;
+  purpose: string;
+  amount: number;
+  status: string;
+  dealNumber?: string;
+}
+
 const STATUS_LABEL: Record<string, string> = {
   terms_pending: 'รอยอมรับเงื่อนไข', payment_pending: 'รอโอนเงิน', payment_uploaded: 'ตรวจสลิป ⚠️',
   packing: 'ผู้ขายแพ็คของ', shipped_to_middleman: 'รอรับพัสดุ ⚠️', middleman_received: 'รับพัสดุแล้ว',
@@ -41,6 +61,19 @@ const NEEDS_ACTION: Record<string, string> = {
   middleman_checking: '⚠️ รอคุณตรวจสินค้าก่อนส่งผู้ซื้อ',
 };
 
+const LEDGER_STATUS: Record<string, string> = {
+  expected: 'รอเริ่ม',
+  held: 'กำลัง hold',
+  released: 'ปลดแล้ว',
+  forfeited: 'ถูกหัก',
+  scheduled: 'รอจ่าย',
+  paid: 'จ่ายแล้ว',
+};
+
+function baht(amount: number) {
+  return `฿${Number(amount || 0).toLocaleString()}`;
+}
+
 export default function MiddlemanDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -48,6 +81,8 @@ export default function MiddlemanDashboard() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [tab, setTab] = useState<'active' | 'history'>('active');
   const [tier, setTier] = useState('Bronze');
+  const [wallet, setWallet] = useState<MiddlemanWallet | null>(null);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
 
   useEffect(() => {
     const r = document.documentElement;
@@ -67,7 +102,13 @@ export default function MiddlemanDashboard() {
         if (prefs.middlemanStatus !== 'approved') { router.replace('/register/middleman'); return; }
         setTier(prefs.middlemanTierIntent || 'Bronze');
         const jwt = (await account.createJWT()).jwt;
-        await fetchDeals(jwt);
+        const [profileRes] = await Promise.all([
+          fetch('/api/profile', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
+          fetchDeals(jwt),
+        ]);
+        const profileData = profileRes?.ok ? await profileRes.json() : null;
+        setWallet(profileData?.wallet || null);
+        setLedger(profileData?.ledger || []);
       } catch { router.replace('/login'); }
       finally { setLoading(false); }
     })();
@@ -75,8 +116,16 @@ export default function MiddlemanDashboard() {
 
   async function refresh() {
     setRefreshing(true);
-    try { const jwt = (await account.createJWT()).jwt; await fetchDeals(jwt); }
-    finally { setRefreshing(false); }
+    try {
+      const jwt = (await account.createJWT()).jwt;
+      await fetchDeals(jwt);
+      try {
+        const res = await fetch('/api/profile', { headers: { 'x-session-jwt': jwt } }).catch(() => null);
+        const data = res?.ok ? await res.json() : null;
+        setWallet(data?.wallet || null);
+        setLedger(data?.ledger || []);
+      } catch { /* ignore */ }
+    } finally { setRefreshing(false); }
   }
 
   const active = deals.filter(d => ACTIVE_STATUSES.includes(d.status));
@@ -136,10 +185,64 @@ export default function MiddlemanDashboard() {
           <div className="tier-card-right"><div className="tier-card-dep-lbl">เงินประกัน</div><div className="tier-card-dep-val" style={{ color: ti.color }}>฿{ti.deposit.toLocaleString()}</div></div>
         </div>
 
+        {wallet && (
+          <div className="deal-card" style={{ gap: 14 }}>
+            <div className="deal-card-header">
+              <div style={{ flex: 1 }}>
+                <div className="deal-card-title">เครดิตคนกลาง</div>
+                <div className="deal-card-meta"><span>วงเงิน {baht(wallet.creditLimit)}</span><span>อัปเดต {new Date(wallet.updatedAt).toLocaleString('th-TH')}</span></div>
+              </div>
+              <span className="sb sb-green">พร้อมรับงาน {wallet.activeDealCount} รายการ</span>
+            </div>
+            <div className="parties-row">
+              <div className="party-box">
+                <span className="party-box-role">เครดิตคงเหลือ</span>
+                <span className="party-box-name" style={{ color: 'var(--accent-strong)' }}>{baht(wallet.availableCredit)}</span>
+              </div>
+              <div className="party-box">
+                <span className="party-box-role">เครดิตที่ hold</span>
+                <span className="party-box-name">{baht(wallet.heldCredit)}</span>
+              </div>
+              <div className="party-box">
+                <span className="party-box-role">เครดิตปลดแล้ว</span>
+                <span className="party-box-name">{baht(wallet.releasedCredit)}</span>
+              </div>
+            </div>
+            {wallet.penaltyCredit > 0 && (
+              <div className="deal-action-needed">เครดิตถูกหักสะสม {baht(wallet.penaltyCredit)}</div>
+            )}
+          </div>
+        )}
+
         <div className="info-banner">
           <Icon name="info" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
           <span>ผู้ซื้อเป็นคนเลือกคุณเป็นคนกลาง กดรีเฟรชเพื่อตรวจสอบดีลใหม่ที่เข้ามา</span>
         </div>
+
+        {ledger.length > 0 && (
+          <div className="deal-card">
+            <div className="deal-card-header">
+              <div>
+                <div className="deal-card-title">รายการเครดิตล่าสุด</div>
+                <div className="deal-card-meta"><span>ดูจาก wallet ledger จริง</span></div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {ledger.slice(0, 4).map(item => (
+                <div key={item.entryKey} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700 }}>{item.purpose}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{item.dealNumber || item.entryKey}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontWeight: 700 }}>{baht(item.amount)}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{LEDGER_STATUS[item.status] || item.status}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="dash-tabs-inline">
           {([{ k: 'active', l: `กำลังดีล (${active.length})` }, { k: 'history', l: `ประวัติ (${history.length})` }] as const).map(({ k, l }) => (

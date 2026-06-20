@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, Users, Query } from 'node-appwrite';
+import { getMiddlemanWallet } from '../_lib/financeLedger';
 
 const DB_ID = 'khonklang_db';
 
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
     const middlemen = await Promise.all(docs.map(async doc => {
       let phone = '', displayName = (doc.fullNameId as string) || '';
       let reviewScore = 0, reviewCount = 0;
+      let wallet = null;
       try {
         const u = await users.get(doc.userId as string);
         const p = ((u.prefs || {}) as Record<string, string>);
@@ -46,6 +48,7 @@ export async function GET(req: NextRequest) {
         reviewScore = parseFloat(p.reviewScore || '0') || 0;
         reviewCount = parseInt(p.reviewCount   || '0') || 0;
       } catch {}
+      wallet = await getMiddlemanWallet(db, users, String(doc.userId || '')).catch(() => null);
       return {
         userId:       doc.userId       as string,
         code:         String(doc.userId || '').slice(-6).toUpperCase(),
@@ -53,7 +56,7 @@ export async function GET(req: NextRequest) {
         tier:         (doc.tier        as string) || 'Bronze',
         categories:   (doc.categories  as string) || '',
         workProvince: (doc.workProvince as string) || '',
-        phone, reviewScore, reviewCount,
+        phone, reviewScore, reviewCount, wallet,
       };
     }));
 

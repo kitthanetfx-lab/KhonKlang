@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, DatabasesIndexType, ID, OrderBy, Permission, Role, Query, Users } from 'node-appwrite';
 import { notifyUsers } from '../_lib/notify';
 import { readServiceControlsConfig } from '../_lib/appConfig';
+import { syncDealLedger } from '../_lib/financeLedger';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'deals';
@@ -264,6 +265,7 @@ export async function POST(req: NextRequest) {
       trackingToMiddleman: '', trackingToBuyer: '', rejectReason: '',
       createdAt: new Date().toISOString(),
     });
+    await syncDealLedger(databases, getAdminUsers(), doc as unknown as Record<string, unknown>).catch(() => {});
 
     // ถูกชวนแบบเจาะจง (เช่น กดนัดรับจากหน้าสินค้า — รู้ตัวผู้ขายอยู่แล้ว) → แจ้งคนนั้นทันที
     if (body.inviteUserId && typeof body.inviteUserId === 'string' && body.inviteUserId !== currentUser.$id) {

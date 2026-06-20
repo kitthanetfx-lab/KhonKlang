@@ -28,6 +28,18 @@ interface MiddlemanApp {
   status: string;
   rejectReason?: string;
   $createdAt: string;
+  wallet?: MiddlemanWallet | null;
+}
+
+interface MiddlemanWallet {
+  tier: string;
+  creditLimit: number;
+  availableCredit: number;
+  heldCredit: number;
+  releasedCredit: number;
+  penaltyCredit: number;
+  activeDealCount: number;
+  updatedAt: string;
 }
 
 const STATUS_TABS = [
@@ -69,6 +81,10 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('th-TH', {
     day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit',
   });
+}
+
+function baht(amount: number) {
+  return `฿${Number(amount || 0).toLocaleString()}`;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -200,6 +216,18 @@ function DetailPanel({ app, onClose, onAction }: {
             <Row k="ประเภทสินค้า"       v={cats} multiline />
             {app.terms && <Row k="เงื่อนไขเพิ่มเติม" v={app.terms} multiline />}
           </Section>
+
+          {app.wallet && (
+            <Section label="เครดิตคนกลาง">
+              <Row k="วงเงินเครดิต" v={baht(app.wallet.creditLimit)} />
+              <Row k="เครดิตคงเหลือ" v={baht(app.wallet.availableCredit)} />
+              <Row k="เครดิตที่ hold" v={baht(app.wallet.heldCredit)} />
+              <Row k="เครดิตปลดแล้ว" v={baht(app.wallet.releasedCredit)} />
+              <Row k="เครดิตถูกหัก" v={baht(app.wallet.penaltyCredit)} />
+              <Row k="ดีล/งานที่ล็อกเครดิต" v={String(app.wallet.activeDealCount)} />
+              <Row k="อัปเดตล่าสุด" v={formatDate(app.wallet.updatedAt)} />
+            </Section>
+          )}
 
           <Section label="บัญชีธนาคาร">
             <Row k="ธนาคาร"     v={app.bankName} />
@@ -374,6 +402,8 @@ function MiddlemenContent() {
               <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                 <th className="text-left px-5 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">ชื่อ-นามสกุล</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">Tier</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">เครดิตคงเหลือ</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">เครดิต Hold</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">เงินประกัน</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">จังหวัด</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">วันที่สมัคร</th>
@@ -384,18 +414,20 @@ function MiddlemenContent() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-400">
+                  <td colSpan={9} className="text-center py-12 text-gray-400">
                     <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">ไม่มีข้อมูล</td>
+                  <td colSpan={9} className="text-center py-12 text-gray-400 text-sm">ไม่มีข้อมูล</td>
                 </tr>
               ) : filtered.map(app => (
                 <tr key={app.$id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                   <td className="px-5 py-3.5 font-medium">{app.fullNameId}</td>
                   <td className="px-4 py-3.5"><TierBadge tier={app.tier} /></td>
+                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.wallet ? baht(app.wallet.availableCredit) : '—'}</td>
+                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.wallet ? baht(app.wallet.heldCredit) : '—'}</td>
                   <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">฿{app.depositIntent.toLocaleString()}</td>
                   <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.workProvince || '—'}</td>
                   <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(app.$createdAt)}</td>
