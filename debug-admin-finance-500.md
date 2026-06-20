@@ -26,4 +26,22 @@
 - Reproduce on production and inspect logs.
 
 ## Status
-- Waiting for instrumentation and reproduction.
+- Evidence collected from production.
+
+## Evidence
+- Production response:
+  - `debugStage = "get:syncFinanceProjection"`
+  - `error = "Invalid document structure: Unknown attribute: \"ownerType\""`
+  - `debugName = "AppwriteException"`
+- This confirms the failure happens before ledger read/summary and inside projection write.
+
+## Hypothesis Result
+- H1 confirmed: finance projection writes before `finance_ledger` schema is fully ready in Appwrite.
+- H2 rejected: route does not reach ledger parsing/build stage.
+- H3 rejected: route does not reach bank lookup stage.
+- H4 confirmed: downstream Appwrite schema readiness is the failure source.
+- H5 partially rejected: this is not caused by malformed deal/app/job payload first; it fails on collection attribute readiness.
+
+## Fix Plan
+- Make `ensureFinanceCollections()` wait until each required attribute is `available` before any ledger upsert runs.
+- Keep route instrumentation in place until production verification succeeds.

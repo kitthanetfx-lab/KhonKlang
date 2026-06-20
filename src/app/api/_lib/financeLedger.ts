@@ -97,6 +97,10 @@ function feeSummary(lines: FeeLine[]) {
   return lines.map(line => ({ label: line.label, amount: Number(line.amount) || 0 }));
 }
 
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function hasCollection(db: Databases, collectionId: string) {
   try {
     await db.getCollection(DB_ID, collectionId);
@@ -115,19 +119,30 @@ async function hasAttribute(db: Databases, collectionId: string, key: string) {
   }
 }
 
+async function waitForAttribute(db: Databases, collectionId: string, key: string, maxAttempts = 20) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (await hasAttribute(db, collectionId, key)) return;
+    await sleep(500);
+  }
+  throw new Error(`Finance attribute not ready: ${collectionId}.${key}`);
+}
+
 async function ensureStringAttribute(db: Databases, collectionId: string, key: string, size: number, required = false, defaultValue = '') {
   if (await hasAttribute(db, collectionId, key)) return;
   await db.createStringAttribute(DB_ID, collectionId, key, size, required, defaultValue).catch(() => {});
+  await waitForAttribute(db, collectionId, key);
 }
 
 async function ensureIntegerAttribute(db: Databases, collectionId: string, key: string, min = 0, max = 999999999, defaultValue = 0) {
   if (await hasAttribute(db, collectionId, key)) return;
   await db.createIntegerAttribute(DB_ID, collectionId, key, false, min, max, defaultValue).catch(() => {});
+  await waitForAttribute(db, collectionId, key);
 }
 
 async function ensureBooleanAttribute(db: Databases, collectionId: string, key: string, defaultValue = false) {
   if (await hasAttribute(db, collectionId, key)) return;
   await db.createBooleanAttribute(DB_ID, collectionId, key, false, defaultValue).catch(() => {});
+  await waitForAttribute(db, collectionId, key);
 }
 
 async function ensureIndex(db: Databases, collectionId: string, key: string, attrs: string[], orders: OrderBy[]) {
