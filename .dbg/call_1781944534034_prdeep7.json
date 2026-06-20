@@ -1,0 +1,2235 @@
+﻿โ— injected env (9) from .env.local // tip: โ multiple files { path: ['.env.local', '.env'] }
+[
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:36.287Z",
+    "location": "src/app/admin/support/page.tsx:useEffect",
+    "msg": "[DEBUG] admin thread state",
+    "data": {
+      "status": "customer_requesting",
+      "callId": "call_1781944534034_prdeep7",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "handledCallId": "",
+      "callState": null
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:36.630Z",
+    "location": "src/components/SupportWidget.tsx:useEffect",
+    "msg": "[DEBUG] customer thread state",
+    "data": {
+      "status": "customer_requesting",
+      "callId": "call_1781944534034_prdeep7",
+      "handledCallId": "",
+      "callState": null
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:42.846Z",
+    "location": "src/app/admin/support/page.tsx:callAction",
+    "msg": "[DEBUG] admin callAction",
+    "data": {
+      "action": "approve",
+      "selected": "6a24e0549fed2a9e8d94",
+      "ok": true,
+      "status": 200,
+      "response": {
+        "ok": true,
+        "callId": "call_1781944534034_prdeep7",
+        "callStatus": "staff_ringing"
+      },
+      "threadStatus": "customer_requesting",
+      "threadCallId": "call_1781944534034_prdeep7"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:43.241Z",
+    "location": "src/app/admin/support/page.tsx:useEffect",
+    "msg": "[DEBUG] admin thread state",
+    "data": {
+      "status": "staff_ringing",
+      "callId": "call_1781944534034_prdeep7",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "handledCallId": "",
+      "callState": null
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:43.699Z",
+    "location": "src/components/SupportWidget.tsx:useEffect",
+    "msg": "[DEBUG] customer thread state",
+    "data": {
+      "status": "staff_ringing",
+      "callId": "call_1781944534034_prdeep7",
+      "handledCallId": "",
+      "callState": null
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:48.782Z",
+    "location": "src/components/SupportWidget.tsx:useEffect",
+    "msg": "[DEBUG] customer thread state",
+    "data": {
+      "status": "connecting",
+      "callId": "call_1781944534034_prdeep7",
+      "handledCallId": "",
+      "callState": null
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:48.839Z",
+    "location": "src/components/SupportWidget.tsx:callAction",
+    "msg": "[DEBUG] customer callAction",
+    "data": {
+      "action": "answer",
+      "ok": true,
+      "status": 200,
+      "response": {
+        "ok": true,
+        "callId": "call_1781944534034_prdeep7",
+        "callStatus": "connecting"
+      },
+      "threadStatus": "connecting",
+      "threadCallId": "call_1781944534034_prdeep7"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:49.098Z",
+    "location": "src/lib/callSession.ts:start",
+    "msg": "[DEBUG] getUserMedia:start",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "isOfferer": false,
+      "customerId": ""
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:49.251Z",
+    "location": "src/app/admin/support/page.tsx:useEffect",
+    "msg": "[DEBUG] admin thread state",
+    "data": {
+      "status": "connecting",
+      "callId": "call_1781944534034_prdeep7",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "handledCallId": "",
+      "callState": null
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:49.443Z",
+    "location": "src/lib/callSession.ts:start",
+    "msg": "[DEBUG] getUserMedia:ok",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "tracks": [
+        {
+          "enabled": true,
+          "readyState": "live",
+          "label": "เธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธ"
+        }
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:49.620Z",
+    "location": "src/lib/callSession.ts:start",
+    "msg": "[DEBUG] getUserMedia:start",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "isOfferer": true,
+      "customerId": "6a24e0549fed2a9e8d94"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:49.832Z",
+    "location": "src/lib/callSession.ts:start",
+    "msg": "[DEBUG] getUserMedia:ok",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "tracks": [
+        {
+          "enabled": true,
+          "readyState": "live",
+          "label": "Microphone (2- High Definition Audio Device)"
+        }
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:50.080Z",
+    "location": "src/components/SupportWidget.tsx:getIceServers",
+    "msg": "[DEBUG] customer getIceServers",
+    "data": {
+      "ok": true,
+      "status": 200,
+      "count": 1,
+      "servers": [
+        {
+          "urls": [
+            "stun:stun.l.google.com:19302",
+            "stun:stun1.l.google.com:19302"
+          ],
+          "hasUsername": false,
+          "hasCredential": false
+        }
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:50.447Z",
+    "location": "src/lib/callSession.ts:start",
+    "msg": "[DEBUG] iceServers",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "count": 1,
+      "servers": [
+        {
+          "urls": [
+            "stun:stun.l.google.com:19302",
+            "stun:stun1.l.google.com:19302"
+          ],
+          "hasUsername": false,
+          "hasCredential": false
+        }
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:50.760Z",
+    "location": "src/app/admin/support/page.tsx:getIceServers",
+    "msg": "[DEBUG] admin getIceServers",
+    "data": {
+      "ok": true,
+      "status": 200,
+      "count": 1,
+      "servers": [
+        {
+          "urls": [
+            "stun:stun.l.google.com:19302",
+            "stun:stun1.l.google.com:19302"
+          ],
+          "hasUsername": false,
+          "hasCredential": false
+        }
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.169Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 175
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.215Z",
+    "location": "src/lib/callSession.ts:start",
+    "msg": "[DEBUG] createOffer",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "offer",
+      "sdpLen": 1295
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.230Z",
+    "location": "src/lib/callSession.ts:start",
+    "msg": "[DEBUG] iceServers",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "count": 1,
+      "servers": [
+        {
+          "urls": [
+            "stun:stun.l.google.com:19302",
+            "stun:stun1.l.google.com:19302"
+          ],
+          "hasUsername": false,
+          "hasCredential": false
+        }
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.236Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 199
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.273Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 205
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.278Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "udp",
+      "address": "[2001:fb1:15c:fb42:5bd4:fac8:61c8:2259]",
+      "candidate": "candidate:910221250 1 udp 2122262783 2001:fb1:15c:fb42:5bd4:fac8:61c8:2259 54087 typ host generation 0 ufrag NZbe network-id 2"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.280Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 185
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.312Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "tcp",
+      "address": "192.168.1.38",
+      "candidate": "candidate:2600541583 1 tcp 1518149375 192.168.1.38 9 typ host tcptype active generation 0 ufrag NZbe network-id 1"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.318Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 211
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.365Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "tcp",
+      "address": "[2001:fb1:15c:fb42:5bd4:fac8:61c8:2259]",
+      "candidate": "candidate:3370781526 1 tcp 1518283007 2001:fb1:15c:fb42:5bd4:fac8:61c8:2259 9 typ host tcptype active generation 0 ufrag NZbe network-id 2"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.373Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "offer",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 1394
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.394Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "tcp",
+      "address": "[2001:fb1:15c:fb42:cc3d:b93f:36d0:935b]",
+      "candidate": "candidate:2670477508 1 tcp 1518217471 2001:fb1:15c:fb42:cc3d:b93f:36d0:935b 9 typ host tcptype active generation 0 ufrag NZbe network-id 3"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.483Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "srflx",
+      "protocol": "udp",
+      "address": "58.10.58.10",
+      "candidate": "candidate:3403753509 1 udp 1685921535 58.10.58.10 4960 typ srflx raddr 192.168.1.38 rport 54085 generation 0 ufrag NZbe network-id 1"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:51.762Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "tcp",
+      "address": "172.30.80.1",
+      "candidate": "candidate:1344756650 1 tcp 1518083839 172.30.80.1 9 typ host tcptype active generation 0 ufrag NZbe network-id 4"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:52.960Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 174
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:52.994Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 186
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:53.031Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 200
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:53.115Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "udp",
+      "address": "[2001:fb1:15c:fb42:cc3d:b93f:36d0:935b]",
+      "candidate": "candidate:1636209744 1 udp 2122197247 2001:fb1:15c:fb42:cc3d:b93f:36d0:935b 54088 typ host generation 0 ufrag NZbe network-id 3"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:53.120Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "udp",
+      "address": "172.30.80.1",
+      "candidate": "candidate:2928512830 1 udp 2122063615 172.30.80.1 54086 typ host generation 0 ufrag NZbe network-id 4"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:53.557Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "udp",
+      "address": "192.168.1.38",
+      "candidate": "candidate:1705756955 1 udp 2122129151 192.168.1.38 54085 typ host generation 0 ufrag NZbe network-id 1"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:54.107Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "size": 211
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.144Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "offer",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.459Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.155Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "",
+      "count": 6,
+      "types": [
+        "candidate",
+        "offer",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate"
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.190Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.442Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.204Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "answer",
+      "customerId": "",
+      "size": 1294
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.227Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "",
+      "size": 192
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.292Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "udp",
+      "address": "10.161.148.154",
+      "candidate": "candidate:737556117 1 udp 2122260223 10.161.148.154 50552 typ host generation 0 ufrag CHXk network-id 1 network-cost 50"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.297Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "srflx",
+      "protocol": "udp",
+      "address": "49.237.180.117",
+      "candidate": "candidate:3929563615 1 udp 1686052607 49.237.180.117 14069 typ srflx raddr 10.161.148.154 rport 50552 generation 0 ufrag CHXk network-id 1 network-cost 50"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.306Z",
+    "location": "src/lib/callSession.ts:onicecandidate",
+    "msg": "[DEBUG] onicecandidate",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "host",
+      "protocol": "tcp",
+      "address": "10.161.148.154",
+      "candidate": "candidate:1429853197 1 tcp 1518280447 10.161.148.154 9 typ host tcptype active generation 0 ufrag CHXk network-id 1 network-cost 50"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.361Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "",
+      "size": 204
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:54.390Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "customerId": "",
+      "size": 227
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:55.750Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:55.755Z",
+    "location": "src/lib/callSession.ts:sendSignal",
+    "msg": "[DEBUG] sendSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "answer",
+      "customerId": "",
+      "size": 1694
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:55.784Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:51.459Z",
+      "count": 10,
+      "types": [
+        "candidate",
+        "offer",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate"
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:55.814Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:55.896Z",
+    "location": "src/lib/callSession.ts:onconnectionstatechange",
+    "msg": "[DEBUG] connectionState",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "connectionState": "connecting",
+      "iceConnectionState": "checking",
+      "signalingState": "stable"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:55.925Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "offer",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.459Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:55.996Z",
+    "location": "src/lib/callSession.ts:oniceconnectionstatechange",
+    "msg": "[DEBUG] iceConnectionState",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "iceConnectionState": "checking",
+      "iceGatheringState": "complete",
+      "signalingState": "stable"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:55.999Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.484Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.069Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.688Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.079Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.357Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.083Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.517Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.085Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.484Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.093Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.315Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.103Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.799Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.109Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:51.459Z",
+      "count": 8,
+      "types": [
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate"
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.115Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.812Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.127Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.812Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.161Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.250Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.193Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.442Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.221Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.799Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:56.403Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.517Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:56.922Z",
+    "location": "src/lib/callSession.ts:onconnectionstatechange",
+    "msg": "[DEBUG] connectionState",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "connectionState": "connecting",
+      "iceConnectionState": "checking",
+      "signalingState": "stable"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:56.928Z",
+    "location": "src/lib/callSession.ts:oniceconnectionstatechange",
+    "msg": "[DEBUG] iceConnectionState",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "iceConnectionState": "checking",
+      "iceGatheringState": "gathering",
+      "signalingState": "stable"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:56.932Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "answer",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:54.199Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:56.975Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:54.354Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:57.011Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "",
+      "count": 4,
+      "types": [
+        "answer",
+        "candidate",
+        "candidate",
+        "candidate"
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:57.017Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:54.376Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:57.047Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:54.240Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.627Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.517Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.651Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.484Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.658Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.799Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.665Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.812Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.666Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.357Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.668Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.250Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.672Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.688Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.685Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.315Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.704Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.357Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.705Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.517Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.716Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:51.812Z",
+      "count": 8,
+      "types": [
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate"
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.735Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.799Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.736Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.688Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.742Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.250Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.744Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.484Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:57.906Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:51.812Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:58.041Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.315Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:58.083Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:54.354Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:58.118Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:54.240Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:58.120Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "answer",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:55.809Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:58.124Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "answer",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:54.199Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:58.132Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:54.376Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:58.166Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:54.376Z",
+      "count": 5,
+      "types": [
+        "answer",
+        "candidate",
+        "candidate",
+        "candidate",
+        "answer"
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:58.234Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.250Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:58.244Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 4,
+      "types": [
+        "candidate",
+        "candidate",
+        "candidate",
+        "candidate"
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:58.277Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.315Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:58.303Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.688Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:58.331Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "candidate",
+      "fromRole": "staff",
+      "createdAt": "2026-06-20T08:35:53.357Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:35:59.421Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:59.439Z",
+    "location": "src/lib/callSession.ts:handleSignal",
+    "msg": "[DEBUG] handleSignal",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "type": "answer",
+      "fromRole": "customer",
+      "createdAt": "2026-06-20T08:35:55.809Z"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:35:59.556Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 1,
+      "types": [
+        "answer"
+      ]
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:00.570Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:01.088Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:01.876Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:02.608Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:03.367Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:04.196Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:04.318Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:05.431Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:05.868Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:06.630Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:07.517Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:07.826Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:09.047Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:09.151Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:10.167Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:10.616Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:11.355Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:11.852Z",
+    "location": "src/lib/callSession.ts:onconnectionstatechange",
+    "msg": "[DEBUG] connectionState",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "connectionState": "failed",
+      "iceConnectionState": "disconnected",
+      "signalingState": "stable"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:11.862Z",
+    "location": "src/lib/callSession.ts:oniceconnectionstatechange",
+    "msg": "[DEBUG] iceConnectionState",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "iceConnectionState": "disconnected",
+      "iceGatheringState": "complete",
+      "signalingState": "stable"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:12.233Z",
+    "location": "src/lib/callSession.ts:onconnectionstatechange",
+    "msg": "[DEBUG] connectionState",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "connectionState": "failed",
+      "iceConnectionState": "disconnected",
+      "signalingState": "stable"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:12.247Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:12.291Z",
+    "location": "src/lib/callSession.ts:oniceconnectionstatechange",
+    "msg": "[DEBUG] iceConnectionState",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "iceConnectionState": "disconnected",
+      "iceGatheringState": "gathering",
+      "signalingState": "stable"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:12.694Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:13.835Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:13.895Z",
+    "location": "src/app/admin/support/page.tsx:callAction",
+    "msg": "[DEBUG] admin callAction",
+    "data": {
+      "action": "hangup",
+      "selected": "6a24e0549fed2a9e8d94",
+      "ok": true,
+      "status": 200,
+      "response": {
+        "ok": true
+      },
+      "threadStatus": "connecting",
+      "threadCallId": "call_1781944534034_prdeep7"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:13.902Z",
+    "location": "src/components/SupportWidget.tsx:callAction",
+    "msg": "[DEBUG] customer callAction",
+    "data": {
+      "action": "hangup",
+      "ok": true,
+      "status": 200,
+      "response": {
+        "ok": true
+      },
+      "threadStatus": "connecting",
+      "threadCallId": "call_1781944534034_prdeep7"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:14.220Z",
+    "location": "src/app/admin/support/page.tsx:useEffect",
+    "msg": "[DEBUG] admin thread state",
+    "data": {
+      "status": "ended",
+      "callId": "call_1781944534034_prdeep7",
+      "customerId": "6a24e0549fed2a9e8d94",
+      "handledCallId": "call_1781944534034_prdeep7",
+      "callState": "failed"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:14.316Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:14.658Z",
+    "location": "src/components/SupportWidget.tsx:useEffect",
+    "msg": "[DEBUG] customer thread state",
+    "data": {
+      "status": "ended",
+      "callId": "call_1781944534034_prdeep7",
+      "handledCallId": "call_1781944534034_prdeep7",
+      "callState": "failed"
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:15.140Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:15.661Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "staff",
+    "createdAt": "2026-06-20T08:36:16.097Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "staff",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:55.809Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:17.240Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:19.262Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:20.359Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  },
+  {
+    "threadId": "6a24e0549fed2a9e8d94",
+    "fromRole": "customer",
+    "createdAt": "2026-06-20T08:36:22.040Z",
+    "location": "src/lib/callSession.ts:pollSignals",
+    "msg": "[DEBUG] pollSignals",
+    "data": {
+      "role": "customer",
+      "callId": "call_1781944534034_prdeep7",
+      "since": "2026-06-20T08:35:53.688Z",
+      "count": 0,
+      "types": []
+    },
+    "callId": "call_1781944534034_prdeep7"
+  }
+]
