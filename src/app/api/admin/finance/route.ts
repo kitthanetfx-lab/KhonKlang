@@ -194,6 +194,7 @@ export async function GET(req: NextRequest) {
   // #region debug-point admin-finance-500
   let debugStage = 'get:start';
   const debugInfo: Record<string, unknown> = {};
+  let debugDb: Databases | null = null;
   // #endregion
   try {
     // #region debug-point admin-finance-500
@@ -202,6 +203,7 @@ export async function GET(req: NextRequest) {
     await verifyAdmin(req);
     const client = getAdminClient();
     const db = new Databases(client);
+    debugDb = db;
     const users = new Users(client);
     // #region debug-point admin-finance-500
     debugStage = 'get:syncFinanceProjection';
@@ -302,6 +304,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ incoming, outgoing, summary, fees });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
+    if (debugDb && /Unknown attribute/i.test(String(e.message || ''))) {
+      try {
+        const attrs = await debugDb.listAttributes(DB_ID, 'finance_ledger');
+        debugInfo.ledgerAttributes = (attrs.attributes || []).map((attr: { key?: string; status?: string; type?: string }) => ({
+          key: String(attr.key || ''),
+          status: String(attr.status || ''),
+          type: String(attr.type || ''),
+        }));
+      } catch (schemaErr) {
+        debugInfo.ledgerAttributesError = String(schemaErr || '');
+      }
+      try {
+        const walletAttrs = await debugDb.listAttributes(DB_ID, 'middleman_wallets');
+        debugInfo.walletAttributes = (walletAttrs.attributes || []).map((attr: { key?: string; status?: string; type?: string }) => ({
+          key: String(attr.key || ''),
+          status: String(attr.status || ''),
+          type: String(attr.type || ''),
+        }));
+      } catch (schemaErr) {
+        debugInfo.walletAttributesError = String(schemaErr || '');
+      }
+    }
     return NextResponse.json({
       error: e.message ?? 'error',
       debugStage,

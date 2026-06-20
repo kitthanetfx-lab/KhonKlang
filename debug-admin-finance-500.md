@@ -58,3 +58,15 @@
 - Create finance attributes sequentially instead of `Promise.all`.
 - Stop swallowing attribute creation failures when the attribute still does not exist.
 - Retry one ledger write after re-running schema ensure on `Unknown attribute` errors.
+
+## New Hypotheses
+1. `finance_ledger.ownerType` still does not exist at all in production after migrations.
+2. `finance_ledger.ownerType` exists but remains non-`available`, so validation still rejects writes.
+3. Production request is hitting a deployment/schema state different from what local code expects.
+4. The same schema bootstrap issue may also affect `middleman_wallets`, indicating broader finance migration drift.
+
+## New Instrumentation
+- On `Unknown attribute` errors, `GET /api/admin/finance` now also returns:
+  - `debugInfo.ledgerAttributes`
+  - `debugInfo.walletAttributes`
+- This will reveal the actual schema visible to the production runtime.
