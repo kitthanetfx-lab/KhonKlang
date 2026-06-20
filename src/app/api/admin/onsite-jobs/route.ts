@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases, Query } from 'node-appwrite';
+import { Databases, Query, Users } from 'node-appwrite';
 import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
+import { syncOnsiteJobLedger } from '../../_lib/financeLedger';
 
 const COL = 'onsite_jobs';
 
@@ -28,7 +29,9 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
+    const client = getAdminClient();
+    const db = new Databases(client);
+    const users = new Users(client);
     const { id, action, note } = await req.json();
     if (!id || !action) return NextResponse.json({ error: 'missing params' }, { status: 400 });
 
@@ -39,14 +42,17 @@ export async function PATCH(req: NextRequest) {
 
     if (action === 'cancel') {
       const updated = await db.updateDocument(DB_ID, COL, id, { status: 'cancelled', reportNotes: appendNote('แอดมินยกเลิก') });
+      await syncOnsiteJobLedger(db, users, updated as unknown as Record<string, unknown>);
       return NextResponse.json({ job: updated });
     }
     if (action === 'mark_refunded') {
       const updated = await db.updateDocument(DB_ID, COL, id, { reportNotes: appendNote('คืนมัดจำแล้ว') });
+      await syncOnsiteJobLedger(db, users, updated as unknown as Record<string, unknown>);
       return NextResponse.json({ job: updated });
     }
     if (action === 'complete') {
       const updated = await db.updateDocument(DB_ID, COL, id, { status: 'completed', completedAt: now, reportNotes: appendNote('แอดมินปิดงาน') });
+      await syncOnsiteJobLedger(db, users, updated as unknown as Record<string, unknown>);
       return NextResponse.json({ job: updated });
     }
     return NextResponse.json({ error: 'unknown action' }, { status: 400 });
