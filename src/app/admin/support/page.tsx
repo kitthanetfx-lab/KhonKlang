@@ -8,6 +8,7 @@ import {
   Loader2, User, Search, Inbox, Image as ImageIcon,
 } from 'lucide-react';
 import { CallSession, type CallSessionState } from '@/lib/callSession';
+import { SUPPORT_CALLS_COMING_SOON, SUPPORT_CALLS_ENABLED, SUPPORT_CALLS_PREPARE_TEXT } from '@/lib/supportCallFeature';
 
 type CallStatus = 'idle' | 'customer_requesting' | 'staff_ringing' | 'connecting' | 'active' | 'ended';
 
@@ -113,6 +114,7 @@ export default function AdminSupportPage() {
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
   const callStatus = thread?.callStatus;
+  const callFeatureLocked = !SUPPORT_CALLS_ENABLED;
 
   const reportDebug = useCallback((hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) => {
     const customerId = selectedRef.current || '';
@@ -196,6 +198,16 @@ export default function AdminSupportPage() {
     const status = thread?.callStatus;
     const callId = thread?.callId || '';
     const customerId = selected;
+    if (callFeatureLocked) {
+      if (sessionRef.current) {
+        sessionRef.current.stop(false);
+        sessionRef.current = null;
+      }
+      setCallState(null);
+      setCallStartedAt(null);
+      setMuted(false);
+      return;
+    }
     if (status || callId || customerId) {
       reportDebug('B', 'src/app/admin/support/page.tsx:useEffect', '[DEBUG] admin thread state', {
         status,
@@ -237,7 +249,7 @@ export default function AdminSupportPage() {
       setCallStartedAt(null);
       setMuted(false);
     }
-  }, [thread?.callStatus, thread?.callId, selected, getJwt, getIceServers, callAction, reportDebug]);
+  }, [thread?.callStatus, thread?.callId, selected, getJwt, getIceServers, callAction, reportDebug, callFeatureLocked]);
 
   useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 
@@ -322,6 +334,11 @@ export default function AdminSupportPage() {
         <h1 className="text-xl font-bold">แชทลูกค้า</h1>
       </div>
       <p className="text-sm text-gray-500 mb-5">ตอบคำถามลูกค้าและจัดการคำขอโทรกลับ — พนักงานคนใดก็ได้รับคำขอแทนกันได้</p>
+      {callFeatureLocked && (
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+          {SUPPORT_CALLS_PREPARE_TEXT} · {SUPPORT_CALLS_COMING_SOON}
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4">
         {/* ── รายชื่อห้องแชท ── */}
@@ -391,15 +408,17 @@ export default function AdminSupportPage() {
                   <p className="text-xs text-gray-400">{thread?.assignedStaffName ? `ดูแลโดย ${thread.assignedStaffName}` : 'ยังไม่มีพนักงานรับเรื่อง'}</p>
                 </div>
                 {(!callStatus || callStatus === 'idle' || callStatus === 'ended') && (
-                  <button type="button" onClick={() => { void callAction('call'); }}
-                    className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
-                    <Phone size={16} /> โทรออก
+                  <button type="button" onClick={() => { if (!callFeatureLocked) void callAction('call'); }}
+                    disabled={callFeatureLocked}
+                    title={callFeatureLocked ? `${SUPPORT_CALLS_PREPARE_TEXT} (${SUPPORT_CALLS_COMING_SOON})` : undefined}
+                    className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${callFeatureLocked ? 'bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:text-gray-400' : 'bg-green-600 text-white hover:bg-green-700'}`}>
+                    <Phone size={16} /> {callFeatureLocked ? SUPPORT_CALLS_COMING_SOON : 'โทรออก'}
                   </button>
                 )}
               </div>
 
               {/* ── แถบสถานะสาย ── */}
-              {callStatus === 'customer_requesting' && (
+              {!callFeatureLocked && callStatus === 'customer_requesting' && (
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 text-sm font-medium" role="alert">
                   <span className="flex items-center gap-2"><PhoneCall size={16} /> ลูกค้าขอให้โทรกลับ</span>
                   <span className="flex gap-2">
@@ -414,7 +433,7 @@ export default function AdminSupportPage() {
                   </span>
                 </div>
               )}
-              {callStatus === 'staff_ringing' && (
+              {!callFeatureLocked && callStatus === 'staff_ringing' && (
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium" role="status">
                   <span className="flex items-center gap-2"><Phone size={16} /> กำลังรอลูกค้ารับสาย…</span>
                   <button type="button" onClick={() => callAction('hangup')} aria-label="ยกเลิกการโทร"
@@ -423,7 +442,7 @@ export default function AdminSupportPage() {
                   </button>
                 </div>
               )}
-              {callStatus === 'connecting' && (
+              {!callFeatureLocked && callStatus === 'connecting' && (
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium" role="status">
                   <span className="flex items-center gap-2"><Phone size={16} /> {callState === 'failed' ? 'เชื่อมต่อไม่สำเร็จ' : 'กำลังเชื่อมต่อสาย…'}</span>
                   <button type="button" onClick={() => callAction('hangup')} aria-label="วางสาย"
@@ -432,7 +451,7 @@ export default function AdminSupportPage() {
                   </button>
                 </div>
               )}
-              {(callStatus === 'active' || callState === 'active') && (
+              {!callFeatureLocked && (callStatus === 'active' || callState === 'active') && (
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-sm font-medium" role="status">
                   <span className="flex items-center gap-2"><Phone size={16} /> สายกำลังคุยอยู่ · {mm}:{ss}</span>
                   <span className="flex gap-2">

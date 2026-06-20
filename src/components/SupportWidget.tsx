@@ -6,6 +6,7 @@ import { account } from '@/lib/appwrite';
 import { compressImage } from '@/lib/imageCompress';
 import { Icon } from './Icon';
 import { CallSession, type CallSessionState } from '@/lib/callSession';
+import { SUPPORT_CALLS_COMING_SOON, SUPPORT_CALLS_ENABLED, SUPPORT_CALLS_PREPARE_TEXT } from '@/lib/supportCallFeature';
 
 interface SupportMsg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string; pending?: boolean }
 interface SupportThread {
@@ -104,6 +105,7 @@ export function SupportWidget() {
 
   const unread = !!thread?.unreadCustomer;
   const ringing = thread?.callStatus === 'staff_ringing';
+  const callFeatureLocked = !SUPPORT_CALLS_ENABLED;
   const elapsed = callStartedAt ? Math.max(0, Math.floor((nowTs - callStartedAt) / 1000)) : 0;
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
@@ -184,6 +186,16 @@ export function SupportWidget() {
   useEffect(() => {
     const status = thread?.callStatus;
     const callId = thread?.callId || '';
+    if (callFeatureLocked) {
+      if (sessionRef.current) {
+        sessionRef.current.stop(false);
+        sessionRef.current = null;
+      }
+      setCallState(null);
+      setCallStartedAt(null);
+      setMuted(false);
+      return;
+    }
     if (status || callId) {
       reportDebug('B', 'src/components/SupportWidget.tsx:useEffect', '[DEBUG] customer thread state', {
         status,
@@ -223,7 +235,7 @@ export function SupportWidget() {
       setCallStartedAt(null);
       setMuted(false);
     }
-  }, [thread?.callStatus, thread?.callId, getJwt, getIceServers, callAction, reportDebug]);
+  }, [thread?.callStatus, thread?.callId, getJwt, getIceServers, callAction, reportDebug, callFeatureLocked]);
 
   useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 
@@ -327,13 +339,18 @@ export function SupportWidget() {
             {authed && (
               <>
                 {/* ── แถบสถานะสาย ── */}
-                {thread?.callStatus === 'customer_requesting' && (
+                {callFeatureLocked && (
+                  <div className="sw-callbar pending" role="status" aria-live="polite">
+                    <span><Icon name="phone" size={16} /> {SUPPORT_CALLS_PREPARE_TEXT} · {SUPPORT_CALLS_COMING_SOON}</span>
+                  </div>
+                )}
+                {!callFeatureLocked && thread?.callStatus === 'customer_requesting' && (
                   <div className="sw-callbar pending" role="status">
                     <span><Icon name="phone" size={16} /> กำลังขอให้พนักงานโทรกลับ…</span>
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => callAction('cancel')}>ยกเลิก</button>
                   </div>
                 )}
-                {ringing && (
+                {!callFeatureLocked && ringing && (
                   <div className="sw-callbar ring" role="alert">
                     <span><Icon name="phone" size={16} /> พนักงาน{thread?.callStaffName ? ` ${thread.callStaffName}` : ''}กำลังโทรเข้า</span>
                     <span className="sw-callbtns">
@@ -342,13 +359,13 @@ export function SupportWidget() {
                     </span>
                   </div>
                 )}
-                {thread?.callStatus === 'connecting' && (
+                {!callFeatureLocked && thread?.callStatus === 'connecting' && (
                   <div className="sw-callbar active" role="status">
                     <span><Icon name="phone" size={16} /> {callState === 'failed' ? 'เชื่อมต่อไม่สำเร็จ' : 'กำลังเชื่อมต่อสาย…'}</span>
                     <button type="button" className="sw-roundbtn decline" onClick={() => callAction('hangup')} aria-label="วางสาย"><Icon name="phoneOff" size={18} /></button>
                   </div>
                 )}
-                {(thread?.callStatus === 'active' || callState === 'active') && (
+                {!callFeatureLocked && (thread?.callStatus === 'active' || callState === 'active') && (
                   <div className="sw-callbar active" role="status">
                     <span><Icon name="phone" size={16} /> สายกำลังคุยอยู่ · {mm}:{ss}</span>
                     <span className="sw-callbtns">
@@ -362,7 +379,7 @@ export function SupportWidget() {
 
                 <div className="sw-feed">
                   {msgs.length === 0 && (
-                    <p className="sw-empty">สวัสดีครับ/ค่ะ มีอะไรให้ทีมงานช่วยไหม? พิมพ์คำถามได้เลย หรือกดโทรศัพท์ด้านบนเพื่อขอให้พนักงานโทรกลับ</p>
+                    <p className="sw-empty">สวัสดีครับ/ค่ะ มีอะไรให้ทีมงานช่วยไหม? พิมพ์คำถามได้เลย{callFeatureLocked ? ` ตอนนี้ระบบโทรอยู่ระหว่างเตรียมเปิดใช้งาน (${SUPPORT_CALLS_COMING_SOON})` : ' หรือกดโทรศัพท์ด้านบนเพื่อขอให้พนักงานโทรกลับ'}</p>
                   )}
                   {msgs.map(m => {
                     const mine = m.senderRole !== 'staff';
@@ -403,9 +420,10 @@ export function SupportWidget() {
                     <Icon name="image" size={18} />
                   </button>
                   <button
-                    type="button" className="sw-iconbtn call" aria-label="ขอให้พนักงานโทรกลับ"
-                    disabled={!!thread && thread.callStatus !== 'idle' && thread.callStatus !== 'ended'}
-                    onClick={() => { void callAction('request'); }}
+                    type="button" className="sw-iconbtn call" aria-label={callFeatureLocked ? `ระบบโทร ${SUPPORT_CALLS_COMING_SOON}` : 'ขอให้พนักงานโทรกลับ'}
+                    title={callFeatureLocked ? `${SUPPORT_CALLS_PREPARE_TEXT} (${SUPPORT_CALLS_COMING_SOON})` : undefined}
+                    disabled={callFeatureLocked || (!!thread && thread.callStatus !== 'idle' && thread.callStatus !== 'ended')}
+                    onClick={() => { if (!callFeatureLocked) void callAction('request'); }}
                   >
                     <Icon name="phoneCall" size={18} />
                   </button>
