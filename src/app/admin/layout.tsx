@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { account, clearPersistedSession } from '@/lib/appwrite';
 import {
-  LayoutDashboard, Store, Shield, Users, Settings,
+  LayoutDashboard, Store, Shield, Users, Settings, SlidersHorizontal,
   LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, MapPin, Wallet, MessageCircle,
 } from 'lucide-react';
 
@@ -20,7 +20,8 @@ const NAV = [
   { href: '/admin/onsite-jobs', icon: MapPin,          label: 'งานนัดออนไซต์' },
   { href: '/admin/moderate',    icon: EyeOff,          label: 'ตรวจสอบเนื้อหา' },
   { href: '/admin/users',       icon: Users,           label: 'ผู้ใช้ทั้งหมด' },
-  { href: '/admin/settings',    icon: Settings,        label: 'ตั้งค่า' },
+  { href: '/admin/service-controls', icon: SlidersHorizontal, label: 'ควบคุมบริการ' },
+  { href: '/admin/settings',    icon: Settings,        label: 'ค่าธรรมเนียม' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Databases } from 'node-appwrite';
-import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
+import { verifyAdmin, getAdminClient } from '../../admin/_lib';
 import { readJsonConfig, writeJsonConfig } from '../../_lib/appConfig';
-import { SERVICE_CONTROL_DEFAULTS, sanitizeServiceControls } from '@/lib/serviceControls';
 
-const COL = 'app_config';
 const DOC = 'fees';
-const SERVICE_DOC = 'service_controls';
 
 // ค่าธรรมเนียม/ค่าบริการแบบตัวเลข (แอดมินปรับได้ในหน้าตั้งค่า)
 const NUM_DEFAULTS = {
@@ -54,8 +51,7 @@ export async function GET(req: NextRequest) {
     await verifyAdmin(req);
     const db = new Databases(getAdminClient());
     const fees = await readConfig(db);
-    const services = sanitizeServiceControls(await readJsonConfig(db, SERVICE_DOC, SERVICE_CONTROL_DEFAULTS));
-    return NextResponse.json({ fees, services });
+    return NextResponse.json({ fees });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
     return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
@@ -68,10 +64,8 @@ export async function PATCH(req: NextRequest) {
     const db = new Databases(getAdminClient());
     const body = await req.json();
     const currentFees = await readConfig(db);
-    const currentServices = sanitizeServiceControls(await readJsonConfig(db, SERVICE_DOC, SERVICE_CONTROL_DEFAULTS));
     const feeBody = body?.fees ?? body;
     const hasFeePayload = feeBody && typeof feeBody === 'object' && NUM_KEYS.some(key => key in feeBody);
-    const serviceBody = body?.services;
 
     // sanitize: เก็บเฉพาะ key ที่รู้จัก ตัวเลข >= 0 และตัวเลือกที่ถูกต้อง
     const cleanFees: Record<string, number | string> = {};
@@ -83,12 +77,10 @@ export async function PATCH(req: NextRequest) {
     for (const k of COMPANY_KEYS) cleanFees[k] = String(feeBody?.[k] ?? '').slice(0, 200);
 
     const nextFees = hasFeePayload ? { ...currentFees, ...cleanFees } : currentFees;
-    const nextServices = serviceBody ? sanitizeServiceControls(serviceBody) : currentServices;
 
     if (hasFeePayload) await writeJsonConfig(db, DOC, nextFees);
-    if (serviceBody) await writeJsonConfig(db, SERVICE_DOC, nextServices);
 
-    return NextResponse.json({ fees: nextFees, services: nextServices, ok: true });
+    return NextResponse.json({ fees: nextFees, ok: true });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
     return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
