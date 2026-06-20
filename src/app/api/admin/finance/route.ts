@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Databases, Query, ID, Users } from 'node-appwrite';
+import * as XLSX from 'xlsx';
 import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
 import { notifyUsers } from '../../_lib/notify';
 import { readDealPriceState, writeDealPriceState, type DealPriceState } from '@/lib/dealPriceState';
@@ -26,6 +27,7 @@ type Row = {
   key: string;
   source: string;
   refId: string;
+  referenceType: string;
   dealNumber?: string;
   title: string;
   payer: string;
@@ -42,6 +44,66 @@ type Row = {
   canApprove?: boolean;
   approveLink?: string;
   bank?: BankInfo | null;
+  detailUrl: string;
+  buyerId?: string;
+  buyerName?: string;
+  sellerId?: string;
+  sellerName?: string;
+  middlemanId?: string;
+  middlemanName?: string;
+  dealStatus?: string;
+  price?: number;
+  feeAmount?: number;
+  imageCount?: number;
+  attachmentCount?: number;
+  hasSlip?: boolean;
+  category?: string;
+  condition?: string;
+  location?: string;
+  description?: string;
+};
+
+type FinanceTab = 'incoming' | 'outgoing' | 'summary';
+type ReferenceDocMap = Record<string, Record<string, unknown>>;
+type ExportFormat = 'csv' | 'xlsx';
+
+const COL_SELLER_APPS = 'seller_applications';
+const COL_MIDDLEMAN_APPS = 'middleman_applications';
+const COL_ONSITE = 'onsite_jobs';
+const SEARCH_SCAN_LIMIT = 5000;
+const SEARCH_BATCH_SIZE = 200;
+
+const ENTRY_TYPE_FILTERS: Record<'incoming' | 'outgoing', Record<string, string[]>> = {
+  incoming: {
+    all: [
+      'buyer_payment',
+      'seller_fee_payment',
+      'meetup_buyer_deposit',
+      'meetup_seller_deposit',
+      'meetup_buyer_fee',
+      'meetup_seller_fee',
+      'seller_registration',
+      'middleman_registration',
+      'platform_fee',
+      'platform_cut',
+    ],
+    escrow: ['buyer_payment', 'seller_fee_payment', 'platform_fee', 'platform_cut'],
+    meetup: ['meetup_buyer_deposit', 'meetup_seller_deposit', 'meetup_buyer_fee', 'meetup_seller_fee'],
+    reg: ['seller_registration', 'middleman_registration'],
+  },
+  outgoing: {
+    all: [
+      'seller_payout',
+      'buyer_refund',
+      'meetup_buyer_refund',
+      'meetup_seller_refund',
+      'middleman_fee_net',
+      'onsite_service_fee',
+      'onsite_travel_fee',
+    ],
+    payout: ['seller_payout', 'middleman_fee_net', 'onsite_service_fee', 'onsite_travel_fee'],
+    refund: ['buyer_refund', 'meetup_buyer_refund', 'meetup_seller_refund'],
+  },
 };
 
 function parseMeta(entry: LedgerDoc) {
@@ -103,6 +165,93 @@ function sourceForEntry(entry: LedgerDoc) {
     default:
       return '';
   }
+}
+
+function parseJsonArray(value: unknown) {
+  if (typeof value !== 'string' || !value) return [] as unknown[];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function referenceCodeForRow(row: Row) {
+  if (row.dealNumber) return row.dealNumber;
+  if (row.referenceType === 'seller_application') return `SELLER-${row.refId.slice(-8).toUpperCase()}`;
+  if (row.referenceType === 'middleman_application') return `MM-${row.refId.slice(-8).toUpperCase()}`;
+  if (row.referenceType === 'onsite_job') return `ONSITE-${row.refId.slice(-8).toUpperCase()}`;
+  return `FIN-${row.refId.slice(-8).toUpperCase()}`;
+}
+
+function rowSearchText(row: Row) {
+  return [
+    referenceCodeForRow(row),
+    row.title,
+    row.purpose,
+    row.payer,
+    row.payerName,
+    row.buyerName,
+    row.sellerName,
+    row.middlemanName,
+    row.description,
+    row.location,
+    row.category,
+    row.condition,
+    row.dealStatus,
+  ].join(' ').toLowerCase();
+}
+
+function matchesSearch(row: Row, search: string) {
+  const q = search.trim().toLowerCase();
+  if (!q) return true;
+  return rowSearchText(row).includes(q);
+}
+
+function exportRows(rows: Row[]) {
+  return rows.map(row => ({
+    referenceCode: referenceCodeForRow(row),
+    referenceType: row.referenceType,
+    source: row.source,
+    title: row.title,
+    purpose: row.purpose,
+    buyerName: row.buyerName || '',
+    sellerName: row.sellerName || '',
+    middlemanName: row.middlemanName || '',
+    payer: row.payer,
+    payerName: row.payerName || '',
+    dealStatus: row.dealStatus || row.status || '',
+    txnStatus: row.txnStatus || '',
+    price: Number(row.price || 0),
+    feeAmount: Number(row.feeAmount || 0),
+    expected: Number(row.expected || 0),
+    imageCount: Number(row.imageCount || 0),
+    attachmentCount: Number(row.attachmentCount || 0),
+    hasSlip: row.hasSlip ? 'yes' : 'no',
+    category: row.category || '',
+    condition: row.condition || '',
+    location: row.location || '',
+    description: row.description || '',
+    detailUrl: row.detailUrl,
+  }));
+}
+
+function countUploads(value: unknown) {
+  return parseJsonArray(value).length;
+}
+
+function feeAmountForEntry(entry: LedgerDoc, fees?: { lines: Array<{ label: string; amount: number }>; total: number }) {
+  if (fees?.total) return fees.total;
+  const meta = parseMeta(entry);
+  return Number(
+    meta.fee
+    ?? meta.sellerFeeShare
+    ?? meta.buyerFeeShare
+    ?? meta.platformCut
+    ?? meta.grossFee
+    ?? 0,
+  ) || 0;
 }
 
 function txnStatusForEntry(entry: LedgerDoc): TxnStatus {
@@ -175,6 +324,78 @@ function approveLinkForEntry(entry: LedgerDoc) {
   return `/onsite/${entry.referenceId}`;
 }
 
+async function loadReferenceDocs(
+  db: Databases,
+  collectionId: string,
+  ids: string[],
+): Promise<ReferenceDocMap> {
+  const docs = await Promise.all(ids.map(async id => {
+    try {
+      const doc = await db.getDocument(DB_ID, collectionId, id);
+      return [id, doc as unknown as Record<string, unknown>] as const;
+    } catch {
+      return null;
+    }
+  }));
+  return Object.fromEntries(docs.filter((row): row is readonly [string, Record<string, unknown>] => !!row));
+}
+
+async function loadReferenceContext(db: Databases, ledger: LedgerDoc[]) {
+  const dealIds = Array.from(new Set(ledger.filter(entry => entry.referenceType === 'deal').map(entry => entry.referenceId)));
+  const sellerAppIds = Array.from(new Set(ledger.filter(entry => entry.referenceType === 'seller_application').map(entry => entry.referenceId)));
+  const middlemanAppIds = Array.from(new Set(ledger.filter(entry => entry.referenceType === 'middleman_application').map(entry => entry.referenceId)));
+  const onsiteIds = Array.from(new Set(ledger.filter(entry => entry.referenceType === 'onsite_job').map(entry => entry.referenceId)));
+
+  const [deals, sellerApps, middlemanApps, onsiteJobs] = await Promise.all([
+    loadReferenceDocs(db, COL_DEALS, dealIds),
+    loadReferenceDocs(db, COL_SELLER_APPS, sellerAppIds),
+    loadReferenceDocs(db, COL_MIDDLEMAN_APPS, middlemanAppIds),
+    loadReferenceDocs(db, COL_ONSITE, onsiteIds),
+  ]);
+
+  return { deals, sellerApps, middlemanApps, onsiteJobs };
+}
+
+async function fetchLedgerEntries(
+  db: Databases,
+  entryTypes: string[],
+  page: number,
+  pageSize: number,
+  search: string,
+  exportMode = false,
+) {
+  if (!search && !exportMode) {
+    const ledgerRes = await db.listDocuments(DB_ID, COL_LEDGER, [
+      Query.equal('active', true),
+      Query.equal('entryType', entryTypes),
+      Query.orderDesc('updatedAt'),
+      Query.limit(pageSize),
+      Query.offset((page - 1) * pageSize),
+    ]).catch(() => ({ documents: [], total: 0 }));
+    const ledger = ledgerRes.documents as unknown as LedgerDoc[];
+    return { ledger, total: Number((ledgerRes as { total?: number }).total || 0) };
+  }
+
+  const all: LedgerDoc[] = [];
+  let offset = 0;
+  let total = 0;
+  while (offset < SEARCH_SCAN_LIMIT) {
+    const res = await db.listDocuments(DB_ID, COL_LEDGER, [
+      Query.equal('active', true),
+      Query.equal('entryType', entryTypes),
+      Query.orderDesc('updatedAt'),
+      Query.limit(SEARCH_BATCH_SIZE),
+      Query.offset(offset),
+    ]).catch(() => ({ documents: [], total: 0 }));
+    const documents = res.documents as unknown as LedgerDoc[];
+    total = Number((res as { total?: number }).total || total);
+    all.push(...documents);
+    offset += documents.length;
+    if (documents.length < SEARCH_BATCH_SIZE || offset >= total) break;
+  }
+  return { ledger: all, total: Math.min(total || all.length, SEARCH_SCAN_LIMIT) };
+}
+
 async function hasDealAttribute(db: Databases, key: string) {
   try {
     const attr = await db.getAttribute(DB_ID, COL_DEALS, key);
@@ -191,10 +412,22 @@ async function sysMsg(db: Databases, dealId: string, content: string) {
   }).catch(() => {});
 }
 
-function buildRow(entry: LedgerDoc, bankMap: Record<string, BankInfo | null>): Row | null {
+function buildRow(
+  entry: LedgerDoc,
+  bankMap: Record<string, BankInfo | null>,
+  refs: Awaited<ReturnType<typeof loadReferenceContext>>,
+): Row | null {
   const source = sourceForEntry(entry);
   if (!source) return null;
   const meta = parseMeta(entry);
+  const refDoc =
+    entry.referenceType === 'deal'
+      ? refs.deals[entry.referenceId]
+      : entry.referenceType === 'seller_application'
+        ? refs.sellerApps[entry.referenceId]
+        : entry.referenceType === 'middleman_application'
+          ? refs.middlemanApps[entry.referenceId]
+          : refs.onsiteJobs[entry.referenceId];
   const bank = entry.ownerId && entry.ownerId !== 'platform' ? (bankMap[entry.ownerId] ?? null) : null;
   const fees = feeLinesFromMeta(meta);
   const note = typeof meta.payoutNote === 'string'
@@ -205,11 +438,20 @@ function buildRow(entry: LedgerDoc, bankMap: Record<string, BankInfo | null>): R
   const payer = entry.direction === 'outgoing' ? 'ศูนย์กลาง' : payerLabel(entry);
   const payerName = entry.ownerName || '';
   const canApprove = entry.entryType === 'buyer_payment' && entry.status === 'pending_review';
+  const buyerName = String(refDoc?.buyerName || '');
+  const sellerName = String(refDoc?.sellerName || '');
+  const middlemanName = String(refDoc?.middlemanName || '');
+  const imageCount = countUploads(refDoc?.imageFileIds);
+  const evidenceCount = countUploads(refDoc?.evidenceData);
+  const price = Number(meta.price ?? refDoc?.price ?? 0) || 0;
+  const feeAmount = feeAmountForEntry(entry, fees);
+  const detailUrl = approveLinkForEntry(entry);
 
   return {
     key: entry.entryKey,
     source,
     refId: entry.referenceId,
+    referenceType: entry.referenceType,
     dealNumber: entry.dealNumber || undefined,
     title: entry.title,
     payer,
@@ -224,83 +466,175 @@ function buildRow(entry: LedgerDoc, bankMap: Record<string, BankInfo | null>): R
     note,
     fees,
     canApprove,
-    approveLink: approveLinkForEntry(entry),
+    approveLink: detailUrl,
     bank,
+    detailUrl,
+    buyerId: String(refDoc?.buyerId || ''),
+    buyerName,
+    sellerId: String(refDoc?.sellerId || ''),
+    sellerName,
+    middlemanId: String(refDoc?.middlemanId || ''),
+    middlemanName,
+    dealStatus: String(refDoc?.status || meta.dealStatus || ''),
+    price,
+    feeAmount,
+    imageCount,
+    attachmentCount: evidenceCount + (entry.fileId ? 1 : 0),
+    hasSlip: !!entry.fileId,
+    category: String(refDoc?.category || ''),
+    condition: String(refDoc?.condition || ''),
+    location: String(refDoc?.location || ''),
+    description: String(refDoc?.description || refDoc?.itemDescription || ''),
+  };
+}
+
+async function buildFinanceResponse(
+  db: Databases,
+  users: Users,
+  params: { tab: FinanceTab; filter: string; page: number; pageSize: number; search: string; exportFormat?: ExportFormat | null },
+) {
+  await syncFinanceProjection(db, users);
+  const fees = await readFeesConfig(db);
+  const tabKey = params.tab === 'outgoing' ? 'outgoing' : 'incoming';
+  const entryTypes = ENTRY_TYPE_FILTERS[tabKey][params.filter] || ENTRY_TYPE_FILTERS[tabKey].all;
+  const base = await fetchLedgerEntries(db, entryTypes, params.page, params.pageSize, params.search, !!params.exportFormat);
+  const refs = await loadReferenceContext(db, base.ledger);
+  const ownerIds = Array.from(new Set(
+    base.ledger
+      .map(entry => String(entry.ownerId || ''))
+      .filter(ownerId => ownerId && ownerId !== 'platform' && ownerId !== 'system'),
+  ));
+  const bankMap = await getBankInfoMap(ownerIds);
+  const allRows = base.ledger
+    .map(entry => buildRow(entry, bankMap, refs))
+    .filter((row): row is Row => !!row)
+    .filter(row => matchesSearch(row, params.search));
+
+  const pagedRows = params.exportFormat
+    ? allRows
+    : allRows.slice((params.page - 1) * params.pageSize, params.page * params.pageSize);
+
+  const summaryLedgerRes = await db.listDocuments(DB_ID, COL_LEDGER, [
+    Query.equal('active', true),
+    Query.orderDesc('updatedAt'),
+    Query.limit(1000),
+  ]).catch(() => ({ documents: [] }));
+  const summaryLedger = summaryLedgerRes.documents as unknown as LedgerDoc[];
+  const summaryRefs = await loadReferenceContext(db, summaryLedger);
+  const summaryBankIds = Array.from(new Set(
+    summaryLedger
+      .map(entry => String(entry.ownerId || ''))
+      .filter(ownerId => ownerId && ownerId !== 'platform' && ownerId !== 'system'),
+  ));
+  const summaryBankMap = summaryBankIds.length === ownerIds.length
+    && summaryBankIds.every(id => ownerIds.includes(id))
+    ? bankMap
+    : await getBankInfoMap(summaryBankIds);
+  const incoming = summaryLedger
+    .filter(entry => entry.direction === 'incoming' || entry.entryType === 'platform_fee' || entry.entryType === 'platform_cut')
+    .map(entry => buildRow(entry, summaryBankMap, summaryRefs))
+    .filter((row): row is Row => !!row);
+  const outgoing = summaryLedger
+    .filter(entry => entry.direction === 'outgoing')
+    .map(entry => buildRow(entry, summaryBankMap, summaryRefs))
+    .filter((row): row is Row => !!row);
+  const completedDealIds = new Set(
+    summaryLedger
+      .filter(entry => entry.entryType === 'seller_payout' && entry.active !== false)
+      .map(entry => entry.referenceId),
+  );
+  const completedVolume = summaryLedger.reduce((sum, entry) => {
+    if (entry.entryType !== 'buyer_payment' || !completedDealIds.has(entry.referenceId)) return sum;
+    const meta = parseMeta(entry);
+    return sum + (Number(meta.price) || 0);
+  }, 0);
+  const estRevenue = summaryLedger.reduce((sum, entry) => {
+    if (!['platform_fee', 'platform_cut', 'meetup_buyer_fee', 'meetup_seller_fee', 'seller_registration', 'middleman_registration'].includes(entry.entryType)) {
+      return sum;
+    }
+    if (entry.status === 'cancelled' || entry.status === 'void') return sum;
+    return sum + (Number(entry.amount) || 0);
+  }, 0);
+  const summary = {
+    incomingCount: incoming.length,
+    escrowPendingCount: incoming.filter(row => row.canApprove).length,
+    heldEscrow: summaryLedger
+      .filter(entry => entry.entryType === 'buyer_payment' && ['pending_review', 'confirmed'].includes(entry.status))
+      .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
+    heldMeetupDeposit: summaryLedger
+      .filter(entry => ['meetup_buyer_deposit', 'meetup_seller_deposit'].includes(entry.entryType) && entry.status === 'confirmed')
+      .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
+    completedVolume,
+    completedCount: completedDealIds.size,
+    estRevenue,
+    outgoingCount: outgoing.length,
+    pendingPayoutAmount: outgoing
+      .filter(row => ['payout', 'middleman_fee', 'onsite_payout'].includes(row.source) && row.txnStatus === 'pending')
+      .reduce((sum, row) => sum + row.expected, 0),
+    pendingRefundAmount: outgoing
+      .filter(row => ['refund', 'meetup_refund'].includes(row.source) && row.txnStatus !== 'refunded')
+      .reduce((sum, row) => sum + row.expected, 0),
+  };
+
+  return {
+    rows: pagedRows,
+    allRows,
+    summary,
+    fees,
+    pagination: {
+      page: params.page,
+      pageSize: params.pageSize,
+      total: allRows.length,
+      hasNext: params.page * params.pageSize < allRows.length,
+    },
   };
 }
 
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
+    const tab = (req.nextUrl.searchParams.get('tab') || 'incoming') as FinanceTab;
+    const filter = req.nextUrl.searchParams.get('filter') || 'all';
+    const page = Math.max(1, Number(req.nextUrl.searchParams.get('page')) || 1);
+    const pageSize = Math.min(100, Math.max(20, Number(req.nextUrl.searchParams.get('pageSize')) || 50));
+    const search = String(req.nextUrl.searchParams.get('search') || '').trim();
+    const exportFormat = req.nextUrl.searchParams.get('format') as ExportFormat | null;
     const client = getAdminClient();
     const db = new Databases(client);
     const users = new Users(client);
-    await syncFinanceProjection(db, users);
-    const fees = await readFeesConfig(db);
+    const data = await buildFinanceResponse(db, users, { tab, filter, page, pageSize, search, exportFormat });
 
-    const ledgerRes = await db.listDocuments(DB_ID, COL_LEDGER, [
-      Query.equal('active', true),
-      Query.orderDesc('updatedAt'),
-      Query.limit(500),
-    ]).catch(() => ({ documents: [] }));
-    const ledger = ledgerRes.documents as unknown as LedgerDoc[];
-    const ownerIds = Array.from(new Set(
-      ledger
-        .map(entry => String(entry.ownerId || ''))
-        .filter(ownerId => ownerId && ownerId !== 'platform' && ownerId !== 'system'),
-    ));
-    const bankMap = await getBankInfoMap(ownerIds);
-
-    const incoming = ledger
-      .filter(entry => entry.direction === 'incoming' || entry.entryType === 'platform_fee' || entry.entryType === 'platform_cut')
-      .map(entry => buildRow(entry, bankMap))
-      .filter((row): row is Row => !!row);
-
-    const outgoing = ledger
-      .filter(entry => entry.direction === 'outgoing')
-      .map(entry => buildRow(entry, bankMap))
-      .filter((row): row is Row => !!row);
-
-    const completedDealIds = new Set(
-      ledger
-        .filter(entry => entry.entryType === 'seller_payout' && entry.active !== false)
-        .map(entry => entry.referenceId),
-    );
-    const completedVolume = ledger.reduce((sum, entry) => {
-      if (entry.entryType !== 'buyer_payment' || !completedDealIds.has(entry.referenceId)) return sum;
-      const meta = parseMeta(entry);
-      return sum + (Number(meta.price) || 0);
-    }, 0);
-    const estRevenue = ledger.reduce((sum, entry) => {
-      if (!['platform_fee', 'platform_cut', 'meetup_buyer_fee', 'meetup_seller_fee', 'seller_registration', 'middleman_registration'].includes(entry.entryType)) {
-        return sum;
+    if (exportFormat === 'csv' || exportFormat === 'xlsx') {
+      const records = exportRows(data.allRows);
+      const worksheet = XLSX.utils.json_to_sheet(records);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Finance');
+      const now = new Date().toISOString().slice(0, 10);
+      const fileBase = `finance-${tab}-${filter}-${now}`;
+      if (exportFormat === 'csv') {
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        return new NextResponse(`\uFEFF${csv}`, {
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="${fileBase}.csv"`,
+          },
+        });
       }
-      if (entry.status === 'cancelled' || entry.status === 'void') return sum;
-      return sum + (Number(entry.amount) || 0);
-    }, 0);
+      const xlsxBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      return new NextResponse(xlsxBuffer, {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="${fileBase}.xlsx"`,
+        },
+      });
+    }
 
-    const summary = {
-      incomingCount: incoming.length,
-      escrowPendingCount: incoming.filter(row => row.canApprove).length,
-      heldEscrow: ledger
-        .filter(entry => entry.entryType === 'buyer_payment' && ['pending_review', 'confirmed'].includes(entry.status))
-        .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
-      heldMeetupDeposit: ledger
-        .filter(entry => ['meetup_buyer_deposit', 'meetup_seller_deposit'].includes(entry.entryType) && entry.status === 'confirmed')
-        .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
-      completedVolume,
-      completedCount: completedDealIds.size,
-      estRevenue,
-      outgoingCount: outgoing.length,
-      pendingPayoutAmount: outgoing
-        .filter(row => ['payout', 'middleman_fee', 'onsite_payout'].includes(row.source) && row.txnStatus === 'pending')
-        .reduce((sum, row) => sum + row.expected, 0),
-      pendingRefundAmount: outgoing
-        .filter(row => ['refund', 'meetup_refund'].includes(row.source) && row.txnStatus !== 'refunded')
-        .reduce((sum, row) => sum + row.expected, 0),
-    };
-
-    return NextResponse.json({ incoming, outgoing, summary, fees });
+    return NextResponse.json({
+      rows: data.rows,
+      summary: data.summary,
+      fees: data.fees,
+      pagination: data.pagination,
+    });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
     return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });

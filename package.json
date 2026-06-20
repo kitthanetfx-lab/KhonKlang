@@ -15,7 +15,8 @@
     "node-appwrite": "^26.0.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "thai-address-database": "^0.0.30"
+    "thai-address-database": "^0.0.30",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
