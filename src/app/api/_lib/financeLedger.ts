@@ -680,7 +680,8 @@ export async function syncDealLedger(db: Databases, users: Users, deal: Record<s
     }
 
     if (status === 'completed') {
-      const sellerPayoutAmount = Math.max(price - sellerFeeAmount, 0);
+      // Seller service fees are paid as separate transfers and must not reduce the goods payout.
+      const sellerPayoutAmount = Math.max(price, 0);
       await push(buildEntry({
         entryKey: `deal:${dealId}:seller_payout`,
         referenceType: 'deal',
@@ -701,7 +702,7 @@ export async function syncDealLedger(db: Databases, users: Users, deal: Record<s
         fileId: '',
         approveLink: `/deal/${dealId}`,
         active: sellerPayoutAmount > 0,
-        meta: { payoutNote: text(pd.payoutNote, 300), sellerFeeShare: sellerFeeAmount },
+        meta: { payoutNote: text(pd.payoutNote, 300), sellerFeeShare: sellerFeeAmount, goodsPrice: price },
       }));
     }
 

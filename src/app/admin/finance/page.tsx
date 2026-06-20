@@ -39,6 +39,7 @@ interface SlipCheck {
 }
 interface FinanceRow {
   key: string;
+  entryType: string;
   source: string;
   refId: string;
   referenceType: string;
@@ -150,6 +151,17 @@ function referenceCodeForRow(row: FinanceRow) {
   return `FIN-${row.refId.slice(-8).toUpperCase()}`;
 }
 
+function groupedFeeAmount(rows: FinanceRow[]) {
+  const detailedTotal = Math.max(...rows.map(row => Number(row.fees?.total || 0)), 0);
+  if (detailedTotal > 0) return detailedTotal;
+  return rows.reduce((sum, row) => {
+    if (['seller_fee_payment', 'meetup_buyer_fee', 'meetup_seller_fee', 'seller_registration', 'middleman_registration'].includes(row.entryType)) {
+      return sum + Number(row.expected || 0);
+    }
+    return sum;
+  }, 0);
+}
+
 function groupRowsByReference(rows: FinanceRow[]) {
   const map = new Map<string, FinanceGroup>();
 
@@ -159,7 +171,6 @@ function groupRowsByReference(rows: FinanceRow[]) {
     if (current) {
       current.rows.push(row);
       current.totalExpected += Number(row.expected || 0);
-      current.feeAmount += Number(row.feeAmount || 0);
       current.attachmentCount = Math.max(current.attachmentCount, Number(row.attachmentCount || 0));
       current.imageCount = Math.max(current.imageCount, Number(row.imageCount || 0));
       current.hasSlip = current.hasSlip || !!row.hasSlip;
@@ -168,6 +179,7 @@ function groupRowsByReference(rows: FinanceRow[]) {
       if (!current.dealStatus && row.dealStatus) current.dealStatus = row.dealStatus;
       if (!current.price && row.price) current.price = row.price;
       if (!current.sources.includes(row.source)) current.sources.push(row.source);
+      current.feeAmount = groupedFeeAmount(current.rows);
       continue;
     }
 
@@ -182,7 +194,7 @@ function groupRowsByReference(rows: FinanceRow[]) {
       middlemanName: row.middlemanName,
       dealStatus: row.dealStatus,
       price: row.price,
-      feeAmount: Number(row.feeAmount || 0),
+      feeAmount: groupedFeeAmount([row]),
       totalExpected: Number(row.expected || 0),
       imageCount: Number(row.imageCount || 0),
       attachmentCount: Number(row.attachmentCount || 0),

@@ -25,6 +25,7 @@ const COL_LEDGER = FINANCE_LEDGER_COLLECTION_ID;
 type TxnStatus = 'pending' | 'confirmed' | 'refund_pending' | 'refunded';
 type Row = {
   key: string;
+  entryType: string;
   source: string;
   refId: string;
   referenceType: string;
@@ -84,10 +85,8 @@ const ENTRY_TYPE_FILTERS: Record<'incoming' | 'outgoing', Record<string, string[
       'meetup_seller_fee',
       'seller_registration',
       'middleman_registration',
-      'platform_fee',
-      'platform_cut',
     ],
-    escrow: ['buyer_payment', 'seller_fee_payment', 'platform_fee', 'platform_cut'],
+    escrow: ['buyer_payment', 'seller_fee_payment'],
     meetup: ['meetup_buyer_deposit', 'meetup_seller_deposit', 'meetup_buyer_fee', 'meetup_seller_fee'],
     reg: ['seller_registration', 'middleman_registration'],
   },
@@ -449,6 +448,7 @@ function buildRow(
 
   return {
     key: entry.entryKey,
+    entryType: entry.entryType,
     source,
     refId: entry.referenceId,
     referenceType: entry.referenceType,
@@ -531,7 +531,7 @@ async function buildFinanceResponse(
     ? bankMap
     : await getBankInfoMap(summaryBankIds);
   const incoming = summaryLedger
-    .filter(entry => entry.direction === 'incoming' || entry.entryType === 'platform_fee' || entry.entryType === 'platform_cut')
+    .filter(entry => entry.direction === 'incoming')
     .map(entry => buildRow(entry, summaryBankMap, summaryRefs))
     .filter((row): row is Row => !!row);
   const outgoing = summaryLedger

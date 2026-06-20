@@ -1048,7 +1048,7 @@ export default function DealRoom() {
           const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
           const buyerShare = fb.total - sellerShare;
           const buyerTotal = deal!.price + buyerShare;
-          const sellerNet = Math.max(deal!.price - sellerShare, 0);
+          const sellerNet = Math.max(deal!.price, 0);
           const priceAgreed = !!pd.agreed;
           const hasMm = !!deal!.middlemanId;
           const evidenceDone = !!(pd.evidenceDoneBuyer && pd.evidenceDoneSeller && (!hasMm || pd.evidenceDoneMiddleman));
@@ -1147,7 +1147,7 @@ export default function DealRoom() {
     const fp = String(deal!.feePayer || pd.feePayer || 'split');
     const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
     const buyerShare = fb.total - sellerShare;
-    const sellerNet = Math.max(deal!.price - sellerShare, 0);
+    const sellerNet = Math.max(deal!.price, 0);
     const finished = deal!.status === 'completed';
 
     const rows: { who: string; bank?: BankInfo | null; note: string }[] = [
