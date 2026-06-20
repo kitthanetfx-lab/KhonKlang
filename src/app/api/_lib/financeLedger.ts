@@ -253,7 +253,6 @@ export async function upsertLedgerEntry(db: Databases, entry: LedgerDoc) {
     referenceId: text(entry.referenceId, 255),
     dealId: text(entry.dealId, 255),
     dealNumber: text(entry.dealNumber, 50),
-    ownerType: text(entry.ownerType, 30),
     ownerId: text(entry.ownerId, 255),
     ownerName: text(entry.ownerName, 200),
     entryType: text(entry.entryType, 50),

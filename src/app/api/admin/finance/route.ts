@@ -114,8 +114,41 @@ function txnStatusForEntry(entry: LedgerDoc): TxnStatus {
   return 'pending';
 }
 
+function ownerTypeForEntry(entry: LedgerDoc) {
+  if (entry.ownerType && entry.ownerType !== 'system') return entry.ownerType;
+  if (entry.ownerId === 'platform') return 'platform';
+  if (entry.ownerId === 'system') return 'system';
+  switch (entry.entryType) {
+    case 'buyer_payment':
+    case 'buyer_refund':
+    case 'meetup_buyer_deposit':
+    case 'meetup_buyer_fee':
+    case 'meetup_buyer_refund':
+      return 'buyer';
+    case 'seller_fee_payment':
+    case 'seller_payout':
+    case 'meetup_seller_deposit':
+    case 'meetup_seller_fee':
+    case 'meetup_seller_refund':
+    case 'seller_registration':
+      return 'seller';
+    case 'middleman_fee_gross':
+    case 'middleman_fee_net':
+    case 'middleman_credit_hold':
+    case 'middleman_registration':
+    case 'onsite_service_fee':
+    case 'onsite_travel_fee':
+      return 'middleman';
+    case 'platform_fee':
+    case 'platform_cut':
+      return 'platform';
+    default:
+      return 'system';
+  }
+}
+
 function payerLabel(entry: LedgerDoc) {
-  switch (entry.ownerType) {
+  switch (ownerTypeForEntry(entry)) {
     case 'buyer':
       return 'ผู้ซื้อ';
     case 'seller':

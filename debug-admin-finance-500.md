@@ -70,3 +70,16 @@
   - `debugInfo.ledgerAttributes`
   - `debugInfo.walletAttributes`
 - This will reveal the actual schema visible to the production runtime.
+
+## Latest Evidence
+- Production `ledgerAttributes` explicitly shows `ownerType` exists with `status = available`.
+- Despite that, Appwrite still rejects ledger writes with `Unknown attribute: "ownerType"`.
+
+## Confirmed Root Cause
+- This is no longer a missing-schema problem.
+- It is a production Appwrite validation inconsistency on `finance_ledger.ownerType`: schema introspection sees the field, but document validation still rejects payloads containing it.
+
+## Minimal Fix Chosen
+- Stop persisting `ownerType` into `finance_ledger` documents.
+- Derive owner role in admin finance reads from `entryType` and `ownerId` instead.
+- This preserves finance behavior while bypassing the broken validation path.
