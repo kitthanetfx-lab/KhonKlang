@@ -7,7 +7,6 @@ import { verifySlipByUrl } from '@/lib/slipok';
 import { getBankInfoMap, type BankInfo } from '@/lib/bankInfo';
 import {
   FINANCE_LEDGER_COLLECTION_ID,
-  MIDDLEMAN_WALLET_COLLECTION_ID,
   readFeesConfig,
   syncDealLedger,
   syncFinanceProjection,
@@ -231,74 +230,37 @@ function buildRow(entry: LedgerDoc, bankMap: Record<string, BankInfo | null>): R
 }
 
 export async function GET(req: NextRequest) {
-  // #region debug-point admin-finance-500
-  let debugStage = 'get:start';
-  const debugInfo: Record<string, unknown> = {};
-  let debugDb: Databases | null = null;
-  // #endregion
   try {
-    // #region debug-point admin-finance-500
-    debugStage = 'get:verifyAdmin';
-    // #endregion
     await verifyAdmin(req);
     const client = getAdminClient();
     const db = new Databases(client);
-    debugDb = db;
     const users = new Users(client);
-    // #region debug-point admin-finance-500
-    debugStage = 'get:syncFinanceProjection';
-    // #endregion
     await syncFinanceProjection(db, users);
-    // #region debug-point admin-finance-500
-    debugStage = 'get:readFeesConfig';
-    // #endregion
     const fees = await readFeesConfig(db);
 
-    // #region debug-point admin-finance-500
-    debugStage = 'get:listLedger';
-    // #endregion
     const ledgerRes = await db.listDocuments(DB_ID, COL_LEDGER, [
       Query.equal('active', true),
       Query.orderDesc('updatedAt'),
       Query.limit(500),
     ]).catch(() => ({ documents: [] }));
     const ledger = ledgerRes.documents as unknown as LedgerDoc[];
-    // #region debug-point admin-finance-500
-    debugInfo.ledgerCount = ledger.length;
-    debugStage = 'get:bankOwnerIds';
-    // #endregion
     const ownerIds = Array.from(new Set(
       ledger
         .map(entry => String(entry.ownerId || ''))
         .filter(ownerId => ownerId && ownerId !== 'platform' && ownerId !== 'system'),
     ));
-    // #region debug-point admin-finance-500
-    debugInfo.ownerIdCount = ownerIds.length;
-    debugStage = 'get:getBankInfoMap';
-    // #endregion
     const bankMap = await getBankInfoMap(ownerIds);
 
-    // #region debug-point admin-finance-500
-    debugStage = 'get:buildIncoming';
-    // #endregion
     const incoming = ledger
       .filter(entry => entry.direction === 'incoming' || entry.entryType === 'platform_fee' || entry.entryType === 'platform_cut')
       .map(entry => buildRow(entry, bankMap))
       .filter((row): row is Row => !!row);
 
-    // #region debug-point admin-finance-500
-    debugInfo.incomingCount = incoming.length;
-    debugStage = 'get:buildOutgoing';
-    // #endregion
     const outgoing = ledger
       .filter(entry => entry.direction === 'outgoing')
       .map(entry => buildRow(entry, bankMap))
       .filter((row): row is Row => !!row);
 
-    // #region debug-point admin-finance-500
-    debugInfo.outgoingCount = outgoing.length;
-    debugStage = 'get:summary';
-    // #endregion
     const completedDealIds = new Set(
       ledger
         .filter(entry => entry.entryType === 'seller_payout' && entry.active !== false)
@@ -338,41 +300,10 @@ export async function GET(req: NextRequest) {
         .reduce((sum, row) => sum + row.expected, 0),
     };
 
-    // #region debug-point admin-finance-500
-    debugStage = 'get:done';
-    // #endregion
     return NextResponse.json({ incoming, outgoing, summary, fees });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
-    if (debugDb && /Unknown attribute/i.test(String(e.message || ''))) {
-      try {
-        const attrs = await debugDb.listAttributes(DB_ID, FINANCE_LEDGER_COLLECTION_ID);
-        debugInfo.ledgerAttributes = (attrs.attributes || []).map((attr: { key?: string; status?: string; type?: string }) => ({
-          key: String(attr.key || ''),
-          status: String(attr.status || ''),
-          type: String(attr.type || ''),
-        }));
-      } catch (schemaErr) {
-        debugInfo.ledgerAttributesError = String(schemaErr || '');
-      }
-      try {
-        const walletAttrs = await debugDb.listAttributes(DB_ID, MIDDLEMAN_WALLET_COLLECTION_ID);
-        debugInfo.walletAttributes = (walletAttrs.attributes || []).map((attr: { key?: string; status?: string; type?: string }) => ({
-          key: String(attr.key || ''),
-          status: String(attr.status || ''),
-          type: String(attr.type || ''),
-        }));
-      } catch (schemaErr) {
-        debugInfo.walletAttributesError = String(schemaErr || '');
-      }
-    }
-    return NextResponse.json({
-      error: e.message ?? 'error',
-      debugStage,
-      debugInfo,
-      debugName: err instanceof Error ? err.name : 'unknown',
-      debugStack: err instanceof Error ? String(err.stack || '').slice(0, 1200) : '',
-    }, { status: e.status ?? 500 });
+    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
   }
 }
 
