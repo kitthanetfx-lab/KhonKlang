@@ -129,19 +129,31 @@ async function waitForAttribute(db: Databases, collectionId: string, key: string
 
 async function ensureStringAttribute(db: Databases, collectionId: string, key: string, size: number, required = false, defaultValue = '') {
   if (await hasAttribute(db, collectionId, key)) return;
-  await db.createStringAttribute(DB_ID, collectionId, key, size, required, defaultValue).catch(() => {});
+  try {
+    await db.createStringAttribute(DB_ID, collectionId, key, size, required, defaultValue);
+  } catch {
+    if (!(await hasAttribute(db, collectionId, key))) throw new Error(`Unable to create finance string attribute: ${collectionId}.${key}`);
+  }
   await waitForAttribute(db, collectionId, key);
 }
 
 async function ensureIntegerAttribute(db: Databases, collectionId: string, key: string, min = 0, max = 999999999, defaultValue = 0) {
   if (await hasAttribute(db, collectionId, key)) return;
-  await db.createIntegerAttribute(DB_ID, collectionId, key, false, min, max, defaultValue).catch(() => {});
+  try {
+    await db.createIntegerAttribute(DB_ID, collectionId, key, false, min, max, defaultValue);
+  } catch {
+    if (!(await hasAttribute(db, collectionId, key))) throw new Error(`Unable to create finance integer attribute: ${collectionId}.${key}`);
+  }
   await waitForAttribute(db, collectionId, key);
 }
 
 async function ensureBooleanAttribute(db: Databases, collectionId: string, key: string, defaultValue = false) {
   if (await hasAttribute(db, collectionId, key)) return;
-  await db.createBooleanAttribute(DB_ID, collectionId, key, false, defaultValue).catch(() => {});
+  try {
+    await db.createBooleanAttribute(DB_ID, collectionId, key, false, defaultValue);
+  } catch {
+    if (!(await hasAttribute(db, collectionId, key))) throw new Error(`Unable to create finance boolean attribute: ${collectionId}.${key}`);
+  }
   await waitForAttribute(db, collectionId, key);
 }
 
@@ -163,40 +175,39 @@ export async function ensureFinanceCollections(db: Databases) {
     ]).catch(() => {});
   }
 
-  await Promise.all([
-    ensureStringAttribute(db, COL_LEDGER, 'entryKey', 120),
-    ensureStringAttribute(db, COL_LEDGER, 'referenceType', 40),
-    ensureStringAttribute(db, COL_LEDGER, 'referenceId', 255),
-    ensureStringAttribute(db, COL_LEDGER, 'dealId', 255),
-    ensureStringAttribute(db, COL_LEDGER, 'dealNumber', 50),
-    ensureStringAttribute(db, COL_LEDGER, 'ownerType', 30),
-    ensureStringAttribute(db, COL_LEDGER, 'ownerId', 255),
-    ensureStringAttribute(db, COL_LEDGER, 'ownerName', 200),
-    ensureStringAttribute(db, COL_LEDGER, 'entryType', 50),
-    ensureStringAttribute(db, COL_LEDGER, 'direction', 20),
-    ensureIntegerAttribute(db, COL_LEDGER, 'amount'),
-    ensureStringAttribute(db, COL_LEDGER, 'status', 30),
-    ensureStringAttribute(db, COL_LEDGER, 'title', 200),
-    ensureStringAttribute(db, COL_LEDGER, 'purpose', 200),
-    ensureStringAttribute(db, COL_LEDGER, 'counterpartyName', 200),
-    ensureStringAttribute(db, COL_LEDGER, 'bucket', 50),
-    ensureStringAttribute(db, COL_LEDGER, 'fileId', 255),
-    ensureStringAttribute(db, COL_LEDGER, 'approveLink', 255),
-    ensureStringAttribute(db, COL_LEDGER, 'meta', 4000),
-    ensureBooleanAttribute(db, COL_LEDGER, 'active', true),
-    ensureStringAttribute(db, COL_LEDGER, 'createdAt', 30),
-    ensureStringAttribute(db, COL_LEDGER, 'updatedAt', 30),
-    ensureStringAttribute(db, COL_WALLETS, 'middlemanId', 255),
-    ensureStringAttribute(db, COL_WALLETS, 'middlemanName', 200),
-    ensureStringAttribute(db, COL_WALLETS, 'tier', 20),
-    ensureIntegerAttribute(db, COL_WALLETS, 'creditLimit'),
-    ensureIntegerAttribute(db, COL_WALLETS, 'availableCredit'),
-    ensureIntegerAttribute(db, COL_WALLETS, 'heldCredit'),
-    ensureIntegerAttribute(db, COL_WALLETS, 'releasedCredit'),
-    ensureIntegerAttribute(db, COL_WALLETS, 'penaltyCredit'),
-    ensureIntegerAttribute(db, COL_WALLETS, 'activeDealCount'),
-    ensureStringAttribute(db, COL_WALLETS, 'updatedAt', 30),
-  ]);
+  await ensureStringAttribute(db, COL_LEDGER, 'entryKey', 120);
+  await ensureStringAttribute(db, COL_LEDGER, 'referenceType', 40);
+  await ensureStringAttribute(db, COL_LEDGER, 'referenceId', 255);
+  await ensureStringAttribute(db, COL_LEDGER, 'dealId', 255);
+  await ensureStringAttribute(db, COL_LEDGER, 'dealNumber', 50);
+  await ensureStringAttribute(db, COL_LEDGER, 'ownerType', 30);
+  await ensureStringAttribute(db, COL_LEDGER, 'ownerId', 255);
+  await ensureStringAttribute(db, COL_LEDGER, 'ownerName', 200);
+  await ensureStringAttribute(db, COL_LEDGER, 'entryType', 50);
+  await ensureStringAttribute(db, COL_LEDGER, 'direction', 20);
+  await ensureIntegerAttribute(db, COL_LEDGER, 'amount');
+  await ensureStringAttribute(db, COL_LEDGER, 'status', 30);
+  await ensureStringAttribute(db, COL_LEDGER, 'title', 200);
+  await ensureStringAttribute(db, COL_LEDGER, 'purpose', 200);
+  await ensureStringAttribute(db, COL_LEDGER, 'counterpartyName', 200);
+  await ensureStringAttribute(db, COL_LEDGER, 'bucket', 50);
+  await ensureStringAttribute(db, COL_LEDGER, 'fileId', 255);
+  await ensureStringAttribute(db, COL_LEDGER, 'approveLink', 255);
+  await ensureStringAttribute(db, COL_LEDGER, 'meta', 4000);
+  await ensureBooleanAttribute(db, COL_LEDGER, 'active', true);
+  await ensureStringAttribute(db, COL_LEDGER, 'createdAt', 30);
+  await ensureStringAttribute(db, COL_LEDGER, 'updatedAt', 30);
+
+  await ensureStringAttribute(db, COL_WALLETS, 'middlemanId', 255);
+  await ensureStringAttribute(db, COL_WALLETS, 'middlemanName', 200);
+  await ensureStringAttribute(db, COL_WALLETS, 'tier', 20);
+  await ensureIntegerAttribute(db, COL_WALLETS, 'creditLimit');
+  await ensureIntegerAttribute(db, COL_WALLETS, 'availableCredit');
+  await ensureIntegerAttribute(db, COL_WALLETS, 'heldCredit');
+  await ensureIntegerAttribute(db, COL_WALLETS, 'releasedCredit');
+  await ensureIntegerAttribute(db, COL_WALLETS, 'penaltyCredit');
+  await ensureIntegerAttribute(db, COL_WALLETS, 'activeDealCount');
+  await ensureStringAttribute(db, COL_WALLETS, 'updatedAt', 30);
 
   await Promise.all([
     ensureIndex(db, COL_LEDGER, 'idx_entry_key', ['entryKey'], [OrderBy.Asc]),
@@ -260,12 +271,24 @@ export async function upsertLedgerEntry(db: Databases, entry: LedgerDoc) {
     createdAt: text(entry.createdAt || new Date().toISOString(), 30),
     updatedAt: text(entry.updatedAt || new Date().toISOString(), 30),
   };
-  if (existing?.$id) {
-    await db.updateDocument(DB_ID, COL_LEDGER, existing.$id, payload);
-    return existing.$id;
+  try {
+    if (existing?.$id) {
+      await db.updateDocument(DB_ID, COL_LEDGER, existing.$id, payload);
+      return existing.$id;
+    }
+    const created = await db.createDocument(DB_ID, COL_LEDGER, ID.unique(), payload);
+    return created.$id;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || '');
+    if (!/Unknown attribute/i.test(message)) throw error;
+    await ensureFinanceCollections(db);
+    if (existing?.$id) {
+      await db.updateDocument(DB_ID, COL_LEDGER, existing.$id, payload);
+      return existing.$id;
+    }
+    const created = await db.createDocument(DB_ID, COL_LEDGER, ID.unique(), payload);
+    return created.$id;
   }
-  const created = await db.createDocument(DB_ID, COL_LEDGER, ID.unique(), payload);
-  return created.$id;
 }
 
 async function deactivateMissingEntries(db: Databases, referenceType: LedgerReferenceType, referenceId: string, activeKeys: Set<string>) {

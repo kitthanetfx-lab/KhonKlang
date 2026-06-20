@@ -45,3 +45,16 @@
 ## Fix Plan
 - Make `ensureFinanceCollections()` wait until each required attribute is `available` before any ledger upsert runs.
 - Keep route instrumentation in place until production verification succeeds.
+
+## Follow-up Evidence
+- After the first readiness patch, production still returned the same `Unknown attribute: "ownerType"` error.
+- This rules out a simple timing-only issue and points to schema bootstrap not creating the attribute successfully at all.
+
+## Revised Root Cause
+- `ensureFinanceCollections()` created many attributes in parallel and swallowed creation errors.
+- In production, at least `finance_ledger.ownerType` remained absent, but ledger writes still proceeded and failed on document validation.
+
+## Revised Fix
+- Create finance attributes sequentially instead of `Promise.all`.
+- Stop swallowing attribute creation failures when the attribute still does not exist.
+- Retry one ledger write after re-running schema ensure on `Unknown attribute` errors.
