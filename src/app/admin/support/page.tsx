@@ -114,15 +114,50 @@ export default function AdminSupportPage() {
   const ss = String(elapsed % 60).padStart(2, '0');
   const callStatus = thread?.callStatus;
 
+  const reportDebug = useCallback((hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) => {
+    const customerId = selectedRef.current || '';
+    if (!customerId) return;
+    const send = (jwt: string) => fetch('/api/admin/support/debug', {
+      method: 'POST',
+      headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'support-call-fail',
+        runId: 'pre-fix',
+        hypothesisId,
+        location,
+        msg,
+        data,
+        ts: Date.now(),
+        customerId,
+        callId: threadRef.current?.callId || '',
+      }),
+    }).catch(() => null);
+    const jwt = jwtRef.current;
+    if (jwt) {
+      void send(jwt);
+      return;
+    }
+    void getJwt().then(send).catch(() => null);
+  }, [getJwt]);
+
   const getIceServers = useCallback(async () => {
     const jwt = jwtRef.current || await getJwt();
     const r = await fetch('/api/admin/support/ice', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
-    // #region debug-point A:admin-ice-response
-    fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"A",location:"src/app/admin/support/page.tsx:getIceServers",msg:"[DEBUG] admin getIceServers",data:{ok:r.ok,status:r.status,count:Array.isArray(d.iceServers)?d.iceServers.length:-1,servers:Array.isArray(d.iceServers)?d.iceServers.map((s:RTCIceServer)=>({urls:s.urls,hasUsername:!!s.username,hasCredential:!!s.credential})):[]},ts:Date.now()})}).catch(()=>{});
-    // #endregion
+    reportDebug('A', 'src/app/admin/support/page.tsx:getIceServers', '[DEBUG] admin getIceServers', {
+      ok: r.ok,
+      status: r.status,
+      count: Array.isArray(d.iceServers) ? d.iceServers.length : -1,
+      servers: Array.isArray(d.iceServers)
+        ? d.iceServers.map((s: RTCIceServer) => ({
+          urls: s.urls,
+          hasUsername: !!s.username,
+          hasCredential: !!s.credential,
+        }))
+        : [],
+    });
     return Array.isArray(d.iceServers) ? d.iceServers : [];
-  }, [getJwt]);
+  }, [getJwt, reportDebug]);
 
   const callAction = useCallback(async (action: string) => {
     if (!selected) return;
@@ -133,14 +168,20 @@ export default function AdminSupportPage() {
         body: JSON.stringify({ customerId: selected, action }),
       });
       const d = await r.json().catch(() => ({}));
-      // #region debug-point B:admin-call-action
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"B",location:"src/app/admin/support/page.tsx:callAction",msg:"[DEBUG] admin callAction",data:{action,selected,ok:r.ok,status:r.status,response:d,threadStatus:threadRef.current?.callStatus||"",threadCallId:threadRef.current?.callId||""},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      reportDebug('B', 'src/app/admin/support/page.tsx:callAction', '[DEBUG] admin callAction', {
+        action,
+        selected,
+        ok: r.ok,
+        status: r.status,
+        response: d,
+        threadStatus: threadRef.current?.callStatus || '',
+        threadCallId: threadRef.current?.callId || '',
+      });
       void loadThread(selected);
       return d as { callId?: string };
     } catch { /* แสดงผลรอบโพลถัดไป */ }
     return {};
-  }, [getJwt, loadThread, selected]);
+  }, [getJwt, loadThread, selected, reportDebug]);
 
   useEffect(() => {
     if (!callStartedAt) {
@@ -155,9 +196,15 @@ export default function AdminSupportPage() {
     const status = thread?.callStatus;
     const callId = thread?.callId || '';
     const customerId = selected;
-    // #region debug-point B:admin-thread-state
-    if (status || callId || customerId) fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"B",location:"src/app/admin/support/page.tsx:useEffect",msg:"[DEBUG] admin thread state",data:{status,callId,customerId,handledCallId:handledCallIdRef.current,callState:callStateRef.current},ts:Date.now()})}).catch(()=>{});
-    // #endregion
+    if (status || callId || customerId) {
+      reportDebug('B', 'src/app/admin/support/page.tsx:useEffect', '[DEBUG] admin thread state', {
+        status,
+        callId,
+        customerId,
+        handledCallId: handledCallIdRef.current,
+        callState: callStateRef.current,
+      });
+    }
     if (status === 'connecting' && callId && customerId && handledCallIdRef.current !== callId) {
       handledCallIdRef.current = callId;
       setCallStartedAt(null);
@@ -190,7 +237,7 @@ export default function AdminSupportPage() {
       setCallStartedAt(null);
       setMuted(false);
     }
-  }, [thread?.callStatus, thread?.callId, selected, getJwt, getIceServers, callAction]);
+  }, [thread?.callStatus, thread?.callId, selected, getJwt, getIceServers, callAction, reportDebug]);
 
   useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 

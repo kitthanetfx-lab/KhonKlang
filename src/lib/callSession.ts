@@ -43,11 +43,38 @@ export class CallSession {
 
   constructor(opts: CallSessionOpts) { this.opts = opts; }
 
+  private reportDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
+    const url = this.opts.role === 'staff' ? '/api/admin/support/debug' : '/api/support/debug';
+    const body = {
+      sessionId: 'support-call-fail',
+      runId: 'pre-fix',
+      hypothesisId,
+      location,
+      msg,
+      data,
+      ts: Date.now(),
+      customerId: this.opts.customerId || '',
+      callId: this.opts.callId,
+      role: this.opts.role,
+    };
+    this.opts.getJwt()
+      .then((jwt) => fetch(url, {
+        method: 'POST',
+        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }))
+      .catch(() => null);
+  }
+
   private async sendSignal(type: string, data: string) {
     try {
-      // #region debug-point C:send-signal
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"C",location:"src/lib/callSession.ts:sendSignal",msg:"[DEBUG] sendSignal",data:{role:this.opts.role,callId:this.opts.callId,type,customerId:this.opts.customerId||"",size:data.length},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      this.reportDebug('C', 'src/lib/callSession.ts:sendSignal', '[DEBUG] sendSignal', {
+        role: this.opts.role,
+        callId: this.opts.callId,
+        type,
+        customerId: this.opts.customerId || '',
+        size: data.length,
+      });
       const jwt = await this.opts.getJwt();
       await fetch(this.opts.signalUrl, {
         method: 'POST',
@@ -66,9 +93,13 @@ export class CallSession {
       if (r.ok) {
         const d = await r.json();
         const signals = (d.signals || []) as SignalMsg[];
-        // #region debug-point C:poll-signals
-        fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"C",location:"src/lib/callSession.ts:pollSignals",msg:"[DEBUG] pollSignals",data:{role:this.opts.role,callId:this.opts.callId,since:this.since,count:signals.length,types:signals.map(s=>s.type)},ts:Date.now()})}).catch(()=>{});
-        // #endregion
+        this.reportDebug('C', 'src/lib/callSession.ts:pollSignals', '[DEBUG] pollSignals', {
+          role: this.opts.role,
+          callId: this.opts.callId,
+          since: this.since,
+          count: signals.length,
+          types: signals.map(s => s.type),
+        });
         for (const s of signals) {
           this.since = s.createdAt;
           await this.handleSignal(s);
@@ -80,9 +111,13 @@ export class CallSession {
   private async handleSignal(s: SignalMsg) {
     if (!this.pc || this.ended) return;
     try {
-      // #region debug-point C:handle-signal
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"C",location:"src/lib/callSession.ts:handleSignal",msg:"[DEBUG] handleSignal",data:{role:this.opts.role,callId:this.opts.callId,type:s.type,fromRole:s.fromRole,createdAt:s.createdAt},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      this.reportDebug('C', 'src/lib/callSession.ts:handleSignal', '[DEBUG] handleSignal', {
+        role: this.opts.role,
+        callId: this.opts.callId,
+        type: s.type,
+        fromRole: s.fromRole,
+        createdAt: s.createdAt,
+      });
       if (s.type === 'offer') {
         await this.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(s.data)));
         const answer = await this.pc.createAnswer();
@@ -103,44 +138,76 @@ export class CallSession {
   async start() {
     this.ended = false;
     try {
-      // #region debug-point D:get-user-media-start
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"D",location:"src/lib/callSession.ts:start",msg:"[DEBUG] getUserMedia:start",data:{role:this.opts.role,callId:this.opts.callId,isOfferer:this.opts.isOfferer,customerId:this.opts.customerId||""},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      this.reportDebug('D', 'src/lib/callSession.ts:start', '[DEBUG] getUserMedia:start', {
+        role: this.opts.role,
+        callId: this.opts.callId,
+        isOfferer: this.opts.isOfferer,
+        customerId: this.opts.customerId || '',
+      });
       this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      // #region debug-point D:get-user-media-ok
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"D",location:"src/lib/callSession.ts:start",msg:"[DEBUG] getUserMedia:ok",data:{role:this.opts.role,callId:this.opts.callId,tracks:this.localStream.getAudioTracks().map(t=>({enabled:t.enabled,readyState:t.readyState,label:t.label}))},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      this.reportDebug('D', 'src/lib/callSession.ts:start', '[DEBUG] getUserMedia:ok', {
+        role: this.opts.role,
+        callId: this.opts.callId,
+        tracks: this.localStream.getAudioTracks().map(t => ({
+          enabled: t.enabled,
+          readyState: t.readyState,
+          label: t.label,
+        })),
+      });
     } catch {
-      // #region debug-point D:get-user-media-fail
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"D",location:"src/lib/callSession.ts:start",msg:"[DEBUG] getUserMedia:fail",data:{role:this.opts.role,callId:this.opts.callId},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      this.reportDebug('D', 'src/lib/callSession.ts:start', '[DEBUG] getUserMedia:fail', {
+        role: this.opts.role,
+        callId: this.opts.callId,
+      });
       this.opts.onState?.('failed');
       return;
     }
     const iceServers = await this.opts.getIceServers?.().catch(() => DEFAULT_ICE_SERVERS) || DEFAULT_ICE_SERVERS;
-    // #region debug-point A:ice-servers
-    fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"A",location:"src/lib/callSession.ts:start",msg:"[DEBUG] iceServers",data:{role:this.opts.role,callId:this.opts.callId,count:iceServers.length,servers:iceServers.map(s=>({urls:s.urls,hasUsername:!!s.username,hasCredential:!!s.credential}))},ts:Date.now()})}).catch(()=>{});
-    // #endregion
+    this.reportDebug('A', 'src/lib/callSession.ts:start', '[DEBUG] iceServers', {
+      role: this.opts.role,
+      callId: this.opts.callId,
+      count: iceServers.length,
+      servers: iceServers.map(s => ({
+        urls: s.urls,
+        hasUsername: !!s.username,
+        hasCredential: !!s.credential,
+      })),
+    });
     const pc = new RTCPeerConnection({ iceServers });
     this.pc = pc;
     this.localStream.getTracks().forEach(t => pc.addTrack(t, this.localStream!));
 
     pc.onicecandidate = (e) => {
-      // #region debug-point A:ice-candidate
-      if (e.candidate) fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"A",location:"src/lib/callSession.ts:onicecandidate",msg:"[DEBUG] onicecandidate",data:{role:this.opts.role,callId:this.opts.callId,type:e.candidate.type,protocol:e.candidate.protocol,address:e.candidate.address||"",candidate:e.candidate.candidate.slice(0,160)},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      if (e.candidate) {
+        this.reportDebug('A', 'src/lib/callSession.ts:onicecandidate', '[DEBUG] onicecandidate', {
+          role: this.opts.role,
+          callId: this.opts.callId,
+          type: e.candidate.type,
+          protocol: e.candidate.protocol,
+          address: e.candidate.address || '',
+          candidate: e.candidate.candidate.slice(0, 160),
+        });
+      }
       if (e.candidate) void this.sendSignal('candidate', JSON.stringify(e.candidate.toJSON()));
     };
     pc.ontrack = (e) => { this.opts.onRemoteStream?.(e.streams[0] || null); };
     pc.oniceconnectionstatechange = () => {
-      // #region debug-point D:ice-connection-state
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"D",location:"src/lib/callSession.ts:oniceconnectionstatechange",msg:"[DEBUG] iceConnectionState",data:{role:this.opts.role,callId:this.opts.callId,iceConnectionState:pc.iceConnectionState,iceGatheringState:pc.iceGatheringState,signalingState:pc.signalingState},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      this.reportDebug('D', 'src/lib/callSession.ts:oniceconnectionstatechange', '[DEBUG] iceConnectionState', {
+        role: this.opts.role,
+        callId: this.opts.callId,
+        iceConnectionState: pc.iceConnectionState,
+        iceGatheringState: pc.iceGatheringState,
+        signalingState: pc.signalingState,
+      });
     };
     pc.onconnectionstatechange = () => {
-      // #region debug-point D:connection-state
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"D",location:"src/lib/callSession.ts:onconnectionstatechange",msg:"[DEBUG] connectionState",data:{role:this.opts.role,callId:this.opts.callId,connectionState:pc.connectionState,iceConnectionState:pc.iceConnectionState,signalingState:pc.signalingState},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      this.reportDebug('D', 'src/lib/callSession.ts:onconnectionstatechange', '[DEBUG] connectionState', {
+        role: this.opts.role,
+        callId: this.opts.callId,
+        connectionState: pc.connectionState,
+        iceConnectionState: pc.iceConnectionState,
+        signalingState: pc.signalingState,
+      });
       if (pc.connectionState === 'connected') this.opts.onState?.('active');
       if (pc.connectionState === 'failed') this.opts.onState?.('failed');
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed') this.opts.onState?.('ended');
@@ -151,9 +218,12 @@ export class CallSession {
     if (this.opts.isOfferer) {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      // #region debug-point B:create-offer
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"B",location:"src/lib/callSession.ts:start",msg:"[DEBUG] createOffer",data:{role:this.opts.role,callId:this.opts.callId,type:offer.type,sdpLen:(offer.sdp||"").length},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      this.reportDebug('B', 'src/lib/callSession.ts:start', '[DEBUG] createOffer', {
+        role: this.opts.role,
+        callId: this.opts.callId,
+        type: offer.type,
+        sdpLen: (offer.sdp || '').length,
+      });
       await this.sendSignal('offer', JSON.stringify(offer));
     }
   }

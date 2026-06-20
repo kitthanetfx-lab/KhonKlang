@@ -108,15 +108,47 @@ export function SupportWidget() {
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
 
+  const reportDebug = useCallback((hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) => {
+    const send = (jwt: string) => fetch('/api/support/debug', {
+      method: 'POST',
+      headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'support-call-fail',
+        runId: 'pre-fix',
+        hypothesisId,
+        location,
+        msg,
+        data,
+        ts: Date.now(),
+        callId: threadRef.current?.callId || '',
+      }),
+    }).catch(() => null);
+    const jwt = jwtRef.current;
+    if (jwt) {
+      void send(jwt);
+      return;
+    }
+    void getJwt().then(send).catch(() => null);
+  }, [getJwt]);
+
   const getIceServers = useCallback(async () => {
     const jwt = jwtRef.current || await getJwt();
     const r = await fetch('/api/support/ice', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
-    // #region debug-point A:customer-ice-response
-    fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"A",location:"src/components/SupportWidget.tsx:getIceServers",msg:"[DEBUG] customer getIceServers",data:{ok:r.ok,status:r.status,count:Array.isArray(d.iceServers)?d.iceServers.length:-1,servers:Array.isArray(d.iceServers)?d.iceServers.map((s:RTCIceServer)=>({urls:s.urls,hasUsername:!!s.username,hasCredential:!!s.credential})):[]},ts:Date.now()})}).catch(()=>{});
-    // #endregion
+    reportDebug('A', 'src/components/SupportWidget.tsx:getIceServers', '[DEBUG] customer getIceServers', {
+      ok: r.ok,
+      status: r.status,
+      count: Array.isArray(d.iceServers) ? d.iceServers.length : -1,
+      servers: Array.isArray(d.iceServers)
+        ? d.iceServers.map((s: RTCIceServer) => ({
+          urls: s.urls,
+          hasUsername: !!s.username,
+          hasCredential: !!s.credential,
+        }))
+        : [],
+    });
     return Array.isArray(d.iceServers) ? d.iceServers : [];
-  }, [getJwt]);
+  }, [getJwt, reportDebug]);
 
   const callAction = useCallback(async (action: string) => {
     try {
@@ -126,14 +158,19 @@ export function SupportWidget() {
         body: JSON.stringify({ action }),
       });
       const d = await r.json().catch(() => ({}));
-      // #region debug-point B:customer-call-action
-      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"B",location:"src/components/SupportWidget.tsx:callAction",msg:"[DEBUG] customer callAction",data:{action,ok:r.ok,status:r.status,response:d,threadStatus:threadRef.current?.callStatus||"",threadCallId:threadRef.current?.callId||""},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+      reportDebug('B', 'src/components/SupportWidget.tsx:callAction', '[DEBUG] customer callAction', {
+        action,
+        ok: r.ok,
+        status: r.status,
+        response: d,
+        threadStatus: threadRef.current?.callStatus || '',
+        threadCallId: threadRef.current?.callId || '',
+      });
       void loadThread(open);
       return d as { callId?: string };
     } catch { /* แสดงผลรอบโพลถัดไป */ }
     return {};
-  }, [getJwt, loadThread, open]);
+  }, [getJwt, loadThread, open, reportDebug]);
 
   useEffect(() => {
     if (!callStartedAt) {
@@ -147,9 +184,14 @@ export function SupportWidget() {
   useEffect(() => {
     const status = thread?.callStatus;
     const callId = thread?.callId || '';
-    // #region debug-point B:customer-thread-state
-    if (status || callId) fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"B",location:"src/components/SupportWidget.tsx:useEffect",msg:"[DEBUG] customer thread state",data:{status,callId,handledCallId:handledCallIdRef.current,callState:callStateRef.current},ts:Date.now()})}).catch(()=>{});
-    // #endregion
+    if (status || callId) {
+      reportDebug('B', 'src/components/SupportWidget.tsx:useEffect', '[DEBUG] customer thread state', {
+        status,
+        callId,
+        handledCallId: handledCallIdRef.current,
+        callState: callStateRef.current,
+      });
+    }
     if (status === 'connecting' && callId && handledCallIdRef.current !== callId) {
       handledCallIdRef.current = callId;
       setCallStartedAt(null);
@@ -181,7 +223,7 @@ export function SupportWidget() {
       setCallStartedAt(null);
       setMuted(false);
     }
-  }, [thread?.callStatus, thread?.callId, getJwt, getIceServers, callAction]);
+  }, [thread?.callStatus, thread?.callId, getJwt, getIceServers, callAction, reportDebug]);
 
   useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 
