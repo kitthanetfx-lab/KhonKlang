@@ -29,7 +29,7 @@ async function logSystem(db: Databases, threadId: string, content: string) {
 
 /**
  * ฝั่งลูกค้า — ขอให้พนักงานโทรกลับ / ยกเลิกคำขอ / รับ-ปฏิเสธสายที่พนักงานโทรมา / วางสาย
- * action: 'request' | 'cancel' | 'answer' | 'decline' | 'hangup'
+ * action: 'request' | 'cancel' | 'answer' | 'active' | 'decline' | 'hangup'
  */
 export async function POST(req: NextRequest) {
   try {
@@ -65,8 +65,14 @@ export async function POST(req: NextRequest) {
 
     if (action === 'answer') {
       if (thread.callStatus !== 'staff_ringing') return NextResponse.json({ error: 'ไม่มีสายเข้า' }, { status: 409 });
+      await db.updateDocument(DB_ID, COL_THREADS, me.$id, { callStatus: 'connecting', callUpdatedAt: now, updatedAt: now });
+      await logSystem(db, me.$id, 'ลูกค้ารับสายแล้ว — กำลังเชื่อมต่อเสียง');
+      return NextResponse.json({ ok: true, callId: thread.callId, callStatus: 'connecting' });
+    }
+
+    if (action === 'active') {
+      if (!['connecting', 'staff_ringing', 'active'].includes(thread.callStatus)) return NextResponse.json({ ok: true });
       await db.updateDocument(DB_ID, COL_THREADS, me.$id, { callStatus: 'active', callUpdatedAt: now, updatedAt: now });
-      await logSystem(db, me.$id, 'ลูกค้ารับสายแล้ว');
       return NextResponse.json({ ok: true, callId: thread.callId, callStatus: 'active' });
     }
 

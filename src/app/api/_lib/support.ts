@@ -1,5 +1,6 @@
 // Shared helpers — ระบบแชทศูนย์ช่วยเหลือ (customer care) + คำขอโทร
 // รูปแบบเดียวกับ dm/route.ts และ _lib/notify.ts: สร้างคอลเลกชันแบบ lazy ครั้งแรกที่ใช้งาน
+import { createHmac } from 'crypto';
 import { Databases, DatabasesIndexType, OrderBy, Permission, Role, Query } from 'node-appwrite';
 
 export const DB_ID = 'khonklang_db';
@@ -216,6 +217,37 @@ export async function getOrCreateThread(db: Databases, customerId: string, custo
 
 export function newCallId() {
   return `call_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function splitCsv(value?: string | null) {
+  return String(value || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+export function buildSupportIceServers(identity: string): RTCIceServer[] {
+  const stunUrls = splitCsv(process.env.WEBRTC_STUN_URLS) || [];
+  const turnUrls = splitCsv(process.env.WEBRTC_TURN_URLS);
+  const servers: RTCIceServer[] = [
+    { urls: stunUrls.length ? stunUrls : ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  ];
+  if (!turnUrls.length) return servers;
+
+  const turnSecret = String(process.env.WEBRTC_TURN_SECRET || '').trim();
+  if (turnSecret) {
+    const ttlSec = Math.max(300, Number(process.env.WEBRTC_TURN_TTL_SECONDS || 3600) || 3600);
+    const expires = Math.floor(Date.now() / 1000) + ttlSec;
+    const username = `${expires}:${identity || 'support'}`;
+    const credential = createHmac('sha1', turnSecret).update(username).digest('base64');
+    servers.push({ urls: turnUrls, username, credential });
+    return servers;
+  }
+
+  const username = String(process.env.WEBRTC_TURN_USERNAME || '').trim();
+  const credential = String(process.env.WEBRTC_TURN_CREDENTIAL || '').trim();
+  if (username && credential) servers.push({ urls: turnUrls, username, credential });
+  return servers;
 }
 
 export async function listSignalsSince(db: Databases, callId: string, sinceIso: string) {

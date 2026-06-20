@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { account } from '@/lib/appwrite';
 import { compressImage } from '@/lib/imageCompress';
 import { Icon } from './Icon';
+import { CallSession, type CallSessionState } from '@/lib/callSession';
 
 interface SupportMsg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string; pending?: boolean }
 interface SupportThread {
@@ -30,14 +31,20 @@ export function SupportWidget() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [callState, setCallState] = useState<CallSessionState | null>(null);
+  const [muted, setMuted] = useState(false);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const [nowTs, setNowTs] = useState(() => Date.now());
 
   const panelRef = useRef<HTMLDivElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sessionRef = useRef<CallSession | null>(null);
   const jwtRef = useRef('');
+  const handledCallIdRef = useRef('');
 
   const getJwt = useCallback(async () => {
     const j = (await account.createJWT()).jwt;
@@ -92,11 +99,30 @@ export function SupportWidget() {
 
   const unread = !!thread?.unreadCustomer;
   const ringing = thread?.callStatus === 'staff_ringing';
-  const callStartedAtRaw = thread?.callStatus === 'active' && thread.callUpdatedAt ? Date.parse(thread.callUpdatedAt) : Number.NaN;
-  const callStartedAt = Number.isFinite(callStartedAtRaw) ? callStartedAtRaw : null;
   const elapsed = callStartedAt ? Math.max(0, Math.floor((nowTs - callStartedAt) / 1000)) : 0;
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
+
+  const getIceServers = useCallback(async () => {
+    const jwt = jwtRef.current || await getJwt();
+    const r = await fetch('/api/support/ice', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+    const d = await r.json().catch(() => ({}));
+    return Array.isArray(d.iceServers) ? d.iceServers : [];
+  }, [getJwt]);
+
+  const callAction = useCallback(async (action: string) => {
+    try {
+      const jwt = jwtRef.current || await getJwt();
+      const r = await fetch('/api/support/call', {
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
+        body: JSON.stringify({ action }),
+      });
+      const d = await r.json().catch(() => ({}));
+      void loadThread(open);
+      return d as { callId?: string };
+    } catch { /* แสดงผลรอบโพลถัดไป */ }
+    return {};
+  }, [getJwt, loadThread, open]);
 
   useEffect(() => {
     if (!callStartedAt) {
@@ -106,6 +132,44 @@ export function SupportWidget() {
     const iv = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(iv);
   }, [callStartedAt]);
+
+  useEffect(() => {
+    const status = thread?.callStatus;
+    const callId = thread?.callId || '';
+    if (status === 'connecting' && callId && handledCallIdRef.current !== callId) {
+      handledCallIdRef.current = callId;
+      setCallStartedAt(null);
+      const session = new CallSession({
+        role: 'customer',
+        isOfferer: false,
+        callId,
+        signalUrl: '/api/support/signal',
+        getJwt,
+        getIceServers,
+        onState: (s) => {
+          setCallState(s);
+          if (s === 'active') {
+            setCallStartedAt(Date.now());
+            void callAction('active');
+          }
+          if (s === 'failed') void callAction('hangup');
+        },
+        onRemoteStream: (stream) => { if (audioRef.current) audioRef.current.srcObject = stream; },
+      });
+      sessionRef.current = session;
+      void session.start();
+    }
+    if ((status === 'idle' || status === 'ended' || !status) && sessionRef.current) {
+      sessionRef.current.stop(false);
+      sessionRef.current = null;
+      handledCallIdRef.current = '';
+      setCallState(null);
+      setCallStartedAt(null);
+      setMuted(false);
+    }
+  }, [thread?.callStatus, thread?.callId, getJwt, getIceServers, callAction]);
+
+  useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 
   async function send() {
     const content = input.trim();
@@ -172,25 +236,10 @@ export function SupportWidget() {
     } finally { setUploading(false); }
   }
 
-  async function callAction(action: string) {
-    try {
-      const jwt = jwtRef.current || await getJwt();
-      const r = await fetch('/api/support/call', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
-        body: JSON.stringify({ action }),
-      });
-      const d = await r.json().catch(() => ({}));
-      void loadThread(open);
-      return d as { callId?: string };
-    } catch { /* แสดงผลรอบโพลถัดไป */ }
-    return {};
-  }
-
-  function openCallWindow(callId: string) {
-    if (!callId) return;
-    const url = `/support-call/${encodeURIComponent(callId)}?role=customer`;
-    const w = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!w) window.location.href = url;
+  function toggleMute() {
+    const next = !muted;
+    setMuted(next);
+    sessionRef.current?.setMuted(next);
   }
 
   // ไม่แสดงในหลังบ้านแอดมิน — แอดมินมีแดชบอร์ดแชทของตัวเองแล้ว
@@ -198,6 +247,7 @@ export function SupportWidget() {
 
   return (
     <>
+      <audio ref={audioRef} autoPlay />
       <div className="sw-wrap">
         {open && (
           <div className="sw-panel" role="dialog" aria-modal="false" aria-label="แชทกับทีมงาน" ref={panelRef}>
@@ -231,22 +281,24 @@ export function SupportWidget() {
                   <div className="sw-callbar ring" role="alert">
                     <span><Icon name="phone" size={16} /> พนักงาน{thread?.callStaffName ? ` ${thread.callStaffName}` : ''}กำลังโทรเข้า</span>
                     <span className="sw-callbtns">
-                      <button type="button" className="sw-roundbtn accept" onClick={async () => { const d = await callAction('answer'); openCallWindow(String(d.callId || thread?.callId || '')); }} aria-label="รับสาย"><Icon name="phoneCall" size={18} /></button>
+                      <button type="button" className="sw-roundbtn accept" onClick={() => callAction('answer')} aria-label="รับสาย"><Icon name="phoneCall" size={18} /></button>
                       <button type="button" className="sw-roundbtn decline" onClick={() => callAction('decline')} aria-label="ปฏิเสธสาย"><Icon name="phoneOff" size={18} /></button>
                     </span>
                   </div>
                 )}
                 {thread?.callStatus === 'connecting' && (
                   <div className="sw-callbar active" role="status">
-                    <span><Icon name="phone" size={16} /> กำลังเตรียมห้องสนทนาเสียง…</span>
+                    <span><Icon name="phone" size={16} /> {callState === 'failed' ? 'เชื่อมต่อไม่สำเร็จ' : 'กำลังเชื่อมต่อสาย…'}</span>
                     <button type="button" className="sw-roundbtn decline" onClick={() => callAction('hangup')} aria-label="วางสาย"><Icon name="phoneOff" size={18} /></button>
                   </div>
                 )}
-                {thread?.callStatus === 'active' && (
+                {(thread?.callStatus === 'active' || callState === 'active') && (
                   <div className="sw-callbar active" role="status">
                     <span><Icon name="phone" size={16} /> สายกำลังคุยอยู่ · {mm}:{ss}</span>
                     <span className="sw-callbtns">
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => openCallWindow(thread?.callId || '')}>เปิดหน้าสาย</button>
+                      <button type="button" className={`sw-roundbtn ${muted ? 'on' : ''}`} onClick={toggleMute} aria-label={muted ? 'เปิดไมค์' : 'ปิดไมค์'}>
+                        <Icon name={muted ? 'micOff' : 'mic'} size={16} />
+                      </button>
                       <button type="button" className="sw-roundbtn decline" onClick={() => callAction('hangup')} aria-label="วางสาย"><Icon name="phoneOff" size={18} /></button>
                     </span>
                   </div>

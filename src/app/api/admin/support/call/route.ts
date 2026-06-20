@@ -24,7 +24,7 @@ async function logSystem(db: Databases, threadId: string, content: string) {
 
 /**
  * ฝั่งพนักงาน — โทรออกตรง / อนุมัติ-ปฏิเสธคำขอของลูกค้า / วางสาย
- * action: 'call' | 'approve' | 'decline' | 'hangup'
+ * action: 'call' | 'approve' | 'active' | 'decline' | 'hangup'
  * เงื่อนไข: พนักงานคนใดก็ได้กดรับคำขอได้ (เผื่อพนักงานคนอื่นไม่อยู่/ติดสาย)
  */
 export async function POST(req: NextRequest) {
@@ -62,6 +62,14 @@ export async function POST(req: NextRequest) {
       });
       await logSystem(db, customerId, `พนักงาน ${staffName} รับคำขอโทรกลับและกำลังเปิดห้องสนทนาเสียง`);
       return NextResponse.json({ ok: true, callId: thread.callId, callStatus: 'staff_ringing' });
+    }
+
+    if (action === 'active') {
+      if (!['connecting', 'staff_ringing', 'active'].includes(thread.callStatus)) return NextResponse.json({ ok: true });
+      await db.updateDocument(DB_ID, COL_THREADS, customerId, {
+        callStatus: 'active', callStaffId: staffId, callStaffName: staffName, callUpdatedAt: now, updatedAt: now,
+      });
+      return NextResponse.json({ ok: true, callId: thread.callId, callStatus: 'active' });
     }
 
     if (action === 'decline') {

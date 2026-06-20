@@ -23,11 +23,12 @@ interface CallSessionOpts {
   /** ต้องระบุเมื่อ role==='staff' เพื่อบอกว่ากำลังคุยกับลูกค้าคนไหน */
   customerId?: string;
   getJwt: () => Promise<string>;
+  getIceServers?: () => Promise<RTCIceServer[]>;
   onState?: (s: CallSessionState) => void;
   onRemoteStream?: (stream: MediaStream | null) => void;
 }
 
-const ICE_SERVERS: RTCIceServer[] = [
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
@@ -98,7 +99,8 @@ export class CallSession {
       this.opts.onState?.('failed');
       return;
     }
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const iceServers = await this.opts.getIceServers?.().catch(() => DEFAULT_ICE_SERVERS) || DEFAULT_ICE_SERVERS;
+    const pc = new RTCPeerConnection({ iceServers });
     this.pc = pc;
     this.localStream.getTracks().forEach(t => pc.addTrack(t, this.localStream!));
 

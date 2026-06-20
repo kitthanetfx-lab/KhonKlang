@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import { account } from '@/lib/appwrite';
 import { compressImage } from '@/lib/imageCompress';
 import {
-  MessageCircle, Phone, PhoneOff, PhoneCall, Send,
+  MessageCircle, Phone, PhoneOff, PhoneCall, Mic, MicOff, Send,
   Loader2, User, Search, Inbox, Image as ImageIcon,
 } from 'lucide-react';
+import { CallSession, type CallSessionState } from '@/lib/callSession';
 
 type CallStatus = 'idle' | 'customer_requesting' | 'staff_ringing' | 'connecting' | 'active' | 'ended';
 
@@ -37,11 +38,17 @@ export default function AdminSupportPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [callState, setCallState] = useState<CallSessionState | null>(null);
+  const [muted, setMuted] = useState(false);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const [nowTs, setNowTs] = useState(() => Date.now());
 
   const jwtRef = useRef('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sessionRef = useRef<CallSession | null>(null);
+  const handledCallIdRef = useRef('');
   const selectedRef = useRef('');
   useEffect(() => { selectedRef.current = selected; }, [selected]);
 
@@ -98,12 +105,32 @@ export default function AdminSupportPage() {
 
   const filtered = (threads || []).filter(t =>
     !search.trim() || t.customerName.toLowerCase().includes(search.trim().toLowerCase()));
-  const callStartedAtRaw = thread?.callStatus === 'active' && thread.callUpdatedAt ? Date.parse(thread.callUpdatedAt) : Number.NaN;
-  const callStartedAt = Number.isFinite(callStartedAtRaw) ? callStartedAtRaw : null;
   const elapsed = callStartedAt ? Math.max(0, Math.floor((nowTs - callStartedAt) / 1000)) : 0;
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
   const callStatus = thread?.callStatus;
+
+  const getIceServers = useCallback(async () => {
+    const jwt = jwtRef.current || await getJwt();
+    const r = await fetch('/api/admin/support/ice', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+    const d = await r.json().catch(() => ({}));
+    return Array.isArray(d.iceServers) ? d.iceServers : [];
+  }, [getJwt]);
+
+  const callAction = useCallback(async (action: string) => {
+    if (!selected) return;
+    try {
+      const jwt = jwtRef.current || await getJwt();
+      const r = await fetch('/api/admin/support/call', {
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
+        body: JSON.stringify({ customerId: selected, action }),
+      });
+      const d = await r.json().catch(() => ({}));
+      void loadThread(selected);
+      return d as { callId?: string };
+    } catch { /* แสดงผลรอบโพลถัดไป */ }
+    return {};
+  }, [getJwt, loadThread, selected]);
 
   useEffect(() => {
     if (!callStartedAt) {
@@ -113,6 +140,46 @@ export default function AdminSupportPage() {
     const iv = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(iv);
   }, [callStartedAt]);
+
+  useEffect(() => {
+    const status = thread?.callStatus;
+    const callId = thread?.callId || '';
+    const customerId = selected;
+    if (status === 'connecting' && callId && customerId && handledCallIdRef.current !== callId) {
+      handledCallIdRef.current = callId;
+      setCallStartedAt(null);
+      const session = new CallSession({
+        role: 'staff',
+        isOfferer: true,
+        callId,
+        customerId,
+        signalUrl: '/api/admin/support/signal',
+        getJwt,
+        getIceServers,
+        onState: (s) => {
+          setCallState(s);
+          if (s === 'active') {
+            setCallStartedAt(Date.now());
+            void callAction('active');
+          }
+          if (s === 'failed') void callAction('hangup');
+        },
+        onRemoteStream: (stream) => { if (audioRef.current) audioRef.current.srcObject = stream; },
+      });
+      sessionRef.current = session;
+      void session.start();
+    }
+    if ((status === 'idle' || status === 'ended' || !status) && sessionRef.current) {
+      sessionRef.current.stop(false);
+      sessionRef.current = null;
+      handledCallIdRef.current = '';
+      setCallState(null);
+      setCallStartedAt(null);
+      setMuted(false);
+    }
+  }, [thread?.callStatus, thread?.callId, selected, getJwt, getIceServers, callAction]);
+
+  useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 
   async function send() {
     const content = input.trim();
@@ -181,30 +248,15 @@ export default function AdminSupportPage() {
     } finally { setUploading(false); }
   }
 
-  async function callAction(action: string) {
-    if (!selected) return;
-    try {
-      const jwt = jwtRef.current || await getJwt();
-      const r = await fetch('/api/admin/support/call', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
-        body: JSON.stringify({ customerId: selected, action }),
-      });
-      const d = await r.json().catch(() => ({}));
-      void loadThread(selected);
-      return d as { callId?: string };
-    } catch { /* แสดงผลรอบโพลถัดไป */ }
-    return {};
-  }
-
-  function openCallWindow(callId: string, customerId: string) {
-    if (!callId || !customerId) return;
-    const url = `/support-call/${encodeURIComponent(callId)}?role=staff&customerId=${encodeURIComponent(customerId)}`;
-    const w = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!w) window.location.href = url;
+  function toggleMute() {
+    const next = !muted;
+    setMuted(next);
+    sessionRef.current?.setMuted(next);
   }
 
   return (
     <div className="h-full flex flex-col">
+      <audio ref={audioRef} autoPlay />
       <div className="flex items-center gap-2 mb-1">
         <MessageCircle size={22} className="text-blue-500" />
         <h1 className="text-xl font-bold">แชทลูกค้า</h1>
@@ -279,7 +331,7 @@ export default function AdminSupportPage() {
                   <p className="text-xs text-gray-400">{thread?.assignedStaffName ? `ดูแลโดย ${thread.assignedStaffName}` : 'ยังไม่มีพนักงานรับเรื่อง'}</p>
                 </div>
                 {(!callStatus || callStatus === 'idle' || callStatus === 'ended') && (
-                  <button type="button" onClick={async () => { const d = await callAction('call'); openCallWindow(String(d?.callId || thread?.callId || ''), selected); }}
+                  <button type="button" onClick={() => { void callAction('call'); }}
                     className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
                     <Phone size={16} /> โทรออก
                   </button>
@@ -291,7 +343,7 @@ export default function AdminSupportPage() {
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 text-sm font-medium" role="alert">
                   <span className="flex items-center gap-2"><PhoneCall size={16} /> ลูกค้าขอให้โทรกลับ</span>
                   <span className="flex gap-2">
-                    <button type="button" onClick={async () => { const d = await callAction('approve'); openCallWindow(String(d?.callId || thread?.callId || ''), selected); }} aria-label="รับคำขอโทร"
+                    <button type="button" onClick={() => { void callAction('approve'); }} aria-label="รับคำขอโทร"
                       className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-green-600 text-white flex items-center justify-center hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
                       <Phone size={17} />
                     </button>
@@ -305,29 +357,29 @@ export default function AdminSupportPage() {
               {callStatus === 'staff_ringing' && (
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium" role="status">
                   <span className="flex items-center gap-2"><Phone size={16} /> กำลังรอลูกค้ารับสาย…</span>
-                  <span className="flex gap-2">
-                    <button type="button" onClick={() => openCallWindow(thread?.callId || '', selected)} className="px-3 py-2 rounded-xl bg-white/80 dark:bg-gray-900/50 border border-blue-200 dark:border-blue-700">เปิดหน้าสาย</button>
-                    <button type="button" onClick={() => callAction('hangup')} aria-label="ยกเลิกการโทร"
-                      className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">
-                      <PhoneOff size={17} />
-                    </button>
-                  </span>
+                  <button type="button" onClick={() => callAction('hangup')} aria-label="ยกเลิกการโทร"
+                    className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">
+                    <PhoneOff size={17} />
+                  </button>
                 </div>
               )}
               {callStatus === 'connecting' && (
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium" role="status">
-                  <span className="flex items-center gap-2"><Phone size={16} /> กำลังเตรียมห้องสนทนาเสียง…</span>
+                  <span className="flex items-center gap-2"><Phone size={16} /> {callState === 'failed' ? 'เชื่อมต่อไม่สำเร็จ' : 'กำลังเชื่อมต่อสาย…'}</span>
                   <button type="button" onClick={() => callAction('hangup')} aria-label="วางสาย"
                     className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">
                     <PhoneOff size={17} />
                   </button>
                 </div>
               )}
-              {callStatus === 'active' && (
+              {(callStatus === 'active' || callState === 'active') && (
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-sm font-medium" role="status">
                   <span className="flex items-center gap-2"><Phone size={16} /> สายกำลังคุยอยู่ · {mm}:{ss}</span>
                   <span className="flex gap-2">
-                    <button type="button" onClick={() => openCallWindow(thread?.callId || '', selected)} className="px-3 py-2 rounded-xl bg-white/80 dark:bg-gray-900/50 border border-green-200 dark:border-green-700">เปิดหน้าสาย</button>
+                    <button type="button" onClick={toggleMute} aria-label={muted ? 'เปิดไมค์' : 'ปิดไมค์'}
+                      className={`w-10 h-10 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${muted ? 'bg-gray-700 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'}`}>
+                      {muted ? <MicOff size={16} /> : <Mic size={16} />}
+                    </button>
                     <button type="button" onClick={() => callAction('hangup')} aria-label="วางสาย"
                       className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">
                       <PhoneOff size={17} />
