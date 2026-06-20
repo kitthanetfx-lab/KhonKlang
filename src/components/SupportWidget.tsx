@@ -45,6 +45,11 @@ export function SupportWidget() {
   const sessionRef = useRef<CallSession | null>(null);
   const jwtRef = useRef('');
   const handledCallIdRef = useRef('');
+  const threadRef = useRef<SupportThread | null>(null);
+  const callStateRef = useRef<CallSessionState | null>(null);
+
+  useEffect(() => { threadRef.current = thread; }, [thread]);
+  useEffect(() => { callStateRef.current = callState; }, [callState]);
 
   const getJwt = useCallback(async () => {
     const j = (await account.createJWT()).jwt;
@@ -107,6 +112,9 @@ export function SupportWidget() {
     const jwt = jwtRef.current || await getJwt();
     const r = await fetch('/api/support/ice', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
+    // #region debug-point A:customer-ice-response
+    fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"A",location:"src/components/SupportWidget.tsx:getIceServers",msg:"[DEBUG] customer getIceServers",data:{ok:r.ok,status:r.status,count:Array.isArray(d.iceServers)?d.iceServers.length:-1,servers:Array.isArray(d.iceServers)?d.iceServers.map((s:RTCIceServer)=>({urls:s.urls,hasUsername:!!s.username,hasCredential:!!s.credential})):[]},ts:Date.now()})}).catch(()=>{});
+    // #endregion
     return Array.isArray(d.iceServers) ? d.iceServers : [];
   }, [getJwt]);
 
@@ -118,6 +126,9 @@ export function SupportWidget() {
         body: JSON.stringify({ action }),
       });
       const d = await r.json().catch(() => ({}));
+      // #region debug-point B:customer-call-action
+      fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"B",location:"src/components/SupportWidget.tsx:callAction",msg:"[DEBUG] customer callAction",data:{action,ok:r.ok,status:r.status,response:d,threadStatus:threadRef.current?.callStatus||"",threadCallId:threadRef.current?.callId||""},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       void loadThread(open);
       return d as { callId?: string };
     } catch { /* แสดงผลรอบโพลถัดไป */ }
@@ -136,6 +147,9 @@ export function SupportWidget() {
   useEffect(() => {
     const status = thread?.callStatus;
     const callId = thread?.callId || '';
+    // #region debug-point B:customer-thread-state
+    if (status || callId) fetch("http://192.168.1.38:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"support-call-fail",runId:"pre-fix",hypothesisId:"B",location:"src/components/SupportWidget.tsx:useEffect",msg:"[DEBUG] customer thread state",data:{status,callId,handledCallId:handledCallIdRef.current,callState:callStateRef.current},ts:Date.now()})}).catch(()=>{});
+    // #endregion
     if (status === 'connecting' && callId && handledCallIdRef.current !== callId) {
       handledCallIdRef.current = callId;
       setCallStartedAt(null);
