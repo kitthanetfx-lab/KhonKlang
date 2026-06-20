@@ -45,7 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-        <p className="text-gray-400 animate-pulse text-sm">กำลังตรวจสอบสิทธิ์...</p>
+        <p className="text-gray-500 animate-pulse text-base font-medium">กำลังตรวจสอบสิทธิ์...</p>
       </div>
     );
   }
@@ -57,14 +57,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
 
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-56 flex flex-col
+        fixed inset-y-0 left-0 z-50 w-60 flex flex-col
         bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
         transition-transform duration-200
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:relative lg:translate-x-0
       `}>
         <div className="h-14 flex items-center px-5 border-b border-gray-200 dark:border-gray-800 shrink-0">
-          <span className="font-bold text-base tracking-tight">🛡️ คนกลาง Admin</span>
+          <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">🛡️ คนกลาง Admin</span>
         </div>
 
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
@@ -73,10 +73,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             return (
               <Link key={n.href} href={n.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
+                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-[15px] font-semibold tracking-[-0.01em] transition-all
                   ${isActive
                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                   }`}>
                 <n.icon className="w-4.5 h-4.5 shrink-0" size={18} />
                 {n.label}
@@ -91,8 +91,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {adminName[0]?.toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{adminName}</p>
-              <p className="text-xs text-gray-400">Admin</p>
+              <p className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">{adminName}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Admin</p>
             </div>
             <button
               onClick={async () => {
@@ -105,7 +105,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   router.push('/login');
                 }
               }}
-              className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
+              className="p-1.5 text-gray-500 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
               <LogOut size={15} />
             </button>
           </div>
@@ -124,30 +124,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Menu size={20} />
           </button>
 
-          <nav className="flex items-center gap-1.5 text-sm min-w-0">
-            <Link href="/admin" className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors shrink-0">
+          <nav className="flex items-center gap-1.5 text-[15px] min-w-0">
+            <Link href="/admin" className="text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors shrink-0 font-medium">
               Admin
             </Link>
             {pathname !== '/admin' && (
               <>
                 <ChevronRight size={14} className="text-gray-300 shrink-0" />
-                <span className="font-medium text-gray-800 dark:text-gray-100 truncate">{activeLabel}</span>
+                <span className="font-semibold text-gray-900 dark:text-white truncate">{activeLabel}</span>
               </>
             )}
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
             <Link href="/" target="_blank"
-              className="text-xs text-gray-400 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
+              className="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
               ดูหน้าเว็บ ↗
             </Link>
             <button className="relative p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" aria-label="การแจ้งเตือน">
-              <Bell size={18} className="text-gray-400" />
+              <Bell size={18} className="text-gray-500" />
             </button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-5">
+        <main className="flex-1 overflow-auto p-6">
           {children}
         </main>
       </div>
