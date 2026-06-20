@@ -1,11 +1,12 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Icon } from '@/components/Icon';
 import { Nav, Footer, CountUp, useReveal, useTilt } from '@/components/Site';
 import { EscrowStage } from '@/components/EscrowStage';
 import { ServiceSlider } from '@/components/ServiceSlider';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 interface SiteStats {
   completedDeals: number; protectedValue: number; middlemen: number; satisfaction: number; reviewCount: number;
@@ -68,7 +69,7 @@ function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: 
   );
 }
 
-function Hero({ stats }: { stats: SiteStats | null }) {
+function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnType<typeof useServiceControls> }) {
   const { ref: stageTiltRef, onMouseLeave, onMouseMove } = useTilt(7);
   const hasReviews = !!stats && stats.reviewCount > 0;
   const avgStars = hasReviews ? Math.round((stats!.satisfaction / 20) * 10) / 10 : 0;
@@ -97,7 +98,13 @@ function Hero({ stats }: { stats: SiteStats | null }) {
             คนกลางพักเงินของคุณไว้กับระบบจนกว่าจะได้รับสินค้าจริง — ครอบคลุมตั้งแต่มือถือ แบรนด์เนม รถมือสอง ไอดีเกม ของสะสม ไปจนถึงเหมาสวนและสั่งผลิตโรงงาน
           </p>
           <div className="hero-cta reveal" style={{ ['--d' as string]: '180ms' }}>
-            <Link className="btn btn-primary btn-lg" href="/service/trade">เริ่มสร้างดีล <Icon name="arrowRight" size={18} /></Link>
+            {controls.isEnabled('tradeOnline') || controls.isEnabled('tradeSimple') ? (
+              <Link className="btn btn-primary btn-lg" href="/service/trade">เริ่มสร้างดีล <Icon name="arrowRight" size={18} /></Link>
+            ) : (
+              <button className="btn btn-primary btn-lg" type="button" disabled title={controls.message('tradeOnline')}>
+                บริการซื้อขายปิดชั่วคราว
+              </button>
+            )}
             <Link className="btn btn-ghost btn-lg" href="/marketplace"><Icon name="store" size={18} /> ดูตลาด</Link>
           </div>
           <div className="hero-trust reveal" style={{ ['--d' as string]: '240ms' }}>
@@ -126,6 +133,7 @@ export default function HomePage() {
   useReveal();
   const stats = useSiteStats();
   const statItems = buildStatItems(stats);
+  const controls = useServiceControls();
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0');
@@ -136,7 +144,7 @@ export default function HomePage() {
   return (
     <>
       <Nav active="home" />
-      <Hero stats={stats} />
+      <Hero stats={stats} controls={controls} />
 
       <section className="stats-band">
         <div className="container stats-grid">
@@ -205,13 +213,21 @@ export default function HomePage() {
               <span className="icon-tile"><Icon name="users" /></span>
               <h3>เปิดร้านในฐานะผู้ขาย</h3>
               <p>เพิ่มความน่าเชื่อถือด้วยตราการันตี ปิดการขายได้ง่ายขึ้น และเบิกเงินไว</p>
-              <Link className="btn btn-dark" href="/register/seller">สมัครเป็นผู้ขาย <Icon name="arrowRight" size={16} /></Link>
+              {controls.isEnabled('sellerRegistration') ? (
+                <Link className="btn btn-dark" href="/register/seller">สมัครเป็นผู้ขาย <Icon name="arrowRight" size={16} /></Link>
+              ) : (
+                <button className="btn btn-dark" type="button" disabled title={controls.message('sellerRegistration')}>สมัครเป็นผู้ขายปิดชั่วคราว</button>
+              )}
             </div>
             <div className="join-card green reveal" style={{ ['--d' as string]: '90ms' }}>
               <span className="icon-tile green"><Icon name="handCoins" /></span>
               <h3>สร้างรายได้เป็นคนกลาง</h3>
               <p>ใช้ความน่าเชื่อถือของคุณรับงานคนกลาง รับค่าธรรมเนียมจากทุกดีลที่สำเร็จ</p>
-              <Link className="btn btn-dark" href="/register/middleman">สมัครเป็นคนกลาง <Icon name="arrowRight" size={16} /></Link>
+              {controls.isEnabled('middlemanRegistration') ? (
+                <Link className="btn btn-dark" href="/register/middleman">สมัครเป็นคนกลาง <Icon name="arrowRight" size={16} /></Link>
+              ) : (
+                <button className="btn btn-dark" type="button" disabled title={controls.message('middlemanRegistration')}>สมัครเป็นคนกลางปิดชั่วคราว</button>
+              )}
             </div>
           </div>
         </div>

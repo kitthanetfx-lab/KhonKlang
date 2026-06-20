@@ -11,6 +11,8 @@ import {
 import { account } from '@/lib/appwrite';
 import { uploadKycFiles } from '@/lib/uploadKyc';
 import { FileUpload } from '@/components/FileUpload';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -96,6 +98,7 @@ function StepIndicator({ current }: { current: number }) {
 
 function MiddlemanForm() {
   const router = useRouter();
+  const controls = useServiceControls();
 
   const [step, setStep]       = useState(1);
   const [loading, setLoading] = useState(true);
@@ -104,6 +107,10 @@ function MiddlemanForm() {
   const [error, setError]     = useState('');
   const [done, setDone]       = useState(false);
   const [copied, setCopied]   = useState<'acct' | 'pp' | null>(null);
+
+  if (!controls.loading && !controls.isEnabled('middlemanRegistration')) {
+    return <ServiceDisabledNotice title="สมัครเป็นคนกลาง" message={controls.message('middlemanRegistration')} backHref="/register" backLabel="กลับไปหน้าเลือกประเภท" />;
+  }
 
   const [displayName, setDisplayName]         = useState('');
   const [oauthEmail, setOauthEmail]           = useState('');

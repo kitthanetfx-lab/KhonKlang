@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { Icon } from './Icon';
+import { ServiceControlKey } from '@/lib/serviceControls';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 interface Slide { key: string; tint: string; icon: string; tag: string; pain: string; title: string; solution: string; benefits: string[]; forWho: string; cta: string; href: string; }
 
@@ -70,12 +72,20 @@ const SS_SLIDES: Slide[] = [
     cta: 'ตรวจสอบคนโกง', href: '/check-scam' },
 ];
 
+const SERVICE_KEYS_BY_SLIDE: Partial<Record<Slide['key'], ServiceControlKey>> = {
+  escrow: 'tradeOnline',
+  meet: 'meetupGuarantee',
+  consign: 'consign',
+  onsite: 'onsite',
+};
+
 export function ServiceSlider({ stats = null }: { stats?: SliderStats | null }) {
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
   const n = SS_SLIDES.length;
   const drag = useRef({ active: false, x0: 0, dx: 0 });
   const [dx, setDx] = useState(0);
+  const controls = useServiceControls();
 
   const go = useCallback((d: number) => setI(p => (p + d + n) % n), [n]);
   const to = useCallback((idx: number) => setI(((idx % n) + n) % n), [n]);
@@ -104,6 +114,8 @@ export function ServiceSlider({ stats = null }: { stats?: SliderStats | null }) 
           <div className="ss-track" style={{ transform: `translateX(calc(${-i * 100}% + ${dx}px))` }}>
             {SS_SLIDES.map((sl) => {
               const st = realStat(sl.key, stats);
+              const serviceKey = SERVICE_KEYS_BY_SLIDE[sl.key];
+              const enabled = serviceKey ? controls.isEnabled(serviceKey) : true;
               return (
               <article key={sl.key} className={`ss-slide tint-${sl.tint}`}>
                 <div className="ss-copy">
@@ -120,7 +132,13 @@ export function ServiceSlider({ stats = null }: { stats?: SliderStats | null }) 
                     </div>
                   </div>
                   <p className="ss-sol">{sl.solution}</p>
-                  <Link className="btn btn-primary" href={sl.href}>{sl.cta} <Icon name="arrowRight" size={17} /></Link>
+                  {enabled ? (
+                    <Link className="btn btn-primary" href={sl.href}>{sl.cta} <Icon name="arrowRight" size={17} /></Link>
+                  ) : (
+                    <button className="btn btn-primary" type="button" disabled title={serviceKey ? controls.message(serviceKey) : ''}>
+                      ปิดชั่วคราว
+                    </button>
+                  )}
                 </div>
                 <div className="ss-panel">
                   <div className="ss-panel-glow" />

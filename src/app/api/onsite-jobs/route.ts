@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, DatabasesIndexType, ID, OrderBy, Permission, Role, Query } from 'node-appwrite';
+import { readServiceControlsConfig } from '../_lib/appConfig';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'onsite_jobs';
@@ -104,6 +105,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
 
     const db = adminDb();
+    const services = await readServiceControlsConfig(db);
+    if (!services.onsite.enabled) {
+      return NextResponse.json({ error: services.onsite.note || 'บริการนัดออนไซต์ถูกปิดชั่วคราว' }, { status: 403 });
+    }
     await ensureCol(db);
     const doc = await db.createDocument(DB_ID, COL_ID, ID.unique(), {
       buyerId: user.$id,

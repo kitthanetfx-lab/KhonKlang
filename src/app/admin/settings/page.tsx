@@ -5,6 +5,13 @@ import { useState, useEffect } from 'react';
 import { account } from '@/lib/appwrite';
 import { Settings, Loader2, CheckCircle2, ShoppingCart, Zap, Search, MapPin, Car, Shield, RotateCcw, Wallet } from 'lucide-react';
 import { THAI_BANKS } from '@/lib/banks';
+import {
+  SERVICE_CONTROL_CATALOG,
+  SERVICE_CONTROL_GROUPS,
+  ServiceControlMap,
+  ServiceControlKey,
+  sanitizeServiceControls,
+} from '@/lib/serviceControls';
 
 interface FeeConfig {
   escrowFeePercent: number; escrowFeeMin: number;
@@ -68,6 +75,7 @@ const GROUPS: { title: string; icon: React.ReactNode; fields: [NumKey, string, s
 
 export default function SettingsPage() {
   const [fees, setFees] = useState<FeeConfig | null>(null);
+  const [services, setServices] = useState<ServiceControlMap | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -80,6 +88,7 @@ export default function SettingsPage() {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'โหลดค่าธรรมเนียมไม่สำเร็จ');
         setFees(d.fees);
+        setServices(sanitizeServiceControls(d.services));
       } catch (e) { setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด'); }
     })();
   }, []);
@@ -91,6 +100,16 @@ export default function SettingsPage() {
 
   function setStr(k: StrKey, v: string) {
     setFees(f => f ? { ...f, [k]: v } : f);
+    setSaved(false);
+  }
+
+  function setServiceEnabled(key: ServiceControlKey, enabled: boolean) {
+    setServices(current => current ? { ...current, [key]: { ...current[key], enabled } } : current);
+    setSaved(false);
+  }
+
+  function setServiceNote(key: ServiceControlKey, note: string) {
+    setServices(current => current ? { ...current, [key]: { ...current[key], note } } : current);
     setSaved(false);
   }
 
@@ -109,18 +128,19 @@ export default function SettingsPage() {
   }
 
   async function save() {
-    if (!fees) return;
+    if (!fees || !services) return;
     setSaving(true); setError(''); setSaved(false);
     try {
       const jwt = (await account.createJWT()).jwt;
       const r = await fetch('/api/admin/settings', {
         method: 'PATCH',
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify(fees),
+        body: JSON.stringify({ fees, services }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
       setFees(d.fees);
+      setServices(sanitizeServiceControls(d.services));
       setSaved(true);
     } catch (e) { setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ'); }
     finally { setSaving(false); }
@@ -129,15 +149,73 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl space-y-5">
       <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><Settings size={20} /> ตั้งค่าค่าธรรมเนียม & ค่าบริการ</h1>
-        <p className="text-sm text-gray-500 mt-0.5">กำหนดอัตราค่าบริการของแต่ละบริการ — ผู้ใช้จะเห็นและต้องยอมรับก่อนเริ่มดีลทุกครั้ง</p>
+        <h1 className="text-xl font-bold flex items-center gap-2"><Settings size={20} /> ตั้งค่าระบบบริการ & ค่าธรรมเนียม</h1>
+        <p className="text-sm text-gray-500 mt-0.5">ควบคุมการเปิดใช้งานบริการต่าง ๆ และกำหนดอัตราค่าบริการจากหลังบ้านได้ในหน้าเดียว</p>
       </div>
 
-      {fees === null && !error && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
+      {(fees === null || services === null) && !error && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
       {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">⚠️ {error}</div>}
 
-      {fees && (
+      {fees && services && (
         <>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-5">
+            <div>
+              <h2 className="font-semibold text-base flex items-center gap-2 mb-1"><Settings size={18} className="text-blue-600" /> ควบคุมสถานะบริการ</h2>
+              <p className="text-sm text-gray-500">เปิดหรือปิดบริการแต่ละส่วนได้ทันทีจากหลังบ้าน โดยไม่ต้องแก้โค้ดใหม่ทุกครั้ง</p>
+            </div>
+
+            {SERVICE_CONTROL_GROUPS.map(group => (
+              <div key={group} className="space-y-3">
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">{group}</div>
+                <div className="grid gap-3">
+                  {SERVICE_CONTROL_CATALOG.filter(item => item.group === group).map(item => {
+                    const entry = services[item.key];
+                    return (
+                      <div key={item.key} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-950/30 p-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">{item.title}</h3>
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${entry.enabled ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                {entry.enabled ? 'เปิดใช้งาน' : 'ปิดชั่วคราว'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-3xl">{item.description}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setServiceEnabled(item.key, true)}
+                              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${entry.enabled ? 'bg-green-600 text-white border-green-600' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'}`}
+                            >
+                              เปิด
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setServiceEnabled(item.key, false)}
+                              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${!entry.enabled ? 'bg-amber-500 text-white border-amber-500' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'}`}
+                            >
+                              ปิด
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <label className="block text-sm text-gray-600 dark:text-gray-300">ข้อความแจ้งผู้ใช้เมื่อปิดบริการ</label>
+                          <input
+                            value={entry.note}
+                            onChange={e => setServiceNote(item.key, e.target.value)}
+                            placeholder="เช่น อยู่ระหว่างเมนเทนแนนซ์ หรือ เปิดให้ใช้งานเฉพาะบางกลุ่ม"
+                            className="mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
           {GROUPS.map(g => (
             <div key={g.title} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
               <h2 className="font-semibold text-sm flex items-center gap-2 mb-4">{g.icon} {g.title}</h2>

@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 const EXPERTS = [
   { icon: '🔧', t: 'ช่างยนต์', sub: 'ตรวจรถมือสอง' },
@@ -18,6 +20,11 @@ const STEPS = [
 ];
 
 export default function ServiceOnsitePage() {
+  const controls = useServiceControls();
+  if (!controls.loading && !controls.isEnabled('onsite')) {
+    return <ServiceDisabledNotice title="บริการนัดออนไซต์" message={controls.message('onsite')} />;
+  }
+
   return (
     <div className="sub-page">
       <header className="sub-header">
@@ -45,7 +52,9 @@ export default function ServiceOnsitePage() {
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 20 }}>
           💰 ค่าบริการ: ฿200–800 ขึ้นอยู่กับประเภทสินค้าและระยะทาง · จ่ายเฉพาะเมื่อรับงานสำเร็จ
         </div>
-        <Link href="/onsite/create" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>สร้างงานออนไซต์ →</Link>
+        {controls.isEnabled('onsite')
+          ? <Link href="/onsite/create" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>สร้างงานออนไซต์ →</Link>
+          : <button type="button" className="btn btn-primary btn-block" disabled>ปิดให้บริการชั่วคราว</button>}
       </div>
     </div>
   );

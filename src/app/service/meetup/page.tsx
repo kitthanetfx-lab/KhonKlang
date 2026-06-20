@@ -4,13 +4,16 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { account } from '@/lib/appwrite';
 import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { RATE_PER_KM } from '@/lib/provinceGeo';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 const PLATFORM = 50, MM_FEE = 300;
 
 function MeetupInner() {
   const router = useRouter();
   const sp = useSearchParams();
+  const controls = useServiceControls();
   // เปิดจากปุ่ม "นัดรับ" ในหน้าสินค้า/ประกาศหา → ข้ามมาขั้นกรอกที่อยู่เลย พร้อม prefill
   const preset = sp.get('step') === '2';
   const [mode, setMode] = useState<string | null>(preset ? 'guarantee' : null);
@@ -27,6 +30,12 @@ function MeetupInner() {
   const total = mode === 'safezone' ? PLATFORM + MM_FEE : PLATFORM;
   const buyerFee = feeWho === 'split' ? total / 2 : feeWho === 'buyer' ? total : 0;
   const sellerFee = feeWho === 'split' ? total / 2 : feeWho === 'seller' ? total : 0;
+  const guaranteeEnabled = controls.isEnabled('meetupGuarantee');
+  const safeZoneEnabled = controls.isEnabled('meetupSafeZone');
+
+  if (!controls.loading && !guaranteeEnabled && !safeZoneEnabled) {
+    return <ServiceDisabledNotice title="นัดรับผ่านกลาง" message={controls.message('meetupGuarantee')} />;
+  }
 
   async function createGuaranteeDeal() {
     if (!title.trim()) { setError('กรุณากรอกชื่อสินค้า/สิ่งที่นัดรับ'); return; }
@@ -82,12 +91,21 @@ function MeetupInner() {
             {[
               { k: 'guarantee', icon: '🚗', title: 'รับประกันเดินทาง', sub: 'ทั้งสองฝ่ายวางเงินประกันเท่ากัน มาตามนัดได้คืนเต็มจำนวน ผิดนัดเงินประกันชดเชยให้ฝ่ายที่มา — ไม่ต้องใช้คนกลาง', fee: PLATFORM },
               { k: 'safezone', icon: '🏪', title: 'Safe Zone (จุดนัดพบปลอดภัย)', sub: 'คนกลางเป็นผู้ดูแลสถานที่นัดพบ เช่น ร้านมือถือ อู่รถ หน้าร้านค้า', fee: PLATFORM + MM_FEE },
-            ].map(o => (
-              <div key={o.k} className={`svc-card${mode === o.k ? ' sel' : ''}`} onClick={() => setMode(o.k)}>
+            ].map(o => {
+              const enabled = o.k === 'guarantee' ? guaranteeEnabled : safeZoneEnabled;
+              const note = o.k === 'guarantee' ? controls.message('meetupGuarantee') : controls.message('meetupSafeZone');
+              return (
+              <div
+                key={o.k}
+                className={`svc-card${mode === o.k ? ' sel' : ''}`}
+                onClick={() => { if (enabled) setMode(o.k); }}
+                style={!enabled ? { opacity: 0.68, cursor: 'not-allowed' } : undefined}
+              >
                 <div className="svc-card-head">
                   <div className="svc-card-icon">{o.icon}</div>
                   <div><div className="svc-card-title">{o.title}</div><div className="svc-card-sub">{o.sub}</div></div>
                 </div>
+                {!enabled && <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700', lineHeight: 1.6 }}>{note}</div>}
                 {mode === o.k && (
                   <div className="svc-fee-box">
                     <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>ค่าใช้จ่าย</div>
@@ -107,15 +125,16 @@ function MeetupInner() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
 
-            {mode === 'guarantee' && (
+            {mode === 'guarantee' && guaranteeEnabled && (
               <button className="btn btn-primary btn-block" style={{ marginTop: 8 }} onClick={() => setStep(2)}>
                 ถัดไป: ระบุที่อยู่ของฉัน →
               </button>
             )}
-            {mode === 'safezone' && (
-              <Link href="/deal/create" className="btn btn-primary btn-block" style={{ marginTop: 8, display: 'flex', textDecoration: 'none', justifyContent: 'center' }}>สร้างดีลนัดรับ →</Link>
+            {mode === 'safezone' && safeZoneEnabled && (
+              <Link href="/deal/create?safezone=1" className="btn btn-primary btn-block" style={{ marginTop: 8, display: 'flex', textDecoration: 'none', justifyContent: 'center' }}>สร้างดีลนัดรับ →</Link>
             )}
           </>
         )}
@@ -161,7 +180,7 @@ function MeetupInner() {
               </div>
 
               {error && <p className="rv-error">{error}</p>}
-              <button className="btn btn-primary btn-block btn-lg" disabled={creating || !title.trim() || !myAddr.tambon} onClick={createGuaranteeDeal}>
+              <button className="btn btn-primary btn-block btn-lg" disabled={creating || !title.trim() || !myAddr.tambon || !guaranteeEnabled} onClick={createGuaranteeDeal}>
                 {creating ? 'กำลังสร้างดีล...' : 'สร้างดีลนัดรับ + รับลิงก์ชวนอีกฝ่าย →'}
               </button>
             </div>

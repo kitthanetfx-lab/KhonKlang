@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 const STEPS = [
   { icon: '📦', bg: '#eef4ff', t: 'ส่งสินค้าให้คนกลาง', d: 'นำสินค้าฝากไว้ที่คนกลาง พร้อมเอกสารประกอบ' },
@@ -10,6 +12,11 @@ const STEPS = [
 ];
 
 export default function ConsignPage() {
+  const controls = useServiceControls();
+  if (!controls.loading && !controls.isEnabled('consign')) {
+    return <ServiceDisabledNotice title="ฝากขายผ่านกลาง" message={controls.message('consign')} />;
+  }
+
   return (
     <div className="sub-page">
       <header className="sub-header">
@@ -37,7 +44,9 @@ export default function ConsignPage() {
             </div>
           ))}
         </div>
-        <Link href="/marketplace" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>เริ่มฝากขาย →</Link>
+        {controls.isEnabled('consign')
+          ? <Link href="/marketplace" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>เริ่มฝากขาย →</Link>
+          : <button type="button" className="btn btn-primary btn-block" disabled>ปิดให้บริการชั่วคราว</button>}
       </div>
     </div>
   );

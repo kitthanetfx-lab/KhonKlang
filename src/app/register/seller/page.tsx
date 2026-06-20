@@ -11,6 +11,8 @@ import {
 import { account } from '@/lib/appwrite';
 import { uploadKycFiles } from '@/lib/uploadKyc';
 import { FileUpload } from '@/components/FileUpload';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -264,6 +266,7 @@ function StepIndicator({ current }: { current: number }) {
 
 function SellerForm() {
   const router = useRouter();
+  const controls = useServiceControls();
 
   const [step, setStep]           = useState(1);
   const [loading, setLoading]     = useState(true);
@@ -272,6 +275,10 @@ function SellerForm() {
   const [error, setError]         = useState('');
   const [done, setDone]           = useState(false);
   const [copied, setCopied]       = useState<'acct' | 'pp' | null>(null);
+
+  if (!controls.loading && !controls.isEnabled('sellerRegistration')) {
+    return <ServiceDisabledNotice title="สมัครเป็นผู้ขาย" message={controls.message('sellerRegistration')} backHref="/register" backLabel="กลับไปหน้าเลือกประเภท" />;
+  }
 
   // OAuth / profile
   const [displayName, setDisplayName]     = useState('');

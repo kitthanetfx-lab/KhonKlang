@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 const MODES = [
   { icon: '🛒', bg: '#eef4ff', title: 'ซื้อขายผ่านกลาง (ออนไลน์)', href: '/deal/create',
@@ -19,6 +21,13 @@ const STEPS = [
 ];
 
 export default function ServiceTradePage() {
+  const controls = useServiceControls();
+  const canUseTrade = controls.isEnabled('tradeOnline') || controls.isEnabled('tradeSimple');
+
+  if (!controls.loading && !canUseTrade) {
+    return <ServiceDisabledNotice title="บริการผ่านคนกลาง" message={controls.message('tradeOnline')} />;
+  }
+
   return (
     <div className="sub-page">
       <header className="sub-header">
@@ -32,7 +41,10 @@ export default function ServiceTradePage() {
           <p className="svc-hero-sub">Khonklang มีบริการคนกลาง 2 รูปแบบ เลือกตามลักษณะสินค้าของคุณ</p>
         </div>
         <div className="svc-modes">
-          {MODES.map(m => (
+          {MODES.map(m => {
+            const enabled = m.href === '/service/simple' ? controls.isEnabled('tradeSimple') : controls.isEnabled('tradeOnline');
+            const note = m.href === '/service/simple' ? controls.message('tradeSimple') : controls.message('tradeOnline');
+            return enabled ? (
             <Link key={m.title} href={m.href} className="svc-mode">
               <div className="svc-mode-icon" style={{ background: m.bg }}>{m.icon}</div>
               <div className="svc-mode-title">{m.title}</div>
@@ -40,7 +52,17 @@ export default function ServiceTradePage() {
               <div className="svc-mode-feats">{m.feats.map(f => <div key={f} className="svc-mode-feat">{f}</div>)}</div>
               <div className="svc-mode-cta">เริ่มต้น <span>→</span></div>
             </Link>
-          ))}
+            ) : (
+            <div key={m.title} className="svc-mode" style={{ opacity: 0.7, cursor: 'not-allowed' }}>
+              <div className="svc-mode-icon" style={{ background: m.bg }}>{m.icon}</div>
+              <div className="svc-mode-title">{m.title}</div>
+              <div className="svc-mode-desc">{m.desc}</div>
+              <div className="svc-mode-feats">{m.feats.map(f => <div key={f} className="svc-mode-feat">{f}</div>)}</div>
+              <div className="svc-mode-cta" style={{ color: '#b7791f' }}>ปิดชั่วคราว</div>
+              <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700', lineHeight: 1.6 }}>{note}</div>
+            </div>
+            );
+          })}
         </div>
         <div className="svc-steps">
           <div className="svc-steps-title">ขั้นตอน Escrow อัตโนมัติ</div>

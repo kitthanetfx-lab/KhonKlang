@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, DatabasesIndexType, ID, OrderBy, Permission, Role, Query, Users } from 'node-appwrite';
 import { notifyUsers } from '../_lib/notify';
+import { readServiceControlsConfig } from '../_lib/appConfig';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'deals';
@@ -217,7 +218,7 @@ export async function POST(req: NextRequest) {
     if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const currentUser = await getUser(jwt);
     const body = await req.json();
-    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData } = body;
+    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isBuyer = creatorRole === 'buyer';
     const prefs = ((currentUser.prefs || {}) as Record<string, string>);
@@ -227,6 +228,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'บัญชีนี้ยังไม่ได้รับอนุมัติเป็นผู้ขาย จึงยังลงประกาศขายสาธารณะไม่ได้' }, { status: 403 });
     }
     const databases = getAdminClient();
+    const serviceControls = await readServiceControlsConfig(databases);
+    if (dealType === 'simple' && !serviceControls.tradeSimple.enabled) {
+      return NextResponse.json({ error: serviceControls.tradeSimple.note || 'บริการซื้อขายผ่านกลางแบบง่ายถูกปิดชั่วคราว' }, { status: 403 });
+    }
+    if (dealType === 'meetup' && !serviceControls.meetupGuarantee.enabled) {
+      return NextResponse.json({ error: serviceControls.meetupGuarantee.note || 'บริการนัดรับรับประกันการเดินทางถูกปิดชั่วคราว' }, { status: 403 });
+    }
+    if (serviceIntent === 'safezone' && !serviceControls.meetupSafeZone.enabled) {
+      return NextResponse.json({ error: serviceControls.meetupSafeZone.note || 'บริการนัดรับ Safe Zone ถูกปิดชั่วคราว' }, { status: 403 });
+    }
+    if (!dealType && serviceIntent !== 'safezone' && !serviceControls.tradeOnline.enabled) {
+      return NextResponse.json({ error: serviceControls.tradeOnline.note || 'บริการซื้อขายผ่านกลางถูกปิดชั่วคราว' }, { status: 403 });
+    }
     await ensureDealsSchemaBestEffort(databases);
     const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
       sellerId: isBuyer ? '' : currentUser.$id,

@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 const STEPS = [
   {
@@ -17,6 +19,11 @@ const STEPS = [
 ];
 
 export default function ServiceSimplePage() {
+  const controls = useServiceControls();
+  if (!controls.loading && !controls.isEnabled('tradeSimple')) {
+    return <ServiceDisabledNotice title="ซื้อขายผ่านกลางแบบง่าย" message={controls.message('tradeSimple')} backHref="/service/trade" backLabel="กลับไปหน้าบริการ" />;
+  }
+
   return (
     <div className="sub-page">
       <header className="sub-header">
@@ -38,7 +45,9 @@ export default function ServiceSimplePage() {
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 20 }}>
           ⚠️ สำคัญ: ผู้ซื้อต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะไม่สามารถเรียกร้องกับผู้ขายได้ และจะถือว่าสินค้าถูกต้องตามที่ตกลง
         </div>
-        <Link href="/deal/create?type=simple" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>เริ่มสร้างดีล →</Link>
+        {controls.isEnabled('tradeSimple')
+          ? <Link href="/deal/create?type=simple" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>เริ่มสร้างดีล →</Link>
+          : <button type="button" className="btn btn-primary btn-block" disabled>ปิดให้บริการชั่วคราว</button>}
       </div>
     </div>
   );

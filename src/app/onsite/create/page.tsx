@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { account } from '@/lib/appwrite';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 const PROVINCES = [
   'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร',
@@ -23,6 +25,7 @@ const PROVINCES = [
 
 export default function CreateOnsiteJob() {
   const router = useRouter();
+  const controls = useServiceControls();
   const [itemDescription, setItemDescription] = useState('');
   const [itemPrice,        setItemPrice]        = useState('');
   const [sellerLocation,   setSellerLocation]   = useState('');
@@ -31,6 +34,10 @@ export default function CreateOnsiteJob() {
   const [maxBudget,        setMaxBudget]        = useState('');
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
+
+  if (!controls.loading && !controls.isEnabled('onsite')) {
+    return <ServiceDisabledNotice title="สร้างคำขอลงพื้นที่" message={controls.message('onsite')} backHref="/service/onsite" backLabel="กลับไปหน้าบริการ" />;
+  }
 
   async function handleSubmit() {
     if (!itemDescription || !sellerLocation || !sellerProvince) {
@@ -121,7 +128,7 @@ export default function CreateOnsiteJob() {
           {maxBudget && <p className="text-xs text-gray-500 mt-1">คนกลางจะเห็นงบนี้และเสนอราคาภายในขอบเขตที่เหมาะสม</p>}
         </div>
 
-        <button onClick={handleSubmit} disabled={loading}
+        <button onClick={handleSubmit} disabled={loading || !controls.isEnabled('onsite')}
           className="w-full py-4 rounded-2xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-lg transition"
         >
           {loading ? 'กำลังสร้างคำขอ...' : '📋 ส่งคำขอหาคนกลาง'}

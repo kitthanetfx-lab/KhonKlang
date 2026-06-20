@@ -1,8 +1,10 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 export default function RegisterSelectPage() {
+  const controls = useServiceControls();
   return (
     <div className="rsel-page">
       <div className="rsel-inner">
@@ -12,7 +14,7 @@ export default function RegisterSelectPage() {
           <p className="rsel-sub">คุณต้องการเข้าร่วมแพลตฟอร์ม Khonklang ในฐานะอะไร?</p>
         </div>
 
-        <Link href="/register/seller" className="rsel-card">
+        <div className="rsel-card" style={!controls.isEnabled('sellerRegistration') ? { opacity: 0.72 } : undefined}>
           <div className="rsel-card-head">
             <div className="rsel-card-icon" style={{ background: '#eef4ff' }}>🛒</div>
             <div>
@@ -28,11 +30,16 @@ export default function RegisterSelectPage() {
           </div>
           <div className="rsel-card-cta">
             <span className="rsel-card-fee">ค่าสมาชิก ฿199/ปี</span>
-            <span className="rsel-card-cta-t">สมัครเลย →</span>
+            {controls.isEnabled('sellerRegistration')
+              ? <Link href="/register/seller" className="rsel-card-cta-t">สมัครเลย →</Link>
+              : <span className="rsel-card-cta-t" style={{ color: '#b7791f' }}>ปิดชั่วคราว</span>}
           </div>
-        </Link>
+          {!controls.isEnabled('sellerRegistration') && (
+            <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700' }}>{controls.message('sellerRegistration')}</div>
+          )}
+        </div>
 
-        <Link href="/register/middleman" className="rsel-card">
+        <div className="rsel-card" style={!controls.isEnabled('middlemanRegistration') ? { opacity: 0.72 } : undefined}>
           <div className="rsel-card-head">
             <div className="rsel-card-icon" style={{ background: '#e9faf2' }}>🤝</div>
             <div>
@@ -48,9 +55,14 @@ export default function RegisterSelectPage() {
           </div>
           <div className="rsel-card-cta">
             <span className="rsel-card-fee">เงินประกัน ฿1,000–50,000</span>
-            <span className="rsel-card-cta-t" style={{ color: 'var(--green-600)' }}>สมัครเลย →</span>
+            {controls.isEnabled('middlemanRegistration')
+              ? <Link href="/register/middleman" className="rsel-card-cta-t" style={{ color: 'var(--green-600)' }}>สมัครเลย →</Link>
+              : <span className="rsel-card-cta-t" style={{ color: '#b7791f' }}>ปิดชั่วคราว</span>}
           </div>
-        </Link>
+          {!controls.isEnabled('middlemanRegistration') && (
+            <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700' }}>{controls.message('middlemanRegistration')}</div>
+          )}
+        </div>
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--muted)' }}>
           มีบัญชีแล้ว? <Link href="/login" style={{ color: 'var(--accent)' }}>เข้าสู่ระบบ</Link>

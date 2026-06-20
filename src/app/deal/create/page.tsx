@@ -4,7 +4,9 @@ import { account } from '@/lib/appwrite';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
+import { useServiceControls } from '@/lib/useServiceControls';
 
 const CATS = ['สินค้าทั่วไป', 'อิเล็กทรอนิกส์', 'เสื้อผ้า', 'ยานพาหนะ', 'อสังหาริมทรัพย์', 'บริการ', 'อื่นๆ'];
 
@@ -13,6 +15,8 @@ function CreateDealForm() {
   const searchParams = useSearchParams();
   // prefill จากหน้าอื่น เช่น /wanted ("เสนอขายผ่านคนกลาง")
   const isSimple = searchParams.get('type') === 'simple';
+  const isSafeZone = searchParams.get('safezone') === '1';
+  const controls = useServiceControls();
   const [role, setRole] = useState<'seller' | 'buyer'>(searchParams.get('role') === 'buyer' ? 'buyer' : 'seller');
   const [title, setTitle] = useState(searchParams.get('title') || '');
   const [description, setDesc] = useState('');
@@ -29,6 +33,23 @@ function CreateDealForm() {
   }, []);
 
   const feeBreakdown = computeDealFees(fees, Number(price) || 0, isSimple ? 'simple' : '');
+  const serviceEnabled = isSimple ? controls.isEnabled('tradeSimple') : isSafeZone ? controls.isEnabled('meetupSafeZone') : controls.isEnabled('tradeOnline');
+  const serviceMessage = isSimple
+    ? controls.message('tradeSimple')
+    : isSafeZone
+      ? controls.message('meetupSafeZone')
+      : controls.message('tradeOnline');
+
+  if (!controls.loading && !serviceEnabled) {
+    return (
+      <ServiceDisabledNotice
+        title={isSimple ? 'สร้างดีลแบบง่าย' : isSafeZone ? 'สร้างดีลนัดรับ Safe Zone' : 'สร้างดีลซื้อขายผ่านกลาง'}
+        message={serviceMessage}
+        backHref={isSafeZone ? '/service/meetup' : '/service/trade'}
+        backLabel="กลับไปหน้าบริการ"
+      />
+    );
+  }
 
   async function handleCreate() {
     if (!title || !price) { setError('กรุณากรอกชื่อและราคา'); return; }
@@ -38,7 +59,17 @@ function CreateDealForm() {
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, price: Number(price), category, creatorRole: role, source: 'private', wantedId: searchParams.get('wantedId') || '', dealType: isSimple ? 'simple' : '' }),
+        body: JSON.stringify({
+          title,
+          description,
+          price: Number(price),
+          category,
+          creatorRole: role,
+          source: 'private',
+          wantedId: searchParams.get('wantedId') || '',
+          dealType: isSimple ? 'simple' : '',
+          serviceIntent: isSafeZone ? 'safezone' : '',
+        }),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || 'เกิดข้อผิดพลาด'); return; }
@@ -57,7 +88,7 @@ function CreateDealForm() {
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px 80px' }}>
         <div className="deal-form">
           <h2 className="deal-form-title">รายละเอียดดีล</h2>
-          <p className="deal-form-sub">{isSimple ? 'ซื้อขายผ่านกลางแบบง่าย — พักเงินกับศูนย์กลาง ผู้ขายส่งตรงถึงผู้ซื้อ ไม่ต้องใช้คนกลางบุคคล' : 'สร้างดีล Escrow แล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม'}</p>
+          <p className="deal-form-sub">{isSimple ? 'ซื้อขายผ่านกลางแบบง่าย — พักเงินกับศูนย์กลาง ผู้ขายส่งตรงถึงผู้ซื้อ ไม่ต้องใช้คนกลางบุคคล' : isSafeZone ? 'สร้างดีลนัดรับ Safe Zone แล้วชวนอีกฝ่ายเข้าร่วมต่อจากลิงก์นี้' : 'สร้างดีล Escrow แล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม'}</p>
 
           {isSimple && (
             <div style={{ background: '#fff3e0', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '10px 14px', fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 16 }}>
@@ -122,7 +153,7 @@ function CreateDealForm() {
 
           {error && <p style={{ color: '#b22441', fontSize: 14, marginTop: 4 }}>⚠️ {error}</p>}
 
-          <button onClick={handleCreate} disabled={loading} className="btn btn-primary btn-block btn-lg" style={{ marginTop: 18 }}>
+          <button onClick={handleCreate} disabled={loading || !serviceEnabled} className="btn btn-primary btn-block btn-lg" style={{ marginTop: 18 }}>
             {loading ? 'กำลังสร้าง...' : 'สร้างดีล & รับลิงก์แชร์'}
           </button>
           <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', marginTop: 12 }}>หลังสร้าง คัดลอกลิงก์จากหน้าดีลและส่งให้อีกฝ่าย</p>

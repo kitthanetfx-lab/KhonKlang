@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases, Permission, Role } from 'node-appwrite';
+import { Databases } from 'node-appwrite';
 import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
+import { readJsonConfig, writeJsonConfig } from '../../_lib/appConfig';
+import { SERVICE_CONTROL_DEFAULTS, sanitizeServiceControls } from '@/lib/serviceControls';
 
 const COL = 'app_config';
 const DOC = 'fees';
+const SERVICE_DOC = 'service_controls';
 
 // ค่าธรรมเนียม/ค่าบริการแบบตัวเลข (แอดมินปรับได้ในหน้าตั้งค่า)
 const NUM_DEFAULTS = {
@@ -42,23 +45,8 @@ const NUM_KEYS = Object.keys(NUM_DEFAULTS) as (keyof typeof NUM_DEFAULTS)[];
 const COMPANY_KEYS = Object.keys(COMPANY_DEFAULTS) as (keyof typeof COMPANY_DEFAULTS)[];
 const RETURN_OPTIONS = ['buyer', 'seller', 'split'];
 
-async function ensureConfig(db: Databases) {
-  try {
-    await db.getCollection(DB_ID, COL);
-  } catch {
-    await db.createCollection(DB_ID, COL, 'App Config', [Permission.read(Role.any())]).catch(() => {});
-    await db.createStringAttribute(DB_ID, COL, 'data', 4000, false, '').catch(() => {});
-  }
-}
-
 async function readConfig(db: Databases): Promise<FeeConfig> {
-  try {
-    const doc = await db.getDocument(DB_ID, COL, DOC) as unknown as { data?: string };
-    const saved = JSON.parse(doc.data || '{}');
-    return { ...DEFAULTS, ...saved };
-  } catch {
-    return DEFAULTS;
-  }
+  return readJsonConfig(db, DOC, DEFAULTS);
 }
 
 export async function GET(req: NextRequest) {
@@ -66,7 +54,8 @@ export async function GET(req: NextRequest) {
     await verifyAdmin(req);
     const db = new Databases(getAdminClient());
     const fees = await readConfig(db);
-    return NextResponse.json({ fees });
+    const services = sanitizeServiceControls(await readJsonConfig(db, SERVICE_DOC, SERVICE_CONTROL_DEFAULTS));
+    return NextResponse.json({ fees, services });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
     return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
@@ -78,28 +67,28 @@ export async function PATCH(req: NextRequest) {
     await verifyAdmin(req);
     const db = new Databases(getAdminClient());
     const body = await req.json();
+    const currentFees = await readConfig(db);
+    const currentServices = sanitizeServiceControls(await readJsonConfig(db, SERVICE_DOC, SERVICE_CONTROL_DEFAULTS));
+    const feeBody = body?.fees ?? body;
+    const hasFeePayload = feeBody && typeof feeBody === 'object' && NUM_KEYS.some(key => key in feeBody);
+    const serviceBody = body?.services;
 
     // sanitize: เก็บเฉพาะ key ที่รู้จัก ตัวเลข >= 0 และตัวเลือกที่ถูกต้อง
-    const clean: Record<string, number | string> = {};
+    const cleanFees: Record<string, number | string> = {};
     for (const k of NUM_KEYS) {
-      const v = Number(body[k]);
-      clean[k] = (isFinite(v) && v >= 0) ? v : NUM_DEFAULTS[k];
+      const v = Number(feeBody?.[k]);
+      cleanFees[k] = (isFinite(v) && v >= 0) ? v : NUM_DEFAULTS[k];
     }
-    clean.returnShippingBy = RETURN_OPTIONS.includes(body.returnShippingBy) ? body.returnShippingBy : STR_DEFAULTS.returnShippingBy;
-    for (const k of COMPANY_KEYS) clean[k] = String(body[k] ?? '').slice(0, 200);
-    const data = JSON.stringify(clean).slice(0, 3900);
+    cleanFees.returnShippingBy = RETURN_OPTIONS.includes(feeBody?.returnShippingBy) ? feeBody.returnShippingBy : STR_DEFAULTS.returnShippingBy;
+    for (const k of COMPANY_KEYS) cleanFees[k] = String(feeBody?.[k] ?? '').slice(0, 200);
 
-    await ensureConfig(db);
-    // เผื่อ attribute เพิ่งถูกสร้างและยังไม่พร้อม — ลองซ้ำสองสามครั้ง
-    let lastErr: unknown = null;
-    for (let i = 0; i < 6; i++) {
-      try {
-        try { await db.updateDocument(DB_ID, COL, DOC, { data }); }
-        catch { await db.createDocument(DB_ID, COL, DOC, { data }); }
-        return NextResponse.json({ fees: clean, ok: true });
-      } catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 1000)); }
-    }
-    throw lastErr;
+    const nextFees = hasFeePayload ? { ...currentFees, ...cleanFees } : currentFees;
+    const nextServices = serviceBody ? sanitizeServiceControls(serviceBody) : currentServices;
+
+    if (hasFeePayload) await writeJsonConfig(db, DOC, nextFees);
+    if (serviceBody) await writeJsonConfig(db, SERVICE_DOC, nextServices);
+
+    return NextResponse.json({ fees: nextFees, services: nextServices, ok: true });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
     return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });

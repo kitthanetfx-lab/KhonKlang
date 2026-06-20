@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Users, Databases, ID, Permission, Role, Query } from 'node-appwrite';
+import { readServiceControlsConfig } from '../../_lib/appConfig';
 
 const DB_ID  = 'khonklang_db';
 const COL_ID = 'seller_applications';
@@ -134,6 +135,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { databases, users } = getAdminClient();
+    const services = await readServiceControlsConfig(databases);
+    if (!services.sellerRegistration.enabled) {
+      return NextResponse.json({ error: services.sellerRegistration.note || 'การสมัครผู้ขายถูกปิดชั่วคราว' }, { status: 403 });
+    }
     await ensureCollection(databases);
 
     const existing = await databases.listDocuments(DB_ID, COL_ID, [
