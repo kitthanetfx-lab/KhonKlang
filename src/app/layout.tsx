@@ -8,7 +8,7 @@ import { HomeButton } from "@/components/HomeButton";
 
 const displayFont = Anuphan({
   subsets: ["latin", "thai"],
-  weight: ["500", "600", "700", "800"],
+  weight: ["500", "600", "700"],
   variable: "--font-display-next",
   display: "swap",
 });
