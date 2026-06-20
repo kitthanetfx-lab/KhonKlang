@@ -76,6 +76,27 @@ interface FinanceRow {
   location?: string;
   description?: string;
 }
+interface FinanceGroup {
+  key: string;
+  referenceCode: string;
+  referenceType: string;
+  refId: string;
+  title: string;
+  buyerName?: string;
+  sellerName?: string;
+  middlemanName?: string;
+  dealStatus?: string;
+  price?: number;
+  feeAmount: number;
+  totalExpected: number;
+  imageCount: number;
+  attachmentCount: number;
+  hasSlip: boolean;
+  detailUrl: string;
+  rows: FinanceRow[];
+  canApprove: boolean;
+  sources: string[];
+}
 interface Summary {
   incomingCount: number; escrowPendingCount: number; heldEscrow: number;
   heldMeetupDeposit: number; completedVolume: number; completedCount: number; estRevenue: number;
@@ -129,6 +150,53 @@ function referenceCodeForRow(row: FinanceRow) {
   return `FIN-${row.refId.slice(-8).toUpperCase()}`;
 }
 
+function groupRowsByReference(rows: FinanceRow[]) {
+  const map = new Map<string, FinanceGroup>();
+
+  for (const row of rows) {
+    const key = `${row.referenceType}:${row.refId}`;
+    const current = map.get(key);
+    if (current) {
+      current.rows.push(row);
+      current.totalExpected += Number(row.expected || 0);
+      current.feeAmount += Number(row.feeAmount || 0);
+      current.attachmentCount = Math.max(current.attachmentCount, Number(row.attachmentCount || 0));
+      current.imageCount = Math.max(current.imageCount, Number(row.imageCount || 0));
+      current.hasSlip = current.hasSlip || !!row.hasSlip;
+      current.canApprove = current.canApprove || !!row.canApprove;
+      if (!current.middlemanName && row.middlemanName) current.middlemanName = row.middlemanName;
+      if (!current.dealStatus && row.dealStatus) current.dealStatus = row.dealStatus;
+      if (!current.price && row.price) current.price = row.price;
+      if (!current.sources.includes(row.source)) current.sources.push(row.source);
+      continue;
+    }
+
+    map.set(key, {
+      key,
+      referenceCode: referenceCodeForRow(row),
+      referenceType: row.referenceType,
+      refId: row.refId,
+      title: row.title,
+      buyerName: row.buyerName,
+      sellerName: row.sellerName,
+      middlemanName: row.middlemanName,
+      dealStatus: row.dealStatus,
+      price: row.price,
+      feeAmount: Number(row.feeAmount || 0),
+      totalExpected: Number(row.expected || 0),
+      imageCount: Number(row.imageCount || 0),
+      attachmentCount: Number(row.attachmentCount || 0),
+      hasSlip: !!row.hasSlip,
+      detailUrl: row.detailUrl,
+      rows: [row],
+      canApprove: !!row.canApprove,
+      sources: [row.source],
+    });
+  }
+
+  return Array.from(map.values());
+}
+
 export default function AdminFinance() {
   const [tab, setTab] = useState<FinanceTab>('incoming');
   const [filter, setFilter] = useState('all');
@@ -140,7 +208,7 @@ export default function AdminFinance() {
   const [verifying, setVerifying] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'xlsx' | ''>('');
   const [slipResults, setSlipResults] = useState<Record<string, SlipCheck>>({});
-  const [selected, setSelected] = useState<FinanceRow | null>(null);
+  const [selected, setSelected] = useState<FinanceGroup | null>(null);
   const [querySearch, setQuerySearch] = useState('');
 
   const load = useCallback(async () => {
@@ -281,6 +349,7 @@ export default function AdminFinance() {
 
   const currentFilters = tab === 'outgoing' ? OUTGOING_FILTERS : INCOMING_FILTERS;
   const filteredRows = rows || [];
+  const groupedRows = groupRowsByReference(filteredRows);
 
   const pageCount = Math.max(1, Math.ceil((pagination.total || 0) / pagination.pageSize));
 
@@ -383,7 +452,7 @@ export default function AdminFinance() {
 
             {rows === null ? (
               <div className="flex justify-center py-20"><Loader2 className="animate-spin text-gray-400" /></div>
-            ) : filteredRows.length === 0 ? (
+            ) : groupedRows.length === 0 ? (
               <div className="text-center py-16 text-gray-400">
                 <CheckCircle2 size={36} className="mx-auto mb-2 opacity-40" />
                 <p>ไม่มีรายการในมุมมองนี้</p>
@@ -410,100 +479,64 @@ export default function AdminFinance() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRows.map(row => {
-                      const source = SOURCE_BADGE[row.source] || { label: row.source, cls: 'bg-gray-100 text-gray-700' };
-                      const txn = TXN_BADGE[(row.txnStatus as TxnStatus) || 'pending'];
-                      const slip = slipResults[row.key];
-                      const canMarkOutgoing = (row.source === 'payout' || row.source === 'refund') && row.txnStatus === 'pending';
+                    {groupedRows.map(group => {
+                      const mainRow = group.rows[0];
+                      const source = SOURCE_BADGE[mainRow.source] || { label: mainRow.source, cls: 'bg-gray-100 text-gray-700' };
+                      const txn = TXN_BADGE[(mainRow.txnStatus as TxnStatus) || 'pending'];
                       return (
                         <tr
-                          key={row.key}
-                          onClick={() => setSelected(row)}
+                          key={group.key}
+                          onClick={() => setSelected(group)}
                           className="cursor-pointer border-b border-gray-100 hover:bg-blue-50/40 transition-colors align-top"
                         >
                           <td className="px-3 py-3 sticky left-0 z-10 bg-white shadow-[8px_0_12px_-12px_rgba(15,23,42,0.18)]">
-                            <div className="font-mono text-xs text-gray-700">{referenceCodeForRow(row)}</div>
-                            <div className="text-[11px] text-gray-400 mt-1">{row.referenceType}</div>
+                            <div className="font-mono text-xs text-gray-700">{group.referenceCode}</div>
+                            <div className="text-[11px] text-gray-400 mt-1">{group.referenceType}</div>
                           </td>
                           <td className="px-3 py-3 sticky left-[130px] z-10 bg-white shadow-[8px_0_12px_-12px_rgba(15,23,42,0.18)]">
                             <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${source.cls}`}>{source.label}</span>
+                            {group.sources.length > 1 && <div className="text-[11px] text-gray-400 mt-1">รวม {group.rows.length} รายการย่อย</div>}
                           </td>
                           <td className="px-3 py-3 min-w-[260px]">
-                            <p className="font-semibold text-gray-900">{row.title}</p>
-                            <p className="text-xs text-gray-500 mt-1">{row.purpose}</p>
-                            {row.description && <p className="text-xs text-gray-400 mt-1 line-clamp-2">{row.description}</p>}
+                            <p className="font-semibold text-gray-900">{group.title}</p>
+                            <p className="text-xs text-gray-500 mt-1">{group.rows.map(item => item.purpose).join(' · ')}</p>
+                            {mainRow.description && <p className="text-xs text-gray-400 mt-1 line-clamp-2">{mainRow.description}</p>}
                           </td>
                           <td className="px-3 py-3">
-                            <div className="font-medium">{row.buyerName || '-'}</div>
+                            <div className="font-medium">{group.buyerName || '-'}</div>
                           </td>
                           <td className="px-3 py-3">
-                            <div className="font-medium">{row.sellerName || '-'}</div>
+                            <div className="font-medium">{group.sellerName || '-'}</div>
                           </td>
                           <td className="px-3 py-3">
-                            <div className="font-medium">{row.middlemanName || '-'}</div>
+                            <div className="font-medium">{group.middlemanName || '-'}</div>
                           </td>
                           <td className="px-3 py-3">
                             <div className="space-y-1">
                               <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${txn.cls}`}>{txn.label}</span>
-                              <div className="text-[11px] text-gray-400">{row.dealStatus || row.status || '-'}</div>
+                              <div className="text-[11px] text-gray-400">{group.dealStatus || mainRow.status || '-'}</div>
                             </div>
                           </td>
-                          <td className="px-3 py-3 font-semibold">{row.price ? baht(row.price) : '-'}</td>
-                          <td className="px-3 py-3">{row.feeAmount ? baht(row.feeAmount) : '-'}</td>
-                          <td className="px-3 py-3 font-bold text-gray-900">{baht(row.expected)}</td>
-                          <td className="px-3 py-3 text-center">{row.imageCount || 0}</td>
-                          <td className="px-3 py-3 text-center">{row.attachmentCount || 0}</td>
+                          <td className="px-3 py-3 font-semibold">{group.price ? baht(group.price) : '-'}</td>
+                          <td className="px-3 py-3">{group.feeAmount ? baht(group.feeAmount) : '-'}</td>
+                          <td className="px-3 py-3 font-bold text-gray-900">{baht(group.totalExpected)}</td>
+                          <td className="px-3 py-3 text-center">{group.imageCount || 0}</td>
+                          <td className="px-3 py-3 text-center">{group.attachmentCount || 0}</td>
                           <td className="px-3 py-3 text-center">
-                            {row.hasSlip ? <span className="text-green-600 font-semibold">มี</span> : <span className="text-gray-400">-</span>}
-                            {slip && <div className="text-[11px] mt-1 text-gray-500">{slip.result.ok ? 'ตรวจแล้ว' : 'ตรวจไม่ผ่าน'}</div>}
+                            {group.hasSlip ? <span className="text-green-600 font-semibold">มี</span> : <span className="text-gray-400">-</span>}
+                            <div className="text-[11px] mt-1 text-gray-500">{group.rows.length} รายการย่อย</div>
                           </td>
                           <td className="px-3 py-3 sticky right-0 z-10 bg-white shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.18)]">
                             <div className="flex flex-col gap-2 min-w-[170px]" onClick={e => e.stopPropagation()}>
                               <button
-                                onClick={() => setSelected(row)}
+                                onClick={() => setSelected(group)}
                                 className="inline-flex items-center justify-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                               >
                                 <PanelRightOpen size={13} /> ดูรายละเอียด
                               </button>
-                              {row.fileId && (
-                                <button
-                                  onClick={() => void verifySlip(row)}
-                                  disabled={verifying === row.key}
-                                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                                >
-                                  {verifying === row.key ? <Loader2 size={13} className="animate-spin" /> : <ScanLine size={13} />}
-                                  ตรวจสลิป
-                                </button>
-                              )}
-                              {row.canApprove && (
-                                <>
-                                  <button
-                                    onClick={() => void act(row.refId, 'approve_payment')}
-                                    disabled={acting === row.refId}
-                                    className="inline-flex items-center justify-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                                  >
-                                    {acting === row.refId ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
-                                    อนุมัติ
-                                  </button>
-                                  <button
-                                    onClick={() => void act(row.refId, 'reject_payment')}
-                                    disabled={!!acting}
-                                    className="inline-flex items-center justify-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-red-50 hover:text-red-600"
-                                  >
-                                    <XCircle size={13} /> ปฏิเสธ
-                                  </button>
-                                </>
-                              )}
-                              {canMarkOutgoing && (
-                                <button
-                                  onClick={() => void act(row.refId, row.source === 'payout' ? 'mark_payout_sent' : 'mark_refund_sent')}
-                                  disabled={!!acting}
-                                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-50"
-                                >
-                                  {acting === row.refId ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
-                                  บันทึกว่าโอนแล้ว
-                                </button>
-                              )}
+                              <Link href={group.detailUrl} target="_blank" className="inline-flex items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100">
+                                <ExternalLink size={13} /> เปิดหน้าจริง
+                              </Link>
                             </div>
                           </td>
                         </tr>
@@ -516,7 +549,7 @@ export default function AdminFinance() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 bg-gray-50/80">
               <div className="text-sm text-gray-500">
-                แสดงหน้า {pagination.page} / {pageCount} · ทั้งหมด {pagination.total.toLocaleString()} รายการ
+                แสดงหน้า {pagination.page} / {pageCount} · ทั้งหมด {groupedRows.length.toLocaleString()} ดีลในหน้านี้
                 {querySearch ? ` · ค้นหา "${querySearch}"` : ''}
               </div>
               <div className="flex items-center gap-2">
@@ -547,13 +580,15 @@ export default function AdminFinance() {
                 <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700">{referenceCodeForRow(selected)}</span>
-                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${(SOURCE_BADGE[selected.source] || { cls: 'bg-gray-100 text-gray-700' }).cls}`}>
-                        {(SOURCE_BADGE[selected.source] || { label: selected.source }).label}
-                      </span>
+                      <span className="rounded-full bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700">{selected.referenceCode}</span>
+                      {selected.sources.map(source => (
+                        <span key={source} className={`rounded-full px-2 py-1 text-xs font-semibold ${(SOURCE_BADGE[source] || { cls: 'bg-gray-100 text-gray-700' }).cls}`}>
+                          {(SOURCE_BADGE[source] || { label: source }).label}
+                        </span>
+                      ))}
                     </div>
                     <h2 className="text-lg font-bold mt-2">{selected.title}</h2>
-                    <p className="text-sm text-gray-500 mt-1">{selected.purpose}</p>
+                    <p className="text-sm text-gray-500 mt-1">รวม {selected.rows.length} รายการย่อยในดีลเดียวกัน</p>
                   </div>
                   <button onClick={() => setSelected(null)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600">ปิด</button>
                 </div>
@@ -561,9 +596,9 @@ export default function AdminFinance() {
                 <div className="p-5 space-y-5">
                   <div className="grid grid-cols-2 gap-3">
                     <DetailCard label="ราคาสินค้า" value={selected.price ? baht(selected.price) : '-'} />
-                    <DetailCard label="ยอดรายการ" value={baht(selected.expected)} />
-                    <DetailCard label="ค่าจัดการ/ค่าธรรมเนียม" value={selected.feeAmount ? baht(selected.feeAmount) : '-'} />
-                    <DetailCard label="สถานะดีล/รายการ" value={selected.dealStatus || selected.status || '-'} />
+                    <DetailCard label="ยอดรวมทั้งดีล" value={baht(selected.totalExpected)} />
+                    <DetailCard label="ค่าจัดการ/ค่าธรรมเนียมรวม" value={selected.feeAmount ? baht(selected.feeAmount) : '-'} />
+                    <DetailCard label="สถานะดีล" value={selected.dealStatus || '-'} />
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
@@ -571,19 +606,19 @@ export default function AdminFinance() {
                       <DetailLine label="ผู้ซื้อ" value={selected.buyerName || '-'} />
                       <DetailLine label="ผู้ขาย" value={selected.sellerName || '-'} />
                       <DetailLine label="คนกลาง" value={selected.middlemanName || '-'} />
-                      <DetailLine label="ผู้จ่าย/เจ้าของรายการ" value={`${selected.payer}${selected.payerName ? ` · ${selected.payerName}` : ''}`} />
+                      <DetailLine label="ประเภทอ้างอิง" value={selected.referenceType} />
                     </InfoPanel>
                     <InfoPanel title="รายละเอียดงาน/ดีล">
-                      <DetailLine label="ประเภทอ้างอิง" value={selected.referenceType} />
-                      <DetailLine label="หมวด" value={selected.category || '-'} />
-                      <DetailLine label="สภาพ" value={selected.condition || '-'} />
-                      <DetailLine label="สถานที่" value={selected.location || '-'} />
+                      <DetailLine label="หมวด" value={selected.rows[0]?.category || '-'} />
+                      <DetailLine label="สภาพ" value={selected.rows[0]?.condition || '-'} />
+                      <DetailLine label="สถานที่" value={selected.rows[0]?.location || '-'} />
+                      <DetailLine label="แหล่งที่มาในดีล" value={selected.sources.join(', ')} />
                     </InfoPanel>
                   </div>
 
-                  {selected.description && (
+                  {selected.rows[0]?.description && (
                     <InfoPanel title="คำอธิบาย">
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{selected.description}</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{selected.rows[0].description}</p>
                     </InfoPanel>
                   )}
 
@@ -600,50 +635,108 @@ export default function AdminFinance() {
                     </InfoPanel>
 
                     <InfoPanel title="ข้อมูลธนาคาร">
-                      <BankInfoBox bank={selected.bank} label={`บัญชีของ${selected.payer || 'ผู้เกี่ยวข้อง'}`} />
+                      <BankInfoBox bank={selected.rows[0]?.bank} label="บัญชีของผู้เกี่ยวข้องในรายการย่อยที่เลือก" />
                     </InfoPanel>
                   </div>
 
-                  {selected.fees && (
-                    <InfoPanel title="รายละเอียดค่าจัดการ">
-                      <div className="space-y-2">
-                        {selected.fees.lines.map(line => (
-                          <div key={line.label} className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600">{line.label}</span>
-                            <span className="font-medium">{baht(line.amount)}</span>
-                          </div>
-                        ))}
-                        <div className="flex items-center justify-between border-t border-gray-200 pt-2 text-sm font-semibold">
-                          <span>รวม</span>
-                          <span>{baht(selected.fees.total)}</span>
-                        </div>
-                      </div>
-                    </InfoPanel>
-                  )}
+                  <InfoPanel title="รายการย่อยในดีลนี้">
+                    <div className="space-y-4">
+                      {selected.rows.map(item => {
+                        const itemSource = SOURCE_BADGE[item.source] || { label: item.source, cls: 'bg-gray-100 text-gray-700' };
+                        const itemTxn = TXN_BADGE[(item.txnStatus as TxnStatus) || 'pending'];
+                        const canMarkOutgoing = (item.source === 'payout' || item.source === 'refund') && item.txnStatus === 'pending';
+                        return (
+                          <div key={item.key} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${itemSource.cls}`}>{itemSource.label}</span>
+                                  <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${itemTxn.cls}`}>{itemTxn.label}</span>
+                                </div>
+                                <p className="font-semibold mt-2">{item.purpose}</p>
+                                <p className="text-xs text-gray-500 mt-1">{item.payer}: {item.payerName || '-'} · ยอด {baht(item.expected)}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-gray-400">ยอดรายการย่อย</p>
+                                <p className="text-sm font-bold">{baht(item.expected)}</p>
+                              </div>
+                            </div>
 
-                  {selected.fileId && (
-                    <InfoPanel title="หลักฐานการโอน">
-                      <a href={fileUrl(selected.bucket, selected.fileId)} target="_blank" rel="noreferrer">
-                        <img src={fileUrl(selected.bucket, selected.fileId)} alt="slip" className="w-full rounded-2xl border border-gray-200 bg-gray-50 object-contain max-h-[380px]" />
-                      </a>
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        <button
-                          onClick={() => void verifySlip(selected)}
-                          disabled={verifying === selected.key}
-                          className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                        >
-                          {verifying === selected.key ? <Loader2 size={14} className="animate-spin" /> : <ScanLine size={14} />}
-                          ตรวจสลิปอัตโนมัติ
-                        </button>
-                        <a href={fileUrl(selected.bucket, selected.fileId)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                          <FileImage size={14} /> เปิดไฟล์ต้นฉบับ
-                        </a>
-                      </div>
-                      {slipResults[selected.key] && (
-                        <SlipResultBox result={slipResults[selected.key]} />
-                      )}
-                    </InfoPanel>
-                  )}
+                            {item.fees && (
+                              <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+                                <p className="text-xs text-gray-400 mb-2">รายละเอียดค่าธรรมเนียม</p>
+                                {item.fees.lines.map(line => (
+                                  <div key={line.label} className="flex items-center justify-between py-0.5 text-sm">
+                                    <span className="text-gray-600">{line.label}</span>
+                                    <span>{baht(line.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {item.fileId && (
+                                <button
+                                  onClick={() => void verifySlip(item)}
+                                  disabled={verifying === item.key}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                                >
+                                  {verifying === item.key ? <Loader2 size={14} className="animate-spin" /> : <ScanLine size={14} />}
+                                  ตรวจสลิป
+                                </button>
+                              )}
+                              {item.canApprove && (
+                                <>
+                                  <button
+                                    onClick={() => void act(item.refId, 'approve_payment')}
+                                    disabled={acting === item.refId}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                                  >
+                                    {acting === item.refId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                    อนุมัติ
+                                  </button>
+                                  <button
+                                    onClick={() => void act(item.refId, 'reject_payment')}
+                                    disabled={!!acting}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <XCircle size={14} /> ปฏิเสธ
+                                  </button>
+                                </>
+                              )}
+                              {canMarkOutgoing && (
+                                <button
+                                  onClick={() => void act(item.refId, item.source === 'payout' ? 'mark_payout_sent' : 'mark_refund_sent')}
+                                  disabled={!!acting}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                                >
+                                  {acting === item.refId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                  บันทึกว่าโอนแล้ว
+                                </button>
+                              )}
+                              <Link href={item.detailUrl} target="_blank" className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50">
+                                <ExternalLink size={14} /> เปิดหน้าจริง
+                              </Link>
+                            </div>
+
+                            {item.fileId && (
+                              <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+                                <a href={fileUrl(item.bucket, item.fileId)} target="_blank" rel="noreferrer">
+                                  <img src={fileUrl(item.bucket, item.fileId)} alt="slip" className="w-full rounded-xl border border-gray-200 bg-gray-50 object-contain max-h-[280px]" />
+                                </a>
+                                <div className="mt-2">
+                                  <a href={fileUrl(item.bucket, item.fileId)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <FileImage size={14} /> เปิดไฟล์ต้นฉบับ
+                                  </a>
+                                </div>
+                                {slipResults[item.key] && <SlipResultBox result={slipResults[item.key]} />}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </InfoPanel>
                 </div>
               </div>
             </div>
