@@ -4,10 +4,9 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import { account } from '@/lib/appwrite';
 import { compressImage } from '@/lib/imageCompress';
 import {
-  MessageCircle, Phone, PhoneOff, PhoneCall, Mic, MicOff, Send,
+  MessageCircle, Phone, PhoneOff, PhoneCall, Send,
   Loader2, User, Search, Inbox, Image as ImageIcon,
 } from 'lucide-react';
-import { CallSession, type CallSessionState } from '@/lib/callSession';
 
 type CallStatus = 'idle' | 'customer_requesting' | 'staff_ringing' | 'connecting' | 'active' | 'ended';
 
@@ -15,8 +14,9 @@ interface ThreadRow {
   $id: string; customerName: string; status: string; lastMessage: string; lastAt: string;
   lastSender: string; unreadStaff: boolean; assignedStaffName: string;
   callStatus: CallStatus; callId: string; callInitiator: string; callStaffName: string;
+  callUpdatedAt: string; lastReadByCustomerAt: string;
 }
-interface Msg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string }
+interface Msg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string; pending?: boolean }
 
 function timeShort(iso: string) {
   if (!iso) return '';
@@ -37,17 +37,11 @@ export default function AdminSupportPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [callState, setCallState] = useState<CallSessionState | null>(null);
-  const [muted, setMuted] = useState(false);
-  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
-  const [elapsed, setElapsed] = useState(0);
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   const jwtRef = useRef('');
   const bottomRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const sessionRef = useRef<CallSession | null>(null);
-  const handledCallIdRef = useRef('');
   const selectedRef = useRef('');
   useEffect(() => { selectedRef.current = selected; }, [selected]);
 
@@ -60,7 +54,7 @@ export default function AdminSupportPage() {
   const loadThreads = useCallback(async () => {
     try {
       const jwt = jwtRef.current || await getJwt();
-      const r = await fetch('/api/admin/support', { headers: { 'x-session-jwt': jwt } });
+      const r = await fetch('/api/admin/support', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
       if (!r.ok) return;
       const d = await r.json();
       setThreads(d.threads || []);
@@ -71,7 +65,7 @@ export default function AdminSupportPage() {
     if (!customerId) return;
     try {
       const jwt = jwtRef.current || await getJwt();
-      const r = await fetch(`/api/admin/support?with=${encodeURIComponent(customerId)}`, { headers: { 'x-session-jwt': jwt } });
+      const r = await fetch(`/api/admin/support?with=${encodeURIComponent(customerId)}`, { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
       if (!r.ok) return;
       const d = await r.json();
       if (selectedRef.current !== customerId) return; // ผู้ใช้สลับห้องไปแล้วระหว่างรอ
@@ -86,7 +80,7 @@ export default function AdminSupportPage() {
   }, [loadThreads]);
 
   useEffect(() => {
-    const iv = setInterval(() => { void loadThreads(); }, 8000);
+    const iv = setInterval(() => { void loadThreads(); }, 2500);
     return () => clearInterval(iv);
   }, [loadThreads]);
 
@@ -96,62 +90,65 @@ export default function AdminSupportPage() {
       return () => window.clearTimeout(t);
     }
     void loadThread(selected);
-    const iv = setInterval(() => { void loadThread(selected); }, 3000);
+    const iv = setInterval(() => { void loadThread(selected); }, 1000);
     return () => clearInterval(iv);
   }, [selected, loadThread]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs.length]);
 
-  // ── จัดการสาย WebRTC ตามสถานะห้องที่เลือก — พนักงานเป็นฝั่ง offerer เสมอ ──
-  useEffect(() => {
-    const status = thread?.callStatus;
-    const callId = thread?.callId || '';
-    const customerId = selected;
-
-    if (status === 'connecting' && callId && customerId && handledCallIdRef.current !== callId) {
-      handledCallIdRef.current = callId;
-      setCallStartedAt(null);
-      const session = new CallSession({
-        role: 'staff', isOfferer: true, callId, customerId,
-        signalUrl: '/api/admin/support/signal', getJwt,
-        onState: (s) => { setCallState(s); if (s === 'active') setCallStartedAt(Date.now()); },
-        onRemoteStream: (stream) => { if (audioRef.current) audioRef.current.srcObject = stream; },
-      });
-      sessionRef.current = session;
-      void session.start();
-    }
-
-    if ((status === 'idle' || status === 'ended' || !status) && sessionRef.current) {
-      sessionRef.current.stop(false);
-      sessionRef.current = null;
-      handledCallIdRef.current = '';
-      setCallState(null);
-      setCallStartedAt(null);
-    }
-  }, [thread?.callStatus, thread?.callId, selected, getJwt]);
+  const filtered = (threads || []).filter(t =>
+    !search.trim() || t.customerName.toLowerCase().includes(search.trim().toLowerCase()));
+  const callStartedAtRaw = thread?.callStatus === 'active' && thread.callUpdatedAt ? Date.parse(thread.callUpdatedAt) : Number.NaN;
+  const callStartedAt = Number.isFinite(callStartedAtRaw) ? callStartedAtRaw : null;
+  const elapsed = callStartedAt ? Math.max(0, Math.floor((nowTs - callStartedAt) / 1000)) : 0;
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  const callStatus = thread?.callStatus;
 
   useEffect(() => {
     if (!callStartedAt) {
-      const t = window.setTimeout(() => setElapsed(0), 0);
+      const t = window.setTimeout(() => setNowTs(Date.now()), 0);
       return () => window.clearTimeout(t);
     }
-    const iv = setInterval(() => setElapsed(Math.floor((Date.now() - callStartedAt) / 1000)), 1000);
+    const iv = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(iv);
   }, [callStartedAt]);
-
-  useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 
   async function send() {
     const content = input.trim();
     if (!content || sending || !selected) return;
+    const tempId = `tmp-${Date.now()}`;
+    const tempMsg: Msg = {
+      $id: tempId,
+      senderId: 'me',
+      senderName: 'พนักงาน',
+      senderRole: 'staff',
+      content,
+      createdAt: new Date().toISOString(),
+      pending: true,
+    };
+    setMsgs(prev => [...prev, tempMsg]);
+    setInput('');
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     setSending(true);
     try {
       const jwt = jwtRef.current || await getJwt();
       const r = await fetch('/api/admin/support', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ customerId: selected, content }),
       });
-      if (r.ok) { setInput(''); void loadThread(selected); void loadThreads(); }
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.message) {
+        setMsgs(prev => prev.map(m => m.$id === tempId ? d.message : m));
+        void loadThread(selected);
+        void loadThreads();
+      } else {
+        setMsgs(prev => prev.filter(m => m.$id !== tempId));
+        setInput(content);
+      }
+    } catch {
+      setMsgs(prev => prev.filter(m => m.$id !== tempId));
+      setInput(content);
     } finally { setSending(false); }
   }
 
@@ -166,14 +163,19 @@ export default function AdminSupportPage() {
       const prepared = await compressImage(file); // บีบอัดรูปก่อนส่ง กันไฟล์ใหญ่เกินลิมิต body ของ API route บน Vercel
       const fd = new FormData();
       fd.append('file', prepared);
-      const up = await fetch('/api/support/upload', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd });
+      const up = await fetch('/api/support/upload', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd, cache: 'no-store' });
       const upData = await up.json().catch(() => ({}));
       if (!up.ok || !upData.url) { alert(upData.error || 'อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
       const r = await fetch('/api/admin/support', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ customerId: selected, content: '', imageUrl: upData.url, mimeType: upData.mimeType }),
       });
-      if (r.ok) { void loadThread(selected); void loadThreads(); }
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.message) {
+        setMsgs(prev => [...prev, d.message]);
+        void loadThread(selected);
+        void loadThreads();
+      }
     } catch {
       alert('อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง');
     } finally { setUploading(false); }
@@ -183,29 +185,26 @@ export default function AdminSupportPage() {
     if (!selected) return;
     try {
       const jwt = jwtRef.current || await getJwt();
-      await fetch('/api/admin/support/call', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+      const r = await fetch('/api/admin/support/call', {
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ customerId: selected, action }),
       });
+      const d = await r.json().catch(() => ({}));
       void loadThread(selected);
+      return d as { callId?: string };
     } catch { /* แสดงผลรอบโพลถัดไป */ }
+    return {};
   }
 
-  function toggleMute() {
-    const next = !muted;
-    setMuted(next);
-    sessionRef.current?.setMuted(next);
+  function openCallWindow(callId: string, customerId: string) {
+    if (!callId || !customerId) return;
+    const url = `/support-call/${encodeURIComponent(callId)}?role=staff&customerId=${encodeURIComponent(customerId)}`;
+    const w = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!w) window.location.href = url;
   }
-
-  const filtered = (threads || []).filter(t =>
-    !search.trim() || t.customerName.toLowerCase().includes(search.trim().toLowerCase()));
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const ss = String(elapsed % 60).padStart(2, '0');
-  const callStatus = thread?.callStatus;
 
   return (
     <div className="h-full flex flex-col">
-      <audio ref={audioRef} autoPlay />
       <div className="flex items-center gap-2 mb-1">
         <MessageCircle size={22} className="text-blue-500" />
         <h1 className="text-xl font-bold">แชทลูกค้า</h1>
@@ -280,7 +279,7 @@ export default function AdminSupportPage() {
                   <p className="text-xs text-gray-400">{thread?.assignedStaffName ? `ดูแลโดย ${thread.assignedStaffName}` : 'ยังไม่มีพนักงานรับเรื่อง'}</p>
                 </div>
                 {(!callStatus || callStatus === 'idle' || callStatus === 'ended') && (
-                  <button type="button" onClick={() => callAction('call')}
+                  <button type="button" onClick={async () => { const d = await callAction('call'); openCallWindow(String(d?.callId || thread?.callId || ''), selected); }}
                     className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
                     <Phone size={16} /> โทรออก
                   </button>
@@ -292,7 +291,7 @@ export default function AdminSupportPage() {
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 text-sm font-medium" role="alert">
                   <span className="flex items-center gap-2"><PhoneCall size={16} /> ลูกค้าขอให้โทรกลับ</span>
                   <span className="flex gap-2">
-                    <button type="button" onClick={() => callAction('approve')} aria-label="รับคำขอโทร"
+                    <button type="button" onClick={async () => { const d = await callAction('approve'); openCallWindow(String(d?.callId || thread?.callId || ''), selected); }} aria-label="รับคำขอโทร"
                       className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-green-600 text-white flex items-center justify-center hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
                       <Phone size={17} />
                     </button>
@@ -305,16 +304,19 @@ export default function AdminSupportPage() {
               )}
               {callStatus === 'staff_ringing' && (
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium" role="status">
-                  <span className="flex items-center gap-2"><Phone size={16} /> กำลังโทรไปหาลูกค้า…</span>
-                  <button type="button" onClick={() => callAction('hangup')} aria-label="ยกเลิกการโทร"
-                    className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">
-                    <PhoneOff size={17} />
-                  </button>
+                  <span className="flex items-center gap-2"><Phone size={16} /> กำลังรอลูกค้ารับสาย…</span>
+                  <span className="flex gap-2">
+                    <button type="button" onClick={() => openCallWindow(thread?.callId || '', selected)} className="px-3 py-2 rounded-xl bg-white/80 dark:bg-gray-900/50 border border-blue-200 dark:border-blue-700">เปิดหน้าสาย</button>
+                    <button type="button" onClick={() => callAction('hangup')} aria-label="ยกเลิกการโทร"
+                      className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">
+                      <PhoneOff size={17} />
+                    </button>
+                  </span>
                 </div>
               )}
               {callStatus === 'connecting' && (
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium" role="status">
-                  <span className="flex items-center gap-2"><Phone size={16} /> {callState === 'failed' ? 'เชื่อมต่อไม่สำเร็จ' : 'กำลังเชื่อมต่อสาย…'}</span>
+                  <span className="flex items-center gap-2"><Phone size={16} /> กำลังเตรียมห้องสนทนาเสียง…</span>
                   <button type="button" onClick={() => callAction('hangup')} aria-label="วางสาย"
                     className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">
                     <PhoneOff size={17} />
@@ -325,10 +327,7 @@ export default function AdminSupportPage() {
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-sm font-medium" role="status">
                   <span className="flex items-center gap-2"><Phone size={16} /> สายกำลังคุยอยู่ · {mm}:{ss}</span>
                   <span className="flex gap-2">
-                    <button type="button" onClick={toggleMute} aria-label={muted ? 'เปิดไมค์' : 'ปิดไมค์'}
-                      className={`w-10 h-10 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${muted ? 'bg-gray-700 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'}`}>
-                      {muted ? <MicOff size={16} /> : <Mic size={16} />}
-                    </button>
+                    <button type="button" onClick={() => openCallWindow(thread?.callId || '', selected)} className="px-3 py-2 rounded-xl bg-white/80 dark:bg-gray-900/50 border border-green-200 dark:border-green-700">เปิดหน้าสาย</button>
                     <button type="button" onClick={() => callAction('hangup')} aria-label="วางสาย"
                       className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">
                       <PhoneOff size={17} />
@@ -344,6 +343,7 @@ export default function AdminSupportPage() {
                   if (m.senderRole === 'system') {
                     return <p key={m.$id} className="text-center text-xs text-gray-400 py-1">{m.content}</p>;
                   }
+                  const readByCustomer = !!(thread?.lastReadByCustomerAt && mine && !m.pending && m.createdAt <= thread.lastReadByCustomerAt);
                   return (
                     <div key={m.$id} className={`flex flex-col max-w-[78%] ${mine ? 'items-end ml-auto' : 'items-start'}`}>
                       <div className={`flex flex-col gap-1.5 px-3.5 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${mine ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-md'}`}>
@@ -354,7 +354,7 @@ export default function AdminSupportPage() {
                         )}
                         {m.content && <span>{m.content}</span>}
                       </div>
-                      <small className="text-[10.5px] text-gray-400 mt-0.5">{mine ? m.senderName : ''} {timeShort(m.createdAt)}</small>
+                      <small className="text-[10.5px] text-gray-400 mt-0.5">{mine ? m.senderName : ''} {timeShort(m.createdAt)}{m.pending ? ' · กำลังส่ง...' : readByCustomer ? ' · อ่านแล้ว' : ''}</small>
                     </div>
                   );
                 })}

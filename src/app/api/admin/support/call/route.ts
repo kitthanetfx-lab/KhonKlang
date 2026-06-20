@@ -58,10 +58,10 @@ export async function POST(req: NextRequest) {
     if (action === 'approve') {
       if (thread.callStatus !== 'customer_requesting') return NextResponse.json({ error: 'ไม่มีคำขอโทรรอดำเนินการ' }, { status: 409 });
       await db.updateDocument(DB_ID, COL_THREADS, customerId, {
-        callStatus: 'connecting', callStaffId: staffId, callStaffName: staffName, callUpdatedAt: now, updatedAt: now,
+        callStatus: 'staff_ringing', callStaffId: staffId, callStaffName: staffName, callUpdatedAt: now, updatedAt: now,
       });
-      await logSystem(db, customerId, `พนักงาน ${staffName} รับคำขอโทรกลับ`);
-      return NextResponse.json({ ok: true, callId: thread.callId });
+      await logSystem(db, customerId, `พนักงาน ${staffName} รับคำขอโทรกลับและกำลังเปิดห้องสนทนาเสียง`);
+      return NextResponse.json({ ok: true, callId: thread.callId, callStatus: 'staff_ringing' });
     }
 
     if (action === 'decline') {

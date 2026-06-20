@@ -65,8 +65,9 @@ export async function POST(req: NextRequest) {
 
     if (action === 'answer') {
       if (thread.callStatus !== 'staff_ringing') return NextResponse.json({ error: 'ไม่มีสายเข้า' }, { status: 409 });
-      await db.updateDocument(DB_ID, COL_THREADS, me.$id, { callStatus: 'connecting', callUpdatedAt: now, updatedAt: now });
-      return NextResponse.json({ ok: true });
+      await db.updateDocument(DB_ID, COL_THREADS, me.$id, { callStatus: 'active', callUpdatedAt: now, updatedAt: now });
+      await logSystem(db, me.$id, 'ลูกค้ารับสายแล้ว');
+      return NextResponse.json({ ok: true, callId: thread.callId, callStatus: 'active' });
     }
 
     if (action === 'decline') {

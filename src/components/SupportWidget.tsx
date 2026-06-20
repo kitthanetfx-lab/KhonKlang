@@ -5,13 +5,13 @@ import { usePathname } from 'next/navigation';
 import { account } from '@/lib/appwrite';
 import { compressImage } from '@/lib/imageCompress';
 import { Icon } from './Icon';
-import { CallSession, type CallSessionState } from '@/lib/callSession';
 
-interface SupportMsg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string }
+interface SupportMsg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string; pending?: boolean }
 interface SupportThread {
   $id: string; unreadCustomer: boolean;
   callStatus: 'idle' | 'customer_requesting' | 'staff_ringing' | 'connecting' | 'active' | 'ended';
-  callId: string; callStaffName: string;
+  callId: string; callStaffName: string; callUpdatedAt: string;
+  lastReadByStaffAt: string;
 }
 
 function timeShort(iso: string) {
@@ -30,20 +30,14 @@ export function SupportWidget() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [callState, setCallState] = useState<CallSessionState | null>(null);
-  const [muted, setMuted] = useState(false);
-  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
-  const [elapsed, setElapsed] = useState(0);
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   const panelRef = useRef<HTMLDivElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const sessionRef = useRef<CallSession | null>(null);
   const jwtRef = useRef('');
-  const handledCallIdRef = useRef('');
 
   const getJwt = useCallback(async () => {
     const j = (await account.createJWT()).jwt;
@@ -54,7 +48,7 @@ export function SupportWidget() {
   const loadThread = useCallback(async (markOpen: boolean) => {
     try {
       const jwt = jwtRef.current || await getJwt();
-      const r = await fetch(`/api/support${markOpen ? '?open=1' : ''}`, { headers: { 'x-session-jwt': jwt } });
+      const r = await fetch(`/api/support${markOpen ? '?open=1' : ''}`, { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
       if (r.status === 401) { setAuthed(false); return; }
       if (!r.ok) return;
       const d = await r.json();
@@ -73,7 +67,7 @@ export function SupportWidget() {
   }, [loadThread]);
 
   useEffect(() => {
-    const iv = setInterval(() => { void loadThread(open); }, open ? 3000 : 20000);
+    const iv = setInterval(() => { void loadThread(open); }, open ? 1000 : 8000);
     return () => clearInterval(iv);
   }, [open, loadThread]);
 
@@ -96,55 +90,57 @@ export function SupportWidget() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  // ── จัดการสาย WebRTC ตามสถานะห้องแชท ──
-  useEffect(() => {
-    const status = thread?.callStatus;
-    const callId = thread?.callId || '';
-
-    if (status === 'connecting' && callId && handledCallIdRef.current !== callId) {
-      handledCallIdRef.current = callId;
-      setCallStartedAt(null);
-      const session = new CallSession({
-        role: 'customer', isOfferer: false, callId,
-        signalUrl: '/api/support/signal', getJwt,
-        onState: (s) => { setCallState(s); if (s === 'active') setCallStartedAt(Date.now()); },
-        onRemoteStream: (stream) => { if (audioRef.current) audioRef.current.srcObject = stream; },
-      });
-      sessionRef.current = session;
-      void session.start();
-    }
-
-    if ((status === 'idle' || status === 'ended' || !status) && sessionRef.current) {
-      sessionRef.current.stop(false);
-      sessionRef.current = null;
-      handledCallIdRef.current = '';
-      setCallState(null);
-      setCallStartedAt(null);
-    }
-  }, [thread?.callStatus, thread?.callId, getJwt]);
+  const unread = !!thread?.unreadCustomer;
+  const ringing = thread?.callStatus === 'staff_ringing';
+  const callStartedAtRaw = thread?.callStatus === 'active' && thread.callUpdatedAt ? Date.parse(thread.callUpdatedAt) : Number.NaN;
+  const callStartedAt = Number.isFinite(callStartedAtRaw) ? callStartedAtRaw : null;
+  const elapsed = callStartedAt ? Math.max(0, Math.floor((nowTs - callStartedAt) / 1000)) : 0;
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
 
   useEffect(() => {
     if (!callStartedAt) {
-      const t = window.setTimeout(() => setElapsed(0), 0);
+      const t = window.setTimeout(() => setNowTs(Date.now()), 0);
       return () => window.clearTimeout(t);
     }
-    const iv = setInterval(() => setElapsed(Math.floor((Date.now() - callStartedAt) / 1000)), 1000);
+    const iv = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(iv);
   }, [callStartedAt]);
-
-  useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 
   async function send() {
     const content = input.trim();
     if (!content || sending) return;
+    const tempId = `tmp-${Date.now()}`;
+    const tempMsg: SupportMsg = {
+      $id: tempId,
+      senderId: myId,
+      senderName: 'คุณ',
+      senderRole: 'customer',
+      content,
+      createdAt: new Date().toISOString(),
+      pending: true,
+    };
+    setMsgs(prev => [...prev, tempMsg]);
+    setInput('');
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     setSending(true);
     try {
       const jwt = jwtRef.current || await getJwt();
       const r = await fetch('/api/support', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ content }),
       });
-      if (r.ok) { setInput(''); void loadThread(true); }
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.message) {
+        setMsgs(prev => prev.map(m => m.$id === tempId ? d.message : m));
+        void loadThread(true);
+      } else {
+        setMsgs(prev => prev.filter(m => m.$id !== tempId));
+        setInput(content);
+      }
+    } catch {
+      setMsgs(prev => prev.filter(m => m.$id !== tempId));
+      setInput(content);
     } finally { setSending(false); }
   }
 
@@ -159,14 +155,18 @@ export function SupportWidget() {
       const prepared = await compressImage(file); // บีบอัดรูปก่อนส่ง กันไฟล์ใหญ่เกินลิมิต body ของ API route บน Vercel
       const fd = new FormData();
       fd.append('file', prepared);
-      const up = await fetch('/api/support/upload', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd });
+      const up = await fetch('/api/support/upload', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd, cache: 'no-store' });
       const upData = await up.json().catch(() => ({}));
       if (!up.ok || !upData.url) { alert(upData.error || 'อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
       const r = await fetch('/api/support', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ content: '', imageUrl: upData.url, mimeType: upData.mimeType }),
       });
-      if (r.ok) void loadThread(true);
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.message) {
+        setMsgs(prev => [...prev, d.message]);
+        void loadThread(true);
+      }
     } catch {
       alert('อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง');
     } finally { setUploading(false); }
@@ -175,31 +175,29 @@ export function SupportWidget() {
   async function callAction(action: string) {
     try {
       const jwt = jwtRef.current || await getJwt();
-      await fetch('/api/support/call', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+      const r = await fetch('/api/support/call', {
+        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ action }),
       });
+      const d = await r.json().catch(() => ({}));
       void loadThread(open);
+      return d as { callId?: string };
     } catch { /* แสดงผลรอบโพลถัดไป */ }
+    return {};
   }
 
-  function toggleMute() {
-    const next = !muted;
-    setMuted(next);
-    sessionRef.current?.setMuted(next);
+  function openCallWindow(callId: string) {
+    if (!callId) return;
+    const url = `/support-call/${encodeURIComponent(callId)}?role=customer`;
+    const w = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!w) window.location.href = url;
   }
 
   // ไม่แสดงในหลังบ้านแอดมิน — แอดมินมีแดชบอร์ดแชทของตัวเองแล้ว
   if (pathname?.startsWith('/admin')) return null;
 
-  const unread = !!thread?.unreadCustomer;
-  const ringing = thread?.callStatus === 'staff_ringing';
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const ss = String(elapsed % 60).padStart(2, '0');
-
   return (
     <>
-      <audio ref={audioRef} autoPlay />
       <div className="sw-wrap">
         {open && (
           <div className="sw-panel" role="dialog" aria-modal="false" aria-label="แชทกับทีมงาน" ref={panelRef}>
@@ -233,14 +231,14 @@ export function SupportWidget() {
                   <div className="sw-callbar ring" role="alert">
                     <span><Icon name="phone" size={16} /> พนักงาน{thread?.callStaffName ? ` ${thread.callStaffName}` : ''}กำลังโทรเข้า</span>
                     <span className="sw-callbtns">
-                      <button type="button" className="sw-roundbtn accept" onClick={() => callAction('answer')} aria-label="รับสาย"><Icon name="phoneCall" size={18} /></button>
+                      <button type="button" className="sw-roundbtn accept" onClick={async () => { const d = await callAction('answer'); openCallWindow(String(d.callId || thread?.callId || '')); }} aria-label="รับสาย"><Icon name="phoneCall" size={18} /></button>
                       <button type="button" className="sw-roundbtn decline" onClick={() => callAction('decline')} aria-label="ปฏิเสธสาย"><Icon name="phoneOff" size={18} /></button>
                     </span>
                   </div>
                 )}
                 {thread?.callStatus === 'connecting' && (
                   <div className="sw-callbar active" role="status">
-                    <span><Icon name="phone" size={16} /> {callState === 'failed' ? 'เชื่อมต่อไม่สำเร็จ' : 'กำลังเชื่อมต่อสาย…'}</span>
+                    <span><Icon name="phone" size={16} /> กำลังเตรียมห้องสนทนาเสียง…</span>
                     <button type="button" className="sw-roundbtn decline" onClick={() => callAction('hangup')} aria-label="วางสาย"><Icon name="phoneOff" size={18} /></button>
                   </div>
                 )}
@@ -248,9 +246,7 @@ export function SupportWidget() {
                   <div className="sw-callbar active" role="status">
                     <span><Icon name="phone" size={16} /> สายกำลังคุยอยู่ · {mm}:{ss}</span>
                     <span className="sw-callbtns">
-                      <button type="button" className={`sw-roundbtn ${muted ? 'on' : ''}`} onClick={toggleMute} aria-label={muted ? 'เปิดไมค์' : 'ปิดไมค์'}>
-                        <Icon name={muted ? 'micOff' : 'mic'} size={16} />
-                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => openCallWindow(thread?.callId || '')}>เปิดหน้าสาย</button>
                       <button type="button" className="sw-roundbtn decline" onClick={() => callAction('hangup')} aria-label="วางสาย"><Icon name="phoneOff" size={18} /></button>
                     </span>
                   </div>
@@ -262,6 +258,7 @@ export function SupportWidget() {
                   )}
                   {msgs.map(m => {
                     const mine = m.senderRole !== 'staff';
+                    const readByStaff = !!(thread?.lastReadByStaffAt && mine && m.senderRole === 'customer' && !m.pending && m.createdAt <= thread.lastReadByStaffAt);
                     return (
                       <div key={m.$id} className={`sw-row ${mine ? 'mine' : ''} ${m.senderRole === 'system' ? 'sys' : ''}`}>
                         {m.senderRole === 'system' ? (
@@ -276,7 +273,7 @@ export function SupportWidget() {
                               )}
                               {m.content && <span>{m.content}</span>}
                             </div>
-                            <small>{m.senderRole === 'staff' ? `${m.senderName} · ` : ''}{timeShort(m.createdAt)}</small>
+                            <small>{m.senderRole === 'staff' ? `${m.senderName} · ` : ''}{timeShort(m.createdAt)}{m.pending ? ' · กำลังส่ง...' : readByStaff ? ' · อ่านแล้ว' : ''}</small>
                           </>
                         )}
                       </div>
@@ -300,7 +297,7 @@ export function SupportWidget() {
                   <button
                     type="button" className="sw-iconbtn call" aria-label="ขอให้พนักงานโทรกลับ"
                     disabled={!!thread && thread.callStatus !== 'idle' && thread.callStatus !== 'ended'}
-                    onClick={() => callAction('request')}
+                    onClick={() => { void callAction('request'); }}
                   >
                     <Icon name="phoneCall" size={18} />
                   </button>
@@ -334,4 +331,3 @@ export function SupportWidget() {
 }
 
 export default SupportWidget;
-

@@ -26,15 +26,22 @@ export async function GET(req: NextRequest) {
     const me = await getMe(req);
     const db = getAdmin();
     await ensureSupportCollections(db);
-    const thread = await getOrCreateThread(db, me.$id, ((me.prefs || {}) as Record<string, string>).displayName || me.name || 'ลูกค้า');
+    let thread = await getOrCreateThread(db, me.$id, ((me.prefs || {}) as Record<string, string>).displayName || me.name || 'ลูกค้า');
 
     const r = await db.listDocuments(DB_ID, COL_MESSAGES, [
       Query.equal('threadId', me.$id), Query.orderAsc('createdAt'), Query.limit(200),
     ]).catch(() => ({ documents: [] as unknown[] }));
 
     // ทำเครื่องหมายอ่านแล้วเฉพาะตอนลูกค้าเปิดดูแชทจริง ๆ (ไม่ใช่ทุกครั้งที่โพลพื้นหลัง)
-    if (req.nextUrl.searchParams.get('open') === '1' && thread.unreadCustomer) {
-      await db.updateDocument(DB_ID, COL_THREADS, me.$id, { unreadCustomer: false }).catch(() => null);
+    if (
+      req.nextUrl.searchParams.get('open') === '1'
+      && (thread.unreadCustomer || (thread.lastSender === 'staff' && (!thread.lastReadByCustomerAt || thread.lastReadByCustomerAt < thread.lastAt)))
+    ) {
+      const now = new Date().toISOString();
+      thread = await db.updateDocument(DB_ID, COL_THREADS, me.$id, {
+        unreadCustomer: false,
+        lastReadByCustomerAt: now,
+      }).catch(() => thread) as typeof thread;
     }
 
     return NextResponse.json({ thread, messages: r.documents });

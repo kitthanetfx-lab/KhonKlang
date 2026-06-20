@@ -30,8 +30,14 @@ export async function GET(req: NextRequest) {
       const r = await db.listDocuments(DB_ID, COL_MESSAGES, [
         Query.equal('threadId', withId), Query.orderAsc('createdAt'), Query.limit(300),
       ]).catch(() => ({ documents: [] as unknown[] }));
-      const thread = await db.getDocument(DB_ID, COL_THREADS, withId).catch(() => null);
-      if (thread?.unreadStaff) await db.updateDocument(DB_ID, COL_THREADS, withId, { unreadStaff: false }).catch(() => null);
+      let thread = await db.getDocument(DB_ID, COL_THREADS, withId).catch(() => null);
+      if (thread && (thread.unreadStaff || (thread.lastSender === 'customer' && (!thread.lastReadByStaffAt || thread.lastReadByStaffAt < thread.lastAt)))) {
+        const now = new Date().toISOString();
+        thread = await db.updateDocument(DB_ID, COL_THREADS, withId, {
+          unreadStaff: false,
+          lastReadByStaffAt: now,
+        }).catch(() => thread);
+      }
       return NextResponse.json({ thread, messages: r.documents });
     }
 

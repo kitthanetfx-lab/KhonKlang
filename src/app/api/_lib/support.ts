@@ -1,6 +1,6 @@
 // Shared helpers — ระบบแชทศูนย์ช่วยเหลือ (customer care) + คำขอโทร
 // รูปแบบเดียวกับ dm/route.ts และ _lib/notify.ts: สร้างคอลเลกชันแบบ lazy ครั้งแรกที่ใช้งาน
-import { Databases, DatabasesIndexType, ID, OrderBy, Permission, Role, Query } from 'node-appwrite';
+import { Databases, DatabasesIndexType, OrderBy, Permission, Role, Query } from 'node-appwrite';
 
 export const DB_ID = 'khonklang_db';
 export const COL_THREADS  = 'support_threads';
@@ -26,6 +26,8 @@ export interface SupportThreadDoc {
   callStaffId: string;
   callStaffName: string;
   callUpdatedAt: string;
+  lastReadByCustomerAt: string;
+  lastReadByStaffAt: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -90,6 +92,7 @@ async function ensureBooleanAttribute(db: Databases, colId: string, key: string,
 
 // กันยิง migration ของ attribute รูปภาพซ้ำในอินสแตนซ์ serverless เดียวกันที่ยัง warm อยู่
 let messageImageAttrsEnsured = false;
+let threadExtraAttrsEnsured = false;
 
 export async function ensureSupportCollections(db: Databases) {
   // ── support_threads ──
@@ -111,6 +114,8 @@ export async function ensureSupportCollections(db: Databases) {
       await ensureStringAttribute(db, COL_THREADS, 'callStaffId', 255, false, '');
       await ensureStringAttribute(db, COL_THREADS, 'callStaffName', 200, false, '');
       await ensureStringAttribute(db, COL_THREADS, 'callUpdatedAt', 30, false, '');
+      await ensureStringAttribute(db, COL_THREADS, 'lastReadByCustomerAt', 30, false, '');
+      await ensureStringAttribute(db, COL_THREADS, 'lastReadByStaffAt', 30, false, '');
       await ensureStringAttribute(db, COL_THREADS, 'createdAt', 30, false, '');
       await ensureStringAttribute(db, COL_THREADS, 'updatedAt', 30, false, '');
       await Promise.all([
@@ -120,6 +125,11 @@ export async function ensureSupportCollections(db: Databases) {
     } catch (err) {
       if (!String(err).includes('missing scopes') && !String(err).includes('already exists')) throw err;
     }
+  }
+  if (!threadExtraAttrsEnsured) {
+    await ensureStringAttribute(db, COL_THREADS, 'lastReadByCustomerAt', 30, false, '');
+    await ensureStringAttribute(db, COL_THREADS, 'lastReadByStaffAt', 30, false, '');
+    threadExtraAttrsEnsured = true;
   }
 
   // ── support_messages ──
@@ -195,6 +205,8 @@ export async function getOrCreateThread(db: Databases, customerId: string, custo
       callStaffId: '',
       callStaffName: '',
       callUpdatedAt: now,
+      lastReadByCustomerAt: '',
+      lastReadByStaffAt: '',
       createdAt: now,
       updatedAt: now,
     });
