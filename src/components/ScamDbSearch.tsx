@@ -2,20 +2,16 @@
 /* eslint-disable @next/next/no-img-element */
 import React, { useState } from 'react';
 import { Icon } from './Icon';
+import { fileViewUrl, REPORT_BUCKET } from '@/lib/supabase';
 
-const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
-const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const fileUrl = (id: string) => `${ENDPOINT}/storage/buckets/report_files/files/${id}/view?project=${PROJECT}`;
+const fileUrl = (id: string) => fileViewUrl(REPORT_BUCKET, id);
 
 interface Hit {
-  id: string; firstName: string; lastName: string; bankAccounts: string;
+  id: string; firstName: string; lastName: string; bankAccounts: { acct: string; bank: string }[];
   product: string; amount: number; transferDate: string; sellerPage: string;
-  province: string; detail: string; chatImageIds: string; slipImageIds: string;
+  province: string; detail: string; chatImageIds: string[]; slipImageIds: string[];
   sourceName: string; status: string; createdAt: string;
 }
-
-function parseArr(s: string): string[] { try { return JSON.parse(s || '[]'); } catch { return []; } }
-function parseAccts(s: string): { acct: string; bank: string }[] { try { return JSON.parse(s || '[]'); } catch { return []; } }
 
 export function ScamDbSearch() {
   const [q, setQ] = useState('');
@@ -62,8 +58,8 @@ export function ScamDbSearch() {
           <div style={{ display: 'grid', gap: 14 }}>
             <p style={{ fontSize: 13.5, color: 'var(--rose-500)', fontWeight: 600 }}>⚠️ พบ {results.length} รายงานที่เกี่ยวข้อง — ตรวจสอบรายละเอียดก่อนตัดสินใจโอนเงิน</p>
             {results.map(h => {
-              const accts = parseAccts(h.bankAccounts);
-              const imgs = [...parseArr(h.slipImageIds), ...parseArr(h.chatImageIds)].slice(0, 6);
+              const accts = h.bankAccounts || [];
+              const imgs = [...(h.slipImageIds || []), ...(h.chatImageIds || [])].slice(0, 6);
               const open = expanded === h.id;
               return (
                 <div key={h.id} className="csr-card csr-hit">

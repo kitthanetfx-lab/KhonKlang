@@ -4,13 +4,11 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { account, clearPersistedSession } from '@/lib/appwrite';
+import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { Icon } from '@/components/Icon';
 import { THAI_BANKS } from '@/lib/banks';
 
-const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
-const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const qrUrl = (id: string) => `${ENDPOINT}/storage/buckets/deal_files/files/${id}/view?project=${PROJECT}`;
+const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
 const PROVINCES = ['กระบี่','กรุงเทพมหานคร','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
@@ -23,21 +21,21 @@ const ROLE_INFO: Record<string, { label: string; cls: string }> = {
 
 interface MiddlemanWallet {
   tier: string;
-  creditLimit: number;
-  availableCredit: number;
-  heldCredit: number;
-  releasedCredit: number;
-  penaltyCredit: number;
-  activeDealCount: number;
-  updatedAt: string;
+  credit_limit: number;
+  available_credit: number;
+  held_credit: number;
+  released_credit: number;
+  penalty_credit: number;
+  active_deal_count: number;
+  updated_at: string;
 }
 
 interface LedgerEntry {
-  entryKey: string;
+  entry_key: string;
   purpose: string;
   amount: number;
   status: string;
-  dealNumber?: string;
+  deal_number?: string;
 }
 
 const LEDGER_STATUS: Record<string, string> = {
@@ -114,49 +112,55 @@ function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    account.get()
-      .then(async u => {
-        setDisplayName(u.name || '');
-        const em = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { router.replace('/login'); return; }
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        let p = (profile || {}) as Record<string, string>;
+        setDisplayName(p.display_name || '');
+        const em = (!user.email || user.email.includes('@line.khonklang.app')) ? '' : user.email;
         setEmail(em);
-        let p = (u.prefs || {}) as Record<string, string>;
         setPrefs(p);
         try {
-          const jwt = (await account.createJWT()).jwt;
+          const headers = await authHeaders();
           const [sellerRes, middlemanRes, profileRes] = await Promise.all([
-            fetch('/api/register/seller', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
-            fetch('/api/register/middleman', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
-            fetch('/api/profile', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
+            fetch('/api/register/seller', { headers }).catch(() => null),
+            fetch('/api/register/middleman', { headers }).catch(() => null),
+            fetch('/api/profile', { headers }).catch(() => null),
           ]);
           const sellerData = sellerRes?.ok ? await sellerRes.json() : null;
           const middlemanData = middlemanRes?.ok ? await middlemanRes.json() : null;
           const profileData = profileRes?.ok ? await profileRes.json() : null;
           let synced = false;
-          if (sellerData?.status && sellerData.status !== p.sellerStatus) { p = { ...p, sellerStatus: sellerData.status }; synced = true; }
-          if (middlemanData?.status && middlemanData.status !== p.middlemanStatus) { p = { ...p, middlemanStatus: middlemanData.status }; synced = true; }
+          if (sellerData?.status && sellerData.status !== p.seller_status) { p = { ...p, seller_status: sellerData.status }; synced = true; }
+          if (middlemanData?.status && middlemanData.status !== p.middleman_status) { p = { ...p, middleman_status: middlemanData.status }; synced = true; }
           if (synced) setPrefs(p);
           setWallet(profileData?.wallet || null);
           setLedger(profileData?.ledger || []);
         } catch { /* best-effort */ }
-      })
-      .catch(() => router.replace('/login'))
-      .finally(() => setLoading(false));
+      } catch {
+        router.replace('/login');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [router]);
 
   const openEdit = () => {
-    setEditFirst(prefs.firstName || ''); setEditLast(prefs.lastName || '');
+    setEditFirst(prefs.first_name || ''); setEditLast(prefs.last_name || '');
     setEditPhone(prefs.phone || ''); setEditAddr(parseAddress(prefs.address || ''));
-    setEditBankName(prefs.bankName || ''); setEditBankAcct(prefs.bankAcct || '');
-    setEditBankOwner(prefs.bankOwner || ''); setEditBankQr(prefs.bankQrFileId || '');
+    setEditBankName(prefs.bank_name || ''); setEditBankAcct(prefs.bank_acct || '');
+    setEditBankOwner(prefs.bank_owner || ''); setEditBankQr(prefs.bank_qr_file_id || '');
     setError(''); setSaveOk(false); setEditing(true);
   };
 
   async function uploadBankQr(file: File) {
     setQrUploading(true);
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const form = new FormData(); form.append('file', file);
-      const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: form });
+      const r = await fetch('/api/upload-deal', { method: 'POST', headers, body: form });
       const d = await r.json();
       if (r.ok && d.fileId) setEditBankQr(d.fileId);
       else setError(d.error || 'อัปโหลด QR ไม่สำเร็จ');
@@ -198,27 +202,23 @@ function ProfilePage() {
     if (!editPhone.trim()) return setError('กรุณากรอกเบอร์โทรศัพท์');
     setSaving(true); setError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const address = buildAddress(editAddr);
       const res = await fetch('/api/profile', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ firstName: editFirst, lastName: editLast, phone: editPhone, address, bankName: editBankName, bankAcct: editBankAcct, bankOwner: editBankOwner, bankQrFileId: editBankQr }),
       });
       if (!res.ok) { const d = await res.json(); setError(d.error || 'เกิดข้อผิดพลาด'); return; }
-      const newPrefs = { ...prefs, firstName: editFirst, lastName: editLast, phone: editPhone, address, displayName: `${editFirst} ${editLast}`.trim(), bankName: editBankName, bankAcct: editBankAcct, bankOwner: editBankOwner, bankQrFileId: editBankQr };
+      const newPrefs = { ...prefs, first_name: editFirst, last_name: editLast, phone: editPhone, address, display_name: `${editFirst} ${editLast}`.trim(), bank_name: editBankName, bank_acct: editBankAcct, bank_owner: editBankOwner, bank_qr_file_id: editBankQr };
       setPrefs(newPrefs); setDisplayName(`${editFirst} ${editLast}`.trim()); setSaveOk(true);
       setTimeout(() => { setEditing(false); setSaveOk(false); }, 1200);
     } catch { setError('เกิดข้อผิดพลาด กรุณาลองใหม่'); } finally { setSaving(false); }
   };
 
   const logout = async () => {
-    try {
-      await account.deleteSession('current');
-    } finally {
-      clearPersistedSession();
-      router.push('/');
-    }
+    await supabase.auth.signOut().catch(() => null);
+    router.push('/');
   };
 
   if (loading) return (
@@ -229,10 +229,10 @@ function ProfilePage() {
 
   const role = (prefs.role || 'user') as string;
   const roleInfo = ROLE_INFO[role] ?? ROLE_INFO.user;
-  const firstName = prefs.firstName || '', lastName = prefs.lastName || '';
+  const firstName = prefs.first_name || '', lastName = prefs.last_name || '';
   const phone = prefs.phone || '', address = prefs.address || '';
   const initials = (displayName || 'U').slice(0, 2).toUpperCase();
-  const sellerStatus = prefs.sellerStatus || '', middlemanStatus = prefs.middlemanStatus || '';
+  const sellerStatus = prefs.seller_status || '', middlemanStatus = prefs.middleman_status || '';
 
   return (
     <div className="sub-page">
@@ -317,20 +317,20 @@ function ProfilePage() {
           <div className="pf-card">
             <div className="pf-card-title">Middleman Credit Wallet</div>
             <div className="pf-row"><span className="pf-row-lbl">Tier</span><span className="pf-row-val">{wallet.tier}</span></div>
-            <div className="pf-row"><span className="pf-row-lbl">วงเงินเครดิต</span><span className="pf-row-val">{baht(wallet.creditLimit)}</span></div>
-            <div className="pf-row"><span className="pf-row-lbl">เครดิตคงเหลือ</span><span className="pf-row-val" style={{ color: 'var(--green-700)' }}>{baht(wallet.availableCredit)}</span></div>
-            <div className="pf-row"><span className="pf-row-lbl">เครดิตที่ hold</span><span className="pf-row-val">{baht(wallet.heldCredit)}</span></div>
-            <div className="pf-row"><span className="pf-row-lbl">เครดิตปลดแล้ว</span><span className="pf-row-val">{baht(wallet.releasedCredit)}</span></div>
-            <div className="pf-row"><span className="pf-row-lbl">เครดิตถูกหัก</span><span className="pf-row-val">{baht(wallet.penaltyCredit)}</span></div>
-            <div className="pf-row"><span className="pf-row-lbl">ดีล/งานที่ lock เครดิต</span><span className="pf-row-val">{wallet.activeDealCount}</span></div>
-            <div className="pf-row"><span className="pf-row-lbl">อัปเดตล่าสุด</span><span className="pf-row-val">{new Date(wallet.updatedAt).toLocaleString('th-TH')}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">วงเงินเครดิต</span><span className="pf-row-val">{baht(wallet.credit_limit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">เครดิตคงเหลือ</span><span className="pf-row-val" style={{ color: 'var(--green-700)' }}>{baht(wallet.available_credit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">เครดิตที่ hold</span><span className="pf-row-val">{baht(wallet.held_credit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">เครดิตปลดแล้ว</span><span className="pf-row-val">{baht(wallet.released_credit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">เครดิตถูกหัก</span><span className="pf-row-val">{baht(wallet.penalty_credit)}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">ดีล/งานที่ lock เครดิต</span><span className="pf-row-val">{wallet.active_deal_count}</span></div>
+            <div className="pf-row"><span className="pf-row-lbl">อัปเดตล่าสุด</span><span className="pf-row-val">{new Date(wallet.updated_at).toLocaleString('th-TH')}</span></div>
             {ledger.length > 0 && (
               <div style={{ marginTop: 12, borderTop: '1px solid var(--line-2)', paddingTop: 12 }}>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, fontWeight: 700 }}>รายการเครดิตล่าสุด</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {ledger.slice(0, 4).map(item => (
-                    <div key={item.entryKey} className="pf-row" style={{ alignItems: 'flex-start' }}>
-                      <span className="pf-row-lbl">{item.dealNumber || 'รายการเครดิต'}</span>
+                    <div key={item.entry_key} className="pf-row" style={{ alignItems: 'flex-start' }}>
+                      <span className="pf-row-lbl">{item.deal_number || 'รายการเครดิต'}</span>
                       <span className="pf-row-val" style={{ maxWidth: '62%', textAlign: 'right' }}>
                         <span style={{ display: 'block', fontWeight: 700 }}>{item.purpose}</span>
                         <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>{baht(item.amount)} · {LEDGER_STATUS[item.status] || item.status}</span>
@@ -364,12 +364,12 @@ function ProfilePage() {
               </div>
             </div>
           ) : (
-            (prefs.bankAcct || prefs.bankName || prefs.bankQrFileId) ? (
+            (prefs.bank_acct || prefs.bank_name || prefs.bank_qr_file_id) ? (
               <>
-                {prefs.bankName && <div className="pf-row"><span className="pf-row-lbl">ธนาคาร</span><span className="pf-row-val">{prefs.bankName}</span></div>}
-                {prefs.bankAcct && <div className="pf-row"><span className="pf-row-lbl">เลขที่บัญชี</span><span className="pf-row-val mono">{prefs.bankAcct}</span></div>}
-                {prefs.bankOwner && <div className="pf-row"><span className="pf-row-lbl">ชื่อบัญชี</span><span className="pf-row-val">{prefs.bankOwner}</span></div>}
-                {prefs.bankQrFileId && <div style={{ marginTop: 10 }}><img src={qrUrl(prefs.bankQrFileId)} alt="QR พร้อมเพย์" style={{ width: 120, height: 120, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} /></div>}
+                {prefs.bank_name && <div className="pf-row"><span className="pf-row-lbl">ธนาคาร</span><span className="pf-row-val">{prefs.bank_name}</span></div>}
+                {prefs.bank_acct && <div className="pf-row"><span className="pf-row-lbl">เลขที่บัญชี</span><span className="pf-row-val mono">{prefs.bank_acct}</span></div>}
+                {prefs.bank_owner && <div className="pf-row"><span className="pf-row-lbl">ชื่อบัญชี</span><span className="pf-row-val">{prefs.bank_owner}</span></div>}
+                {prefs.bank_qr_file_id && <div style={{ marginTop: 10 }}><img src={qrUrl(prefs.bank_qr_file_id)} alt="QR พร้อมเพย์" style={{ width: 120, height: 120, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} /></div>}
               </>
             ) : (
               <p style={{ color: 'var(--muted)', fontSize: 13 }}>ยังไม่ได้กรอกบัญชีรับเงิน — กด &quot;แก้ไข&quot; เพื่อเพิ่มบัญชีและรูป QR สำหรับรับเงิน</p>

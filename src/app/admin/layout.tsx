@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { account, clearPersistedSession } from '@/lib/appwrite';
+import { supabase } from '@/lib/supabase';
 import {
   LayoutDashboard, Store, Shield, Users, Settings, SlidersHorizontal,
   LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, MapPin, Wallet, MessageCircle,
@@ -33,14 +33,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (pathname === '/admin/setup') return;
-    account.get()
-      .then(u => {
-        const prefs = (u.prefs as Record<string, string>) || {};
-        if (prefs.role !== 'admin') { router.replace('/admin/setup'); return; }
-        setAdminName(u.name || 'Admin');
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { router.replace('/login'); return; }
+        const { data: profile } = await supabase.from('profiles').select('role, display_name').eq('id', user.id).maybeSingle();
+        if (profile?.role !== 'admin') { router.replace('/admin/setup'); return; }
+        setAdminName(profile.display_name || 'Admin');
         setChecking(false);
-      })
-      .catch(() => router.replace('/login'));
+      } catch {
+        router.replace('/login');
+      }
+    })();
   }, [router, pathname]);
 
   if (checking) {
@@ -97,14 +101,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <button
               onClick={async () => {
-                try {
-                  await account.deleteSession('current');
-                } catch {
-                  // Continue clearing local auth state even if the remote session is gone.
-                } finally {
-                  clearPersistedSession();
-                  router.push('/login');
-                }
+                await supabase.auth.signOut().catch(() => {
+                  // Continue even if the remote session is already gone.
+                });
+                router.push('/login');
               }}
               className="p-1.5 text-gray-500 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
               <LogOut size={15} />

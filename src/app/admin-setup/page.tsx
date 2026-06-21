@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 
 export default function AdminSetupPage() {
   const router = useRouter();
@@ -14,10 +14,10 @@ export default function AdminSetupPage() {
   const handleSetup = async () => {
     setLoading(true); setError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const res = await fetch('/api/admin/setup', {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt },
+        headers,
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'เกิดข้อผิดพลาด'); return; }

@@ -26,3 +26,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# Appwrite -> Supabase migration exports (contain real user/financial data — never commit)
+/supabase/migration/.data/
+/supabase/migration/.transformed/

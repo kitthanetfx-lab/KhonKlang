@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases, Query } from 'node-appwrite';
-import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
-
-const COL = 'scam_reports';
+import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 
 /** รายการรายงานคนโกงสำหรับแอดมิน (กรองตามสถานะได้: pending_review / approved / rejected) */
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const databases = new Databases(getAdminClient());
+    const db = getAdminClient();
     const status = req.nextUrl.searchParams.get('status') || 'pending_review';
-    const queries = [Query.orderDesc('createdAt'), Query.limit(200)];
-    if (status !== 'all') queries.push(Query.equal('status', status));
-    const res = await databases.listDocuments(DB_ID, COL, queries).catch(() => ({ documents: [], total: 0 }));
-    return NextResponse.json(res);
+    let query = db.from('scam_reports').select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(200);
+    if (status !== 'all') query = query.eq('status', status);
+    const { data, count } = await query;
+    return NextResponse.json({ documents: data || [], total: count || 0 });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }
 
@@ -24,17 +21,18 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const databases = new Databases(getAdminClient());
+    const db = getAdminClient();
     const { id, action } = await req.json();
     if (!id || !['approve', 'reject'].includes(action)) {
       return NextResponse.json({ error: 'missing params' }, { status: 400 });
     }
-    const updated = await databases.updateDocument(DB_ID, COL, id, {
+    const { data: updated, error } = await db.from('scam_reports').update({
       status: action === 'approve' ? 'approved' : 'rejected',
-    });
+    }).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
     return NextResponse.json({ report: updated });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

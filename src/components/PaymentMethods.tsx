@@ -7,9 +7,8 @@ const ENV_PP = process.env.NEXT_PUBLIC_PROMPTPAY_ID || '';
 const ENV_BANK = process.env.NEXT_PUBLIC_COMPANY_BANK || '';
 const ENV_ACCT = process.env.NEXT_PUBLIC_COMPANY_BANK_ACCT || '';
 const ENV_HOLDER = process.env.NEXT_PUBLIC_COMPANY_BANK_HOLDER || 'บริษัท คนกลาง จำกัด';
-const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
-const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const fileUrl = (id: string) => `${ENDPOINT}/storage/buckets/deal_files/files/${id}/view?project=${PROJECT}`;
+import { fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
+const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
 interface PayCfg { promptPay: string; bankName: string; bankAcct: string; bankHolder: string; qrFileId: string; }
 

@@ -2,20 +2,26 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { account } from '@/lib/appwrite';
+import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2 } from 'lucide-react';
 import { dealCode } from '@/lib/dealNumber';
-import { readDealPriceState } from '@/lib/dealPriceState';
 
-const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
-const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const fileUrl = (id: string) => `${ENDPOINT}/storage/buckets/deal_files/files/${id}/view?project=${PROJECT}`;
+const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
+interface DealMeetup {
+  deposit: number; refunded_at?: string; buyer_met: boolean; seller_met: boolean;
+  buyer_slip?: string; seller_slip?: string;
+}
+interface DealPriceState {
+  seller_fee_slip?: string; payout_slip_file_id?: string; refund_slip_file_id?: string;
+}
 interface Deal {
-  $id: string; title: string; price: number; status: string; dealType?: string;
-  buyerName: string; sellerName: string; middlemanName: string;
-  rejectReason: string; meetupData?: string; priceData?: string; createdAt: string;
-  paymentSlipFileId?: string;
+  id: string; title: string; price: number; status: string; deal_type?: string;
+  buyer_name: string; seller_name: string; middleman_name: string;
+  reject_reason: string; created_at: string;
+  payment_slip_file_id?: string;
+  meetup?: DealMeetup | null;
+  priceState?: DealPriceState | null;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -43,8 +49,8 @@ export default function AdminDeals() {
   const load = useCallback(async (filter: string) => {
     setDeals(null);
     try {
-      const jwt = (await account.createJWT()).jwt;
-      const r = await fetch(`/api/admin/deals?filter=${filter}`, { headers: { 'x-session-jwt': jwt } });
+      const headers = await authHeaders();
+      const r = await fetch(`/api/admin/deals?filter=${filter}`, { headers });
       const d = await r.json();
       setDeals(d.documents || []);
     } catch { setDeals([]); }
@@ -60,10 +66,10 @@ export default function AdminDeals() {
     if (promptMsg) { const v = window.prompt(promptMsg); if (v === null) return; note = v; }
     setActing(id);
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const r = await fetch('/api/admin/deals', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action, note }),
       });
       if (r.ok) load(tab);
@@ -71,27 +77,22 @@ export default function AdminDeals() {
   }
 
   function refundInfo(d: Deal) {
-    if (d.dealType !== 'meetup') return null;
-    try {
-      const md = JSON.parse(d.meetupData || '{}');
-      return { deposit: md.deposit || 0, refundedAt: md.refundedAt, bothMet: md.buyerMet && md.sellerMet };
-    } catch { return null; }
+    if (d.deal_type !== 'meetup' || !d.meetup) return null;
+    const md = d.meetup;
+    return { deposit: md.deposit || 0, refundedAt: md.refunded_at, bothMet: md.buyer_met && md.seller_met };
   }
 
   // รวมสลิปทุกใบของดีล — ทุกฝ่าย (ผู้ซื้อ/ผู้ขาย/คนกลาง/แอดมิน) ต้องเห็นได้ที่นี่เช่นกัน
   function slipsOf(d: Deal): { label: string; fileId: string }[] {
     const slips: { label: string; fileId: string }[] = [];
-    if (d.paymentSlipFileId) slips.push({ label: 'สลิปผู้ซื้อ (ค่าสินค้า)', fileId: d.paymentSlipFileId });
-    const pd = readDealPriceState({ priceData: d.priceData || '', meetupData: d.meetupData || '' });
-    if (pd.sellerFeeSlip) slips.push({ label: 'สลิปผู้ขาย (ค่าบริการ)', fileId: pd.sellerFeeSlip });
-    if (pd.payoutSlipFileId) slips.push({ label: 'สลิปศูนย์กลางโอนให้ผู้ขาย', fileId: pd.payoutSlipFileId });
-    if (pd.refundSlipFileId) slips.push({ label: 'สลิปศูนย์กลางคืนให้ผู้ซื้อ', fileId: pd.refundSlipFileId });
-    if (d.dealType === 'meetup') {
-      try {
-        const md = JSON.parse(d.meetupData || '{}');
-        if (md.buyerSlip) slips.push({ label: 'สลิปผู้ซื้อ (เงินประกัน)', fileId: md.buyerSlip });
-        if (md.sellerSlip) slips.push({ label: 'สลิปผู้ขาย (เงินประกัน)', fileId: md.sellerSlip });
-      } catch {}
+    if (d.payment_slip_file_id) slips.push({ label: 'สลิปผู้ซื้อ (ค่าสินค้า)', fileId: d.payment_slip_file_id });
+    const pd = d.priceState;
+    if (pd?.seller_fee_slip) slips.push({ label: 'สลิปผู้ขาย (ค่าบริการ)', fileId: pd.seller_fee_slip });
+    if (pd?.payout_slip_file_id) slips.push({ label: 'สลิปศูนย์กลางโอนให้ผู้ขาย', fileId: pd.payout_slip_file_id });
+    if (pd?.refund_slip_file_id) slips.push({ label: 'สลิปศูนย์กลางคืนให้ผู้ซื้อ', fileId: pd.refund_slip_file_id });
+    if (d.deal_type === 'meetup' && d.meetup) {
+      if (d.meetup.buyer_slip) slips.push({ label: 'สลิปผู้ซื้อ (เงินประกัน)', fileId: d.meetup.buyer_slip });
+      if (d.meetup.seller_slip) slips.push({ label: 'สลิปผู้ขาย (เงินประกัน)', fileId: d.meetup.seller_slip });
     }
     return slips;
   }
@@ -124,21 +125,21 @@ export default function AdminDeals() {
           const refund = refundInfo(d);
           const slips = slipsOf(d);
           return (
-            <div key={d.$id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+            <div key={d.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">{dealCode(d.$id)}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">{dealCode(d.id)}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.label}</span>
-                    {d.dealType === 'meetup' && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">นัดรับ</span>}
-                    {d.dealType === 'simple' && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">แบบง่าย</span>}
+                    {d.deal_type === 'meetup' && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">นัดรับ</span>}
+                    {d.deal_type === 'simple' && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">แบบง่าย</span>}
                     <span className="font-mono text-sm font-bold text-green-600">฿{Number(d.price || 0).toLocaleString()}</span>
                   </div>
                   <p className="font-semibold mt-1 text-gray-900 dark:text-gray-100">{d.title}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    ผู้ขาย: {d.sellerName || '-'} · ผู้ซื้อ: {d.buyerName || '-'} {d.middlemanName ? `· คนกลาง: ${d.middlemanName}` : ''}
+                    ผู้ขาย: {d.seller_name || '-'} · ผู้ซื้อ: {d.buyer_name || '-'} {d.middleman_name ? `· คนกลาง: ${d.middleman_name}` : ''}
                   </p>
-                  {d.rejectReason && <p className="text-xs text-red-500 mt-1">เหตุ: {d.rejectReason}</p>}
+                  {d.reject_reason && <p className="text-xs text-red-500 mt-1">เหตุ: {d.reject_reason}</p>}
                   {refund && (
                     <p className="text-xs mt-1 text-gray-500">
                       เงินประกัน ฿{refund.deposit.toLocaleString()}/ฝ่าย · {refund.bothMet ? 'เจอกันสำเร็จ' : 'ยังไม่ครบ'} ·
@@ -146,7 +147,7 @@ export default function AdminDeals() {
                     </p>
                   )}
                 </div>
-                <Link href={`/deal/${d.$id}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">
+                <Link href={`/deal/${d.id}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">
                   <ExternalLink size={12} /> เปิดดีล
                 </Link>
               </div>
@@ -165,29 +166,29 @@ export default function AdminDeals() {
               <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {d.status === 'disputed' && (
                   <>
-                    <button onClick={() => act(d.$id, 'resolve_dispute', 'บันทึกผลการตัดสิน (ปล่อยเงินให้ผู้ขาย/ดำเนินการต่อ):')} disabled={!!acting}
+                    <button onClick={() => act(d.id, 'resolve_dispute', 'บันทึกผลการตัดสิน (ปล่อยเงินให้ผู้ขาย/ดำเนินการต่อ):')} disabled={!!acting}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
-                      {acting === d.$id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ตัดสินให้จบ
+                      {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ตัดสินให้จบ
                     </button>
-                    <button onClick={() => act(d.$id, 'cancel_refund', 'เหตุผลยกเลิก + คืนเงินผู้ซื้อ:')} disabled={!!acting}
+                    <button onClick={() => act(d.id, 'cancel_refund', 'เหตุผลยกเลิก + คืนเงินผู้ซื้อ:')} disabled={!!acting}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 disabled:opacity-50">
                       <RotateCcw size={14} /> ยกเลิก + คืนเงินผู้ซื้อ
                     </button>
                   </>
                 )}
                 {d.status === 'payment_uploaded' && (
-                  <button onClick={() => act(d.$id, 'confirm_payment', 'หมายเหตุ (เช่น เลขอ้างอิงสลิป) — เว้นว่างได้:')} disabled={!!acting}
+                  <button onClick={() => act(d.id, 'confirm_payment', 'หมายเหตุ (เช่น เลขอ้างอิงสลิป) — เว้นว่างได้:')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
-                    {acting === d.$id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ยืนยันรับเงิน — เริ่มแพ็ค
+                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ยืนยันรับเงิน — เริ่มแพ็ค
                   </button>
                 )}
                 {refund && !refund.refundedAt && (
-                  <button onClick={() => act(d.$id, 'mark_refunded', 'หมายเหตุการคืนเงิน (เช่น เลขอ้างอิงการโอน):')} disabled={!!acting}
+                  <button onClick={() => act(d.id, 'mark_refunded', 'หมายเหตุการคืนเงิน (เช่น เลขอ้างอิงการโอน):')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
-                    {acting === d.$id ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />} ยืนยันคืนเงินประกันแล้ว
+                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />} ยืนยันคืนเงินประกันแล้ว
                   </button>
                 )}
-                <button onClick={() => { if (window.confirm(`ลบดีล "${d.title}" ถาวร? (ใช้เฉพาะกรณีดีลทดสอบ/สแปม — กู้คืนไม่ได้)`)) act(d.$id, 'delete_deal'); }} disabled={!!acting}
+                <button onClick={() => { if (window.confirm(`ลบดีล "${d.title}" ถาวร? (ใช้เฉพาะกรณีดีลทดสอบ/สแปม — กู้คืนไม่ได้)`)) act(d.id, 'delete_deal'); }} disabled={!!acting}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 disabled:opacity-50 ml-auto">
                   <Trash2 size={14} /> ลบดีล
                 </button>

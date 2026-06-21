@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders } from '@/lib/supabase';
 import { Nav, Footer, useReveal } from '@/components/Site';
 import { Icon } from '@/components/Icon';
 
@@ -16,9 +16,9 @@ const MODE_INFO: Record<string, { label: string; cls: string; desc: string }> = 
 };
 
 interface WantedPost {
-  $id: string; userId: string; userName: string; title: string; detail: string;
-  budgetMin: number; budgetMax: number; category: string; province: string;
-  buyMode: string; contact: string; status: string; createdAt: string;
+  id: string; user_id: string; user_name: string; title: string; detail: string;
+  budget_min: number; budget_max: number; category: string; province: string;
+  buy_mode: string; contact: string; status: string; created_at: string;
 }
 
 function timeAgo(iso: string) {
@@ -29,9 +29,9 @@ function timeAgo(iso: string) {
 }
 
 function budgetText(p: WantedPost) {
-  if (p.budgetMin && p.budgetMax) return `฿${p.budgetMin.toLocaleString()} – ฿${p.budgetMax.toLocaleString()}`;
-  if (p.budgetMax) return `ไม่เกิน ฿${p.budgetMax.toLocaleString()}`;
-  if (p.budgetMin) return `ตั้งแต่ ฿${p.budgetMin.toLocaleString()}`;
+  if (p.budget_min && p.budget_max) return `฿${p.budget_min.toLocaleString()} – ฿${p.budget_max.toLocaleString()}`;
+  if (p.budget_max) return `ไม่เกิน ฿${p.budget_max.toLocaleString()}`;
+  if (p.budget_min) return `ตั้งแต่ ฿${p.budget_min.toLocaleString()}`;
   return 'ตามตกลง';
 }
 
@@ -79,7 +79,7 @@ export default function WantedPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void load();
-      account.get().then(u => setMyId(u.$id)).catch(() => {});
+      supabase.auth.getUser().then(({ data: { user } }) => { if (user) setMyId(user.id); });
     }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
@@ -88,10 +88,10 @@ export default function WantedPage() {
     if (!fTitle.trim()) { setFormError('กรุณากรอกชื่อสินค้าที่ต้องการหา'); return; }
     setPosting(true); setFormError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const res = await fetch('/api/wanted', {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: fTitle, detail: fDetail,
           budgetMin: Number(fBudgetMin) || 0, budgetMax: Number(fBudgetMax) || 0,
@@ -111,26 +111,26 @@ export default function WantedPage() {
 
   async function closePost(id: string) {
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const res = await fetch('/api/wanted', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action: 'close' }),
       });
-      if (res.ok) setPosts(prev => prev.filter(p => p.$id !== id));
+      if (res.ok) setPosts(prev => prev.filter(p => p.id !== id));
     } catch {}
   }
 
   function offerToSell(p: WantedPost) {
     if (!myId) { router.push(`/login?returnTo=${encodeURIComponent('/wanted')}`); return; }
-    const params = new URLSearchParams({ title: `เสนอขาย: ${p.title}`, role: 'seller', ref: 'wanted', wantedId: p.$id });
+    const params = new URLSearchParams({ title: `เสนอขาย: ${p.title}`, role: 'seller', ref: 'wanted', wantedId: p.id });
     router.push(`/deal/create?${params}`);
   }
 
   const filtered = posts
     .filter(p => !cat || p.category === cat)
     .filter(p => !province || p.province === province)
-    .filter(p => !mode || p.buyMode === mode || p.buyMode === 'both')
+    .filter(p => !mode || p.buy_mode === mode || p.buy_mode === 'both')
     .filter(p => !search || p.title.toLowerCase().includes(search.toLowerCase()) || (p.detail || '').toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -235,10 +235,10 @@ export default function WantedPage() {
 
           <div className="wt-list">
             {filtered.map(p => {
-              const m = MODE_INFO[p.buyMode] || MODE_INFO.middleman;
-              const mine = p.userId === myId;
+              const m = MODE_INFO[p.buy_mode] || MODE_INFO.middleman;
+              const mine = p.user_id === myId;
               return (
-                <div key={p.$id} className="wt-card reveal">
+                <div key={p.id} className="wt-card reveal">
                   <div className="wt-card-head">
                     <span className={`badge ${m.cls}`}>{m.label}</span>
                     {p.category && <span className="badge badge-gray">{p.category}</span>}
@@ -249,7 +249,7 @@ export default function WantedPage() {
                   {p.detail && <p className="wt-detail">{p.detail}</p>}
                   <div className="wt-meta">
                     <span className="wt-budget">{budgetText(p)}</span>
-                    <span>โดย {p.userName} · {timeAgo(p.createdAt)}</span>
+                    <span>โดย {p.user_name} · {timeAgo(p.created_at)}</span>
                   </div>
                   <div className="wt-actions">
                     {!mine && (
@@ -258,22 +258,22 @@ export default function WantedPage() {
                       </button>
                     )}
                     {!mine && (
-                      <Link className="btn btn-soft btn-sm" href={`/service/meetup?step=2&role=seller&title=${encodeURIComponent(p.title)}&wantedId=${p.$id}&inviteUserId=${p.userId}`}>
+                      <Link className="btn btn-soft btn-sm" href={`/service/meetup?step=2&role=seller&title=${encodeURIComponent(p.title)}&wantedId=${p.id}&inviteUserId=${p.user_id}`}>
                         🚗 นัดรับขาย
                       </Link>
                     )}
                     {!mine && (
-                      <Link className="btn btn-ghost btn-sm" href={`/messages?to=${p.userId}&name=${encodeURIComponent(p.userName || 'สมาชิก')}`}>
+                      <Link className="btn btn-ghost btn-sm" href={`/messages?to=${p.user_id}&name=${encodeURIComponent(p.user_name || 'สมาชิก')}`}>
                         <Icon name="message" size={15} /> ส่งข้อความ
                       </Link>
                     )}
-                    {!mine && p.contact && (p.buyMode === 'direct' || p.buyMode === 'both') && (
-                      contactOpen === p.$id
+                    {!mine && p.contact && (p.buy_mode === 'direct' || p.buy_mode === 'both') && (
+                      contactOpen === p.id
                         ? <span className="wt-contact">{p.contact}</span>
-                        : <button className="btn btn-ghost btn-sm" onClick={() => setContactOpen(p.$id)}><Icon name="message" size={15} /> ดูช่องทางติดต่อ</button>
+                        : <button className="btn btn-ghost btn-sm" onClick={() => setContactOpen(p.id)}><Icon name="message" size={15} /> ดูช่องทางติดต่อ</button>
                     )}
                     {mine && (
-                      <button className="btn btn-ghost btn-sm" onClick={() => closePost(p.$id)}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => closePost(p.id)}>
                         <Icon name="check" size={15} /> ได้ของแล้ว — ปิดประกาศ
                       </button>
                     )}

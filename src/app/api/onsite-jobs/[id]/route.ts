@@ -1,43 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Databases, Users } from 'node-appwrite';
-import { syncOnsiteJobLedger } from '../../_lib/financeLedger';
-
-const DB_ID  = 'khonklang_db';
-const COL_ID = 'onsite_jobs';
-
-function adminDb() {
-  const c = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return new Databases(c);
-}
-function adminUsers() {
-  const c = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return new Users(c);
-}
-function userAccount(jwt: string) {
-  const c = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setJWT(jwt);
-  return new Account(c);
-}
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
+import { syncOnsiteJobLedger, readFeesConfig } from '../../_lib/financeLedger';
+import { getTierCreditLimit } from '@/lib/financeLedger';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    await userAccount(jwt).get();
-    const doc = await adminDb().getDocument(DB_ID, COL_ID, id);
+    await verifyUser(req);
+    const db = getAdminClient();
+    const { data: doc, error } = await db.from('onsite_jobs').select('*').eq('id', id).single();
+    if (error || !doc) return NextResponse.json({ error: 'ไม่พบงาน' }, { status: 404 });
     return NextResponse.json({ job: doc });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
+}
+
+async function getDeposit(db: SupabaseClient, uid: string): Promise<number> {
+  const [{ data: profile }, fees] = await Promise.all([
+    db.from('profiles').select('middleman_tier_intent').eq('id', uid).maybeSingle(),
+    readFeesConfig(db),
+  ]);
+  const tier = profile?.middleman_tier_intent || 'Bronze';
+  return getTierCreditLimit(fees, tier);
 }
 
 // PATCH actions:
@@ -50,77 +36,64 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const user = await userAccount(jwt).get();
+    const me = await verifyUser(req);
     const body = await req.json();
     const { action } = body;
 
-    const db = adminDb();
-    const usersApi = adminUsers();
-    const job = await db.getDocument(DB_ID, COL_ID, id);
+    const db = getAdminClient();
+    const { data: job, error: jobErr } = await db.from('onsite_jobs').select('*').eq('id', id).single();
+    if (jobErr || !job) return NextResponse.json({ error: 'ไม่พบงาน' }, { status: 404 });
     const now = new Date().toISOString();
 
-    // Fetch middleman deposit from user prefs
-    async function getDeposit(uid: string): Promise<string> {
-      try {
-        const u = await usersApi.get(uid);
-        const p = (u.prefs || {}) as Record<string, string>;
-        const tier = p.middlemanTierIntent || 'Bronze';
-        const deposits: Record<string, number> = { Bronze: 1000, Silver: 5000, Gold: 20000, Platinum: 50000 };
-        return String(deposits[tier] || 1000);
-      } catch { return '1000'; }
-    }
-
-    let update: Record<string, string> = {};
+    let update: Record<string, unknown> = {};
 
     if (action === 'submit_quote') {
       if (job.status !== 'open') return NextResponse.json({ error: 'งานไม่ได้อยู่สถานะ open' }, { status: 400 });
       const { travelFee, serviceFee, estimatedArrival, conditions } = body;
-      const deposit = await getDeposit(user.$id);
-      let mmName = user.name || '';
-      try { const u = await usersApi.get(user.$id); const p = (u.prefs||{}) as Record<string,string>; mmName = p.displayName || u.name || mmName; } catch {}
+      const deposit = await getDeposit(db, me.id);
+      const { data: profile } = await db.from('profiles').select('display_name').eq('id', me.id).maybeSingle();
       update = {
         status: 'quoted',
-        middlemanId: user.$id,
-        middlemanName: mmName,
-        middlemanDeposit: deposit,
-        travelFee: String(travelFee || 0),
-        serviceFee: String(serviceFee || 0),
-        estimatedArrival: estimatedArrival || '',
+        middleman_id: me.id,
+        middleman_name: profile?.display_name || '',
+        middleman_deposit: deposit,
+        travel_fee: Number(travelFee) || 0,
+        service_fee: Number(serviceFee) || 0,
+        estimated_arrival: estimatedArrival || '',
         conditions: conditions || '',
-        quotedAt: now,
+        quoted_at: now,
       };
     } else if (action === 'accept_quote') {
-      if (job.buyerId !== user.$id) return NextResponse.json({ error: 'ไม่ใช่ผู้ว่าจ้าง' }, { status: 403 });
+      if (job.buyer_id !== me.id) return NextResponse.json({ error: 'ไม่ใช่ผู้ว่าจ้าง' }, { status: 403 });
       if (job.status !== 'quoted') return NextResponse.json({ error: 'ยังไม่มีใบเสนอราคา' }, { status: 400 });
-      update = { status: 'accepted', acceptedAt: now };
+      update = { status: 'accepted', accepted_at: now };
     } else if (action === 'reject_quote') {
-      if (job.buyerId !== user.$id) return NextResponse.json({ error: 'ไม่ใช่ผู้ว่าจ้าง' }, { status: 403 });
+      if (job.buyer_id !== me.id) return NextResponse.json({ error: 'ไม่ใช่ผู้ว่าจ้าง' }, { status: 403 });
       update = {
         status: 'open',
-        middlemanId: '', middlemanName: '', middlemanDeposit: '0',
-        travelFee: '0', serviceFee: '0', estimatedArrival: '', conditions: '', quotedAt: '',
+        middleman_id: null, middleman_name: '', middleman_deposit: 0,
+        travel_fee: 0, service_fee: 0, estimated_arrival: '', conditions: '', quoted_at: null,
       };
     } else if (action === 'start_work') {
-      if (job.middlemanId !== user.$id) return NextResponse.json({ error: 'ไม่ใช่คนกลางที่ได้รับงาน' }, { status: 403 });
+      if (job.middleman_id !== me.id) return NextResponse.json({ error: 'ไม่ใช่คนกลางที่ได้รับงาน' }, { status: 403 });
       if (job.status !== 'accepted') return NextResponse.json({ error: 'ยังไม่ได้รับการอนุมัติ' }, { status: 400 });
-      update = { status: 'in_progress', startedAt: now };
+      update = { status: 'in_progress', started_at: now };
     } else if (action === 'complete') {
-      if (job.middlemanId !== user.$id) return NextResponse.json({ error: 'ไม่ใช่คนกลางที่ได้รับงาน' }, { status: 403 });
+      if (job.middleman_id !== me.id) return NextResponse.json({ error: 'ไม่ใช่คนกลางที่ได้รับงาน' }, { status: 403 });
       if (job.status !== 'in_progress') return NextResponse.json({ error: 'งานยังไม่ได้เริ่มต้น' }, { status: 400 });
-      update = { status: 'completed', completedAt: now, reportNotes: body.reportNotes || '' };
+      update = { status: 'completed', completed_at: now, report_notes: body.reportNotes || '' };
     } else if (action === 'cancel') {
-      if (job.buyerId !== user.$id) return NextResponse.json({ error: 'ไม่ใช่ผู้ว่าจ้าง' }, { status: 403 });
-      if (['completed','in_progress'].includes(job.status as string))
+      if (job.buyer_id !== me.id) return NextResponse.json({ error: 'ไม่ใช่ผู้ว่าจ้าง' }, { status: 403 });
+      if (['completed', 'in_progress'].includes(job.status as string))
         return NextResponse.json({ error: 'ไม่สามารถยกเลิกได้ในขั้นตอนนี้' }, { status: 400 });
       update = { status: 'cancelled' };
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
 
-    const updated = await db.updateDocument(DB_ID, COL_ID, id, update);
-    await syncOnsiteJobLedger(db, usersApi, updated as unknown as Record<string, unknown>);
+    const { data: updated, error } = await db.from('onsite_jobs').update(update).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    await syncOnsiteJobLedger(db, updated as Record<string, unknown>);
     return NextResponse.json({ job: updated });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

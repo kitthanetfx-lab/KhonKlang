@@ -1,75 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Databases, Users, Query } from 'node-appwrite';
+import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
 import { getMiddlemanWallet } from '../_lib/financeLedger';
-
-const DB_ID = 'khonklang_db';
-
-function getAdmin() {
-  const c = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return { db: new Databases(c), users: new Users(c) };
-}
 
 export async function GET(req: NextRequest) {
   try {
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const c = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setJWT(jwt);
-    await new Account(c).get();
+    await verifyUser(req);
+    const db = getAdminClient();
 
     const { searchParams } = req.nextUrl;
     const filterProvince = searchParams.get('province') || '';
-    const filterTier     = searchParams.get('tier')     || '';
-    const filterQuery    = (searchParams.get('q') || '').trim().toLowerCase();
-    const filterNeed     = (searchParams.get('need') || '').trim().toLowerCase();
+    const filterTier = searchParams.get('tier') || '';
+    const filterQuery = (searchParams.get('q') || '').trim().toLowerCase();
+    const filterNeed = (searchParams.get('need') || '').trim().toLowerCase();
 
-    const { db, users } = getAdmin();
-    const queries: string[] = [Query.equal('status', 'approved'), Query.limit(200)];
-    if (filterProvince) queries.push(Query.equal('workProvince', filterProvince));
-    if (filterTier)     queries.push(Query.equal('tier', filterTier));
+    let query = db.from('middleman_applications').select('*').eq('status', 'approved').limit(200);
+    if (filterProvince) query = query.eq('work_province', filterProvince);
+    if (filterTier) query = query.eq('tier', filterTier);
+    const { data: docs } = await query;
 
-    const docs = await db.listDocuments(DB_ID, 'middleman_applications', queries)
-      .then(r => r.documents).catch(() => []);
+    const userIds = (docs || []).map(d => d.user_id).filter(Boolean);
+    const { data: profiles } = userIds.length
+      ? await db.from('profiles').select('id, phone, display_name, review_score, review_count').in('id', userIds)
+      : { data: [] };
+    const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
-    const middlemen = await Promise.all(docs.map(async doc => {
-      let phone = '', displayName = (doc.fullNameId as string) || '';
-      let reviewScore = 0, reviewCount = 0;
-      let wallet = null;
-      try {
-        const u = await users.get(doc.userId as string);
-        const p = ((u.prefs || {}) as Record<string, string>);
-        phone       = p.phone       || '';
-        displayName = p.displayName || u.name || displayName;
-        reviewScore = parseFloat(p.reviewScore || '0') || 0;
-        reviewCount = parseInt(p.reviewCount   || '0') || 0;
-      } catch {}
-      wallet = await getMiddlemanWallet(db, users, String(doc.userId || '')).catch(() => null);
+    const middlemen = await Promise.all((docs || []).map(async doc => {
+      const p = profileMap.get(doc.user_id);
+      const displayName = p?.display_name || doc.full_name_id || '';
+      const wallet = await getMiddlemanWallet(db, String(doc.user_id || '')).catch(() => null);
       return {
-        userId:       doc.userId       as string,
-        code:         String(doc.userId || '').slice(-6).toUpperCase(),
-        name:         displayName,
-        tier:         (doc.tier        as string) || 'Bronze',
-        categories:   (doc.categories  as string) || '',
-        workProvince: (doc.workProvince as string) || '',
-        phone, reviewScore, reviewCount, wallet,
+        userId: doc.user_id as string,
+        code: String(doc.user_id || '').slice(-6).toUpperCase(),
+        name: displayName,
+        tier: doc.tier || 'Bronze',
+        categories: Array.isArray(doc.categories) ? doc.categories.join(',') : '',
+        workProvince: doc.work_province || '',
+        phone: p?.phone || '',
+        reviewScore: Number(p?.review_score) || 0,
+        reviewCount: Number(p?.review_count) || 0,
+        wallet,
       };
     }));
 
     const filtered = middlemen.filter(mm => {
-      const haystack = [
-        mm.name,
-        mm.userId,
-        mm.code,
-        mm.categories,
-        mm.workProvince,
-        mm.tier,
-      ].join(' ').toLowerCase();
-
+      const haystack = [mm.name, mm.userId, mm.code, mm.categories, mm.workProvince, mm.tier].join(' ').toLowerCase();
       if (filterQuery && !haystack.includes(filterQuery)) return false;
       if (filterNeed && !haystack.includes(filterNeed)) return false;
       return true;

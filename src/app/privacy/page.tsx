@@ -9,7 +9,7 @@ export default function Privacy() {
           <h2 className="text-xl font-semibold mb-3">1. ข้อมูลที่เราเก็บรวบรวม</h2>
           <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
             เราเก็บรวบรวมข้อมูลที่คุณให้ไว้โดยตรง เช่น ชื่อ อีเมล และข้อมูลบัญชีธนาคาร
-            รวมถึงข้อมูลที่ได้รับจากการเข้าสู่ระบบผ่าน Facebook เช่น ชื่อผู้ใช้และรูปโปรไฟล์
+            รวมถึงข้อมูลที่ได้รับจากการเข้าสู่ระบบผ่าน LINE หรือ Google เช่น ชื่อผู้ใช้และรูปโปรไฟล์
           </p>
         </section>
 

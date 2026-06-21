@@ -1,114 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Databases, ID, Users, Query } from 'node-appwrite';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../../_lib/notify';
-import { DealPriceState, readDealPriceState, writeDealPriceState } from '@/lib/dealPriceState';
-import { syncDealLedger } from '../../_lib/financeLedger';
+import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
+import { getTierCreditLimit } from '@/lib/financeLedger';
 
-const DB_ID  = 'khonklang_db';
-const COL_DEALS = 'deals';
-const COL_MSGS  = 'messages';
-
-function getAdminClient() {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return new Databases(client);
+// หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
+async function getAdminIds(db: SupabaseClient): Promise<string[]> {
+  const { data } = await db.from('profiles').select('id').eq('role', 'admin').limit(200);
+  return (data || []).map(r => r.id as string);
 }
 
-function getAdminUsers() {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return new Users(client);
+// เครดิตประกันคนกลางตามเทียร์ (วางตอนทุกฝ่ายตกลงราคา/อนุมัติดีล)
+async function getMmDeposit(db: SupabaseClient, uid: string): Promise<number> {
+  const [{ data: profile }, fees] = await Promise.all([
+    db.from('profiles').select('middleman_tier, middleman_tier_intent').eq('id', uid).maybeSingle(),
+    readFeesConfig(db),
+  ]);
+  const tier = profile?.middleman_tier || profile?.middleman_tier_intent || 'Bronze';
+  return getTierCreditLimit(fees, tier);
 }
 
-// หา user id ของแอดมินทั้งหมด (prefs.role === 'admin') เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
-// sync-touch
-async function getAdminIds(): Promise<string[]> {
-  try {
-    const c = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.APPWRITE_API_KEY!);
-    const res = await new Users(c).list([Query.limit(100)]);
-    return res.users.filter(u => (u.prefs as Record<string, unknown> | undefined)?.role === 'admin').map(u => u.$id);
-  } catch { return []; }
-}
-
-// เครดิตประกันคนกลางตามเทียร์ (วางตอนคนกลางอนุมัติดีล)
-async function getMmDeposit(uid: string): Promise<number> {
-  try {
-    const c = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.APPWRITE_API_KEY!);
-    const u = await new Users(c).get(uid);
-    const tier = String((u.prefs as Record<string, unknown> | undefined)?.middlemanTierIntent || 'Bronze');
-    const d: Record<string, number> = { Bronze: 1000, Silver: 5000, Gold: 20000, Platinum: 50000 };
-    return d[tier] || 1000;
-  } catch { return 1000; }
-}
-
-function getUserFromJwt(jwt: string) {
-  const c = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setJWT(jwt);
-  return new Account(c).get();
-}
-
-async function hasDealAttribute(databases: Databases, key: string) {
-  try {
-    const attr = await databases.getAttribute(DB_ID, COL_DEALS, key);
-    return attr.status === 'available';
-  } catch {
-    return false;
-  }
-}
-
-// ดึงเลขบัญชี/ธนาคารของผู้ใช้จาก prefs — ใช้แสดงในดีลเพื่อสรุปว่าต้องโอนคืนเข้าบัญชีไหน
-async function getBankInfo(uid?: string): Promise<{ bankName: string; bankAcct: string; bankOwner: string } | null> {
+// ดึงเลขบัญชี/ธนาคารของผู้ใช้ — ใช้แสดงในดีลเพื่อสรุปว่าต้องโอนคืนเข้าบัญชีไหน
+async function getBankInfo(db: SupabaseClient, uid?: string | null): Promise<{ bankName: string; bankAcct: string; bankOwner: string } | null> {
   if (!uid) return null;
-  try {
-    const c = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.APPWRITE_API_KEY!);
-    const u = await new Users(c).get(uid);
-    const p = (u.prefs || {}) as Record<string, string>;
-    const bankName = p.bankName || '';
-    const bankAcct = p.bankAcct || p.accountNumber || '';
-    const bankOwner = p.bankOwner || p.bankAccountName || u.name || '';
-    if (!bankName && !bankAcct) return null;
-    return { bankName, bankAcct, bankOwner };
-  } catch { return null; }
+  const { data: u } = await db.from('profiles').select('bank_name, bank_acct, bank_owner, display_name').eq('id', uid).maybeSingle();
+  if (!u) return null;
+  const bankName = u.bank_name || '';
+  const bankAcct = u.bank_acct || '';
+  const bankOwner = u.bank_owner || u.display_name || '';
+  if (!bankName && !bankAcct) return null;
+  return { bankName, bankAcct, bankOwner };
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const db = getAdminClient();
     // Public GET — no auth required so anyone with the link can view
-    const databases = getAdminClient();
-    const deal = await databases.getDocument(DB_ID, COL_DEALS, id);
+    const { data: deal, error } = await db.from('deals').select('*').eq('id', id).single();
+    if (error || !deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+
+    let current = deal;
     // Self-heal: ทั้งสองฝ่าย (และคนกลางถ้ามี) ยอมรับครบแล้วแต่สถานะค้างที่ขั้นยอมรับ
     // (เกิดได้จาก race ตอนสองฝ่ายกดยอมรับพร้อมกัน) → ดันไปขั้นโอนเงินให้อัตโนมัติ
     if (['buyer_joined', 'terms_pending'].includes(String(deal.status))
-      && deal.sellerAcceptedTerms && deal.buyerAcceptedTerms
-      && (!deal.middlemanId || deal.middlemanAcceptedTerms)) {
-      try {
-        const fixed = await databases.updateDocument(DB_ID, COL_DEALS, id, { status: 'payment_pending' });
-        const [buyerBank, sellerBank, middlemanBank] = await Promise.all([
-          getBankInfo(fixed.buyerId as string), getBankInfo(fixed.sellerId as string), getBankInfo(fixed.middlemanId as string),
-        ]);
-        return NextResponse.json({ deal: { ...fixed, buyerBank, sellerBank, middlemanBank } });
-      } catch { /* ถ้าแก้ไม่ได้ก็คืนค่าเดิม */ }
+      && deal.seller_accepted_terms && deal.buyer_accepted_terms
+      && (!deal.middleman_id || deal.middleman_accepted_terms)) {
+      const { data: fixed } = await db.from('deals').update({ status: 'payment_pending' }).eq('id', id).select().single();
+      if (fixed) current = fixed;
     }
-    const [buyerBank, sellerBank, middlemanBank] = await Promise.all([
-      getBankInfo(deal.buyerId as string), getBankInfo(deal.sellerId as string), getBankInfo(deal.middlemanId as string),
+
+    const [priceStateRes, meetupRes, evidenceRes, imagesRes, buyerBank, sellerBank, middlemanBank] = await Promise.all([
+      db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle(),
+      db.from('deal_meetup').select('*').eq('deal_id', id).maybeSingle(),
+      db.from('deal_evidence').select('*').eq('deal_id', id).order('created_at', { ascending: true }),
+      db.from('deal_images').select('file_id').eq('deal_id', id).order('position', { ascending: true }),
+      getBankInfo(db, current.buyer_id),
+      getBankInfo(db, current.seller_id),
+      getBankInfo(db, current.middleman_id),
     ]);
-    return NextResponse.json({ deal: { ...deal, buyerBank, sellerBank, middlemanBank } });
+
+    return NextResponse.json({
+      deal: { ...current, images: (imagesRes.data || []).map(r => r.file_id) },
+      priceState: priceStateRes.data || null,
+      meetup: meetupRes.data || null,
+      evidence: evidenceRes.data || [],
+      buyerBank, sellerBank, middlemanBank,
+    });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
@@ -117,56 +76,61 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const currentUser = await getUserFromJwt(jwt);
-    const uid = currentUser.$id;
+    const me = await verifyUser(req);
+    const db = getAdminClient();
+    const { data: meProfile } = await db.from('profiles').select('display_name').eq('id', me.id).maybeSingle();
+    const myName = meProfile?.display_name || '';
+
     const body = await req.json();
     const { action } = body;
 
-    const databases = getAdminClient();
-    const [deal, supportsPriceData, supportsFeePayer] = await Promise.all([
-      databases.getDocument(DB_ID, COL_DEALS, id),
-      hasDealAttribute(databases, 'priceData'),
-      hasDealAttribute(databases, 'feePayer'),
-    ]);
+    const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('id', id).single();
+    if (dealErr || !deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
 
-    const isSeller    = deal.sellerId    === uid;
-    const isMiddleman = deal.middlemanId === uid;
-    const isBuyer     = deal.buyerId     === uid;
+    const isSeller    = deal.seller_id    === me.id;
+    const isMiddleman = deal.middleman_id === me.id;
+    const isBuyer      = deal.buyer_id     === me.id;
 
     let updates: Record<string, unknown> = {};
+    let priceUpdates: Record<string, unknown> = {};
+    let meetupUpdates: Record<string, unknown> = {};
+    let evidenceInsert: Record<string, unknown> | null = null;
     let systemMsg = '';
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
-    const syncPriceState = (priceState: DealPriceState) => {
-      const serialized = writeDealPriceState(priceState, String(deal.meetupData || ''));
-      if (supportsPriceData) updates.priceData = serialized.priceData;
-      else updates.meetupData = serialized.meetupDataFallback;
-    };
+
+    // โหลด deal_price_state / deal_meetup ตามต้องการ (เฉพาะ action ที่ใช้)
+    const needsPriceState = ['price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid'].includes(action);
+    const needsMeetup = action.startsWith('meetup_');
+    const [pdRow, mdRow] = await Promise.all([
+      needsPriceState ? db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data) : Promise.resolve(null),
+      needsMeetup ? db.from('deal_meetup').select('*').eq('deal_id', id).maybeSingle().then(r => r.data) : Promise.resolve(null),
+    ]);
+    const pd = pdRow || {};
+    const md = mdRow || {};
 
     switch (action) {
       case 'join_as_buyer': {
-        if (!['posted','waiting_buyer'].includes(deal.status))
+        if (!['posted', 'waiting_buyer'].includes(deal.status))
           return NextResponse.json({ error: 'Deal not available' }, { status: 400 });
         if (isSeller || isMiddleman)
           return NextResponse.json({ error: 'ไม่สามารถเป็นผู้ซื้อได้' }, { status: 400 });
-        if (deal.buyerId)
+        if (deal.buyer_id)
           return NextResponse.json({ error: 'มีผู้ซื้อแล้ว' }, { status: 400 });
-        const newStatus = deal.sellerId ? 'buyer_joined' : 'waiting_seller';
-        updates = { buyerId: uid, buyerName: currentUser.name || '', status: newStatus };
-        systemMsg = `${currentUser.name} เข้าร่วมเป็นผู้ซื้อ`;
+        const newStatus = deal.seller_id ? 'buyer_joined' : 'waiting_seller';
+        updates = { buyer_id: me.id, buyer_name: myName, status: newStatus };
+        systemMsg = `${myName} เข้าร่วมเป็นผู้ซื้อ`;
         break;
       }
       case 'join_as_seller': {
-        if (!['posted','waiting_seller'].includes(deal.status))
+        if (!['posted', 'waiting_seller'].includes(deal.status))
           return NextResponse.json({ error: 'Deal not available' }, { status: 400 });
         if (isBuyer || isMiddleman)
           return NextResponse.json({ error: 'ไม่สามารถเป็นผู้ขายได้' }, { status: 400 });
-        if (deal.sellerId)
+        if (deal.seller_id)
           return NextResponse.json({ error: 'มีผู้ขายแล้ว' }, { status: 400 });
-        const newSt = deal.buyerId ? 'buyer_joined' : 'waiting_buyer';
-        updates = { sellerId: uid, sellerName: currentUser.name || '', status: newSt };
-        systemMsg = `${currentUser.name} เข้าร่วมเป็นผู้ขาย`;
+        const newSt = deal.buyer_id ? 'buyer_joined' : 'waiting_buyer';
+        updates = { seller_id: me.id, seller_name: myName, status: newSt };
+        systemMsg = `${myName} เข้าร่วมเป็นผู้ขาย`;
         break;
       }
       case 'select_middleman': {
@@ -174,23 +138,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'ผู้ซื้อเท่านั้นที่เลือกคนกลางได้' }, { status: 403 });
         if (!body.middlemanId || !body.middlemanName)
           return NextResponse.json({ error: 'Missing middlemanId' }, { status: 400 });
-        // กฎสำคัญ: ผู้ซื้อ/ผู้ขาย/คนกลาง ในดีลเดียวกันต้องเป็นคนละคนเสมอ
-        if (body.middlemanId === deal.buyerId)
+        if (body.middlemanId === deal.buyer_id)
           return NextResponse.json({ error: 'ผู้ซื้อไม่สามารถเป็นคนกลางในดีลของตัวเองได้' }, { status: 400 });
-        if (body.middlemanId === deal.sellerId)
+        if (body.middlemanId === deal.seller_id)
           return NextResponse.json({ error: 'ผู้ขายไม่สามารถเป็นคนกลางในดีลที่ตัวเองขายได้' }, { status: 400 });
-        updates = { middlemanId: body.middlemanId, middlemanName: body.middlemanName, status: 'terms_pending' };
+        updates = { middleman_id: body.middlemanId, middleman_name: body.middlemanName, status: 'terms_pending' };
         systemMsg = `ผู้ซื้อเลือก ${body.middlemanName} เป็นคนกลาง`;
         break;
       }
       case 'accept_terms': {
-        if (isSeller)    updates.sellerAcceptedTerms    = true;
-        if (isMiddleman) updates.middlemanAcceptedTerms = true;
-        if (isBuyer)     updates.buyerAcceptedTerms     = true;
-        const sc = isSeller    ? true : deal.sellerAcceptedTerms;
-        const mc = isMiddleman ? true : deal.middlemanAcceptedTerms;
-        const bc = isBuyer     ? true : deal.buyerAcceptedTerms;
-        const hasMm = !!deal.middlemanId;
+        if (isSeller)    updates.seller_accepted_terms    = true;
+        if (isMiddleman) updates.middleman_accepted_terms = true;
+        if (isBuyer)     updates.buyer_accepted_terms     = true;
+        const sc = isSeller    ? true : deal.seller_accepted_terms;
+        const mc = isMiddleman ? true : deal.middleman_accepted_terms;
+        const bc = isBuyer     ? true : deal.buyer_accepted_terms;
+        const hasMm = !!deal.middleman_id;
         if (sc && bc && (!hasMm || mc)) {
           updates.status = 'payment_pending';
           systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — รอผู้ซื้อโอนเงิน';
@@ -202,31 +165,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'upload_payment': {
         if (!isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        updates = { paymentSlipFileId: body.fileId, status: 'payment_uploaded' };
+        updates = { payment_slip_file_id: body.fileId, status: 'payment_uploaded' };
         systemMsg = 'ผู้ซื้ออัปโหลดหลักฐานการโอนเงินแล้ว';
         break;
       }
       case 'confirm_payment': {
         if (!isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        updates = { status: 'packing', middlemanConfirmedPayment: true };
+        updates = { status: 'packing', middleman_confirmed_payment: true };
         systemMsg = 'คนกลางยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้า';
         break;
       }
       case 'add_evidence': {
         const { evidenceType, fileId, fileName, content } = body;
-        const existing = (() => { try { return JSON.parse(deal.evidenceData || '[]'); } catch { return []; } })();
-        existing.push({
+        evidenceInsert = {
+          deal_id: id,
           type: evidenceType,
-          fileId: fileId || '',
-          fileName: fileName || '',
+          file_id: fileId || '',
+          file_name: fileName || '',
           content: content ? String(content).slice(0, 200) : '',
-          uploadedBy: uid,
-          uploaderName: currentUser.name || '',
-          at: new Date().toISOString(),
-        });
-        // Trim to last 20 evidence items to avoid field size overflow
-        const trimmed = existing.slice(-20);
-        updates.evidenceData = JSON.stringify(trimmed);
+          uploaded_by: me.id,
+          uploader_name: myName,
+        };
         const label: Record<string, string> = {
           packing: 'วิดีโอแพ็คของ', testing: 'วิดีโอทดสอบสินค้า',
           receive: 'วิดีโอรับสินค้า', check: 'วิดีโอตรวจสินค้า',
@@ -237,12 +196,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'seller_done_packing': {
         if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        if (deal.dealType === 'simple') {
-          // โหมดง่าย: ผู้ขายส่งตรงถึงผู้ซื้อ ไม่ผ่านคนกลางบุคคล
-          updates = { status: 'shipped_to_buyer', trackingToBuyer: body.trackingNumber || '' };
+        if (deal.deal_type === 'simple') {
+          updates = { status: 'shipped_to_buyer', tracking_to_buyer: body.trackingNumber || '' };
           systemMsg = `ผู้ขายจัดส่งสินค้าให้ผู้ซื้อโดยตรงแล้ว (เลขพัสดุ: ${body.trackingNumber || '-'}) — ผู้ซื้ออย่าลืมถ่ายวิดีโอก่อนแกะกล่อง`;
         } else {
-          updates = { status: 'shipped_to_middleman', trackingToMiddleman: body.trackingNumber || '' };
+          updates = { status: 'shipped_to_middleman', tracking_to_middleman: body.trackingNumber || '' };
           systemMsg = `ผู้ขายจัดส่งสินค้าแล้ว (เลขพัสดุ: ${body.trackingNumber || '-'})`;
         }
         break;
@@ -255,14 +213,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'buyer_confirm_check': {
         if (!isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        updates = { buyerConfirmedCheck: true };
+        updates = { buyer_confirmed_check: true };
         systemMsg = 'ผู้ซื้อยืนยันว่าสินค้าไม่มีปัญหา';
         break;
       }
       case 'middleman_ship_to_buyer': {
         if (!isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        if (!deal.buyerConfirmedCheck) return NextResponse.json({ error: 'รอผู้ซื้อยืนยันก่อน' }, { status: 400 });
-        updates = { status: 'shipped_to_buyer', trackingToBuyer: body.trackingNumber || '' };
+        if (!deal.buyer_confirmed_check) return NextResponse.json({ error: 'รอผู้ซื้อยืนยันก่อน' }, { status: 400 });
+        updates = { status: 'shipped_to_buyer', tracking_to_buyer: body.trackingNumber || '' };
         systemMsg = `คนกลางจัดส่งให้ผู้ซื้อแล้ว (เลขพัสดุ: ${body.trackingNumber || '-'})`;
         break;
       }
@@ -275,24 +233,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'cancel': {
         if (!isSeller && !isMiddleman && !isBuyer)
           return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        updates = { status: 'cancelled', rejectReason: body.reason || '' };
+        updates = { status: 'cancelled', reject_reason: body.reason || '' };
         systemMsg = `ยกเลิกดีล${body.reason ? ': ' + body.reason : ''}`;
         break;
       }
       case 'dispute': {
-        updates = { status: 'disputed', rejectReason: body.reason || '' };
+        updates = { status: 'disputed', reject_reason: body.reason || '' };
         systemMsg = `แจ้งปัญหา: ${body.reason || 'ไม่ระบุ'}`;
         break;
       }
       case 'start_call': {
-        // ใครก็ตามที่ล็อกอินและเปิดคอลในดีลนี้ (รวมถึงคนที่มาจากลิงก์แชร์) → แจ้งผู้ร่วมดีลทุกคน
         const isParty = isSeller || isMiddleman || isBuyer;
-        systemMsg = `📹 ${currentUser.name || 'ผู้ใช้'}${isParty ? '' : ' (ผู้สนใจจากลิงก์แชร์)'} เข้าร่วมวิดีโอคอล — กดเข้าร่วมได้เลย`;
+        systemMsg = `📹 ${myName || 'ผู้ใช้'}${isParty ? '' : ' (ผู้สนใจจากลิงก์แชร์)'} เข้าร่วมวิดีโอคอล — กดเข้าร่วมได้เลย`;
         break;
       }
       case 'meetup_set_location': {
-        // แต่ละฝ่ายระบุที่อยู่ของตัวเอง (ตำบล/อำเภอ/จังหวัด) — ใช้ตกลงจุดนัดพบ
-        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const loc = body.loc || {};
         const clean = {
@@ -302,61 +258,51 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         };
         if (!clean.province || !clean.amphoe || !clean.tambon)
           return NextResponse.json({ error: 'กรุณาเลือกที่อยู่ให้ครบถึงระดับตำบล' }, { status: 400 });
-        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
-        if (md.buyerSlip || md.sellerSlip) return NextResponse.json({ error: 'วางเงินประกันแล้ว แก้ที่อยู่ไม่ได้' }, { status: 400 });
-        if (isBuyer) md.buyerLoc = clean; else md.sellerLoc = clean;
-        updates.meetupData = JSON.stringify(md);
+        if (md.buyer_slip || md.seller_slip) return NextResponse.json({ error: 'วางเงินประกันแล้ว แก้ที่อยู่ไม่ได้' }, { status: 400 });
+        if (isBuyer) meetupUpdates.buyer_loc = clean; else meetupUpdates.seller_loc = clean;
         systemMsg = `📍 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}ระบุที่อยู่แล้ว: ต.${clean.tambon} อ.${clean.amphoe} จ.${clean.province}`;
         break;
       }
       case 'meetup_propose': {
-        // ต่อรองยอดประกัน: ฝ่ายหนึ่งเสนอยอดใหม่ → อีกฝ่ายต้องกดยอมรับจึงมีผล
-        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const amount = Math.round(Number(body.amount));
         if (!(amount >= 50 && amount <= 999999999)) return NextResponse.json({ error: 'ยอดประกันไม่ถูกต้อง (ขั้นต่ำ ฿50)' }, { status: 400 });
-        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
-        if (md.buyerSlip || md.sellerSlip) return NextResponse.json({ error: 'มีการวางเงินประกันแล้ว เปลี่ยนยอดไม่ได้ — ติดต่อทีมงานหากจำเป็น' }, { status: 400 });
-        md.pendingDeposit = amount;
-        md.pendingBy = isBuyer ? 'buyer' : 'seller';
-        // ข้อเสนออาจพ่วงจุดนัดพบมาด้วย เช่น "ผู้ขายเดินทางไปหาผู้ซื้อ" หรือ "เจอกันที่ปั๊ม ปตท. วังน้อย"
-        if (body.meetLabel) md.pendingMeetLabel = String(body.meetLabel).slice(0, 200);
-        updates.meetupData = JSON.stringify(md);
-        systemMsg = `💰 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เสนอ${md.pendingMeetLabel ? `จุดนัด "${md.pendingMeetLabel}" + ` : 'เปลี่ยน'}เงินประกัน ฿${amount.toLocaleString()}/ฝ่าย — รออีกฝ่ายกดยอมรับ`;
+        if (md.buyer_slip || md.seller_slip) return NextResponse.json({ error: 'มีการวางเงินประกันแล้ว เปลี่ยนยอดไม่ได้ — ติดต่อทีมงานหากจำเป็น' }, { status: 400 });
+        meetupUpdates.pending_deposit = amount;
+        meetupUpdates.pending_by = isBuyer ? 'buyer' : 'seller';
+        if (body.meetLabel) meetupUpdates.pending_meet_label = String(body.meetLabel).slice(0, 200);
+        systemMsg = `💰 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เสนอ${body.meetLabel ? `จุดนัด "${String(body.meetLabel).slice(0, 200)}" + ` : 'เปลี่ยน'}เงินประกัน ฿${amount.toLocaleString()}/ฝ่าย — รออีกฝ่ายกดยอมรับ`;
         break;
       }
       case 'meetup_respond': {
-        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
-        if (!md.pendingDeposit) return NextResponse.json({ error: 'ไม่มีข้อเสนอที่รอการตอบรับ' }, { status: 400 });
+        if (!md.pending_deposit) return NextResponse.json({ error: 'ไม่มีข้อเสนอที่รอการตอบรับ' }, { status: 400 });
         const meSide = isBuyer ? 'buyer' : 'seller';
         if (body.accept) {
-          if (md.pendingBy === meSide) return NextResponse.json({ error: 'ผู้เสนอกดยอมรับเองไม่ได้ — ต้องให้อีกฝ่ายยอมรับ' }, { status: 400 });
-          md.deposit = md.pendingDeposit;
-          if (md.pendingMeetLabel) md.meetLabel = md.pendingMeetLabel;
-          systemMsg = `✅ ตกลงกันแล้ว${md.meetLabel ? `: ${md.meetLabel}` : ''} — เงินประกัน ฿${Number(md.pendingDeposit).toLocaleString()}/ฝ่าย วางเงินได้เลย`;
+          if (md.pending_by === meSide) return NextResponse.json({ error: 'ผู้เสนอกดยอมรับเองไม่ได้ — ต้องให้อีกฝ่ายยอมรับ' }, { status: 400 });
+          meetupUpdates.deposit = md.pending_deposit;
+          if (md.pending_meet_label) meetupUpdates.meet_label = md.pending_meet_label;
+          systemMsg = `✅ ตกลงกันแล้ว${md.pending_meet_label ? `: ${md.pending_meet_label}` : ''} — เงินประกัน ฿${Number(md.pending_deposit).toLocaleString()}/ฝ่าย วางเงินได้เลย`;
         } else {
-          systemMsg = md.pendingBy === meSide
+          systemMsg = md.pending_by === meSide
             ? `↩️ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ยกเลิกข้อเสนอ`
-            : `❌ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ปฏิเสธข้อเสนอ ฿${Number(md.pendingDeposit).toLocaleString()} — เสนอใหม่หรือคุยกันในแชทได้`;
+            : `❌ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ปฏิเสธข้อเสนอ ฿${Number(md.pending_deposit).toLocaleString()} — เสนอใหม่หรือคุยกันในแชทได้`;
         }
-        delete md.pendingDeposit;
-        delete md.pendingBy;
-        delete md.pendingMeetLabel;
-        updates.meetupData = JSON.stringify(md);
+        meetupUpdates.pending_deposit = null;
+        meetupUpdates.pending_by = null;
+        meetupUpdates.pending_meet_label = null;
         break;
       }
       case 'meetup_deposit': {
-        // รับประกันเดินทาง: แต่ละฝ่ายอัปสลิปวางเงินประกัน+ค่าบริการ
-        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
-        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
         if (!md.deposit) return NextResponse.json({ error: 'ต้องตกลงจุดนัดพบและยอดประกันกับอีกฝ่ายก่อนวางเงิน' }, { status: 400 });
-        if (isBuyer) md.buyerSlip = body.fileId; else md.sellerSlip = body.fileId;
-        updates.meetupData = JSON.stringify(md);
-        if (md.buyerSlip && md.sellerSlip) {
+        if (isBuyer) meetupUpdates.buyer_slip = body.fileId; else meetupUpdates.seller_slip = body.fileId;
+        const bothSlipped = isBuyer ? (!!md.seller_slip) : (!!md.buyer_slip);
+        if (bothSlipped) {
           updates.status = 'meetup_ready';
           systemMsg = '✅ ทั้งสองฝ่ายวางเงินประกันแล้ว — นัดเจอกันได้เลย เมื่อเจอกันสำเร็จกดยืนยันทั้งคู่เพื่อรับเงินประกันคืน';
         } else {
@@ -365,39 +311,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'meetup_depart': {
-        // กดเริ่มออกเดินทาง — แจ้งอีกฝ่ายทันที (โอนเสร็จไม่ได้แปลว่าออกเดินทางเลย)
-        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (deal.status !== 'meetup_ready') return NextResponse.json({ error: 'ต้องวางเงินประกันครบทั้งสองฝ่ายก่อน' }, { status: 400 });
-        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
-        if (isBuyer) md.buyerDepartedAt = new Date().toISOString();
-        else md.sellerDepartedAt = new Date().toISOString();
-        updates.meetupData = JSON.stringify(md);
+        if (isBuyer) meetupUpdates.buyer_departed_at = new Date().toISOString();
+        else meetupUpdates.seller_departed_at = new Date().toISOString();
         systemMsg = `🚗 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เริ่มออกเดินทางแล้ว — มุ่งหน้าสู่จุดนัดพบ`;
         break;
       }
       case 'meetup_position': {
-        // อัปเดตตำแหน่งระหว่างเดินทาง (เงียบ — ไม่ลงแชท ไม่แจ้งเตือน อีกฝ่ายเห็นในแผงนัดรับ)
-        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const lat = Number(body.lat), lng = Number(body.lng);
         if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180)
           return NextResponse.json({ error: 'พิกัดไม่ถูกต้อง' }, { status: 400 });
-        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
         const pos = { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5, at: new Date().toISOString() };
-        if (isBuyer) md.buyerPos = pos; else md.sellerPos = pos;
-        updates.meetupData = JSON.stringify(md);
+        if (isBuyer) meetupUpdates.buyer_pos = pos; else meetupUpdates.seller_pos = pos;
         // ไม่ตั้ง systemMsg — อัปเดตเงียบ
         break;
       }
       case 'meetup_met': {
-        if (deal.dealType !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (deal.status !== 'meetup_ready') return NextResponse.json({ error: 'ต้องวางเงินประกันครบทั้งสองฝ่ายก่อน' }, { status: 400 });
-        const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
-        if (isBuyer) md.buyerMet = true; else md.sellerMet = true;
-        updates.meetupData = JSON.stringify(md);
-        if (md.buyerMet && md.sellerMet) {
+        if (isBuyer) meetupUpdates.buyer_met = true; else meetupUpdates.seller_met = true;
+        const bothMet = isBuyer ? (!!md.seller_met) : (!!md.buyer_met);
+        if (bothMet) {
           updates.status = 'completed';
           systemMsg = '🎉 นัดเจอสำเร็จทั้งสองฝ่าย! บริษัท คนกลาง จำกัด จะโอนเงินประกันคืนให้ทั้งคู่เต็มจำนวน (หักเฉพาะค่าบริการ)';
         } else {
@@ -406,97 +345,100 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'visit': {
-        // มีคนเปิดห้องดีล (รวมคนคลิกลิงก์แชร์) → แจ้งผู้ร่วมดีลคนอื่น ไม่ลงข้อความในแชท
         const roleLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : isMiddleman ? 'คนกลาง' : 'ผู้สนใจจากลิงก์แชร์';
-        systemMsg = `👀 ${currentUser.name || 'ผู้ใช้'} (${roleLabel}) เข้ามาดูห้องดีล`;
+        systemMsg = `👀 ${myName || 'ผู้ใช้'} (${roleLabel}) เข้ามาดูห้องดีล`;
         writeChatMsg = false;
         break;
       }
       case 'price_propose': {
-        // เสนอราคาสินค้า + ผู้จ่ายค่าบริการ → รีเซ็ต รอทุกฝ่ายกดตกลงใหม่ (เปลี่ยนได้ก่อนชำระเงิน)
         if (!isSeller && !isBuyer) return NextResponse.json({ error: 'เฉพาะผู้ซื้อหรือผู้ขายที่เสนอราคาใหม่ได้' }, { status: 403 });
         if (!['posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status))
           return NextResponse.json({ error: 'ดีลเลยขั้นตอนตกลงราคาแล้ว' }, { status: 400 });
         const price = Math.round(Number(body.price));
         if (!(price >= 1 && price <= 999999999)) return NextResponse.json({ error: 'ราคาไม่ถูกต้อง' }, { status: 400 });
-        const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
         const feePayer = ['buyer', 'seller', 'split'].includes(body.feePayer)
           ? body.feePayer
-          : (pd.proposedFeePayer || pd.feePayer || (deal.feePayer === 'buyer' || deal.feePayer === 'seller' || deal.feePayer === 'split' ? deal.feePayer : 'split'));
+          : (pd.proposed_fee_payer || deal.fee_payer || 'split');
         const who = isSeller ? 'seller' : isBuyer ? 'buyer' : 'middleman';
-        pd.proposedPrice = price; pd.proposedFeePayer = feePayer; pd.proposedBy = who; pd.proposalKind = 'reprice'; pd.agreed = false;
-        pd.sellerAgreed = isSeller; pd.buyerAgreed = isBuyer; pd.middlemanAgreed = isMiddleman;
-        syncPriceState(pd);
+        priceUpdates = {
+          proposed_price: price, proposed_fee_payer: feePayer, proposed_by: who, proposal_kind: 'reprice', agreed: false,
+          seller_agreed: isSeller, buyer_agreed: isBuyer, middleman_agreed: isMiddleman,
+        };
         const fpLabel = feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
         systemMsg = `💬 ${who === 'seller' ? 'ผู้ขาย' : who === 'buyer' ? 'ผู้ซื้อ' : 'คนกลาง'}เสนอราคา ฿${price.toLocaleString()} · ค่าบริการ: ${fpLabel} — รอทุกฝ่ายกดตกลง`;
         break;
       }
       case 'price_agree': {
         if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
         const who = isSeller ? 'seller' : isBuyer ? 'buyer' : 'middleman';
         const requestedFeePayer = ['buyer', 'seller', 'split'].includes(body.feePayer) ? body.feePayer : undefined;
-        if (!pd.proposedPrice) {
-          const feePayer = requestedFeePayer || (deal.feePayer === 'buyer' || deal.feePayer === 'seller' || deal.feePayer === 'split' ? deal.feePayer : 'split');
-          pd.proposedPrice = Number(deal.price) || 0;
-          pd.proposedFeePayer = feePayer;
-          pd.proposalKind = 'current';
-          pd.proposedBy = who;
-        } else if (requestedFeePayer && requestedFeePayer !== pd.proposedFeePayer) {
-          pd.proposedFeePayer = requestedFeePayer;
-          pd.proposedBy = who;
-          pd.agreed = false;
-          pd.sellerAgreed = isSeller;
-          pd.buyerAgreed = isBuyer;
-          pd.middlemanAgreed = isMiddleman;
-          syncPriceState(pd);
+        let proposedPrice = pd.proposed_price;
+        let proposedFeePayer = pd.proposed_fee_payer;
+        let proposalKind = pd.proposal_kind;
+        let proposedBy = pd.proposed_by;
+        let sellerAgreed = !!pd.seller_agreed, buyerAgreed = !!pd.buyer_agreed, middlemanAgreed = !!pd.middleman_agreed;
+
+        if (!proposedPrice) {
+          proposedFeePayer = requestedFeePayer || (deal.fee_payer || 'split');
+          proposedPrice = Number(deal.price) || 0;
+          proposalKind = 'current';
+          proposedBy = who;
+        } else if (requestedFeePayer && requestedFeePayer !== proposedFeePayer) {
+          proposedFeePayer = requestedFeePayer;
+          proposedBy = who;
+          sellerAgreed = isSeller; buyerAgreed = isBuyer; middlemanAgreed = isMiddleman;
+          priceUpdates = {
+            proposed_price: proposedPrice, proposed_fee_payer: proposedFeePayer, proposed_by: proposedBy, proposal_kind: proposalKind,
+            agreed: false, seller_agreed: sellerAgreed, buyer_agreed: buyerAgreed, middleman_agreed: middlemanAgreed,
+          };
           const fpLabel = requestedFeePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : requestedFeePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
           systemMsg = `🔁 ${who === 'seller' ? 'ผู้ขาย' : who === 'buyer' ? 'ผู้ซื้อ' : 'คนกลาง'}เปลี่ยนผู้จ่ายค่าบริการเป็น ${fpLabel} — ต้องรอทุกฝ่ายยอมรับใหม่`;
           break;
         }
-        if (isSeller) pd.sellerAgreed = true;
-        if (isBuyer) pd.buyerAgreed = true;
-        if (isMiddleman) pd.middlemanAgreed = true;
-        const hasMm = !!deal.middlemanId;
-        const allAgreed = pd.sellerAgreed && pd.buyerAgreed && (!hasMm || pd.middlemanAgreed);
+        if (isSeller) sellerAgreed = true;
+        if (isBuyer) buyerAgreed = true;
+        if (isMiddleman) middlemanAgreed = true;
+        const hasMm = !!deal.middleman_id;
+        const allAgreed = sellerAgreed && buyerAgreed && (!hasMm || middlemanAgreed);
+        priceUpdates = {
+          proposed_price: proposedPrice, proposed_fee_payer: proposedFeePayer, proposed_by: proposedBy, proposal_kind: proposalKind,
+          seller_agreed: sellerAgreed, buyer_agreed: buyerAgreed, middleman_agreed: middlemanAgreed, agreed: allAgreed,
+        };
         if (allAgreed) {
-          pd.agreed = true; pd.feePayer = pd.proposedFeePayer;
-          updates.price = pd.proposedPrice;
-          if (supportsFeePayer) updates.feePayer = pd.proposedFeePayer;
-          if (hasMm) pd.mmDepositHeld = await getMmDeposit(String(deal.middlemanId));
-          const fpLabel = pd.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : pd.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
-          systemMsg = pd.proposalKind === 'reprice'
-            ? `✅ ทุกฝ่ายตกลงราคา ฿${Number(pd.proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()})` : ''}`
-            : `✅ ทุกฝ่ายยืนยันใช้ราคาเดิม ฿${Number(pd.proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(pd.mmDepositHeld).toLocaleString()})` : ''}`;
+          updates.price = proposedPrice;
+          updates.fee_payer = proposedFeePayer;
+          let mmDepositHeld = 0;
+          if (hasMm) {
+            mmDepositHeld = await getMmDeposit(db, String(deal.middleman_id));
+            priceUpdates.mm_deposit_held = mmDepositHeld;
+          }
+          const fpLabel = proposedFeePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : proposedFeePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
+          systemMsg = proposalKind === 'reprice'
+            ? `✅ ทุกฝ่ายตกลงราคา ฿${Number(proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(mmDepositHeld).toLocaleString()})` : ''}`
+            : `✅ ทุกฝ่ายยืนยันใช้ราคาเดิม ฿${Number(proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(mmDepositHeld).toLocaleString()})` : ''}`;
         } else {
           const whoLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
-          systemMsg = pd.proposalKind === 'reprice'
+          systemMsg = proposalKind === 'reprice'
             ? `${whoLabel}${isMiddleman ? ' อนุมัติดีล + วางเครดิตประกัน' : ' ตกลงราคานี้'}แล้ว — รอฝ่ายอื่น`
             : `${whoLabel}${isMiddleman ? ' รับรู้ราคาเดิม + อนุมัติดีล' : ' ยืนยันใช้ราคาเดิม'}แล้ว — รอฝ่ายอื่น`;
         }
-        syncPriceState(pd);
         break;
       }
       case 'evidence_done': {
-        // แต่ละฝ่ายยืนยันว่าเก็บหลักฐาน (แชต/วิดีโอคอล/รูป) เรียบร้อยแล้ว ก่อนเข้าขั้นโอนเงิน
         if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
-        if (isSeller) pd.evidenceDoneSeller = true;
-        if (isBuyer) pd.evidenceDoneBuyer = true;
-        if (isMiddleman) pd.evidenceDoneMiddleman = true;
-        const hasMm = !!deal.middlemanId;
-        const allDone = pd.evidenceDoneSeller && pd.evidenceDoneBuyer && (!hasMm || pd.evidenceDoneMiddleman);
-        syncPriceState(pd);
+        const sellerDone = isSeller ? true : !!pd.evidence_done_seller;
+        const buyerDone = isBuyer ? true : !!pd.evidence_done_buyer;
+        const middlemanDone = isMiddleman ? true : !!pd.evidence_done_middleman;
+        priceUpdates = { evidence_done_seller: sellerDone, evidence_done_buyer: buyerDone, evidence_done_middleman: middlemanDone };
+        const hasMm = !!deal.middleman_id;
+        const allDone = sellerDone && buyerDone && (!hasMm || middlemanDone);
         systemMsg = allDone ? '📁 ทุกฝ่ายยืนยันเก็บหลักฐานเรียบร้อย — เข้าสู่ขั้นตอนโอนเงินได้' : `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ยืนยันเก็บหลักฐานแล้ว — รอฝ่ายอื่น`;
         break;
       }
       case 'seller_fee_paid': {
-        // ผู้ขายโอนค่าบริการส่วนของตัวเองทันที (แยกจากยอดสินค้า) แล้วอัปสลิป
         if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
-        const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
-        pd.sellerFeeSlip = String(body.fileId);
-        syncPriceState(pd);
+        priceUpdates = { seller_fee_slip: String(body.fileId) };
         systemMsg = 'ผู้ขายโอนค่าบริการส่วนของตนแล้ว — รอศูนย์กลางตรวจสอบ';
         break;
       }
@@ -504,61 +446,71 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
 
-    let updated = Object.keys(updates).length > 0
-      ? await databases.updateDocument(DB_ID, COL_DEALS, id, updates)
-      : deal;
+    let updated = deal;
+    if (Object.keys(updates).length > 0) {
+      const { data } = await db.from('deals').update(updates).eq('id', id).select().single();
+      if (data) updated = data;
+    }
+    if (Object.keys(priceUpdates).length > 0) {
+      await db.from('deal_price_state').upsert({ deal_id: id, ...priceUpdates }, { onConflict: 'deal_id' });
+    }
+    if (Object.keys(meetupUpdates).length > 0) {
+      await db.from('deal_meetup').upsert({ deal_id: id, ...meetupUpdates }, { onConflict: 'deal_id' });
+    }
+    if (evidenceInsert) {
+      await db.from('deal_evidence').insert(evidenceInsert);
+    }
 
     // กัน race ตอนยอมรับเงื่อนไข: ถ้าหลังอัปเดตแล้วทุกฝ่ายยอมรับครบแต่สถานะยังค้าง → ดันไปขั้นโอนเงินทันที
     if (['buyer_joined', 'terms_pending'].includes(String(updated.status))
-      && updated.sellerAcceptedTerms && updated.buyerAcceptedTerms
-      && (!updated.middlemanId || updated.middlemanAcceptedTerms)) {
-      try {
-        updated = await databases.updateDocument(DB_ID, COL_DEALS, id, { status: 'payment_pending' });
+      && updated.seller_accepted_terms && updated.buyer_accepted_terms
+      && (!updated.middleman_id || updated.middleman_accepted_terms)) {
+      const { data: fixed } = await db.from('deals').update({ status: 'payment_pending' }).eq('id', id).select().single();
+      if (fixed) {
+        updated = fixed;
         if (!systemMsg || /ยอมรับเงื่อนไขแล้ว$/.test(systemMsg)) systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — รอผู้ซื้อโอนเงิน';
-      } catch { /* ปล่อยผ่าน */ }
+      }
     }
 
     if (systemMsg) {
       if (writeChatMsg) {
-        await databases.createDocument(DB_ID, COL_MSGS, ID.unique(), {
-          dealId: id, senderId: 'system', senderName: 'ระบบ',
-          role: 'system', type: 'system', content: systemMsg, fileId: '', fileName: '',
-          createdAt: new Date().toISOString(),
-        }).catch(() => {});
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ',
+          role: 'system', type: 'system', content: systemMsg, file_id: '', file_name: '',
+        });
       }
 
-      // แจ้งเตือนทุกฝ่ายในดีล ยกเว้นคนที่กดเอง — กระดิ่งใน Nav จะเด้งให้รู้ทันที
-      // (กรณีเลือกคนกลาง: คนกลางได้แจ้งเตือนเฉพาะตัวด้านล่าง จึงตัดออกจากรอบนี้กันแจ้งซ้ำ)
-      const recipients = [updated.sellerId, updated.buyerId, updated.middlemanId]
-        .filter((x): x is string => typeof x === 'string' && !!x && x !== uid)
-        .filter(x => !(action === 'select_middleman' && x === updated.middlemanId));
+      // แจ้งเตือนทุกฝ่ายในดีล ยกเว้นคนที่กดเอง
+      const recipients = [updated.seller_id, updated.buyer_id, updated.middleman_id]
+        .filter((x): x is string => typeof x === 'string' && !!x && x !== me.id)
+        .filter(x => !(action === 'select_middleman' && x === updated.middleman_id));
       if (recipients.length) {
         const title =
           action === 'start_call' ? `📹 วิดีโอคอล: ${updated.title || 'ดีล'}` :
           action === 'visit' ? `👀 มีคนเข้ามาดูห้องดีล: ${updated.title || ''}` :
           `ดีล: ${updated.title || 'ไม่มีชื่อ'}`;
-        await notifyUsers(databases, recipients, {
+        await notifyUsers(db, recipients, {
           title,
           body: systemMsg,
           link: action === 'start_call' ? `/deal/${id}?call=1` : `/deal/${id}`,
         });
       }
 
-      // แจ้งคนกลางแบบเจาะจงเมื่อถูกเลือก — ให้รู้ชัดว่า "คุณ" ถูกเลือก ไม่ใช่แค่ความเคลื่อนไหวของดีล
-      if (action === 'select_middleman' && updated.middlemanId && updated.middlemanId !== uid) {
-        await notifyUsers(databases, [updated.middlemanId as string], {
+      // แจ้งคนกลางแบบเจาะจงเมื่อถูกเลือก
+      if (action === 'select_middleman' && updated.middleman_id && updated.middleman_id !== me.id) {
+        await notifyUsers(db, [updated.middleman_id as string], {
           title: '🤝 คุณถูกเลือกเป็นคนกลาง!',
           body: `ดีล "${updated.title || 'ไม่มีชื่อ'}" มูลค่า ฿${Number(updated.price || 0).toLocaleString()} — เข้าไปยอมรับเงื่อนไขเพื่อเริ่มงานได้เลย`,
           link: `/deal/${id}`,
         });
       }
 
-      // แจ้งเตือนแอดมินเมื่อมีเงินเข้า/ข้อพิพาท — ให้รู้ทันทีว่าต้องเข้าไปตรวจ
+      // แจ้งเตือนแอดมินเมื่อมีเงินเข้า/ข้อพิพาท
       if (action === 'upload_payment' || action === 'dispute') {
-        const admins = await getAdminIds();
+        const admins = await getAdminIds(db);
         if (admins.length) {
           const isPay = action === 'upload_payment';
-          await notifyUsers(databases, admins, {
+          await notifyUsers(db, admins, {
             title: isPay ? `💰 มีการโอนเงินรอตรวจสอบ: ${updated.title || 'ดีล'}` : `⚠️ มีข้อพิพาท: ${updated.title || 'ดีล'}`,
             body: isPay
               ? `ผู้ซื้อโอนเงิน ฿${Number(updated.price || 0).toLocaleString()} แล้ว — เข้าไปตรวจสอบและอนุมัติที่หน้าการเงิน`
@@ -569,9 +521,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    await syncDealLedger(databases, getAdminUsers(), updated as unknown as Record<string, unknown>).catch(() => {});
+    await syncDealLedger(db, updated as Record<string, unknown>).catch(() => {});
     return NextResponse.json({ deal: updated });
   } catch (err: unknown) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

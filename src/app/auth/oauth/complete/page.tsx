@@ -2,12 +2,13 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { account, persistSession } from '@/lib/appwrite';
+import { supabase } from '@/lib/supabase';
 
 /**
- * หน้ารับ callback จาก Google/Facebook OAuth (token flow)
- * — แลก userId+secret เป็น session ผ่าน XHR แล้วเก็บ secret ใน localStorage
- * วิธีนี้ไม่พึ่ง third-party cookie จึงใช้ได้บนมือถือ/แท็บเล็ต (Safari/Chrome บล็อก cookie ข้ามโดเมน)
+ * หน้ารับ callback จาก Google/Facebook OAuth.
+ * supabase-js (detectSessionInUrl: true ใน src/lib/supabase.ts) จะอ่าน
+ * access_token/refresh_token จาก URL hash ที่ Supabase ส่งกลับมาให้อัตโนมัติ
+ * แล้วเก็บ session ไว้ใน localStorage เอง — ไม่ต้องแลก token เองแบบ Appwrite เดิม
  */
 function OAuthCompleteInner() {
   const router = useRouter();
@@ -16,22 +17,22 @@ function OAuthCompleteInner() {
 
   useEffect(() => {
     async function finish() {
-      const userId = searchParams.get('userId') || '';
-      const secret = searchParams.get('secret') || '';
       const returnTo = searchParams.get('returnTo') || '/register';
-
       try {
-        if (userId && secret) {
-          // แลก token เป็น session — SDK จะเก็บ fallback cookie ใน localStorage ให้อัตโนมัติ
-          const session = await account.createSession({ userId, secret });
-          if (session.secret) persistSession(session.secret);
-        }
+        // ให้เวลา supabase-js อ่าน token จาก URL hash ก่อน (เกิดทันทีตอนโหลดสคริปต์
+        // แต่ getSession() รอ promise นั้นให้เสร็จก่อนคืนค่าอยู่แล้ว)
+        const { data, error } = await supabase.auth.getSession();
+        if (error || !data.session) throw new Error(error?.message || 'no_session');
+
         setStatus('กำลังโหลดข้อมูล...');
-        const u = await account.get();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name')
+          .eq('id', data.session.user.id)
+          .single();
+
         setStatus('เข้าสู่ระบบสำเร็จ...');
-        const prefs = u.prefs as Record<string, string>;
-        // สมาชิกใหม่ (ยังไม่มีโปรไฟล์) → ไปหน้าลงทะเบียน / สมาชิกเดิม → ไปหน้าที่ตั้งใจ
-        const dest = prefs?.firstName
+        const dest = profile?.first_name
           ? (returnTo.startsWith('/') ? returnTo : '/')
           : '/register';
         router.replace(dest);

@@ -1,6 +1,4 @@
-import { Databases, DatabasesIndexType, ID, OrderBy, Permission, Query, Role, Users } from 'node-appwrite';
-import { DB_ID } from '../admin/_lib';
-import { readDealPriceState } from '@/lib/dealPriceState';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { FEE_DEFAULTS, computeDealFees, type FeeConfig, type FeeLine } from '@/lib/fees';
 import {
   financeReferenceCode,
@@ -14,793 +12,344 @@ import {
   type LedgerStatus,
   type MiddlemanWalletSnapshot,
 } from '@/lib/financeLedger';
-import { readJsonConfig } from './appConfig';
-
-const COL_CFG = 'app_config';
-export const FINANCE_LEDGER_COLLECTION_ID = 'finance_ledger_v2';
-export const MIDDLEMAN_WALLET_COLLECTION_ID = 'middleman_wallets_v2';
-const COL_LEDGER = FINANCE_LEDGER_COLLECTION_ID;
-const COL_WALLETS = MIDDLEMAN_WALLET_COLLECTION_ID;
-const COL_DEALS = 'deals';
-const COL_SELLER = 'seller_applications';
-const COL_MM = 'middleman_applications';
-const COL_ONSITE = 'onsite_jobs';
 
 const HELD_DEAL_STATUSES = new Set([
-  'terms_pending',
-  'payment_pending',
-  'payment_uploaded',
-  'packing',
-  'shipped_to_middleman',
-  'middleman_received',
-  'middleman_checking',
-  'shipped_to_buyer',
-  'delivered',
-  'meetup_ready',
-  'disputed',
+  'terms_pending', 'payment_pending', 'payment_uploaded', 'packing', 'shipped_to_middleman',
+  'middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered', 'meetup_ready', 'disputed',
 ]);
 const CONFIRMED_DEAL_STATUSES = new Set([
-  'packing',
-  'shipped_to_middleman',
-  'middleman_received',
-  'middleman_checking',
-  'shipped_to_buyer',
-  'delivered',
-  'completed',
+  'packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered', 'completed',
 ]);
 
-type JsonMap = Record<string, unknown>;
-
 export interface LedgerDoc {
-  $id?: string;
-  entryKey: string;
-  referenceType: LedgerReferenceType;
-  referenceId: string;
-  dealId: string;
-  dealNumber: string;
-  ownerType: LedgerOwnerType;
-  ownerId: string;
-  ownerName: string;
-  entryType: LedgerEntryType;
+  id?: string;
+  entry_key: string;
+  reference_type: LedgerReferenceType;
+  reference_id: string;
+  deal_id: string | null;
+  deal_number: string;
+  owner_type: LedgerOwnerType;
+  owner_id: string | null;
+  owner_name: string;
+  entry_type: LedgerEntryType;
   direction: LedgerDirection;
   amount: number;
   status: LedgerStatus;
   title: string;
   purpose: string;
-  counterpartyName: string;
+  counterparty_name: string;
   bucket: string;
-  fileId: string;
-  approveLink: string;
-  meta: string;
+  file_id: string;
+  approve_link: string;
+  meta: Record<string, unknown>;
   active: boolean;
-  createdAt: string;
-  updatedAt: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 function text(value: unknown, max: number) {
   return String(value ?? '').slice(0, max);
 }
 
-function toJson(value: unknown, max = 3800) {
-  return JSON.stringify(value || {}).slice(0, max);
-}
-
-function parseJsonMap(value: unknown): JsonMap {
-  if (typeof value !== 'string' || !value) return {};
-  try {
-    const parsed = JSON.parse(value);
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed as JsonMap : {};
-  } catch {
-    return {};
-  }
-}
-
 function feeSummary(lines: FeeLine[]) {
   return lines.map(line => ({ label: line.label, amount: Number(line.amount) || 0 }));
 }
 
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+export async function readFeesConfig(db: SupabaseClient): Promise<FeeConfig> {
+  const { data } = await db.from('fee_config').select('*').eq('id', true).maybeSingle();
+  if (!data) return FEE_DEFAULTS;
+  return {
+    escrowFeePercent: Number(data.escrow_fee_percent) || FEE_DEFAULTS.escrowFeePercent,
+    escrowFeeMin: Number(data.escrow_fee_min) || FEE_DEFAULTS.escrowFeeMin,
+    middlemanFeePercent: Number(data.middleman_fee_percent) || FEE_DEFAULTS.middlemanFeePercent,
+    middlemanFeeMin: Number(data.middleman_fee_min) || FEE_DEFAULTS.middlemanFeeMin,
+    platformCutPercent: Number(data.platform_cut_percent) || FEE_DEFAULTS.platformCutPercent,
+    simpleFeePercent: Number(data.simple_fee_percent) || FEE_DEFAULTS.simpleFeePercent,
+    simpleFeeMin: Number(data.simple_fee_min) || FEE_DEFAULTS.simpleFeeMin,
+    inspectionFee: Number(data.inspection_fee) || FEE_DEFAULTS.inspectionFee,
+    packingFee: Number(data.packing_fee) || FEE_DEFAULTS.packingFee,
+    depositBronze: Number(data.deposit_bronze) || FEE_DEFAULTS.depositBronze,
+    depositSilver: Number(data.deposit_silver) || FEE_DEFAULTS.depositSilver,
+    depositGold: Number(data.deposit_gold) || FEE_DEFAULTS.depositGold,
+    depositPlatinum: Number(data.deposit_platinum) || FEE_DEFAULTS.depositPlatinum,
+    failedDealFee: Number(data.failed_deal_fee) || FEE_DEFAULTS.failedDealFee,
+    onsiteBaseFee: Number(data.onsite_base_fee) || FEE_DEFAULTS.onsiteBaseFee,
+    onsitePerKm: Number(data.onsite_per_km) || FEE_DEFAULTS.onsitePerKm,
+    meetupFeePercent: Number(data.meetup_fee_percent) || FEE_DEFAULTS.meetupFeePercent,
+    meetupFeeMin: Number(data.meetup_fee_min) || FEE_DEFAULTS.meetupFeeMin,
+    sellerRegFee: Number(data.seller_reg_fee) || FEE_DEFAULTS.sellerRegFee,
+    middlemanRegFee: Number(data.middleman_reg_fee) || FEE_DEFAULTS.middlemanRegFee,
+    returnShippingBy: data.return_shipping_by || FEE_DEFAULTS.returnShippingBy,
+    companyPromptPay: data.company_prompt_pay || '',
+    companyBankName: data.company_bank_name || '',
+    companyBankAcct: data.company_bank_acct || '',
+    companyBankHolder: data.company_bank_holder || '',
+    companyQrFileId: data.company_qr_file_id || '',
+  };
 }
 
-function appwriteMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error || '');
-}
-
-function isMissingCollectionError(error: unknown) {
-  const status = (error as { code?: number; status?: number } | undefined)?.code ?? (error as { status?: number } | undefined)?.status;
-  const message = appwriteMessage(error);
-  return status === 404 || /collection.*not found|could not be found|document with the requested id.*not found/i.test(message);
-}
-
-function isMissingAttributeError(error: unknown) {
-  const status = (error as { code?: number; status?: number } | undefined)?.code ?? (error as { status?: number } | undefined)?.status;
-  const message = appwriteMessage(error);
-  return status === 404 || /attribute.*not found|attribute with the requested id.*not found|unknown attribute/i.test(message);
-}
-
-async function hasCollection(db: Databases, collectionId: string) {
-  try {
-    await db.getCollection(DB_ID, collectionId);
-    return true;
-  } catch (error) {
-    if (!isMissingCollectionError(error)) throw error;
-    return false;
-  }
-}
-
-async function waitForCollection(db: Databases, collectionId: string, maxAttempts = 40) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    if (await hasCollection(db, collectionId)) return;
-    await sleep(500);
-  }
-  throw new Error(`Finance collection not ready: ${collectionId}`);
-}
-
-async function getAttributeStatus(db: Databases, collectionId: string, key: string) {
-  try {
-    const attr = await db.getAttribute(DB_ID, collectionId, key);
-    return (attr as unknown as { status?: string }).status || 'unknown';
-  } catch (error) {
-    if (!isMissingAttributeError(error)) throw error;
-    return '';
-  }
-}
-
-async function hasAttribute(db: Databases, collectionId: string, key: string) {
-  return (await getAttributeStatus(db, collectionId, key)) === 'available';
-}
-
-async function waitForAttribute(db: Databases, collectionId: string, key: string, maxAttempts = 20) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    if (await hasAttribute(db, collectionId, key)) return;
-    await sleep(500);
-  }
-  throw new Error(`Finance attribute not ready: ${collectionId}.${key}`);
-}
-
-async function ensureCollection(db: Databases, collectionId: string, name: string) {
-  if (await hasCollection(db, collectionId)) return;
-  try {
-    await db.createCollection(DB_ID, collectionId, name, [
-      Permission.read(Role.users()),
-      Permission.write(Role.users()),
-    ]);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || '');
-    if (!(await hasCollection(db, collectionId)) && !/already exists/i.test(message)) {
-      throw new Error(`Unable to create finance collection: ${collectionId}: ${message}`);
-    }
-  }
-  await waitForCollection(db, collectionId, 40);
-}
-
-async function ensureStringAttribute(db: Databases, collectionId: string, key: string, size: number, required = false, defaultValue = '') {
-  if (await hasAttribute(db, collectionId, key)) return;
-  try {
-    await db.createStringAttribute(DB_ID, collectionId, key, size, required, defaultValue);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || '');
-    const status = await getAttributeStatus(db, collectionId, key);
-    if (status) {
-      await waitForAttribute(db, collectionId, key, 40);
-      return;
-    }
-    throw new Error(`Unable to create finance string attribute: ${collectionId}.${key}: ${message}`);
-  }
-  await waitForAttribute(db, collectionId, key, 40);
-}
-
-async function ensureIntegerAttribute(db: Databases, collectionId: string, key: string, min = 0, max = 999999999, defaultValue = 0) {
-  if (await hasAttribute(db, collectionId, key)) return;
-  try {
-    await db.createIntegerAttribute(DB_ID, collectionId, key, false, min, max, defaultValue);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || '');
-    const status = await getAttributeStatus(db, collectionId, key);
-    if (status) {
-      await waitForAttribute(db, collectionId, key, 40);
-      return;
-    }
-    throw new Error(`Unable to create finance integer attribute: ${collectionId}.${key}: ${message}`);
-  }
-  await waitForAttribute(db, collectionId, key, 40);
-}
-
-async function ensureBooleanAttribute(db: Databases, collectionId: string, key: string, defaultValue = false) {
-  if (await hasAttribute(db, collectionId, key)) return;
-  try {
-    await db.createBooleanAttribute(DB_ID, collectionId, key, false, defaultValue);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || '');
-    const status = await getAttributeStatus(db, collectionId, key);
-    if (status) {
-      await waitForAttribute(db, collectionId, key, 40);
-      return;
-    }
-    throw new Error(`Unable to create finance boolean attribute: ${collectionId}.${key}: ${message}`);
-  }
-  await waitForAttribute(db, collectionId, key, 40);
-}
-
-async function ensureIndex(db: Databases, collectionId: string, key: string, attrs: string[], orders: OrderBy[]) {
-  await db.createIndex(DB_ID, collectionId, key, DatabasesIndexType.Key, attrs, orders).catch(() => {});
-}
-
-let ensureFinanceCollectionsPromise: Promise<void> | null = null;
-
-async function ensureFinanceCollectionsOnce(db: Databases) {
-  await ensureCollection(db, COL_LEDGER, 'Finance Ledger');
-  await ensureCollection(db, COL_WALLETS, 'Middleman Wallets');
-
-  await ensureStringAttribute(db, COL_LEDGER, 'entryKey', 120);
-  await ensureStringAttribute(db, COL_LEDGER, 'referenceType', 40);
-  await ensureStringAttribute(db, COL_LEDGER, 'referenceId', 255);
-  await ensureStringAttribute(db, COL_LEDGER, 'dealId', 255);
-  await ensureStringAttribute(db, COL_LEDGER, 'dealNumber', 50);
-  await ensureStringAttribute(db, COL_LEDGER, 'ownerType', 30);
-  await ensureStringAttribute(db, COL_LEDGER, 'ownerId', 255);
-  await ensureStringAttribute(db, COL_LEDGER, 'ownerName', 200);
-  await ensureStringAttribute(db, COL_LEDGER, 'entryType', 50);
-  await ensureStringAttribute(db, COL_LEDGER, 'direction', 20);
-  await ensureIntegerAttribute(db, COL_LEDGER, 'amount');
-  await ensureStringAttribute(db, COL_LEDGER, 'status', 30);
-  await ensureStringAttribute(db, COL_LEDGER, 'title', 200);
-  await ensureStringAttribute(db, COL_LEDGER, 'purpose', 200);
-  await ensureStringAttribute(db, COL_LEDGER, 'counterpartyName', 200);
-  await ensureStringAttribute(db, COL_LEDGER, 'bucket', 50);
-  await ensureStringAttribute(db, COL_LEDGER, 'fileId', 255);
-  await ensureStringAttribute(db, COL_LEDGER, 'approveLink', 255);
-  await ensureStringAttribute(db, COL_LEDGER, 'meta', 4000);
-  await ensureBooleanAttribute(db, COL_LEDGER, 'active', true);
-  await ensureStringAttribute(db, COL_LEDGER, 'createdAt', 30);
-  await ensureStringAttribute(db, COL_LEDGER, 'updatedAt', 30);
-
-  await ensureStringAttribute(db, COL_WALLETS, 'middlemanId', 255);
-  await ensureStringAttribute(db, COL_WALLETS, 'middlemanName', 200);
-  await ensureStringAttribute(db, COL_WALLETS, 'tier', 20);
-  await ensureIntegerAttribute(db, COL_WALLETS, 'creditLimit');
-  await ensureIntegerAttribute(db, COL_WALLETS, 'availableCredit');
-  await ensureIntegerAttribute(db, COL_WALLETS, 'heldCredit');
-  await ensureIntegerAttribute(db, COL_WALLETS, 'releasedCredit');
-  await ensureIntegerAttribute(db, COL_WALLETS, 'penaltyCredit');
-  await ensureIntegerAttribute(db, COL_WALLETS, 'activeDealCount');
-  await ensureStringAttribute(db, COL_WALLETS, 'updatedAt', 30);
-
-  await Promise.all([
-    ensureIndex(db, COL_LEDGER, 'idx_entry_key', ['entryKey'], [OrderBy.Asc]),
-    ensureIndex(db, COL_LEDGER, 'idx_ref', ['referenceType', 'referenceId'], [OrderBy.Asc, OrderBy.Asc]),
-    ensureIndex(db, COL_LEDGER, 'idx_deal', ['dealId'], [OrderBy.Asc]),
-    ensureIndex(db, COL_LEDGER, 'idx_owner', ['ownerId'], [OrderBy.Asc]),
-    ensureIndex(db, COL_LEDGER, 'idx_status', ['status'], [OrderBy.Asc]),
-    ensureIndex(db, COL_LEDGER, 'idx_updated', ['updatedAt'], [OrderBy.Desc]),
-    ensureIndex(db, COL_WALLETS, 'idx_middleman_wallet', ['middlemanId'], [OrderBy.Asc]),
-    ensureIndex(db, COL_WALLETS, 'idx_wallet_updated', ['updatedAt'], [OrderBy.Desc]),
-  ]);
-}
-
-export async function ensureFinanceCollections(db: Databases) {
-  if (!ensureFinanceCollectionsPromise) {
-    ensureFinanceCollectionsPromise = ensureFinanceCollectionsOnce(db).catch(error => {
-      ensureFinanceCollectionsPromise = null;
-      throw error;
-    });
-  }
-  return ensureFinanceCollectionsPromise;
-}
-
-export async function readFeesConfig(db: Databases): Promise<FeeConfig> {
-  try {
-    const doc = await db.getDocument(DB_ID, COL_CFG, 'fees') as unknown as { data?: string };
-    return { ...FEE_DEFAULTS, ...parseJsonMap(doc.data) } as FeeConfig;
-  } catch {
-    return readJsonConfig(db, 'fees', FEE_DEFAULTS);
-  }
-}
-
-async function findEntryByKey(db: Databases, entryKey: string) {
-  const res = await db.listDocuments(DB_ID, COL_LEDGER, [Query.equal('entryKey', entryKey), Query.limit(1)]).catch(() => ({ documents: [] }));
-  return res.documents[0] as unknown as LedgerDoc | undefined;
-}
-
-async function listReferenceEntries(db: Databases, referenceType: LedgerReferenceType, referenceId: string) {
-  const res = await db.listDocuments(DB_ID, COL_LEDGER, [
-    Query.equal('referenceType', referenceType),
-    Query.equal('referenceId', referenceId),
-    Query.limit(200),
-  ]).catch(() => ({ documents: [] }));
-  return res.documents as unknown as LedgerDoc[];
-}
-
-export async function upsertLedgerEntry(db: Databases, entry: LedgerDoc) {
-  await ensureFinanceCollections(db);
-  const existing = await findEntryByKey(db, entry.entryKey);
+export async function upsertLedgerEntry(db: SupabaseClient, entry: LedgerDoc) {
   const payload = {
-    entryKey: text(entry.entryKey, 120),
-    referenceType: text(entry.referenceType, 40),
-    referenceId: text(entry.referenceId, 255),
-    dealId: text(entry.dealId, 255),
-    dealNumber: text(entry.dealNumber, 50),
-    ownerId: text(entry.ownerId, 255),
-    ownerName: text(entry.ownerName, 200),
-    entryType: text(entry.entryType, 50),
-    direction: text(entry.direction, 20),
+    entry_key: text(entry.entry_key, 120),
+    reference_type: entry.reference_type,
+    reference_id: entry.reference_id,
+    deal_id: entry.deal_id || null,
+    deal_number: text(entry.deal_number, 50),
+    owner_type: entry.owner_type,
+    owner_id: entry.owner_id || null,
+    owner_name: text(entry.owner_name, 200),
+    entry_type: entry.entry_type,
+    direction: entry.direction,
     amount: Math.max(0, Math.round(Number(entry.amount) || 0)),
-    status: text(entry.status, 30),
+    status: entry.status,
     title: text(entry.title, 200),
     purpose: text(entry.purpose, 200),
-    counterpartyName: text(entry.counterpartyName, 200),
+    counterparty_name: text(entry.counterparty_name, 200),
     bucket: text(entry.bucket, 50),
-    fileId: text(entry.fileId, 255),
-    approveLink: text(entry.approveLink, 255),
-    meta: text(entry.meta, 4000),
+    file_id: text(entry.file_id, 255),
+    approve_link: text(entry.approve_link, 255),
+    meta: entry.meta || {},
     active: !!entry.active,
-    createdAt: text(entry.createdAt || new Date().toISOString(), 30),
-    updatedAt: text(entry.updatedAt || new Date().toISOString(), 30),
+    updated_at: new Date().toISOString(),
   };
-  try {
-    if (existing?.$id) {
-      await db.updateDocument(DB_ID, COL_LEDGER, existing.$id, payload);
-      return existing.$id;
-    }
-    const created = await db.createDocument(DB_ID, COL_LEDGER, ID.unique(), payload);
-    return created.$id;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || '');
-    if (!/Unknown attribute/i.test(message)) throw error;
-    await ensureFinanceCollections(db);
-    if (existing?.$id) {
-      await db.updateDocument(DB_ID, COL_LEDGER, existing.$id, payload);
-      return existing.$id;
-    }
-    const created = await db.createDocument(DB_ID, COL_LEDGER, ID.unique(), payload);
-    return created.$id;
-  }
+  const { error } = await db.from('finance_ledger').upsert(payload, { onConflict: 'entry_key' });
+  if (error) throw error;
 }
 
-async function deactivateMissingEntries(db: Databases, referenceType: LedgerReferenceType, referenceId: string, activeKeys: Set<string>) {
-  const existing = await listReferenceEntries(db, referenceType, referenceId);
-  await Promise.all(existing.map(async entry => {
-    if (!entry.$id || activeKeys.has(entry.entryKey)) return;
-    await db.updateDocument(DB_ID, COL_LEDGER, entry.$id, {
+async function deactivateMissingEntries(db: SupabaseClient, referenceType: LedgerReferenceType, referenceId: string, activeKeys: Set<string>) {
+  const { data: existing } = await db
+    .from('finance_ledger')
+    .select('id, entry_key, status')
+    .eq('reference_type', referenceType)
+    .eq('reference_id', referenceId);
+  await Promise.all((existing || []).map(async entry => {
+    if (activeKeys.has(entry.entry_key)) return;
+    const keepStatus = ['paid', 'released', 'refunded'].includes(entry.status);
+    await db.from('finance_ledger').update({
       active: false,
-      status: entry.status === 'paid' || entry.status === 'released' || entry.status === 'refunded' ? entry.status : 'void',
-      updatedAt: new Date().toISOString(),
-    }).catch(() => {});
+      status: keepStatus ? entry.status : 'void',
+      updated_at: new Date().toISOString(),
+    }).eq('id', entry.id);
   }));
 }
 
-async function getMiddlemanTier(users: Users, middlemanId: string) {
-  try {
-    const user = await users.get(middlemanId);
-    const prefs = (user.prefs || {}) as Record<string, string>;
-    return prefs.middlemanTierIntent || prefs.middlemanTier || 'Bronze';
-  } catch {
-    return 'Bronze';
-  }
+async function getMiddlemanProfile(db: SupabaseClient, middlemanId: string) {
+  const { data } = await db.from('profiles').select('display_name, middleman_tier, middleman_tier_intent').eq('id', middlemanId).maybeSingle();
+  return data;
 }
 
-async function getMiddlemanName(users: Users, middlemanId: string, fallback = '') {
-  try {
-    const user = await users.get(middlemanId);
-    const prefs = (user.prefs || {}) as Record<string, string>;
-    return prefs.displayName || user.name || fallback || middlemanId;
-  } catch {
-    return fallback || middlemanId;
-  }
+function buildEntry(partial: Omit<LedgerDoc, 'meta'> & { meta?: Record<string, unknown> }): LedgerDoc {
+  return { ...partial, meta: partial.meta || {} };
 }
 
-function buildEntry(
-  partial: Omit<LedgerDoc, '$id' | 'meta' | 'createdAt' | 'updatedAt'> & { meta?: unknown; createdAt?: string; updatedAt?: string },
-): LedgerDoc {
-  const now = new Date().toISOString();
-  return {
-    ...partial,
-    meta: typeof partial.meta === 'string' ? partial.meta : toJson(partial.meta),
-    createdAt: partial.createdAt || now,
-    updatedAt: partial.updatedAt || now,
-  };
-}
-
-export async function syncDealLedger(db: Databases, users: Users, deal: Record<string, unknown>, feesConfig?: FeeConfig) {
-  await ensureFinanceCollections(db);
+export async function syncDealLedger(db: SupabaseClient, deal: Record<string, unknown>, feesConfig?: FeeConfig) {
   const fees = feesConfig || await readFeesConfig(db);
-  const pd = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
-  const dealId = String(deal.$id || '');
-  const dealNumber = financeReferenceCode('deal', dealId, dealId);
+  const dealId = String(deal.id || '');
+  const dealNumber = String(deal.deal_number || financeReferenceCode('deal', dealId, dealId));
   const title = String(deal.title || '');
-  const dealType = String(deal.dealType || '');
+  const dealType = String(deal.deal_type || 'normal');
   const status = String(deal.status || '');
   const price = Number(deal.price) || 0;
-  const feePayer = splitFeeByPayer(computeDealFees(fees, price, dealType).total, String(deal.feePayer || pd.feePayer || 'split'));
+
+  const { data: pdRow } = await db.from('deal_price_state').select('*').eq('deal_id', dealId).maybeSingle();
+  const pd = pdRow || {};
+
+  const feePayerInput = String(deal.fee_payer || pd.proposed_fee_payer || 'split');
   const feeBreakdown = computeDealFees(fees, price, dealType);
+  const feePayer = splitFeeByPayer(feeBreakdown.total, feePayerInput);
   const feeParts = splitDealFeeComponents(fees, feeBreakdown.lines);
   const activeKeys = new Set<string>();
 
   const push = async (entry: LedgerDoc) => {
-    activeKeys.add(entry.entryKey);
+    activeKeys.add(entry.entry_key);
     await upsertLedgerEntry(db, entry);
   };
 
   if (dealType === 'meetup') {
-    const md = parseJsonMap(deal.meetupData);
-    const depositEach = Number(md.deposit ?? Math.max(Number(md.buyerDeposit || 0), Number(md.sellerDeposit || 0))) || 0;
-    const buyerFee = Number(md.buyerFee || 0);
-    const sellerFee = Number(md.sellerFee || 0);
+    const { data: meetupRow } = await db.from('deal_meetup').select('*').eq('deal_id', dealId).maybeSingle();
+    const md = meetupRow || {};
+    const depositEach = Number(md.deposit) || 0;
+    const buyerFee = Number(md.buyer_fee || 0);
+    const sellerFee = Number(md.seller_fee || 0);
     const finished = status === 'completed' || status === 'cancelled';
-    const buyerDepositStatus: LedgerStatus = !md.buyerSlip ? 'expected' : finished ? (md.refundedAt ? 'refunded' : 'confirmed') : 'confirmed';
-    const sellerDepositStatus: LedgerStatus = !md.sellerSlip ? 'expected' : finished ? (md.refundedAt ? 'refunded' : 'confirmed') : 'confirmed';
+    const buyerDepositStatus: LedgerStatus = !md.buyer_slip ? 'expected' : finished ? (md.refunded_at ? 'refunded' : 'confirmed') : 'confirmed';
+    const sellerDepositStatus: LedgerStatus = !md.seller_slip ? 'expected' : finished ? (md.refunded_at ? 'refunded' : 'confirmed') : 'confirmed';
 
-    if (depositEach > 0 || md.buyerSlip) {
+    if (depositEach > 0 || md.buyer_slip) {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:meetup:buyer:deposit`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'buyer',
-        ownerId: text(deal.buyerId, 255),
-        ownerName: text(deal.buyerName, 200),
-        entryType: 'meetup_buyer_deposit',
-        direction: 'incoming',
-        amount: depositEach,
-        status: buyerDepositStatus,
-        title,
-        purpose: 'เงินประกันการเดินทาง (ผู้ซื้อ)',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: 'deal_files',
-        fileId: text(md.buyerSlip, 255),
-        approveLink: `/deal/${dealId}`,
-        active: depositEach > 0 || !!md.buyerSlip,
+        entry_key: `deal:${dealId}:meetup:buyer:deposit`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'buyer', owner_id: String(deal.buyer_id || '') || null, owner_name: text(deal.buyer_name, 200),
+        entry_type: 'meetup_buyer_deposit', direction: 'incoming', amount: depositEach, status: buyerDepositStatus, title,
+        purpose: 'เงินประกันการเดินทาง (ผู้ซื้อ)', counterparty_name: 'ศูนย์กลาง', bucket: 'deal-files', file_id: text(md.buyer_slip, 255),
+        approve_link: `/deal/${dealId}`, active: depositEach > 0 || !!md.buyer_slip,
         meta: { depositEach, fee: buyerFee, totalPaid: depositEach + buyerFee, dealType: 'meetup' },
       }));
     }
-    if (buyerFee > 0 || md.buyerSlip) {
+    if (buyerFee > 0 || md.buyer_slip) {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:meetup:buyer:fee`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'platform',
-        ownerId: 'platform',
-        ownerName: 'ศูนย์กลาง',
-        entryType: 'meetup_buyer_fee',
-        direction: 'incoming',
-        amount: buyerFee,
-        status: !md.buyerSlip ? 'expected' : 'confirmed',
-        title,
-        purpose: 'ค่าบริการรับประกันการเดินทาง (ผู้ซื้อ)',
-        counterpartyName: text(deal.buyerName, 200),
-        bucket: 'deal_files',
-        fileId: text(md.buyerSlip, 255),
-        approveLink: `/deal/${dealId}`,
-        active: buyerFee > 0 || !!md.buyerSlip,
+        entry_key: `deal:${dealId}:meetup:buyer:fee`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'platform', owner_id: null, owner_name: 'ศูนย์กลาง',
+        entry_type: 'meetup_buyer_fee', direction: 'incoming', amount: buyerFee, status: !md.buyer_slip ? 'expected' : 'confirmed', title,
+        purpose: 'ค่าบริการรับประกันการเดินทาง (ผู้ซื้อ)', counterparty_name: text(deal.buyer_name, 200), bucket: 'deal-files', file_id: text(md.buyer_slip, 255),
+        approve_link: `/deal/${dealId}`, active: buyerFee > 0 || !!md.buyer_slip,
         meta: { depositEach, fee: buyerFee, payer: 'buyer' },
       }));
     }
-    if (depositEach > 0 || md.sellerSlip) {
+    if (depositEach > 0 || md.seller_slip) {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:meetup:seller:deposit`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'seller',
-        ownerId: text(deal.sellerId, 255),
-        ownerName: text(deal.sellerName, 200),
-        entryType: 'meetup_seller_deposit',
-        direction: 'incoming',
-        amount: depositEach,
-        status: sellerDepositStatus,
-        title,
-        purpose: 'เงินประกันการเดินทาง (ผู้ขาย)',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: 'deal_files',
-        fileId: text(md.sellerSlip, 255),
-        approveLink: `/deal/${dealId}`,
-        active: depositEach > 0 || !!md.sellerSlip,
+        entry_key: `deal:${dealId}:meetup:seller:deposit`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'seller', owner_id: String(deal.seller_id || '') || null, owner_name: text(deal.seller_name, 200),
+        entry_type: 'meetup_seller_deposit', direction: 'incoming', amount: depositEach, status: sellerDepositStatus, title,
+        purpose: 'เงินประกันการเดินทาง (ผู้ขาย)', counterparty_name: 'ศูนย์กลาง', bucket: 'deal-files', file_id: text(md.seller_slip, 255),
+        approve_link: `/deal/${dealId}`, active: depositEach > 0 || !!md.seller_slip,
         meta: { depositEach, fee: sellerFee, totalPaid: depositEach + sellerFee, dealType: 'meetup' },
       }));
     }
-    if (sellerFee > 0 || md.sellerSlip) {
+    if (sellerFee > 0 || md.seller_slip) {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:meetup:seller:fee`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'platform',
-        ownerId: 'platform',
-        ownerName: 'ศูนย์กลาง',
-        entryType: 'meetup_seller_fee',
-        direction: 'incoming',
-        amount: sellerFee,
-        status: !md.sellerSlip ? 'expected' : 'confirmed',
-        title,
-        purpose: 'ค่าบริการรับประกันการเดินทาง (ผู้ขาย)',
-        counterpartyName: text(deal.sellerName, 200),
-        bucket: 'deal_files',
-        fileId: text(md.sellerSlip, 255),
-        approveLink: `/deal/${dealId}`,
-        active: sellerFee > 0 || !!md.sellerSlip,
+        entry_key: `deal:${dealId}:meetup:seller:fee`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'platform', owner_id: null, owner_name: 'ศูนย์กลาง',
+        entry_type: 'meetup_seller_fee', direction: 'incoming', amount: sellerFee, status: !md.seller_slip ? 'expected' : 'confirmed', title,
+        purpose: 'ค่าบริการรับประกันการเดินทาง (ผู้ขาย)', counterparty_name: text(deal.seller_name, 200), bucket: 'deal-files', file_id: text(md.seller_slip, 255),
+        approve_link: `/deal/${dealId}`, active: sellerFee > 0 || !!md.seller_slip,
         meta: { depositEach, fee: sellerFee, payer: 'seller' },
       }));
     }
-    if (finished && md.buyerSlip) {
+    if (finished && md.buyer_slip) {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:meetup:buyer:refund`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'buyer',
-        ownerId: text(deal.buyerId, 255),
-        ownerName: text(deal.buyerName, 200),
-        entryType: 'meetup_buyer_refund',
-        direction: 'outgoing',
-        amount: depositEach,
-        status: md.refundedAt ? 'paid' : 'scheduled',
-        title,
-        purpose: 'คืนเงินประกันการเดินทาง (ผู้ซื้อ)',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: '',
-        fileId: '',
-        approveLink: '/admin/deals',
-        active: depositEach > 0,
-        meta: { refundNote: text(md.refundNote, 300), dealType: 'meetup' },
+        entry_key: `deal:${dealId}:meetup:buyer:refund`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'buyer', owner_id: String(deal.buyer_id || '') || null, owner_name: text(deal.buyer_name, 200),
+        entry_type: 'meetup_buyer_refund', direction: 'outgoing', amount: depositEach, status: md.refunded_at ? 'paid' : 'scheduled', title,
+        purpose: 'คืนเงินประกันการเดินทาง (ผู้ซื้อ)', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: '',
+        approve_link: '/admin/deals', active: depositEach > 0,
+        meta: { refundNote: text(md.refund_note, 300), dealType: 'meetup' },
       }));
     }
-    if (finished && md.sellerSlip) {
+    if (finished && md.seller_slip) {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:meetup:seller:refund`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'seller',
-        ownerId: text(deal.sellerId, 255),
-        ownerName: text(deal.sellerName, 200),
-        entryType: 'meetup_seller_refund',
-        direction: 'outgoing',
-        amount: depositEach,
-        status: md.refundedAt ? 'paid' : 'scheduled',
-        title,
-        purpose: 'คืนเงินประกันการเดินทาง (ผู้ขาย)',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: '',
-        fileId: '',
-        approveLink: '/admin/deals',
-        active: depositEach > 0,
-        meta: { refundNote: text(md.refundNote, 300), dealType: 'meetup' },
+        entry_key: `deal:${dealId}:meetup:seller:refund`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'seller', owner_id: String(deal.seller_id || '') || null, owner_name: text(deal.seller_name, 200),
+        entry_type: 'meetup_seller_refund', direction: 'outgoing', amount: depositEach, status: md.refunded_at ? 'paid' : 'scheduled', title,
+        purpose: 'คืนเงินประกันการเดินทาง (ผู้ขาย)', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: '',
+        approve_link: '/admin/deals', active: depositEach > 0,
+        meta: { refundNote: text(md.refund_note, 300), dealType: 'meetup' },
       }));
     }
   } else {
     const buyerPaymentAmount = price + feePayer.buyerShare;
     const sellerFeeAmount = feePayer.sellerShare;
-    const buyerPaymentStatus: LedgerStatus = !deal.paymentSlipFileId
+    const buyerPaymentStatus: LedgerStatus = !deal.payment_slip_file_id
       ? (status === 'payment_pending' ? 'expected' : 'void')
       : status === 'payment_uploaded'
         ? 'pending_review'
-        : status === 'cancelled' && pd.refundSentAt
+        : status === 'cancelled' && pd.refund_sent_at
           ? 'refunded'
           : CONFIRMED_DEAL_STATUSES.has(status) || status === 'cancelled'
             ? 'confirmed'
             : 'pending_review';
 
-    if (status === 'payment_pending' || deal.paymentSlipFileId || CONFIRMED_DEAL_STATUSES.has(status) || status === 'cancelled') {
+    if (status === 'payment_pending' || deal.payment_slip_file_id || CONFIRMED_DEAL_STATUSES.has(status) || status === 'cancelled') {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:buyer_payment`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'buyer',
-        ownerId: text(deal.buyerId, 255),
-        ownerName: text(deal.buyerName, 200),
-        entryType: 'buyer_payment',
-        direction: 'incoming',
-        amount: buyerPaymentAmount,
-        status: buyerPaymentStatus,
-        title,
-        purpose: 'ค่าสินค้าและค่าบริการส่วนผู้ซื้อ',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: 'deal_files',
-        fileId: text(deal.paymentSlipFileId, 255),
-        approveLink: `/deal/${dealId}`,
-        active: buyerPaymentAmount > 0,
+        entry_key: `deal:${dealId}:buyer_payment`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'buyer', owner_id: String(deal.buyer_id || '') || null, owner_name: text(deal.buyer_name, 200),
+        entry_type: 'buyer_payment', direction: 'incoming', amount: buyerPaymentAmount, status: buyerPaymentStatus, title,
+        purpose: 'ค่าสินค้าและค่าบริการส่วนผู้ซื้อ', counterparty_name: 'ศูนย์กลาง', bucket: 'deal-files', file_id: text(deal.payment_slip_file_id, 255),
+        approve_link: `/deal/${dealId}`, active: buyerPaymentAmount > 0,
         meta: { price, buyerFeeShare: feePayer.buyerShare, lines: feeSummary(feeBreakdown.lines), feePayer: feePayer.feePayer },
       }));
     }
 
-    if (sellerFeeAmount > 0 || pd.sellerFeeSlip) {
-      const sellerFeeStatus: LedgerStatus = !pd.sellerFeeSlip
+    if (sellerFeeAmount > 0 || pd.seller_fee_slip) {
+      const sellerFeeStatus: LedgerStatus = !pd.seller_fee_slip
         ? 'expected'
-        : status === 'cancelled' && pd.refundSentAt
+        : status === 'cancelled' && pd.refund_sent_at
           ? 'refunded'
           : CONFIRMED_DEAL_STATUSES.has(status) || status === 'cancelled'
             ? 'confirmed'
             : 'pending_review';
       await push(buildEntry({
-        entryKey: `deal:${dealId}:seller_fee`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'seller',
-        ownerId: text(deal.sellerId, 255),
-        ownerName: text(deal.sellerName, 200),
-        entryType: 'seller_fee_payment',
-        direction: 'incoming',
-        amount: sellerFeeAmount,
-        status: sellerFeeStatus,
-        title,
-        purpose: 'ค่าบริการส่วนผู้ขาย',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: 'deal_files',
-        fileId: text(pd.sellerFeeSlip, 255),
-        approveLink: `/deal/${dealId}`,
-        active: sellerFeeAmount > 0 || !!pd.sellerFeeSlip,
+        entry_key: `deal:${dealId}:seller_fee`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'seller', owner_id: String(deal.seller_id || '') || null, owner_name: text(deal.seller_name, 200),
+        entry_type: 'seller_fee_payment', direction: 'incoming', amount: sellerFeeAmount, status: sellerFeeStatus, title,
+        purpose: 'ค่าบริการส่วนผู้ขาย', counterparty_name: 'ศูนย์กลาง', bucket: 'deal-files', file_id: text(pd.seller_fee_slip, 255),
+        approve_link: `/deal/${dealId}`, active: sellerFeeAmount > 0 || !!pd.seller_fee_slip,
         meta: { sellerFeeShare: sellerFeeAmount, feePayer: feePayer.feePayer },
       }));
     }
 
     if (feeParts.platformFee > 0) {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:platform_fee`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'platform',
-        ownerId: 'platform',
-        ownerName: 'ศูนย์กลาง',
-        entryType: 'platform_fee',
-        direction: 'incoming',
-        amount: feeParts.platformFee,
-        status: status === 'completed' ? 'confirmed' : status === 'cancelled' ? 'cancelled' : buyerPaymentStatus,
-        title,
+        entry_key: `deal:${dealId}:platform_fee`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'platform', owner_id: null, owner_name: 'ศูนย์กลาง',
+        entry_type: 'platform_fee', direction: 'incoming', amount: feeParts.platformFee,
+        status: status === 'completed' ? 'confirmed' : status === 'cancelled' ? 'cancelled' : buyerPaymentStatus, title,
         purpose: dealType === 'simple' ? 'ค่าธรรมเนียมแพลตฟอร์ม (ซื้อขายผ่านกลางแบบง่าย)' : 'ค่าธรรมเนียมแพลตฟอร์ม',
-        counterpartyName: `${text(deal.buyerName, 200)} / ${text(deal.sellerName, 200)}`.trim(),
-        bucket: '',
-        fileId: '',
-        approveLink: `/deal/${dealId}`,
-        active: feeParts.platformFee > 0,
-        meta: {
-          lines: feeSummary(feeBreakdown.lines.filter(line => line.label !== 'ค่าบริการคนกลาง')),
-          platformCutFromMiddleman: feeParts.platformCutFromMiddleman,
-          dealType,
-        },
+        counterparty_name: `${text(deal.buyer_name, 200)} / ${text(deal.seller_name, 200)}`.trim(), bucket: '', file_id: '',
+        approve_link: `/deal/${dealId}`, active: feeParts.platformFee > 0,
+        meta: { lines: feeSummary(feeBreakdown.lines.filter(line => line.label !== 'ค่าบริการคนกลาง')), platformCutFromMiddleman: feeParts.platformCutFromMiddleman, dealType },
       }));
     }
 
-    if (feeParts.middlemanGrossFee > 0 && deal.middlemanId) {
+    if (feeParts.middlemanGrossFee > 0 && deal.middleman_id) {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:middleman_fee_gross`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'middleman',
-        ownerId: text(deal.middlemanId, 255),
-        ownerName: text(deal.middlemanName, 200),
-        entryType: 'middleman_fee_gross',
-        direction: 'internal',
-        amount: feeParts.middlemanGrossFee,
-        status: status === 'completed' ? 'confirmed' : status === 'cancelled' ? 'cancelled' : buyerPaymentStatus,
-        title,
-        purpose: 'ค่าบริการคนกลาง (ก่อนหักเข้าแอป)',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: '',
-        fileId: '',
-        approveLink: `/deal/${dealId}`,
-        active: true,
+        entry_key: `deal:${dealId}:middleman_fee_gross`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'middleman', owner_id: String(deal.middleman_id), owner_name: text(deal.middleman_name, 200),
+        entry_type: 'middleman_fee_gross', direction: 'internal', amount: feeParts.middlemanGrossFee,
+        status: status === 'completed' ? 'confirmed' : status === 'cancelled' ? 'cancelled' : buyerPaymentStatus, title,
+        purpose: 'ค่าบริการคนกลาง (ก่อนหักเข้าแอป)', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: '',
+        approve_link: `/deal/${dealId}`, active: true,
         meta: { grossFee: feeParts.middlemanGrossFee, dealType },
       }));
       if (feeParts.platformCutFromMiddleman > 0) {
         await push(buildEntry({
-          entryKey: `deal:${dealId}:platform_cut`,
-          referenceType: 'deal',
-          referenceId: dealId,
-          dealId,
-          dealNumber,
-          ownerType: 'platform',
-          ownerId: 'platform',
-          ownerName: 'ศูนย์กลาง',
-          entryType: 'platform_cut',
-          direction: 'internal',
-          amount: feeParts.platformCutFromMiddleman,
-          status: status === 'completed' ? 'confirmed' : status === 'cancelled' ? 'cancelled' : buyerPaymentStatus,
-          title,
-          purpose: 'ส่วนหักเข้าแอปจากค่าบริการคนกลาง',
-          counterpartyName: text(deal.middlemanName, 200),
-          bucket: '',
-          fileId: '',
-          approveLink: `/deal/${dealId}`,
-          active: true,
+          entry_key: `deal:${dealId}:platform_cut`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+          owner_type: 'platform', owner_id: null, owner_name: 'ศูนย์กลาง',
+          entry_type: 'platform_cut', direction: 'internal', amount: feeParts.platformCutFromMiddleman,
+          status: status === 'completed' ? 'confirmed' : status === 'cancelled' ? 'cancelled' : buyerPaymentStatus, title,
+          purpose: 'ส่วนหักเข้าแอปจากค่าบริการคนกลาง', counterparty_name: text(deal.middleman_name, 200), bucket: '', file_id: '',
+          approve_link: `/deal/${dealId}`, active: true,
           meta: { grossFee: feeParts.middlemanGrossFee, cutPercent: Number(fees.platformCutPercent) || 0 },
         }));
       }
       await push(buildEntry({
-        entryKey: `deal:${dealId}:middleman_fee_net`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'middleman',
-        ownerId: text(deal.middlemanId, 255),
-        ownerName: text(deal.middlemanName, 200),
-        entryType: 'middleman_fee_net',
-        direction: 'outgoing',
-        amount: feeParts.middlemanNetFee,
-        status: status === 'completed' ? 'scheduled' : status === 'cancelled' ? 'cancelled' : 'expected',
-        title,
-        purpose: 'รายได้สุทธิของคนกลางหลังหักเข้าแอป',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: '',
-        fileId: '',
-        approveLink: `/deal/${dealId}`,
-        active: feeParts.middlemanNetFee > 0,
+        entry_key: `deal:${dealId}:middleman_fee_net`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'middleman', owner_id: String(deal.middleman_id), owner_name: text(deal.middleman_name, 200),
+        entry_type: 'middleman_fee_net', direction: 'outgoing', amount: feeParts.middlemanNetFee,
+        status: status === 'completed' ? 'scheduled' : status === 'cancelled' ? 'cancelled' : 'expected', title,
+        purpose: 'รายได้สุทธิของคนกลางหลังหักเข้าแอป', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: '',
+        approve_link: `/deal/${dealId}`, active: feeParts.middlemanNetFee > 0,
         meta: { grossFee: feeParts.middlemanGrossFee, platformCut: feeParts.platformCutFromMiddleman },
       }));
     }
 
     if (status === 'completed') {
-      // Seller service fees are paid as separate transfers and must not reduce the goods payout.
       const sellerPayoutAmount = Math.max(price, 0);
       await push(buildEntry({
-        entryKey: `deal:${dealId}:seller_payout`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'seller',
-        ownerId: text(deal.sellerId, 255),
-        ownerName: text(deal.sellerName, 200),
-        entryType: 'seller_payout',
-        direction: 'outgoing',
-        amount: sellerPayoutAmount,
-        status: pd.payoutSentAt ? 'paid' : 'scheduled',
-        title,
-        purpose: 'จ่ายคืนผู้ขายเมื่อดีลสำเร็จ',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: pd.payoutSlipFileId ? 'deal_files' : '',
-        fileId: text(pd.payoutSlipFileId, 255),
-        approveLink: `/deal/${dealId}`,
-        active: sellerPayoutAmount > 0,
-        meta: { payoutNote: text(pd.payoutNote, 300), sellerFeeShare: sellerFeeAmount, goodsPrice: price },
+        entry_key: `deal:${dealId}:seller_payout`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'seller', owner_id: String(deal.seller_id || '') || null, owner_name: text(deal.seller_name, 200),
+        entry_type: 'seller_payout', direction: 'outgoing', amount: sellerPayoutAmount, status: pd.payout_sent_at ? 'paid' : 'scheduled', title,
+        purpose: 'จ่ายคืนผู้ขายเมื่อดีลสำเร็จ', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: '',
+        approve_link: `/deal/${dealId}`, active: sellerPayoutAmount > 0,
+        meta: { payoutNote: text(pd.payout_note, 300), sellerFeeShare: sellerFeeAmount, goodsPrice: price },
       }));
     }
 
-    if (status === 'cancelled' && deal.paymentSlipFileId) {
+    if (status === 'cancelled' && deal.payment_slip_file_id) {
       await push(buildEntry({
-        entryKey: `deal:${dealId}:buyer_refund`,
-        referenceType: 'deal',
-        referenceId: dealId,
-        dealId,
-        dealNumber,
-        ownerType: 'buyer',
-        ownerId: text(deal.buyerId, 255),
-        ownerName: text(deal.buyerName, 200),
-        entryType: 'buyer_refund',
-        direction: 'outgoing',
-        amount: price,
-        status: pd.refundSentAt ? 'paid' : 'scheduled',
-        title,
-        purpose: 'คืนเงินผู้ซื้อเมื่อยกเลิกดีล',
-        counterpartyName: 'ศูนย์กลาง',
-        bucket: pd.refundSlipFileId ? 'deal_files' : '',
-        fileId: text(pd.refundSlipFileId, 255),
-        approveLink: `/deal/${dealId}`,
-        active: price > 0,
-        meta: { refundNote: text(pd.refundNote, 300) },
+        entry_key: `deal:${dealId}:buyer_refund`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'buyer', owner_id: String(deal.buyer_id || '') || null, owner_name: text(deal.buyer_name, 200),
+        entry_type: 'buyer_refund', direction: 'outgoing', amount: price, status: pd.refund_sent_at ? 'paid' : 'scheduled', title,
+        purpose: 'คืนเงินผู้ซื้อเมื่อยกเลิกดีล', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: '',
+        approve_link: `/deal/${dealId}`, active: price > 0,
+        meta: { refundNote: text(pd.refund_note, 300) },
       }));
     }
   }
 
-  const middlemanId = text(deal.middlemanId, 255);
-  if (middlemanId && Number(pd.mmDepositHeld || 0) > 0) {
-    const middlemanName = await getMiddlemanName(users, middlemanId, text(deal.middlemanName, 200));
+  const middlemanId = text(deal.middleman_id, 255);
+  if (middlemanId && Number(pd.mm_deposit_held || 0) > 0) {
+    const profile = await getMiddlemanProfile(db, middlemanId);
+    const middlemanName = profile?.display_name || text(deal.middleman_name, 200) || middlemanId;
     const holdStatus: LedgerStatus = status === 'completed' || status === 'cancelled'
       ? 'released'
       : status === 'disputed'
@@ -809,318 +358,211 @@ export async function syncDealLedger(db: Databases, users: Users, deal: Record<s
           ? 'held'
           : 'expected';
     await push(buildEntry({
-      entryKey: `deal:${dealId}:middleman_credit_hold`,
-      referenceType: 'deal',
-      referenceId: dealId,
-      dealId,
-      dealNumber,
-      ownerType: 'middleman',
-      ownerId: middlemanId,
-      ownerName: middlemanName,
-      entryType: 'middleman_credit_hold',
-      direction: 'hold',
-      amount: Number(pd.mmDepositHeld) || 0,
-      status: holdStatus,
-      title,
-      purpose: 'เครดิตประกันคนกลางที่ hold ไว้กับดีลนี้',
-      counterpartyName: 'ศูนย์กลาง',
-      bucket: '',
-      fileId: '',
-      approveLink: `/deal/${dealId}`,
-      active: true,
+      entry_key: `deal:${dealId}:middleman_credit_hold`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+      owner_type: 'middleman', owner_id: middlemanId, owner_name: middlemanName,
+      entry_type: 'middleman_credit_hold', direction: 'hold', amount: Number(pd.mm_deposit_held) || 0, status: holdStatus, title,
+      purpose: 'เครดิตประกันคนกลางที่ hold ไว้กับดีลนี้', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: '',
+      approve_link: `/deal/${dealId}`, active: true,
       meta: { dealStatus: status, disputed: status === 'disputed' },
     }));
-    await syncMiddlemanWallet(db, users, middlemanId, middlemanName, undefined, fees);
+    await syncMiddlemanWallet(db, middlemanId, middlemanName, undefined, fees);
   }
 
   await deactivateMissingEntries(db, 'deal', dealId, activeKeys);
 }
 
-export async function syncSellerApplicationLedger(db: Databases, app: Record<string, unknown>, feesConfig?: FeeConfig) {
+export async function syncSellerApplicationLedger(db: SupabaseClient, app: Record<string, unknown>, feesConfig?: FeeConfig) {
   const fees = feesConfig || await readFeesConfig(db);
-  const referenceId = String(app.$id || '');
+  const referenceId = String(app.id || '');
   const amount = Number(fees.sellerRegFee) || 0;
   const activeKeys = new Set<string>();
-  if (amount > 0 || app.slipFileId) {
-    const status = String(app.status || '') === 'approved'
-      ? 'confirmed'
-      : String(app.status || '') === 'rejected'
-        ? 'cancelled'
-        : 'pending_review';
+  if (amount > 0 || app.slip_file_id) {
+    const status = String(app.status || '') === 'approved' ? 'confirmed' : String(app.status || '') === 'rejected' ? 'cancelled' : 'pending_review';
     const entry = buildEntry({
-      entryKey: `seller-app:${referenceId}:registration`,
-      referenceType: 'seller_application',
-      referenceId,
-      dealId: '',
-      dealNumber: financeReferenceCode('seller_application', referenceId),
-      ownerType: 'seller',
-      ownerId: text(app.userId, 255),
-      ownerName: text(app.fullNameId, 200),
-      entryType: 'seller_registration',
-      direction: 'incoming',
-      amount,
-      status,
-      title: text(app.fullNameId || 'สมัครผู้ขาย', 200),
-      purpose: 'ค่าสมัครผู้ขาย',
-      counterpartyName: 'ศูนย์กลาง',
-      bucket: 'kyc_docs',
-      fileId: text(app.slipFileId, 255),
-      approveLink: '/admin/sellers',
-      active: true,
-      meta: { sellerType: text(app.sellerType, 50) },
+      entry_key: `seller-app:${referenceId}:registration`, reference_type: 'seller_application', reference_id: referenceId, deal_id: null,
+      deal_number: financeReferenceCode('seller_application', referenceId),
+      owner_type: 'seller', owner_id: String(app.user_id || '') || null, owner_name: text(app.full_name_id, 200),
+      entry_type: 'seller_registration', direction: 'incoming', amount, status, title: text(app.full_name_id || 'สมัครผู้ขาย', 200),
+      purpose: 'ค่าสมัครผู้ขาย', counterparty_name: 'ศูนย์กลาง', bucket: 'kyc-docs', file_id: text(app.slip_file_id, 255),
+      approve_link: '/admin/sellers', active: true,
+      meta: { sellerType: text(app.seller_type, 50) },
     });
-    activeKeys.add(entry.entryKey);
+    activeKeys.add(entry.entry_key);
     await upsertLedgerEntry(db, entry);
   }
   await deactivateMissingEntries(db, 'seller_application', referenceId, activeKeys);
 }
 
-export async function syncMiddlemanApplicationLedger(
-  db: Databases,
-  users: Users,
-  app: Record<string, unknown>,
-  feesConfig?: FeeConfig,
-) {
+export async function syncMiddlemanApplicationLedger(db: SupabaseClient, app: Record<string, unknown>, feesConfig?: FeeConfig) {
   const fees = feesConfig || await readFeesConfig(db);
-  const referenceId = String(app.$id || '');
+  const referenceId = String(app.id || '');
   const amount = Number(fees.middlemanRegFee) || 0;
   const activeKeys = new Set<string>();
-  if (amount > 0 || app.slipFileId) {
-    const status = String(app.status || '') === 'approved'
-      ? 'confirmed'
-      : String(app.status || '') === 'rejected'
-        ? 'cancelled'
-        : 'pending_review';
+  if (amount > 0 || app.slip_file_id) {
+    const status = String(app.status || '') === 'approved' ? 'confirmed' : String(app.status || '') === 'rejected' ? 'cancelled' : 'pending_review';
     const entry = buildEntry({
-      entryKey: `middleman-app:${referenceId}:registration`,
-      referenceType: 'middleman_application',
-      referenceId,
-      dealId: '',
-      dealNumber: financeReferenceCode('middleman_application', referenceId),
-      ownerType: 'middleman',
-      ownerId: text(app.userId, 255),
-      ownerName: text(app.fullNameId, 200),
-      entryType: 'middleman_registration',
-      direction: 'incoming',
-      amount,
-      status,
-      title: text(app.fullNameId || 'สมัครคนกลาง', 200),
-      purpose: 'ค่าสมัครคนกลาง',
-      counterpartyName: 'ศูนย์กลาง',
-      bucket: 'kyc_docs',
-      fileId: text(app.slipFileId, 255),
-      approveLink: '/admin/middlemen',
-      active: true,
-      meta: { tier: text(app.tier, 20), depositIntent: Number(app.depositIntent) || 0 },
+      entry_key: `middleman-app:${referenceId}:registration`, reference_type: 'middleman_application', reference_id: referenceId, deal_id: null,
+      deal_number: financeReferenceCode('middleman_application', referenceId),
+      owner_type: 'middleman', owner_id: String(app.user_id || '') || null, owner_name: text(app.full_name_id, 200),
+      entry_type: 'middleman_registration', direction: 'incoming', amount, status, title: text(app.full_name_id || 'สมัครคนกลาง', 200),
+      purpose: 'ค่าสมัครคนกลาง', counterparty_name: 'ศูนย์กลาง', bucket: 'kyc-docs', file_id: text(app.slip_file_id, 255),
+      approve_link: '/admin/middlemen', active: true,
+      meta: { tier: text(app.tier, 20), depositIntent: Number(app.deposit_intent) || 0 },
     });
-    activeKeys.add(entry.entryKey);
+    activeKeys.add(entry.entry_key);
     await upsertLedgerEntry(db, entry);
   }
   await deactivateMissingEntries(db, 'middleman_application', referenceId, activeKeys);
-  if (String(app.status || '') === 'approved' && app.userId) {
-    await syncMiddlemanWallet(db, users, text(app.userId, 255), text(app.fullNameId, 200), text(app.tier, 20), fees);
+  if (String(app.status || '') === 'approved' && app.user_id) {
+    await syncMiddlemanWallet(db, text(app.user_id, 255), text(app.full_name_id, 200), text(app.tier, 20), fees);
   }
 }
 
-export async function syncOnsiteJobLedger(db: Databases, users: Users, job: Record<string, unknown>, feesConfig?: FeeConfig) {
+export async function syncOnsiteJobLedger(db: SupabaseClient, job: Record<string, unknown>, feesConfig?: FeeConfig) {
   const fees = feesConfig || await readFeesConfig(db);
-  const referenceId = String(job.$id || '');
+  const referenceId = String(job.id || '');
   const referenceCode = financeReferenceCode('onsite_job', referenceId);
   const status = String(job.status || '');
   const activeKeys = new Set<string>();
-  const middlemanId = text(job.middlemanId, 255);
-  const middlemanName = middlemanId ? await getMiddlemanName(users, middlemanId, text(job.middlemanName, 200)) : '';
-  const travelFee = Number(job.travelFee) || 0;
-  const serviceFee = Number(job.serviceFee) || 0;
-  const creditHold = Number(job.middlemanDeposit) || 0;
+  const middlemanId = text(job.middleman_id, 255);
+  let middlemanName = '';
+  if (middlemanId) {
+    const profile = await getMiddlemanProfile(db, middlemanId);
+    middlemanName = profile?.display_name || text(job.middleman_name, 200);
+  }
+  const travelFee = Number(job.travel_fee) || 0;
+  const serviceFee = Number(job.service_fee) || 0;
+  const creditHold = Number(job.middleman_deposit) || 0;
 
   const push = async (entry: LedgerDoc) => {
-    activeKeys.add(entry.entryKey);
+    activeKeys.add(entry.entry_key);
     await upsertLedgerEntry(db, entry);
   };
 
   if (travelFee > 0 && middlemanId) {
     await push(buildEntry({
-      entryKey: `onsite:${referenceId}:travel_fee`,
-      referenceType: 'onsite_job',
-      referenceId,
-      dealId: '',
-      dealNumber: referenceCode,
-      ownerType: 'middleman',
-      ownerId: middlemanId,
-      ownerName: middlemanName,
-      entryType: 'onsite_travel_fee',
-      direction: 'outgoing',
-      amount: travelFee,
-      status: status === 'completed' ? 'scheduled' : status === 'cancelled' ? 'cancelled' : status === 'accepted' || status === 'in_progress' ? 'expected' : 'expected',
-      title: text(job.itemDescription || 'งานนัดออนไซต์', 200),
-      purpose: 'ค่าเดินทางคนกลาง (งานนัดออนไซต์)',
-      counterpartyName: text(job.buyerName, 200),
-      bucket: '',
-      fileId: '',
-      approveLink: `/onsite/${referenceId}`,
-      active: true,
-      meta: { sellerProvince: text(job.sellerProvince, 80), estimatedArrival: text(job.estimatedArrival, 40) },
+      entry_key: `onsite:${referenceId}:travel_fee`, reference_type: 'onsite_job', reference_id: referenceId, deal_id: null, deal_number: referenceCode,
+      owner_type: 'middleman', owner_id: middlemanId, owner_name: middlemanName,
+      entry_type: 'onsite_travel_fee', direction: 'outgoing', amount: travelFee,
+      status: status === 'completed' ? 'scheduled' : status === 'cancelled' ? 'cancelled' : 'expected',
+      title: text(job.item_description || 'งานนัดออนไซต์', 200), purpose: 'ค่าเดินทางคนกลาง (งานนัดออนไซต์)', counterparty_name: text(job.buyer_name, 200),
+      bucket: '', file_id: '', approve_link: `/onsite/${referenceId}`, active: true,
+      meta: { sellerProvince: text(job.seller_province, 80), estimatedArrival: text(job.estimated_arrival, 40) },
     }));
   }
   if (serviceFee > 0 && middlemanId) {
     await push(buildEntry({
-      entryKey: `onsite:${referenceId}:service_fee`,
-      referenceType: 'onsite_job',
-      referenceId,
-      dealId: '',
-      dealNumber: referenceCode,
-      ownerType: 'middleman',
-      ownerId: middlemanId,
-      ownerName: middlemanName,
-      entryType: 'onsite_service_fee',
-      direction: 'outgoing',
-      amount: serviceFee,
-      status: status === 'completed' ? 'scheduled' : status === 'cancelled' ? 'cancelled' : status === 'accepted' || status === 'in_progress' ? 'expected' : 'expected',
-      title: text(job.itemDescription || 'งานนัดออนไซต์', 200),
-      purpose: 'ค่าบริการตรวจ/นัดออนไซต์ของคนกลาง',
-      counterpartyName: text(job.buyerName, 200),
-      bucket: '',
-      fileId: '',
-      approveLink: `/onsite/${referenceId}`,
-      active: true,
-      meta: { itemPrice: Number(job.itemPrice) || 0 },
+      entry_key: `onsite:${referenceId}:service_fee`, reference_type: 'onsite_job', reference_id: referenceId, deal_id: null, deal_number: referenceCode,
+      owner_type: 'middleman', owner_id: middlemanId, owner_name: middlemanName,
+      entry_type: 'onsite_service_fee', direction: 'outgoing', amount: serviceFee,
+      status: status === 'completed' ? 'scheduled' : status === 'cancelled' ? 'cancelled' : 'expected',
+      title: text(job.item_description || 'งานนัดออนไซต์', 200), purpose: 'ค่าบริการตรวจ/นัดออนไซต์ของคนกลาง', counterparty_name: text(job.buyer_name, 200),
+      bucket: '', file_id: '', approve_link: `/onsite/${referenceId}`, active: true,
+      meta: { itemPrice: Number(job.item_price) || 0 },
     }));
   }
   if (creditHold > 0 && middlemanId) {
     await push(buildEntry({
-      entryKey: `onsite:${referenceId}:credit_hold`,
-      referenceType: 'onsite_job',
-      referenceId,
-      dealId: '',
-      dealNumber: referenceCode,
-      ownerType: 'middleman',
-      ownerId: middlemanId,
-      ownerName: middlemanName,
-      entryType: 'middleman_credit_hold',
-      direction: 'hold',
-      amount: creditHold,
-      status: status === 'accepted' || status === 'in_progress'
-        ? 'held'
-        : status === 'completed' || status === 'cancelled'
-          ? 'released'
-          : 'expected',
-      title: text(job.itemDescription || 'งานนัดออนไซต์', 200),
-      purpose: 'เครดิตประกันคนกลางสำหรับงานนัดออนไซต์',
-      counterpartyName: 'ศูนย์กลาง',
-      bucket: '',
-      fileId: '',
-      approveLink: `/onsite/${referenceId}`,
-      active: true,
+      entry_key: `onsite:${referenceId}:credit_hold`, reference_type: 'onsite_job', reference_id: referenceId, deal_id: null, deal_number: referenceCode,
+      owner_type: 'middleman', owner_id: middlemanId, owner_name: middlemanName,
+      entry_type: 'middleman_credit_hold', direction: 'hold', amount: creditHold,
+      status: status === 'accepted' || status === 'in_progress' ? 'held' : status === 'completed' || status === 'cancelled' ? 'released' : 'expected',
+      title: text(job.item_description || 'งานนัดออนไซต์', 200), purpose: 'เครดิตประกันคนกลางสำหรับงานนัดออนไซต์', counterparty_name: 'ศูนย์กลาง',
+      bucket: '', file_id: '', approve_link: `/onsite/${referenceId}`, active: true,
       meta: { travelFee, serviceFee, onsiteStatus: status },
     }));
-    await syncMiddlemanWallet(db, users, middlemanId, middlemanName, text(job.middlemanTier, 20), fees);
+    await syncMiddlemanWallet(db, middlemanId, middlemanName, text(job.middleman_tier, 20), fees);
   }
 
   await deactivateMissingEntries(db, 'onsite_job', referenceId, activeKeys);
 }
 
 export async function syncMiddlemanWallet(
-  db: Databases,
-  users: Users,
+  db: SupabaseClient,
   middlemanId: string,
   fallbackName = '',
   tierHint?: string,
   feesConfig?: FeeConfig,
 ): Promise<MiddlemanWalletSnapshot> {
-  await ensureFinanceCollections(db);
   const fees = feesConfig || await readFeesConfig(db);
-  const tier = tierHint || await getMiddlemanTier(users, middlemanId);
-  const middlemanName = await getMiddlemanName(users, middlemanId, fallbackName);
+  const profile = await getMiddlemanProfile(db, middlemanId);
+  const tier = tierHint || profile?.middleman_tier || profile?.middleman_tier_intent || 'Bronze';
+  const middlemanName = profile?.display_name || fallbackName || middlemanId;
   const creditLimit = getTierCreditLimit(fees, tier);
-  const entriesRes = await db.listDocuments(DB_ID, COL_LEDGER, [
-    Query.equal('ownerId', middlemanId),
-    Query.equal('entryType', 'middleman_credit_hold'),
-    Query.limit(200),
-  ]).catch(() => ({ documents: [] }));
-  const entries = entriesRes.documents as unknown as Array<{ amount?: number; status?: string; active?: boolean; entryKey?: string }>;
-  const activeHeld = entries.filter(entry => entry.active !== false && entry.status === 'held');
-  const heldCredit = activeHeld.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
-  const releasedCredit = entries
-    .filter(entry => entry.status === 'released')
-    .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
-  const penaltyCredit = entries
-    .filter(entry => entry.status === 'forfeited')
-    .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+
+  const { data: entries } = await db
+    .from('finance_ledger')
+    .select('amount, status, active')
+    .eq('owner_id', middlemanId)
+    .eq('entry_type', 'middleman_credit_hold')
+    .limit(500);
+  const rows = entries || [];
+  const activeHeld = rows.filter(e => e.active !== false && e.status === 'held');
+  const heldCredit = activeHeld.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const releasedCredit = rows.filter(e => e.status === 'released').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const penaltyCredit = rows.filter(e => e.status === 'forfeited').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
   const wallet: MiddlemanWalletSnapshot = {
-    middlemanId,
-    middlemanName,
-    tier,
+    middlemanId, middlemanName, tier,
     creditLimit,
     availableCredit: Math.max(creditLimit - heldCredit - penaltyCredit, 0),
-    heldCredit,
-    releasedCredit,
-    penaltyCredit,
+    heldCredit, releasedCredit, penaltyCredit,
     activeDealCount: activeHeld.length,
     updatedAt: new Date().toISOString(),
   };
 
-  try {
-    await db.updateDocument(DB_ID, COL_WALLETS, middlemanId, wallet);
-  } catch {
-    await db.createDocument(DB_ID, COL_WALLETS, middlemanId, wallet).catch(async () => {
-      const found = await db.listDocuments(DB_ID, COL_WALLETS, [Query.equal('middlemanId', middlemanId), Query.limit(1)]).catch(() => ({ documents: [] }));
-      const docId = found.documents[0]?.$id;
-      if (docId) await db.updateDocument(DB_ID, COL_WALLETS, docId, wallet).catch(() => {});
-    });
-  }
+  await db.from('middleman_wallets').upsert({
+    middleman_id: middlemanId,
+    middleman_name: middlemanName,
+    tier,
+    credit_limit: wallet.creditLimit,
+    available_credit: wallet.availableCredit,
+    held_credit: wallet.heldCredit,
+    released_credit: wallet.releasedCredit,
+    penalty_credit: wallet.penaltyCredit,
+    active_deal_count: wallet.activeDealCount,
+    updated_at: wallet.updatedAt,
+  }, { onConflict: 'middleman_id' });
 
   return wallet;
 }
 
-export async function getMiddlemanWallet(db: Databases, users: Users, middlemanId: string) {
-  await ensureFinanceCollections(db);
-  try {
-    const doc = await db.getDocument(DB_ID, COL_WALLETS, middlemanId) as unknown as MiddlemanWalletSnapshot & { $id?: string };
-    return doc;
-  } catch {
-    return syncMiddlemanWallet(db, users, middlemanId);
-  }
+export async function getMiddlemanWallet(db: SupabaseClient, middlemanId: string) {
+  const { data } = await db.from('middleman_wallets').select('*').eq('middleman_id', middlemanId).maybeSingle();
+  if (data) return data;
+  // ยังไม่มีแถวในตาราง — sync แล้วดึงแถวที่เพิ่ง upsert กลับมา (เพื่อให้ shape เป็น snake_case เหมือนกันเสมอ ไม่ใช่ camelCase ของ syncMiddlemanWallet)
+  await syncMiddlemanWallet(db, middlemanId);
+  const { data: created } = await db.from('middleman_wallets').select('*').eq('middleman_id', middlemanId).maybeSingle();
+  return created;
 }
 
-export async function listLedgerEntriesForOwner(db: Databases, ownerId: string) {
-  await ensureFinanceCollections(db);
-  const res = await db.listDocuments(DB_ID, COL_LEDGER, [
-    Query.equal('ownerId', ownerId),
-    Query.orderDesc('updatedAt'),
-    Query.limit(100),
-  ]).catch(() => ({ documents: [] }));
-  return res.documents as unknown as LedgerDoc[];
+export async function listLedgerEntriesForOwner(db: SupabaseClient, ownerId: string) {
+  const { data } = await db
+    .from('finance_ledger')
+    .select('*')
+    .eq('owner_id', ownerId)
+    .order('updated_at', { ascending: false })
+    .limit(100);
+  return data || [];
 }
 
-export async function syncFinanceProjection(db: Databases, users: Users) {
-  await ensureFinanceCollections(db);
+export async function syncFinanceProjection(db: SupabaseClient) {
   const fees = await readFeesConfig(db);
-  const [deals, sellerApps, middlemanApps, onsiteJobs] = await Promise.all([
-    db.listDocuments(DB_ID, COL_DEALS, [Query.orderDesc('createdAt'), Query.limit(200)]).then(r => r.documents).catch(() => []),
-    db.listDocuments(DB_ID, COL_SELLER, [Query.orderDesc('$createdAt'), Query.limit(200)]).then(r => r.documents).catch(() => []),
-    db.listDocuments(DB_ID, COL_MM, [Query.orderDesc('$createdAt'), Query.limit(200)]).then(r => r.documents).catch(() => []),
-    db.listDocuments(DB_ID, COL_ONSITE, [Query.orderDesc('$createdAt'), Query.limit(200)]).then(r => r.documents).catch(() => []),
+  const [{ data: deals }, { data: sellerApps }, { data: middlemanApps }, { data: onsiteJobs }] = await Promise.all([
+    db.from('deals').select('*').order('created_at', { ascending: false }).limit(200),
+    db.from('seller_applications').select('*').order('created_at', { ascending: false }).limit(200),
+    db.from('middleman_applications').select('*').order('created_at', { ascending: false }).limit(200),
+    db.from('onsite_jobs').select('*').order('created_at', { ascending: false }).limit(200),
   ]);
 
-  for (const deal of deals as Record<string, unknown>[]) {
-    await syncDealLedger(db, users, deal, fees);
-  }
-  for (const app of sellerApps as Record<string, unknown>[]) {
-    await syncSellerApplicationLedger(db, app, fees);
-  }
-  for (const app of middlemanApps as Record<string, unknown>[]) {
-    await syncMiddlemanApplicationLedger(db, users, app, fees);
-  }
-  for (const job of onsiteJobs as Record<string, unknown>[]) {
-    await syncOnsiteJobLedger(db, users, job, fees);
-  }
+  for (const deal of deals || []) await syncDealLedger(db, deal as Record<string, unknown>, fees);
+  for (const app of sellerApps || []) await syncSellerApplicationLedger(db, app as Record<string, unknown>, fees);
+  for (const app of middlemanApps || []) await syncMiddlemanApplicationLedger(db, app as Record<string, unknown>, fees);
+  for (const job of onsiteJobs || []) await syncOnsiteJobLedger(db, job as Record<string, unknown>, fees);
 
   const middlemanIds = new Set<string>();
-  for (const deal of deals as Record<string, unknown>[]) if (deal.middlemanId) middlemanIds.add(String(deal.middlemanId));
-  for (const job of onsiteJobs as Record<string, unknown>[]) if (job.middlemanId) middlemanIds.add(String(job.middlemanId));
-  for (const app of middlemanApps as Record<string, unknown>[]) if (app.userId && app.status === 'approved') middlemanIds.add(String(app.userId));
-  for (const middlemanId of middlemanIds) {
-    await syncMiddlemanWallet(db, users, middlemanId, '', undefined, fees);
-  }
+  for (const deal of deals || []) if (deal.middleman_id) middlemanIds.add(String(deal.middleman_id));
+  for (const job of onsiteJobs || []) if (job.middleman_id) middlemanIds.add(String(job.middleman_id));
+  for (const app of middlemanApps || []) if (app.user_id && app.status === 'approved') middlemanIds.add(String(app.user_id));
+  for (const middlemanId of middlemanIds) await syncMiddlemanWallet(db, middlemanId, '', undefined, fees);
 }

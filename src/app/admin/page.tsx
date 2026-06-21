@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { Users, Store, Shield, Clock, CheckCircle2, TrendingUp, ArrowRight, MapPin } from 'lucide-react';
 
 interface Stats {
@@ -20,14 +20,14 @@ interface Stats {
 }
 
 interface Application {
-  $id: string;
-  fullNameId: string;
-  sellerType?: string;
+  id: string;
+  full_name_id: string;
+  seller_type?: string;
   tier?: string;
   province?: string;
-  workProvince?: string;
+  work_province?: string;
   status: string;
-  $createdAt: string;
+  created_at: string;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -73,8 +73,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     (async () => {
       try {
-        const jwt = (await account.createJWT()).jwt;
-        const res = await fetch('/api/admin/stats', { headers: { 'x-session-jwt': jwt } });
+        const headers = await authHeaders();
+        const res = await fetch('/api/admin/stats', { headers });
         if (res.status === 403) { router.replace('/'); return; }
         if (!res.ok) throw new Error('Failed to load stats');
         setStats(await res.json());
@@ -173,10 +173,10 @@ export default function AdminDashboard() {
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {stats.recentSellers.map(s => (
-                <div key={s.$id} className="flex items-center gap-3 px-5 py-3">
+                <div key={s.id} className="flex items-center gap-3 px-5 py-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{s.fullNameId}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{s.province} · {formatDate(s.$createdAt)}</p>
+                    <p className="text-sm font-medium truncate">{s.full_name_id}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{s.province} · {formatDate(s.created_at)}</p>
                   </div>
                   <StatusBadge status={s.status} />
                 </div>
@@ -198,10 +198,10 @@ export default function AdminDashboard() {
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {stats.recentMiddlemen.map(m => (
-                <div key={m.$id} className="flex items-center gap-3 px-5 py-3">
+                <div key={m.id} className="flex items-center gap-3 px-5 py-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{m.fullNameId}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{m.workProvince} · Tier {m.tier} · {formatDate(m.$createdAt)}</p>
+                    <p className="text-sm font-medium truncate">{m.full_name_id}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{m.work_province} · Tier {m.tier} · {formatDate(m.created_at)}</p>
                   </div>
                   <StatusBadge status={m.status} />
                 </div>

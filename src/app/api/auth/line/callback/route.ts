@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Users } from 'node-appwrite';
 import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
+import { getAdminClient } from '@/lib/supabaseServer';
+import { lineUserUuid } from '@/lib/deterministicUuid';
 
-type AppwriteLikeError = { code?: number; message?: string };
 type LineIdTokenPayload = { email?: string };
 
 export async function GET(request: NextRequest) {
-  const code    = request.nextUrl.searchParams.get('code');
-  const state   = request.nextUrl.searchParams.get('state') || '';
+  const code     = request.nextUrl.searchParams.get('code');
+  const state    = request.nextUrl.searchParams.get('state') || '';
   const returnTo = (state && state !== 'line_login') ? decodeURIComponent(state) : '/';
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL!;
+  const appUrl   = process.env.NEXT_PUBLIC_APP_URL!;
   const secureCookie = appUrl.startsWith('https://');
 
   if (!code) {
@@ -51,48 +52,56 @@ export async function GET(request: NextRequest) {
       } catch { /* synthetic */ }
     }
 
-    // 4. Admin client
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.APPWRITE_API_KEY!);
-    const users   = new Users(adminClient);
-    const userId  = `line${profile.userId.slice(0, 28)}`;
+    // 4. Deterministic Supabase user id + password (same derivation pattern as the old
+    //    Appwrite version — re-running this flow for the same LINE account always
+    //    resolves to the same Supabase auth user).
+    const userId = lineUserUuid(profile.userId);
     const password = crypto.createHmac('sha256', process.env.LINE_CHANNEL_SECRET!).update(profile.userId).digest('hex');
 
-    // 5. Upsert user
-    try {
-      await users.create(userId, email, undefined, password, profile.displayName);
-    } catch (error: unknown) {
-      const appwriteError = error as AppwriteLikeError;
-      if (appwriteError.code !== 409) throw new Error(`Create user: ${appwriteError.message}`);
+    const admin = getAdminClient();
+
+    // 5. Upsert the auth user (id is caller-specified — this is the documented
+    //    pattern for migrating users with pre-existing ids into Supabase Auth).
+    const { error: createErr } = await admin.auth.admin.createUser({
+      id: userId,
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { displayName: profile.displayName },
+    });
+    if (createErr && !/already.*registered|already exists/i.test(createErr.message)) {
+      throw new Error(`Create user: ${createErr.message}`);
+    }
+    if (createErr) {
+      // already exists — make sure the password still matches our deterministic
+      // derivation (in case LINE_CHANNEL_SECRET ever rotates, this resyncs it)
+      await admin.auth.admin.updateUserById(userId, { password, email_confirm: true }).catch(() => {});
     }
 
-    // 6. Create session
-    const session = await users.createSession(userId);
-    const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
+    // 6. Sign in as that user (anon-key client call) to mint a real session.
+    const anon = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false } },
+    );
+    const { data: signInData, error: signInErr } = await anon.auth.signInWithPassword({ email, password });
+    if (signInErr || !signInData.session) throw new Error(`Sign in: ${signInErr?.message || 'no session'}`);
 
-    // 7. Redirect to bridge page — bridge page calls client.setSession() which the SDK needs
+    // 7. Redirect to bridge page — bridge page calls supabase.auth.setSession()
+    //    which the browser SDK needs to persist the session into localStorage.
     const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
     const response = NextResponse.redirect(
-      `${appUrl}/auth/line/complete?returnTo=${encodeURIComponent(safeReturn)}`
+      `${appUrl}/auth/line/complete?returnTo=${encodeURIComponent(safeReturn)}`,
     );
 
-    const yr = 60 * 60 * 24 * 365;
-    // line_session_pending: httpOnly=false so bridge page JS can read it
-    response.cookies.set('line_session_pending', session.secret, {
+    response.cookies.set('line_session_pending', JSON.stringify({
+      access_token: signInData.session.access_token,
+      refresh_token: signInData.session.refresh_token,
+    }), {
       httpOnly: false, secure: secureCookie, sameSite: 'lax', path: '/', maxAge: 300, // 5 min TTL
-    });
-    // Also set standard Appwrite cookies for any server-side use
-    response.cookies.set(`a_session_${projectId}`, session.secret, {
-      httpOnly: false, secure: secureCookie, sameSite: 'lax', path: '/', maxAge: yr,
-    });
-    response.cookies.set(`a_session_${projectId}_legacy`, session.secret, {
-      httpOnly: false, secure: false, sameSite: 'lax', path: '/', maxAge: yr,
     });
 
     return response;
-
   } catch (error: unknown) {
     console.error('LINE login error:', error);
     const msg = encodeURIComponent(error instanceof Error ? error.message : 'unknown');

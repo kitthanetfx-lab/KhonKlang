@@ -15,15 +15,15 @@ const QUICK_TAGS: Record<Role, string[]> = {
 };
 
 interface DealParties {
-  $id: string;
-  buyerId: string; buyerName: string;
-  sellerId: string; sellerName: string;
-  middlemanId: string; middlemanName: string;
+  id: string;
+  buyer_id: string; buyer_name: string;
+  seller_id: string; seller_name: string;
+  middleman_id: string; middleman_name: string;
 }
 
 interface RowState { rating: number; tags: string[] }
 
-export function ReviewPanel({ deal, myRole, jwt }: { deal: DealParties; myRole: Role | 'guest' | ''; jwt: string }) {
+export function ReviewPanel({ deal, myRole, headers }: { deal: DealParties; myRole: Role | 'guest' | ''; headers: Record<string, string> }) {
   const [reviewed, setReviewed] = useState<boolean | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [comment, setComment] = useState('');
@@ -35,22 +35,22 @@ export function ReviewPanel({ deal, myRole, jwt }: { deal: DealParties; myRole: 
   // Who do I review? Everyone in the deal except me, plus the platform.
   const targets: { role: Role; name: string }[] = [];
   if (isParty) {
-    if (myRole !== 'buyer' && deal.buyerId) targets.push({ role: 'buyer', name: deal.buyerName || 'ผู้ซื้อ' });
-    if (myRole !== 'seller' && deal.sellerId) targets.push({ role: 'seller', name: deal.sellerName || 'ผู้ขาย' });
-    if (myRole !== 'middleman' && deal.middlemanId) targets.push({ role: 'middleman', name: deal.middlemanName || 'คนกลาง' });
+    if (myRole !== 'buyer' && deal.buyer_id) targets.push({ role: 'buyer', name: deal.buyer_name || 'ผู้ซื้อ' });
+    if (myRole !== 'seller' && deal.seller_id) targets.push({ role: 'seller', name: deal.seller_name || 'ผู้ขาย' });
+    if (myRole !== 'middleman' && deal.middleman_id) targets.push({ role: 'middleman', name: deal.middleman_name || 'คนกลาง' });
     targets.push({ role: 'platform', name: 'คนกลาง (เว็บไซต์/แอป)' });
   }
 
   useEffect(() => {
-    if (!isParty || !jwt) return;
+    if (!isParty || !headers.Authorization) return;
     let cancelled = false;
-    fetch(`/api/reviews?dealId=${deal.$id}`, { headers: { 'x-session-jwt': jwt } })
+    fetch(`/api/reviews?dealId=${deal.id}`, { headers })
       .then(r => r.json())
       .then(d => { if (!cancelled) setReviewed(!!d.reviewed); })
       .catch(() => { if (!cancelled) setReviewed(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deal.$id, isParty, !!jwt]);
+  }, [deal.id, isParty, headers.Authorization]);
 
   if (!isParty || reviewed === null) return null;
 
@@ -85,8 +85,8 @@ export function ReviewPanel({ deal, myRole, jwt }: { deal: DealParties; myRole: 
       }));
       const r = await fetch('/api/reviews', {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dealId: deal.$id, items }),
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId: deal.id, items }),
       });
       const d = await r.json();
       if (r.ok) setReviewed(true);

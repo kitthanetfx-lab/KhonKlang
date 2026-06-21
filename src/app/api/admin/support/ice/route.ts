@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Account, Client } from 'node-appwrite';
-import { verifyAdmin } from '../../_lib';
+import { verifyAdmin, getAdminClient } from '../../_lib';
 import { buildSupportIceServers } from '../../../_lib/support';
 
 export async function GET(req: NextRequest) {
   try {
-    await verifyAdmin(req);
-    const jwt = req.headers.get('x-session-jwt')!;
-    const c = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setJWT(jwt);
-    const me = await new Account(c).get();
-    const label = ((me.prefs || {}) as Record<string, string>).displayName || me.name || me.$id || 'staff';
+    const staffId = await verifyAdmin(req);
+    const db = getAdminClient();
+    const { data } = await db.from('profiles').select('display_name').eq('id', staffId).maybeSingle();
+    const label = data?.display_name || staffId || 'staff';
     return NextResponse.json({ iceServers: buildSupportIceServers(label) });
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status || 500;

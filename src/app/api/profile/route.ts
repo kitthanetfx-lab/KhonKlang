@@ -1,63 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Users, Databases, Query } from 'node-appwrite';
-import { getMiddlemanWallet, listLedgerEntriesForOwner } from '../_lib/financeLedger';
-
-const DB_ID  = 'khonklang_db';
-const COL_ID = 'profiles';
-
-function getAdminClient() {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return { users: new Users(client), databases: new Databases(client) };
-}
-
-async function getUserFromJwt(jwt: string) {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setJWT(jwt);
-  return new Account(client).get();
-}
+import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
 
 export async function GET(req: NextRequest) {
   try {
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'ไม่ได้เข้าสู่ระบบ' }, { status: 401 });
-
-    const currentUser = await getUserFromJwt(jwt);
-    const userId = currentUser.$id;
-    const { users, databases } = getAdminClient();
-    const fullUser = await users.get(userId);
-    const prefs = (fullUser.prefs || {}) as Record<string, string>;
+    const me = await verifyUser(req);
+    const admin = getAdminClient();
 
     let wallet = null;
     let ledger: Array<Record<string, unknown>> = [];
-    if (prefs.middlemanStatus === 'approved') {
-      wallet = await getMiddlemanWallet(databases, users, userId).catch(() => null);
-      ledger = await listLedgerEntriesForOwner(databases, userId)
-        .then(entries => entries.slice(0, 8) as unknown as Array<Record<string, unknown>>)
-        .catch(() => []);
+    const { data: profile } = await admin.from('profiles').select('middleman_status').eq('id', me.id).single();
+    if (profile?.middleman_status === 'approved') {
+      const { data: w } = await admin.from('middleman_wallets').select('*').eq('middleman_id', me.id).maybeSingle();
+      wallet = w || null;
+      const { data: entries } = await admin
+        .from('finance_ledger')
+        .select('*')
+        .eq('owner_id', me.id)
+        .order('updated_at', { ascending: false })
+        .limit(8);
+      ledger = entries || [];
     }
 
-    return NextResponse.json({ userId, wallet, ledger });
+    return NextResponse.json({ userId: me.id, wallet, ledger });
   } catch (err: unknown) {
+    const status = (err as { status?: number }).status ?? 500;
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status });
   }
 }
 
-// ─── PATCH: update profile ────────────────────────────────────────────────────
-
 export async function PATCH(req: NextRequest) {
   try {
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'ไม่ได้เข้าสู่ระบบ' }, { status: 401 });
-
-    const currentUser = await getUserFromJwt(jwt);
-    const userId      = currentUser.$id;
-
+    const me = await verifyUser(req);
     const { firstName, lastName, phone, address, bankName, bankAcct, bankOwner, bankQrFileId } = await req.json();
     if (!firstName?.trim() || !lastName?.trim()) {
       return NextResponse.json({ error: 'กรุณากรอกชื่อ-นามสกุล' }, { status: 400 });
@@ -66,50 +40,28 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'กรุณากรอกเบอร์โทรศัพท์' }, { status: 400 });
     }
 
-    const { users, databases } = getAdminClient();
     const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
-
-    // Build new prefs (merge with existing)
-    const existing = (currentUser.prefs || {}) as Record<string, string>;
-    const newPrefs: Record<string, string> = {
-      ...existing,
-      firstName: firstName.trim(),
-      lastName:  lastName.trim(),
-      phone:     phone.trim(),
-      address:   address || '',
-      displayName,
-      profileUpdatedAt: new Date().toISOString(), // ใช้ตัดสินว่าโปรไฟล์บัญชีไหนใหม่สุดตอน sync ข้ามช่องทาง login
-      // บัญชีธนาคารสำหรับรับเงิน (อัปเดตเฉพาะเมื่อส่งมา)
-      ...(bankName     !== undefined ? { bankName:     String(bankName).slice(0, 100) } : {}),
-      ...(bankAcct     !== undefined ? { bankAcct:     String(bankAcct).slice(0, 50) } : {}),
-      ...(bankOwner    !== undefined ? { bankOwner:    String(bankOwner).slice(0, 100) } : {}),
-      ...(bankQrFileId !== undefined ? { bankQrFileId: String(bankQrFileId).slice(0, 255) } : {}),
+    const update: Record<string, string> = {
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      phone: phone.trim(),
+      address: address || '',
+      display_name: displayName,
+      ...(bankName !== undefined ? { bank_name: String(bankName).slice(0, 100) } : {}),
+      ...(bankAcct !== undefined ? { bank_acct: String(bankAcct).slice(0, 50) } : {}),
+      ...(bankOwner !== undefined ? { bank_owner: String(bankOwner).slice(0, 100) } : {}),
+      ...(bankQrFileId !== undefined ? { bank_qr_file_id: String(bankQrFileId).slice(0, 255) } : {}),
     };
 
-    // Update Appwrite account name + prefs
-    await users.updateName(userId, displayName);
-    await users.updatePrefs(userId, newPrefs);
-
-    // Update the profiles collection document if it exists
-    try {
-      const docs = await databases.listDocuments(DB_ID, COL_ID, [Query.equal('userId', userId)]);
-      if (docs.documents.length > 0) {
-        await databases.updateDocument(DB_ID, COL_ID, docs.documents[0].$id, {
-          firstName: firstName.trim(),
-          lastName:  lastName.trim(),
-          phone:     phone.trim(),
-          address:   address || '',
-          displayName,
-        });
-      }
-    } catch {
-      // profiles collection doesn't exist yet — non-fatal
-    }
+    const admin = getAdminClient();
+    const { error } = await admin.from('profiles').update(update).eq('id', me.id);
+    if (error) throw new Error(error.message);
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
+    const status = (err as { status?: number }).status ?? 500;
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Profile PATCH error:', msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status });
   }
 }

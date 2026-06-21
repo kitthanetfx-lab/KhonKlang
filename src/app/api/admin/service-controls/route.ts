@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases } from 'node-appwrite';
 import { verifyAdmin, getAdminClient } from '../../admin/_lib';
-import { readJsonConfig, writeJsonConfig } from '../../_lib/appConfig';
-import { SERVICE_CONTROL_DEFAULTS, sanitizeServiceControls } from '@/lib/serviceControls';
-
-const DOC = 'service_controls';
+import { readServiceControlsConfig, writeServiceControlsConfig } from '../../_lib/appConfig';
+import { sanitizeServiceControls } from '@/lib/serviceControls';
 
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
-    const services = sanitizeServiceControls(await readJsonConfig(db, DOC, SERVICE_CONTROL_DEFAULTS));
+    const db = getAdminClient();
+    const services = await readServiceControlsConfig(db);
     return NextResponse.json({ services });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
@@ -21,10 +18,10 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
+    const db = getAdminClient();
     const body = await req.json();
     const nextServices = sanitizeServiceControls(body?.services);
-    await writeJsonConfig(db, DOC, nextServices);
+    await writeServiceControlsConfig(db, nextServices);
     return NextResponse.json({ services: nextServices, ok: true });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };

@@ -12,7 +12,7 @@
 export type CallRole = 'customer' | 'staff';
 export type CallSessionState = 'connecting' | 'active' | 'ended' | 'failed';
 
-interface SignalMsg { fromRole: string; type: string; data: string; createdAt: string }
+interface SignalMsg { from_role: string; type: string; data: string; created_at: string }
 
 interface CallSessionOpts {
   role: CallRole;
@@ -22,7 +22,7 @@ interface CallSessionOpts {
   signalUrl: string;
   /** ต้องระบุเมื่อ role==='staff' เพื่อบอกว่ากำลังคุยกับลูกค้าคนไหน */
   customerId?: string;
-  getJwt: () => Promise<string>;
+  getAuthHeaders: () => Promise<Record<string, string>>;
   getIceServers?: () => Promise<RTCIceServer[]>;
   onState?: (s: CallSessionState) => void;
   onRemoteStream?: (stream: MediaStream | null) => void;
@@ -57,10 +57,10 @@ export class CallSession {
       callId: this.opts.callId,
       role: this.opts.role,
     };
-    this.opts.getJwt()
-      .then((jwt) => fetch(url, {
+    this.opts.getAuthHeaders()
+      .then((headers) => fetch(url, {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }))
       .catch(() => null);
@@ -75,10 +75,10 @@ export class CallSession {
         customerId: this.opts.customerId || '',
         size: data.length,
       });
-      const jwt = await this.opts.getJwt();
+      const headers = await this.opts.getAuthHeaders();
       await fetch(this.opts.signalUrl, {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ callId: this.opts.callId, customerId: this.opts.customerId, type, data }),
       });
     } catch { /* best-effort — สัญญาณหาย ผู้ใช้กดวางสาย/โทรใหม่ได้ */ }
@@ -87,9 +87,9 @@ export class CallSession {
   private async pollSignals() {
     if (this.ended) return;
     try {
-      const jwt = await this.opts.getJwt();
+      const headers = await this.opts.getAuthHeaders();
       const url = `${this.opts.signalUrl}?callId=${encodeURIComponent(this.opts.callId)}&since=${encodeURIComponent(this.since)}`;
-      const r = await fetch(url, { headers: { 'x-session-jwt': jwt } });
+      const r = await fetch(url, { headers });
       if (r.ok) {
         const d = await r.json();
         const signals = (d.signals || []) as SignalMsg[];
@@ -101,7 +101,7 @@ export class CallSession {
           types: signals.map(s => s.type),
         });
         for (const s of signals) {
-          this.since = s.createdAt;
+          this.since = s.created_at;
           await this.handleSignal(s);
         }
       }
@@ -115,8 +115,8 @@ export class CallSession {
         role: this.opts.role,
         callId: this.opts.callId,
         type: s.type,
-        fromRole: s.fromRole,
-        createdAt: s.createdAt,
+        fromRole: s.from_role,
+        createdAt: s.created_at,
       });
       if (s.type === 'offer') {
         await this.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(s.data)));

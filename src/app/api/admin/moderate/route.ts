@@ -1,26 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases, Query } from 'node-appwrite';
-import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
+import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 
 /** รวม moderation ของประกาศหา (wanted_posts) และรีวิว (reviews) ในที่เดียว */
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
+    const db = getAdminClient();
     const type = req.nextUrl.searchParams.get('type') || 'wanted';
     if (type === 'listings') {
       // ประกาศขายในตลาด = ดีลที่ source='listing'
-      const res = await db.listDocuments(DB_ID, 'deals', [Query.equal('source', 'listing'), Query.orderDesc('createdAt'), Query.limit(200)])
-        .catch(() => ({ documents: [], total: 0 }));
-      return NextResponse.json(res);
+      const { data, count } = await db.from('deals').select('*', { count: 'exact' }).eq('source', 'listing').order('created_at', { ascending: false }).limit(200);
+      return NextResponse.json({ documents: data || [], total: count || 0 });
     }
-    const col = type === 'reviews' ? 'reviews' : 'wanted_posts';
-    const res = await db.listDocuments(DB_ID, col, [Query.orderDesc('createdAt'), Query.limit(200)])
-      .catch(() => ({ documents: [], total: 0 }));
-    return NextResponse.json(res);
+    const table = type === 'reviews' ? 'reviews' : 'wanted_posts';
+    const { data, count } = await db.from(table).select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(200);
+    return NextResponse.json({ documents: data || [], total: count || 0 });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }
 
@@ -28,36 +25,32 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
+    const db = getAdminClient();
     const { type, id, action } = await req.json();
     if (!type || !id || !action) return NextResponse.json({ error: 'missing params' }, { status: 400 });
 
-    if (type === 'wanted') {
-      if (action === 'remove') {
-        await db.updateDocument(DB_ID, 'wanted_posts', id, { status: 'closed' });
-        return NextResponse.json({ ok: true });
-      }
+    if (type === 'wanted' && action === 'remove') {
+      await db.from('wanted_posts').update({ status: 'closed' }).eq('id', id);
+      return NextResponse.json({ ok: true });
     }
-    if (type === 'reviews') {
-      if (action === 'delete') {
-        await db.deleteDocument(DB_ID, 'reviews', id);
-        return NextResponse.json({ ok: true });
-      }
+    if (type === 'reviews' && action === 'delete') {
+      await db.from('reviews').delete().eq('id', id);
+      return NextResponse.json({ ok: true });
     }
     if (type === 'listings') {
       // ถอดประกาศ = ตั้งสถานะดีลเป็น cancelled (ตลาดแสดงเฉพาะ status='posted') / คืนประกาศ = posted
       if (action === 'remove') {
-        await db.updateDocument(DB_ID, 'deals', id, { status: 'cancelled', rejectReason: '[แอดมินถอดประกาศจากตลาด]' });
+        await db.from('deals').update({ status: 'cancelled', reject_reason: '[แอดมินถอดประกาศจากตลาด]' }).eq('id', id);
         return NextResponse.json({ ok: true });
       }
       if (action === 'restore') {
-        await db.updateDocument(DB_ID, 'deals', id, { status: 'posted', rejectReason: '' });
+        await db.from('deals').update({ status: 'posted', reject_reason: '' }).eq('id', id);
         return NextResponse.json({ ok: true });
       }
     }
     return NextResponse.json({ error: 'unknown action' }, { status: 400 });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

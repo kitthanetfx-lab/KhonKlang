@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 import React, { useEffect, useRef, useState } from 'react';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
 import { Icon } from './Icon';
 
@@ -149,13 +149,13 @@ export function ScamReportForm({ onDone }: { onDone?: () => void }) {
     setAccounts(prev => prev.map((a, j) => (j === i ? { ...a, ...patch } : a)));
   }
 
-  async function uploadAll(items: PickedFile[], jwt: string, label: string, startAt: number, total: number): Promise<string[]> {
+  async function uploadAll(items: PickedFile[], headers: Record<string, string>, label: string, startAt: number, total: number): Promise<string[]> {
     const ids: string[] = [];
     for (let i = 0; i < items.length; i += 1) {
       setProgress(`กำลังอัปโหลด${label} (${startAt + i + 1}/${total})...`);
       const prepared = await compressImage(items[i].file);
       const form = new FormData(); form.append('file', prepared);
-      const r = await fetch('/api/upload-report', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: form });
+      const r = await fetch('/api/upload-report', { method: 'POST', headers, body: form });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || `อัปโหลด${label}ไม่สำเร็จ`);
       ids.push(d.fileId);
@@ -174,19 +174,18 @@ export function ScamReportForm({ onDone }: { onDone?: () => void }) {
 
     setSending(true);
     try {
-      let jwt = '';
-      try { jwt = (await account.createJWT()).jwt; }
-      catch { throw new Error('กรุณาเข้าสู่ระบบก่อนรายงานคนโกง'); }
+      const headers = await authHeaders();
+      if (!headers.Authorization) throw new Error('กรุณาเข้าสู่ระบบก่อนรายงานคนโกง');
 
       const total = chatImgs.length + policeDocs.length + slipImgs.length;
-      const chatIds = await uploadAll(chatImgs, jwt, 'รูปแชท', 0, total);
-      const policeIds = await uploadAll(policeDocs, jwt, 'เอกสารแจ้งความ', chatImgs.length, total);
-      const slipIds = await uploadAll(slipImgs, jwt, 'สลิป', chatImgs.length + policeDocs.length, total);
+      const chatIds = await uploadAll(chatImgs, headers, 'รูปแชท', 0, total);
+      const policeIds = await uploadAll(policeDocs, headers, 'เอกสารแจ้งความ', chatImgs.length, total);
+      const slipIds = await uploadAll(slipImgs, headers, 'สลิป', chatImgs.length + policeDocs.length, total);
 
       setProgress('กำลังบันทึกรายงาน...');
       const res = await fetch('/api/scam-reports', {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           firstName, lastName, idCard,
           bankAccounts: accounts.filter(a => a.acct.trim()),

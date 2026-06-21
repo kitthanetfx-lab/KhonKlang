@@ -1,23 +1,18 @@
 'use client';
 
 import { useState, useEffect, Suspense, useCallback } from 'react';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { Search, Users, RefreshCw, MoreVertical } from 'lucide-react';
 
 interface AppUser {
-  $id: string;
-  name: string;
+  id: string;
+  display_name: string;
+  first_name?: string;
   email: string;
-  status: boolean; // true = active, false = blocked
-  $createdAt: string;
-  prefs: {
-    role?: string;
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    sellerStatus?: string;
-    middlemanStatus?: string;
-  };
+  active: boolean; // true = active, false = blocked
+  created_at: string;
+  role?: string;
+  phone?: string;
 }
 
 const ROLE_CFG: Record<string, { label: string; cls: string }> = {
@@ -38,16 +33,17 @@ function formatDate(iso: string) {
 }
 
 // Action menu component
-function ActionMenu({ user, jwt, onRefresh }: { user: AppUser; jwt: string; onRefresh: () => void }) {
+function ActionMenu({ user, onRefresh }: { user: AppUser; onRefresh: () => void }) {
   const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr]         = useState('');
 
   const call = async (body: object) => {
     setLoading(true); setOpen(false); setErr('');
+    const headers = await authHeaders();
     const res = await fetch('/api/admin/users', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!res.ok) {
@@ -59,12 +55,12 @@ function ActionMenu({ user, jwt, onRefresh }: { user: AppUser; jwt: string; onRe
   };
 
   const setRole = (role: string) =>
-    call({ userId: user.$id, action: 'set_role', role });
+    call({ userId: user.id, action: 'set_role', role });
 
   const toggleBlock = () =>
-    call({ userId: user.$id, action: user.status ? 'block' : 'unblock' });
+    call({ userId: user.id, action: user.active ? 'block' : 'unblock' });
 
-  const currentRole = user.prefs?.role || 'user';
+  const currentRole = user.role || 'user';
 
   return (
     <div className="relative">
@@ -100,10 +96,10 @@ function ActionMenu({ user, jwt, onRefresh }: { user: AppUser; jwt: string; onRe
             <div className="border-t border-gray-100 dark:border-gray-700">
               <button onClick={toggleBlock}
                 className={`w-full text-left px-4 py-2.5 text-sm transition-colors
-                  ${user.status
+                  ${user.active
                     ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
                     : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'}`}>
-                {user.status ? '🚫 ระงับบัญชี' : '✅ ยกเลิกการระงับ'}
+                {user.active ? '🚫 ระงับบัญชี' : '✅ ยกเลิกการระงับ'}
               </button>
             </div>
           </div>
@@ -118,32 +114,28 @@ function UsersContent() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-  const [jwt, setJwt]         = useState('');
   const [total, setTotal]     = useState(0);
 
-  const load = useCallback(async (j?: string) => {
-    const token = j ?? jwt;
-    if (!token) return;
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res  = await fetch('/api/admin/users', { headers: { 'x-session-jwt': token } });
+      const headers = await authHeaders();
+      const res  = await fetch('/api/admin/users', { headers });
       const data = await res.json();
       setUsers(data.users ?? []);
       setTotal(data.total ?? 0);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [jwt]);
+  }, []);
 
-  useEffect(() => {
-    account.createJWT().then(({ jwt: j }) => { setJwt(j); void load(j); });
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const filtered = users.filter(u => {
-    const name  = (u.name || u.prefs?.firstName || '').toLowerCase();
+    const name  = (u.display_name || u.first_name || '').toLowerCase();
     const email = (u.email || '').toLowerCase();
     const q     = search.toLowerCase();
     if (search && !name.includes(q) && !email.includes(q)) return false;
-    if (roleFilter && (u.prefs?.role || 'user') !== roleFilter) return false;
+    if (roleFilter && (u.role || 'user') !== roleFilter) return false;
     return true;
   });
 
@@ -180,7 +172,7 @@ function UsersContent() {
       {/* Stats row */}
       <div className="flex gap-3 flex-wrap">
         {Object.entries(ROLE_CFG).map(([key, cfg]) => {
-          const count = users.filter(u => (u.prefs?.role || 'user') === key).length;
+          const count = users.filter(u => (u.role || 'user') === key).length;
           return (
             <button key={key} onClick={() => setRoleFilter(roleFilter === key ? '' : key)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm border transition-all
@@ -215,35 +207,35 @@ function UsersContent() {
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">ไม่มีข้อมูล</td></tr>
               ) : filtered.map(u => (
-                <tr key={u.$id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs font-bold shrink-0">
-                        {(u.name || u.email || '?')[0]?.toUpperCase()}
+                        {(u.display_name || u.email || '?')[0]?.toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-medium truncate">{u.name || u.prefs?.firstName || '—'}</p>
-                        {u.prefs?.phone && <p className="text-xs text-gray-400 mt-0.5">{u.prefs.phone}</p>}
+                        <p className="font-medium truncate">{u.display_name || u.first_name || '—'}</p>
+                        {u.phone && <p className="text-xs text-gray-400 mt-0.5">{u.phone}</p>}
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400 text-xs">
                     {u.email?.includes('@line.khonklang.app') ? (
-                      <span className="text-gray-400 italic">LINE ({u.$id.slice(0, 12)}...)</span>
+                      <span className="text-gray-400 italic">LINE ({u.id.slice(0, 12)}...)</span>
                     ) : u.email || '—'}
                   </td>
-                  <td className="px-4 py-3.5"><RoleBadge role={u.prefs?.role} /></td>
+                  <td className="px-4 py-3.5"><RoleBadge role={u.role} /></td>
                   <td className="px-4 py-3.5">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
-                      ${u.status
+                      ${u.active
                         ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                         : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-                      {u.status ? '● ใช้งานได้' : '● ระงับ'}
+                      {u.active ? '● ใช้งานได้' : '● ระงับ'}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(u.$createdAt)}</td>
+                  <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(u.created_at)}</td>
                   <td className="px-4 py-3.5 text-right">
-                    <ActionMenu user={u} jwt={jwt} onRefresh={() => load()} />
+                    <ActionMenu user={u} onRefresh={() => load()} />
                   </td>
                 </tr>
               ))}

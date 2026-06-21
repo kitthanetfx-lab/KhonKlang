@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { account, hydratePersistedSession, persistSession } from '@/lib/appwrite';
-import { Suspense } from 'react';
+import { supabase } from '@/lib/supabase';
 
 function LineCompleteInner() {
   const router = useRouter();
@@ -13,52 +12,53 @@ function LineCompleteInner() {
 
   useEffect(() => {
     async function finish() {
-      // อ่าน session secret จาก cookie (httpOnly=false)
       const cookieMap = Object.fromEntries(
         document.cookie.split(';').map(c => {
           const [k, ...v] = c.trim().split('=');
           return [k.trim(), v.join('=')];
-        })
+        }),
       );
-      const secret = cookieMap['line_session_pending'];
+      const raw = cookieMap['line_session_pending'];
 
-      if (!secret) {
-        hydratePersistedSession();
-        // ไม่มี pending cookie — ลอง account.get() โดยตรง
+      if (!raw) {
+        // ไม่มี pending cookie — ลองใช้ session ที่มีอยู่แล้วใน localStorage
         try {
-          const u = await account.get();
-          setStatus('เข้าสู่ระบบสำเร็จ...');
-          const prefs = u.prefs as Record<string, string>;
-          const dest = prefs?.firstName
-            ? (returnTo.startsWith('/') ? returnTo : '/')
-            : '/register';
-          router.replace(dest);
+          const { data } = await supabase.auth.getSession();
+          if (!data.session) throw new Error('no_session');
+          await routeAfterLogin();
         } catch {
           router.replace('/login?error=line_failed&msg=no_session');
         }
         return;
       }
 
-      // ลบ pending cookie
       document.cookie = 'line_session_pending=; max-age=0; path=/';
 
-      // บอก Appwrite SDK ให้ใช้ session นี้ (สำคัญมาก — SDK ไม่ auto-read server cookies)
-      persistSession(secret);
-      setStatus('กำลังโหลดข้อมูล...');
-
       try {
-        const u = await account.get();
-        setStatus('เข้าสู่ระบบสำเร็จ...');
-        const prefs = u.prefs as Record<string, string>;
-        const dest = prefs?.firstName
-          ? (returnTo.startsWith('/') ? returnTo : '/')
-          : '/register';
-        router.replace(dest);
+        const { access_token, refresh_token } = JSON.parse(raw);
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (error) throw error;
+        setStatus('กำลังโหลดข้อมูล...');
+        await routeAfterLogin();
       } catch (err: unknown) {
         console.error('LINE complete error:', err);
         const message = err instanceof Error ? err.message : 'session_invalid';
         router.replace(`/login?error=line_failed&msg=${encodeURIComponent(message)}`);
       }
+    }
+
+    async function routeAfterLogin() {
+      setStatus('เข้าสู่ระบบสำเร็จ...');
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name')
+        .eq('id', user?.id)
+        .single();
+      const dest = profile?.first_name
+        ? (returnTo.startsWith('/') ? returnTo : '/')
+        : '/register';
+      router.replace(dest);
     }
 
     finish();

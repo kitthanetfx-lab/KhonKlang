@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Account, Client, Databases, ID, Query } from 'node-appwrite';
-import { verifyAdmin, getAdminClient, DB_ID } from '../_lib';
-import { COL_THREADS, COL_MESSAGES, ensureSupportCollections } from '../../_lib/support';
+import { verifyAdmin, getAdminClient } from '../_lib';
 
-async function getAdminName(req: NextRequest, id: string) {
-  try {
-    const jwt = req.headers.get('x-session-jwt')!;
-    const c = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setJWT(jwt);
-    const u = await new Account(c).get();
-    return ((u.prefs || {}) as Record<string, string>).displayName || u.name || 'พนักงาน';
-  } catch { return id; }
+async function getStaffName(db: ReturnType<typeof getAdminClient>, staffId: string) {
+  const { data } = await db.from('profiles').select('display_name').eq('id', staffId).maybeSingle();
+  return data?.display_name || 'พนักงาน';
 }
 
 /**
@@ -22,28 +13,31 @@ async function getAdminName(req: NextRequest, id: string) {
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
-    await ensureSupportCollections(db);
+    const db = getAdminClient();
 
     const withId = req.nextUrl.searchParams.get('with') || '';
     if (withId) {
-      const r = await db.listDocuments(DB_ID, COL_MESSAGES, [
-        Query.equal('threadId', withId), Query.orderAsc('createdAt'), Query.limit(300),
-      ]).catch(() => ({ documents: [] as unknown[] }));
-      let thread = await db.getDocument(DB_ID, COL_THREADS, withId).catch(() => null);
-      if (thread && (thread.unreadStaff || (thread.lastSender === 'customer' && (!thread.lastReadByStaffAt || thread.lastReadByStaffAt < thread.lastAt)))) {
+      const { data: messages } = await db
+        .from('support_messages')
+        .select('*')
+        .eq('thread_id', withId)
+        .order('created_at', { ascending: true })
+        .limit(300);
+
+      let { data: thread } = await db.from('support_threads').select('*').eq('customer_id', withId).maybeSingle();
+      if (thread && (thread.unread_staff || (thread.last_sender === 'customer' && (!thread.last_read_by_staff_at || thread.last_read_by_staff_at < thread.last_at)))) {
         const now = new Date().toISOString();
-        thread = await db.updateDocument(DB_ID, COL_THREADS, withId, {
-          unreadStaff: false,
-          lastReadByStaffAt: now,
-        }).catch(() => thread);
+        const { data: updated } = await db.from('support_threads').update({
+          unread_staff: false,
+          last_read_by_staff_at: now,
+        }).eq('customer_id', withId).select().single();
+        if (updated) thread = updated;
       }
-      return NextResponse.json({ thread, messages: r.documents });
+      return NextResponse.json({ thread, messages: messages || [] });
     }
 
-    const r = await db.listDocuments(DB_ID, COL_THREADS, [Query.orderDesc('updatedAt'), Query.limit(200)])
-      .catch(() => ({ documents: [] as unknown[] }));
-    return NextResponse.json({ threads: r.documents });
+    const { data: threads } = await db.from('support_threads').select('*').order('updated_at', { ascending: false }).limit(200);
+    return NextResponse.json({ threads: threads || [] });
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status || 500;
     return NextResponse.json({ error: String((err as Error)?.message || err) }, { status });
@@ -61,19 +55,20 @@ export async function POST(req: NextRequest) {
     const mimeType = String(body.mimeType || '').trim().slice(0, 60);
     if (!customerId || (!content && !imageUrl)) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
 
-    const db = new Databases(getAdminClient());
-    await ensureSupportCollections(db);
-    const staffName = await getAdminName(req, staffId);
+    const db = getAdminClient();
+    const staffName = await getStaffName(db, staffId);
     const now = new Date().toISOString();
 
-    const msg = await db.createDocument(DB_ID, COL_MESSAGES, ID.unique(), {
-      threadId: customerId, senderId: staffId, senderName: staffName, senderRole: 'staff',
-      content, imageUrl, mimeType, createdAt: now,
-    });
-    await db.updateDocument(DB_ID, COL_THREADS, customerId, {
-      lastMessage: content || 'ส่งรูปภาพ', lastAt: now, lastSender: 'staff', unreadCustomer: true,
-      assignedStaffId: staffId, assignedStaffName: staffName, updatedAt: now,
-    }).catch(() => null);
+    const { data: msg, error } = await db.from('support_messages').insert({
+      thread_id: customerId, sender_id: staffId, sender_name: staffName, sender_role: 'staff',
+      content, image_url: imageUrl, mime_type: mimeType, created_at: now,
+    }).select().single();
+    if (error) throw new Error(error.message);
+
+    await db.from('support_threads').update({
+      last_message: content || 'ส่งรูปภาพ', last_at: now, last_sender: 'staff', unread_customer: true,
+      assigned_staff_id: staffId, assigned_staff_name: staffName, updated_at: now,
+    }).eq('customer_id', customerId);
 
     return NextResponse.json({ message: msg });
   } catch (err: unknown) {
@@ -91,9 +86,8 @@ export async function PATCH(req: NextRequest) {
     const status = String(body.status || '');
     if (!customerId || !['open', 'closed'].includes(status)) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
 
-    const db = new Databases(getAdminClient());
-    await ensureSupportCollections(db);
-    await db.updateDocument(DB_ID, COL_THREADS, customerId, { status, updatedAt: new Date().toISOString() });
+    const db = getAdminClient();
+    await db.from('support_threads').update({ status, updated_at: new Date().toISOString() }).eq('customer_id', customerId);
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status || 500;

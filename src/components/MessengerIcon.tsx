@@ -1,7 +1,7 @@
 'use client';
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { Icon } from './Icon';
 
 /** ไอคอนกล่องข้อความ (ข้างกระดิ่ง) — badge แสดงจำนวนข้อความที่ยังไม่อ่าน */
@@ -10,8 +10,8 @@ export function MessengerIcon() {
 
   const load = useCallback(async () => {
     try {
-      const jwt = (await account.createJWT()).jwt;
-      const r = await fetch('/api/dm?box=unread', { headers: { 'x-session-jwt': jwt } });
+      const headers = await authHeaders();
+      const r = await fetch('/api/dm?box=unread', { headers });
       if (r.ok) { const d = await r.json(); setUnread(d.unread || 0); }
     } catch { /* not logged in */ }
   }, []);

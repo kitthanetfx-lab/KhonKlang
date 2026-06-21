@@ -1,98 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Storage, Account, ID, Permission, Role } from 'node-appwrite';
-import { InputFile } from 'node-appwrite/file';
+import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
 
-const BUCKET_ID = 'deal_files';
-
-function getStorage() {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return new Storage(client);
-}
-
-function getUserFromJwt(jwt: string) {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setJWT(jwt);
-  return new Account(client).get();
-}
-
-const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi', 'webm', 'pdf'];
-
-async function ensureBucket(storage: Storage) {
-  try {
-    const bucket = await storage.getBucket(BUCKET_ID) as unknown as { allowedFileExtensions?: string[] };
-    // เปิดให้รองรับ .webm (วิดีโอคอลที่บันทึก) หากบัคเก็ตเดิมยังไม่อนุญาต
-    const exts = bucket.allowedFileExtensions || [];
-    if (exts.length && !exts.includes('webm')) {
-      try {
-        await storage.updateBucket(BUCKET_ID, 'Deal Files', [Permission.read(Role.any()), Permission.create(Role.users())], false, true, 30 * 1024 * 1024, Array.from(new Set([...exts, 'webm'])));
-      } catch { /* ไม่มีสิทธิ์แก้บัคเก็ตก็ข้ามไป */ }
-    }
-    return;
-  } catch {
-    try {
-      await storage.createBucket(
-        BUCKET_ID,
-        'Deal Files',
-        [
-          Permission.read(Role.any()),
-          Permission.create(Role.users()),
-        ],
-        false,
-        true,
-        30 * 1024 * 1024,
-        ALLOWED_EXT,
-      );
-      return;
-    } catch (createErr) {
-      try {
-        await storage.getBucket(BUCKET_ID);
-        return;
-      } catch {
-        const msg = createErr instanceof Error ? createErr.message : String(createErr);
-        if (msg.includes('buckets.write')) {
-          throw new Error('ยังอัปโหลดรูปสินค้าไม่ได้ เพราะ production ยังไม่มี bucket `deal_files` และ API key ปัจจุบันไม่มีสิทธิ์สร้าง bucket อัตโนมัติ กรุณาสร้าง bucket นี้ใน Appwrite Console หรือเพิ่ม scope `buckets.write`');
-        }
-        throw new Error(`ไม่พบบัคเก็ตรูปสินค้าและสร้างอัตโนมัติไม่สำเร็จ: ${msg}`);
-      }
-    }
-  }
-}
+const BUCKET_ID = 'deal-files';
+const MAX_SIZE = 30 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   try {
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const currentUser = await getUserFromJwt(jwt);
+    const me = await verifyUser(req);
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 });
+    if (file.size > MAX_SIZE) return NextResponse.json({ error: 'ไฟล์ใหญ่เกิน 30MB' }, { status: 413 });
 
-    const storage = getStorage();
-    await ensureBucket(storage);
-
+    const db = getAdminClient();
     const buf = Buffer.from(await file.arrayBuffer());
-    const result = await storage.createFile(
-      BUCKET_ID,
-      ID.unique(),
-      InputFile.fromBuffer(buf, file.name),
-      [
-        Permission.read(Role.any()),
-        Permission.update(Role.user(currentUser.$id)),
-        Permission.delete(Role.user(currentUser.$id)),
-      ],
-    );
+    const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+    const fileId = `${me.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-    const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!;
-    const project  = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
-    const viewUrl  = `${endpoint}/storage/buckets/${BUCKET_ID}/files/${result.$id}/view?project=${project}`;
+    const { error } = await db.storage.from(BUCKET_ID).upload(fileId, buf, {
+      contentType: file.type || 'application/octet-stream',
+      upsert: false,
+    });
+    if (error) throw new Error(error.message);
 
-    return NextResponse.json({ fileId: result.$id, fileName: file.name, url: viewUrl, mimeType: file.type });
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_ID}/${fileId}`;
+
+    return NextResponse.json({ fileId, fileName: file.name, url, mimeType: file.type });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[upload-deal]', msg);

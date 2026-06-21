@@ -1,69 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases } from 'node-appwrite';
-import { verifyAdmin, getAdminClient } from '../../admin/_lib';
-import { readJsonConfig, writeJsonConfig } from '../../_lib/appConfig';
-
-const DOC = 'fees';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
+import { readFeesConfig } from '../../_lib/financeLedger';
 
 // ค่าธรรมเนียม/ค่าบริการแบบตัวเลข (แอดมินปรับได้ในหน้าตั้งค่า)
 const NUM_DEFAULTS = {
-  escrowFeePercent: 2.5,    // ซื้อขายผ่านกลาง (ออนไลน์) — ค่าธรรมเนียมระบบ % ของราคา
-  escrowFeeMin: 20,         // ขั้นต่ำ (บาท)
-  middlemanFeePercent: 1.5, // ค่าบริการคนกลาง — % ของราคา
-  middlemanFeeMin: 30,      // ค่าบริการคนกลางขั้นต่ำ (บาท)
-  platformCutPercent: 20,   // ส่วนแบ่งแพลตฟอร์มจากค่าบริการคนกลาง (%)
-  simpleFeePercent: 2,      // ซื้อขายผ่านกลางแบบง่าย (ส่งตรง) — %
-  simpleFeeMin: 20,
-  inspectionFee: 100,       // ค่าตรวจสอบสินค้า (บาท)
-  packingFee: 50,           // ค่าแพ็คสินค้า (บาท)
-  depositBronze: 1000,      // เครดิตประกันคนกลางตามเทียร์ (บาท)
-  depositSilver: 5000,
-  depositGold: 20000,
-  depositPlatinum: 50000,
-  failedDealFee: 50,        // ค่าจัดการเมื่อดีลไม่สำเร็จ/ตีกลับ (บาท)
-  onsiteBaseFee: 300,       // ค่าบริการนัดออนไซต์ ฐาน (บาท)
-  onsitePerKm: 5,           // ค่าเดินทางออนไซต์ (บาท/กม.)
-  meetupFeePercent: 0,      // รับประกันเดินทาง — %
-  meetupFeeMin: 50,         // ค่าบริการรับประกันเดินทางขั้นต่ำ (บาท)
-  sellerRegFee: 0,          // ค่าสมัครผู้ขาย (บาท)
-  middlemanRegFee: 0,       // ค่าสมัครคนกลาง (บาท)
+  escrowFeePercent: 2.5, escrowFeeMin: 20,
+  middlemanFeePercent: 1.5, middlemanFeeMin: 30,
+  platformCutPercent: 20,
+  simpleFeePercent: 2, simpleFeeMin: 20,
+  inspectionFee: 100, packingFee: 50,
+  depositBronze: 1000, depositSilver: 5000, depositGold: 20000, depositPlatinum: 50000,
+  failedDealFee: 50,
+  onsiteBaseFee: 300, onsitePerKm: 5,
+  meetupFeePercent: 0, meetupFeeMin: 50,
+  sellerRegFee: 0, middlemanRegFee: 0,
 };
-// ค่าตั้งแบบตัวเลือก (string)
-const STR_DEFAULTS = {
-  returnShippingBy: 'buyer' as 'buyer' | 'seller' | 'split', // ผู้รับผิดชอบค่าส่งคืนเมื่อตีกลับ
-};
-// บัญชีรับเงินของบริษัท (free text) — ลูกค้าโอนเข้าตรงนี้
+const STR_DEFAULTS = { returnShippingBy: 'buyer' as 'buyer' | 'seller' | 'split' };
 const COMPANY_DEFAULTS = {
   companyPromptPay: '', companyBankName: '', companyBankAcct: '', companyBankHolder: '', companyQrFileId: '',
 };
-const DEFAULTS = { ...NUM_DEFAULTS, ...STR_DEFAULTS, ...COMPANY_DEFAULTS };
-type FeeConfig = typeof DEFAULTS;
 const NUM_KEYS = Object.keys(NUM_DEFAULTS) as (keyof typeof NUM_DEFAULTS)[];
 const COMPANY_KEYS = Object.keys(COMPANY_DEFAULTS) as (keyof typeof COMPANY_DEFAULTS)[];
 const RETURN_OPTIONS = ['buyer', 'seller', 'split'];
 
-async function readConfig(db: Databases): Promise<FeeConfig> {
-  return readJsonConfig(db, DOC, DEFAULTS);
+const COLUMN_OF: Record<string, string> = {
+  escrowFeePercent: 'escrow_fee_percent', escrowFeeMin: 'escrow_fee_min',
+  middlemanFeePercent: 'middleman_fee_percent', middlemanFeeMin: 'middleman_fee_min',
+  platformCutPercent: 'platform_cut_percent',
+  simpleFeePercent: 'simple_fee_percent', simpleFeeMin: 'simple_fee_min',
+  inspectionFee: 'inspection_fee', packingFee: 'packing_fee',
+  depositBronze: 'deposit_bronze', depositSilver: 'deposit_silver', depositGold: 'deposit_gold', depositPlatinum: 'deposit_platinum',
+  failedDealFee: 'failed_deal_fee',
+  onsiteBaseFee: 'onsite_base_fee', onsitePerKm: 'onsite_per_km',
+  meetupFeePercent: 'meetup_fee_percent', meetupFeeMin: 'meetup_fee_min',
+  sellerRegFee: 'seller_reg_fee', middlemanRegFee: 'middleman_reg_fee',
+  returnShippingBy: 'return_shipping_by',
+  companyPromptPay: 'company_prompt_pay', companyBankName: 'company_bank_name',
+  companyBankAcct: 'company_bank_acct', companyBankHolder: 'company_bank_holder', companyQrFileId: 'company_qr_file_id',
+};
+
+async function writeFeesConfig(db: SupabaseClient, fees: Record<string, number | string>) {
+  const row: Record<string, unknown> = { id: true };
+  for (const [camel, col] of Object.entries(COLUMN_OF)) row[col] = fees[camel];
+  const { error } = await db.from('fee_config').upsert(row, { onConflict: 'id' });
+  if (error) throw new Error(error.message);
 }
 
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
-    const fees = await readConfig(db);
+    const db = getAdminClient();
+    const fees = await readFeesConfig(db);
     return NextResponse.json({ fees });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
+    const db = getAdminClient();
     const body = await req.json();
-    const currentFees = await readConfig(db);
+    const currentFees = await readFeesConfig(db);
     const feeBody = body?.fees ?? body;
     const hasFeePayload = feeBody && typeof feeBody === 'object' && NUM_KEYS.some(key => key in feeBody);
 
@@ -78,11 +79,11 @@ export async function PATCH(req: NextRequest) {
 
     const nextFees = hasFeePayload ? { ...currentFees, ...cleanFees } : currentFees;
 
-    if (hasFeePayload) await writeJsonConfig(db, DOC, nextFees);
+    if (hasFeePayload) await writeFeesConfig(db, nextFees as Record<string, number | string>);
 
     return NextResponse.json({ fees: nextFees, ok: true });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

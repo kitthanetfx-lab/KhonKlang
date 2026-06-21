@@ -7,32 +7,28 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Nav, Footer } from '@/components/Site';
 import { Icon } from '@/components/Icon';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { addToCart, getCartCount } from '@/lib/cart';
 import { isCertifiedMode, supportsDirectPurchase, supportsEscrowPurchase, supportsSellerChat } from '@/lib/listingMode';
 
 interface ListingDetail {
-  $id: string;
-  sellerId: string;
-  sellerName: string;
-  buyerId: string;
+  id: string;
+  seller_id: string;
+  seller_name: string;
+  buyer_id: string;
   title: string;
   description: string;
   price: number;
   category: string;
   condition: string;
   location: string;
-  sellingMode: string;
-  imageFileIds: string;
+  selling_mode: string;
+  images: string[];
   status: string;
 }
 
-const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
-const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const BUCKET_ID = 'deal_files';
-
 function imgUrl(fileId: string) {
-  return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${PROJECT}`;
+  return fileViewUrl(DEAL_BUCKET, fileId);
 }
 
 export default function MarketplaceDetailPage() {
@@ -44,7 +40,7 @@ export default function MarketplaceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [myId, setMyId] = useState('');
-  const [jwt, setJwt] = useState('');
+  const [hdrs, setHdrs] = useState<Record<string, string>>({});
   const [mainImage, setMainImage] = useState('');
   const [cartCount, setCartCount] = useState(0);
   const [joining, setJoining] = useState(false);
@@ -77,25 +73,18 @@ export default function MarketplaceDetailPage() {
 
   useEffect(() => {
     (async () => {
-      try {
-        const user = await account.get();
-        setMyId(user.$id);
-        const token = (await account.createJWT()).jwt;
-        setJwt(token);
-      } catch {
-        // Guests can still view details and use local cart.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setMyId(user.id);
+        setHdrs(await authHeaders());
       }
+      // Guests can still view details and use local cart.
     })();
   }, []);
 
   const images = useMemo(() => {
     if (!listing) return [] as string[];
-    try {
-      const ids = JSON.parse(listing.imageFileIds || '[]') as string[];
-      return ids.map(imgUrl);
-    } catch {
-      return [];
-    }
+    return (listing.images || []).map(imgUrl);
   }, [listing]);
 
   const displayImage = mainImage || images[0] || '';
@@ -104,11 +93,11 @@ export default function MarketplaceDetailPage() {
     if (!listing) return;
     setAdding(true);
     addToCart({
-      dealId: listing.$id,
+      dealId: listing.id,
       title: listing.title,
       price: listing.price,
       imageUrl: images[0] || '',
-      sellerName: listing.sellerName || 'ผู้ขาย',
+      sellerName: listing.seller_name || 'ผู้ขาย',
       location: listing.location || '',
     });
     setCartCount(getCartCount());
@@ -119,15 +108,15 @@ export default function MarketplaceDetailPage() {
   async function buyViaEscrow() {
     if (!listing) return;
     if (!myId) {
-      router.push(`/login?returnTo=${encodeURIComponent(`/marketplace/${listing.$id}`)}`);
+      router.push(`/login?returnTo=${encodeURIComponent(`/marketplace/${listing.id}`)}`);
       return;
     }
     setJoining(true);
     try {
-      const token = jwt || (await account.createJWT()).jwt;
-      const res = await fetch(`/api/deals/${listing.$id}`, {
+      const headers = Object.keys(hdrs).length ? hdrs : await authHeaders();
+      const res = await fetch(`/api/deals/${listing.id}`, {
         method: 'PATCH',
-        headers: { 'x-session-jwt': token, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'join_as_buyer' }),
       });
       const data = await res.json().catch(() => ({}));
@@ -135,7 +124,7 @@ export default function MarketplaceDetailPage() {
         alert(data.error || 'ยังไม่สามารถซื้อผ่านคนกลางได้');
         return;
       }
-      router.push(`/deal/${listing.$id}`);
+      router.push(`/deal/${listing.id}`);
     } finally {
       setJoining(false);
     }
@@ -144,10 +133,10 @@ export default function MarketplaceDetailPage() {
   function sellerChatHref() {
     if (!listing) return;
     if (!myId) {
-      router.push(`/login?returnTo=${encodeURIComponent(`/messages?to=${listing.sellerId}&name=${encodeURIComponent(listing.sellerName || 'ผู้ขาย')}`)}`);
+      router.push(`/login?returnTo=${encodeURIComponent(`/messages?to=${listing.seller_id}&name=${encodeURIComponent(listing.seller_name || 'ผู้ขาย')}`)}`);
       return;
     }
-    router.push(`/messages?to=${listing.sellerId}&name=${encodeURIComponent(listing.sellerName || 'ผู้ขาย')}`);
+    router.push(`/messages?to=${listing.seller_id}&name=${encodeURIComponent(listing.seller_name || 'ผู้ขาย')}`);
   }
 
   if (loading) {
@@ -176,10 +165,10 @@ export default function MarketplaceDetailPage() {
     );
   }
 
-  const isOwner = listing.sellerId === myId;
-  const canDirectBuy = supportsDirectPurchase(listing.sellingMode);
-  const canEscrowBuy = supportsEscrowPurchase(listing.sellingMode);
-  const canSellerChat = supportsSellerChat(listing.sellingMode);
+  const isOwner = listing.seller_id === myId;
+  const canDirectBuy = supportsDirectPurchase(listing.selling_mode);
+  const canEscrowBuy = supportsEscrowPurchase(listing.selling_mode);
+  const canSellerChat = supportsSellerChat(listing.selling_mode);
 
   return (
     <>
@@ -215,13 +204,13 @@ export default function MarketplaceDetailPage() {
               <div className="mkt-detail-badges">
                 {listing.category && <span className="badge badge-gray">{listing.category}</span>}
                 {listing.condition && <span className="badge badge-gray">{listing.condition}</span>}
-                {isCertifiedMode(listing.sellingMode) && <span className="badge badge-amber">⭐ Certified</span>}
+                {isCertifiedMode(listing.selling_mode) && <span className="badge badge-amber">⭐ Certified</span>}
               </div>
 
               <h1 className="mkt-detail-title">{listing.title}</h1>
               <div className="mkt-detail-price">฿{(listing.price || 0).toLocaleString()}</div>
               <div className="mkt-detail-meta">
-                <span><Icon name="user" size={15} /> {listing.sellerName || 'ผู้ขาย'}</span>
+                <span><Icon name="user" size={15} /> {listing.seller_name || 'ผู้ขาย'}</span>
                 {listing.location && <span><Icon name="mapPin" size={15} /> {listing.location}</span>}
               </div>
 
@@ -229,7 +218,7 @@ export default function MarketplaceDetailPage() {
 
               <div className="mkt-detail-actions">
                 {isOwner ? (
-                  <Link href={`/deal/${listing.$id}`} className="btn btn-primary btn-lg">รายการของคุณ</Link>
+                  <Link href={`/deal/${listing.id}`} className="btn btn-primary btn-lg">รายการของคุณ</Link>
                 ) : (
                   <>
                     {canDirectBuy && (
@@ -252,10 +241,10 @@ export default function MarketplaceDetailPage() {
                         <Icon name="chat" size={18} /> แชทกับผู้ขาย
                       </button>
                     )}
-                    <Link href={`/service/meetup?step=2&role=buyer&title=${encodeURIComponent(listing.title)}&price=${listing.price}&inviteUserId=${listing.sellerId}`} className="btn btn-soft btn-lg">
+                    <Link href={`/service/meetup?step=2&role=buyer&title=${encodeURIComponent(listing.title)}&price=${listing.price}&inviteUserId=${listing.seller_id}`} className="btn btn-soft btn-lg">
                       🚗 นัดรับ + ประกันเดินทาง
                     </Link>
-                    <Link href={`/messages?to=${listing.sellerId}&name=${encodeURIComponent(listing.sellerName || 'ผู้ขาย')}`} className="btn btn-ghost btn-lg">
+                    <Link href={`/messages?to=${listing.seller_id}&name=${encodeURIComponent(listing.seller_name || 'ผู้ขาย')}`} className="btn btn-ghost btn-lg">
                       <Icon name="message" size={18} /> ฝากข้อความถึงผู้ขาย
                     </Link>
                   </>

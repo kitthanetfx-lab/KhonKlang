@@ -4,42 +4,42 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { account, fileViewUrl } from '@/lib/appwrite';
+import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import {
   Search, CheckCircle2, XCircle, Eye, Shield, RefreshCw, FileText, Download,
 } from 'lucide-react';
 
 interface MiddlemanApp {
-  $id: string;
-  userId: string;
-  fullNameId: string;
-  idNumber: string;
-  depositIntent: number;
+  id: string;
+  user_id: string;
+  full_name_id: string;
+  id_number: string;
+  deposit_intent: number;
   tier: string;
-  categories: string;
-  workProvince: string;
+  categories: string[];
+  work_province: string;
   terms: string;
-  bankAcct: string;
-  bankName: string;
-  bankOwner: string;
-  idCardFileId: string;
-  bookbankFileId: string;
-  slipFileId: string;
+  bank_acct: string;
+  bank_name: string;
+  bank_owner: string;
+  id_card_file_id: string;
+  bookbank_file_id: string;
+  slip_file_id: string;
   status: string;
-  rejectReason?: string;
-  $createdAt: string;
+  reject_reason?: string;
+  created_at: string;
   wallet?: MiddlemanWallet | null;
 }
 
 interface MiddlemanWallet {
   tier: string;
-  creditLimit: number;
-  availableCredit: number;
-  heldCredit: number;
-  releasedCredit: number;
-  penaltyCredit: number;
-  activeDealCount: number;
-  updatedAt: string;
+  credit_limit: number;
+  available_credit: number;
+  held_credit: number;
+  released_credit: number;
+  penalty_credit: number;
+  active_deal_count: number;
+  updated_at: string;
 }
 
 const STATUS_TABS = [
@@ -129,8 +129,8 @@ function Row({ k, v, multiline }: { k: string; v: string; multiline?: boolean })
 function FileCard({ label, fileId }: { label: string; fileId: string }) {
   const [imgOk, setImgOk] = useState(true);
   if (!fileId) return null;
-  const url   = fileViewUrl(fileId);
-  const dlUrl = fileViewUrl(fileId) + '&output=attachment';
+  const url   = fileViewUrl(DEAL_BUCKET, fileId);
+  const dlUrl = url;
   return (
     <div className="px-4 py-3 space-y-2">
       <div className="flex items-center justify-between">
@@ -179,13 +179,13 @@ function DetailPanel({ app, onClose, onAction }: {
 
   const handle = async (action: 'approve' | 'reject') => {
     setActing(true);
-    await onAction(app.$id, action, action === 'reject' ? reason : undefined);
+    await onAction(app.id, action, action === 'reject' ? reason : undefined);
     setActing(false);
     setShowReject(false);
   };
 
-  const cats = app.categories
-    ? app.categories.split(',').map(c => CAT_LABEL[c] ?? c).join(', ')
+  const cats = (app.categories && app.categories.length)
+    ? app.categories.map(c => CAT_LABEL[c] ?? c).join(', ')
     : '—';
 
   return (
@@ -201,50 +201,50 @@ function DetailPanel({ app, onClose, onAction }: {
           <div className="flex items-center gap-3 flex-wrap">
             <StatusBadge status={app.status} />
             <TierBadge tier={app.tier} />
-            <span className="text-xs text-gray-400">{formatDate(app.$createdAt)}</span>
+            <span className="text-xs text-gray-400">{formatDate(app.created_at)}</span>
           </div>
 
           <Section label="ข้อมูลส่วนตัว">
-            <Row k="ชื่อ-นามสกุล"   v={app.fullNameId} />
-            <Row k="เลขบัตรประชาชน" v={maskId(app.idNumber)} />
+            <Row k="ชื่อ-นามสกุล"   v={app.full_name_id} />
+            <Row k="เลขบัตรประชาชน" v={maskId(app.id_number)} />
           </Section>
 
           <Section label="ข้อมูลคนกลาง">
             <Row k="Tier (ที่ประกาศ)"   v={`${TIER_ICON[app.tier] ?? ''} ${app.tier}`} />
-            <Row k="เงินประกัน (เจตนา)" v={`฿${app.depositIntent.toLocaleString()}`} />
-            <Row k="จังหวัดรับงาน"      v={app.workProvince} />
+            <Row k="เงินประกัน (เจตนา)" v={`฿${app.deposit_intent.toLocaleString()}`} />
+            <Row k="จังหวัดรับงาน"      v={app.work_province} />
             <Row k="ประเภทสินค้า"       v={cats} multiline />
             {app.terms && <Row k="เงื่อนไขเพิ่มเติม" v={app.terms} multiline />}
           </Section>
 
           {app.wallet && (
             <Section label="เครดิตคนกลาง">
-              <Row k="วงเงินเครดิต" v={baht(app.wallet.creditLimit)} />
-              <Row k="เครดิตคงเหลือ" v={baht(app.wallet.availableCredit)} />
-              <Row k="เครดิตที่ hold" v={baht(app.wallet.heldCredit)} />
-              <Row k="เครดิตปลดแล้ว" v={baht(app.wallet.releasedCredit)} />
-              <Row k="เครดิตถูกหัก" v={baht(app.wallet.penaltyCredit)} />
-              <Row k="ดีล/งานที่ล็อกเครดิต" v={String(app.wallet.activeDealCount)} />
-              <Row k="อัปเดตล่าสุด" v={formatDate(app.wallet.updatedAt)} />
+              <Row k="วงเงินเครดิต" v={baht(app.wallet.credit_limit)} />
+              <Row k="เครดิตคงเหลือ" v={baht(app.wallet.available_credit)} />
+              <Row k="เครดิตที่ hold" v={baht(app.wallet.held_credit)} />
+              <Row k="เครดิตปลดแล้ว" v={baht(app.wallet.released_credit)} />
+              <Row k="เครดิตถูกหัก" v={baht(app.wallet.penalty_credit)} />
+              <Row k="ดีล/งานที่ล็อกเครดิต" v={String(app.wallet.active_deal_count)} />
+              <Row k="อัปเดตล่าสุด" v={formatDate(app.wallet.updated_at)} />
             </Section>
           )}
 
           <Section label="บัญชีธนาคาร">
-            <Row k="ธนาคาร"     v={app.bankName} />
-            <Row k="เลขที่บัญชี" v={app.bankAcct} />
-            <Row k="ชื่อบัญชี"   v={app.bankOwner} />
+            <Row k="ธนาคาร"     v={app.bank_name} />
+            <Row k="เลขที่บัญชี" v={app.bank_acct} />
+            <Row k="ชื่อบัญชี"   v={app.bank_owner} />
           </Section>
 
           <Section label="เอกสารแนบ">
-            <FileCard label="บัตรประชาชน"     fileId={app.idCardFileId} />
-            <FileCard label="สมุดบัญชีธนาคาร" fileId={app.bookbankFileId} />
-            <FileCard label="สลิปโอนค่าสมัคร" fileId={app.slipFileId} />
+            <FileCard label="บัตรประชาชน"     fileId={app.id_card_file_id} />
+            <FileCard label="สมุดบัญชีธนาคาร" fileId={app.bookbank_file_id} />
+            <FileCard label="สลิปโอนค่าสมัคร" fileId={app.slip_file_id} />
           </Section>
 
-          {app.rejectReason && (
+          {app.reject_reason && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
               <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">เหตุผลการปฏิเสธ</p>
-              <p className="text-sm text-red-700 dark:text-red-300">{app.rejectReason}</p>
+              <p className="text-sm text-red-700 dark:text-red-300">{app.reject_reason}</p>
             </div>
           )}
 
@@ -303,42 +303,29 @@ function MiddlemenContent() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [detail, setDetail]   = useState<MiddlemanApp | null>(null);
-  const [jwt, setJwt]         = useState('');
 
   const statusFilter = searchParams.get('status') ?? '';
 
-  const load = useCallback(async (j?: string) => {
-    const token = j ?? jwt;
-    if (!token) return;
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
-      const res  = await fetch(`/api/admin/middlemen?${params}`, { headers: { 'x-session-jwt': token } });
+      const headers = await authHeaders();
+      const res  = await fetch(`/api/admin/middlemen?${params}`, { headers });
       const data = await res.json();
       setApps(data.documents ?? []);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [jwt, statusFilter]);
+  }, [statusFilter]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      const { jwt: j } = await account.createJWT().catch(() => ({ jwt: '' }));
-      if (!j || cancelled) return;
-      setJwt(j);
-      await load(j);
-    }, 0);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const handleAction = async (docId: string, action: 'approve' | 'reject', reason?: string) => {
+    const headers = await authHeaders();
     await fetch('/api/admin/middlemen', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ docId, action, reason }),
     });
     setDetail(null);
@@ -347,8 +334,8 @@ function MiddlemenContent() {
 
   const filtered = apps.filter(a =>
     !search ||
-    a.fullNameId.toLowerCase().includes(search.toLowerCase()) ||
-    a.workProvince?.toLowerCase().includes(search.toLowerCase())
+    a.full_name_id.toLowerCase().includes(search.toLowerCase()) ||
+    a.work_province?.toLowerCase().includes(search.toLowerCase())
   );
 
   const setStatus = (s: string) => {
@@ -423,14 +410,14 @@ function MiddlemenContent() {
                   <td colSpan={9} className="text-center py-12 text-gray-400 text-sm">ไม่มีข้อมูล</td>
                 </tr>
               ) : filtered.map(app => (
-                <tr key={app.$id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                  <td className="px-5 py-3.5 font-medium">{app.fullNameId}</td>
+                <tr key={app.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                  <td className="px-5 py-3.5 font-medium">{app.full_name_id}</td>
                   <td className="px-4 py-3.5"><TierBadge tier={app.tier} /></td>
-                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.wallet ? baht(app.wallet.availableCredit) : '—'}</td>
-                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.wallet ? baht(app.wallet.heldCredit) : '—'}</td>
-                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">฿{app.depositIntent.toLocaleString()}</td>
-                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.workProvince || '—'}</td>
-                  <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(app.$createdAt)}</td>
+                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.wallet ? baht(app.wallet.available_credit) : '—'}</td>
+                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.wallet ? baht(app.wallet.held_credit) : '—'}</td>
+                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">฿{app.deposit_intent.toLocaleString()}</td>
+                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.work_province || '—'}</td>
+                  <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(app.created_at)}</td>
                   <td className="px-4 py-3.5"><StatusBadge status={app.status} /></td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2 justify-end">
@@ -440,11 +427,11 @@ function MiddlemenContent() {
                       </button>
                       {app.status === 'pending_review' && (
                         <>
-                          <button onClick={() => handleAction(app.$id, 'reject')}
+                          <button onClick={() => handleAction(app.id, 'reject')}
                             className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all">
                             ปฏิเสธ
                           </button>
-                          <button onClick={() => handleAction(app.$id, 'approve')}
+                          <button onClick={() => handleAction(app.id, 'approve')}
                             className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all">
                             อนุมัติ
                           </button>

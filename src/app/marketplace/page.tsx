@@ -3,36 +3,32 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState } from 'react';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { Nav, Footer, useReveal } from '@/components/Site';
 import { isCertifiedMode } from '@/lib/listingMode';
 
 interface Listing {
-  $id: string;
-  sellerId: string;
-  sellerName: string;
+  id: string;
+  seller_id: string;
+  seller_name: string;
   title: string;
   description: string;
   price: number;
   category: string;
   condition: string;
   location: string;
-  sellingMode: string;
+  selling_mode: string;
   source?: string;
-  imageFileIds: string;
+  images: string[];
   status: string;
-  buyerId: string;
-  createdAt: string;
+  buyer_id: string;
+  created_at: string;
 }
 
-const ENDPOINT  = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT  || 'https://sgp.cloud.appwrite.io/v1';
-const PROJECT   = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const BUCKET_ID = 'deal_files';
-
 function imgUrl(fileId: string) {
-  return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${PROJECT}`;
+  return fileViewUrl(DEAL_BUCKET, fileId);
 }
 
 const CATS = ['ทั้งหมด','สินค้าทั่วไป','อิเล็กทรอนิกส์','เสื้อผ้า','ยานพาหนะ','อสังหาริมทรัพย์','บริการ','อื่นๆ'];
@@ -89,14 +85,16 @@ export default function Marketplace() {
   useEffect(() => {
     (async () => {
       try {
-        const user = await account.get();
-        setMyId(user.$id);
-        const j = (await account.createJWT()).jwt;
-        const res = await fetch('/api/deals?role=buyer', { headers: { 'x-session-jwt': j } });
-        if (res.ok) { const data = await res.json(); setListings(data.deals || []); }
-      } catch {
-        const res = await fetch('/api/deals?role=buyer').catch(() => null);
-        if (res?.ok) { const data = await res.json(); setListings(data.deals || []); }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setMyId(user.id);
+          const headers = await authHeaders();
+          const res = await fetch('/api/deals?role=buyer', { headers });
+          if (res.ok) { const data = await res.json(); setListings(data.deals || []); }
+        } else {
+          const res = await fetch('/api/deals?role=buyer').catch(() => null);
+          if (res?.ok) { const data = await res.json(); setListings(data.deals || []); }
+        }
       } finally { setLoading(false); }
     })();
   }, []);
@@ -104,10 +102,10 @@ export default function Marketplace() {
   let filtered = listings
     .filter(d => d.status === 'posted')
     // ตลาดแสดงเฉพาะ "ประกาศขาย" — ไม่รวมดีลส่วนตัว/ดีลจากหน้าบริการ
-    .filter(d => d.source === 'listing' || (!d.source && !!d.sellingMode && d.sellingMode !== 'normal'))
+    .filter(d => d.source === 'listing' || (!d.source && !!d.selling_mode && d.selling_mode !== 'normal'))
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)
     .filter(d => !province || d.location === province)
-    .filter(d => !certified || isCertifiedMode(d.sellingMode))
+    .filter(d => !certified || isCertifiedMode(d.selling_mode))
     .filter(d => !search ||
       d.title.toLowerCase().includes(search.toLowerCase()) ||
       (d.description || '').toLowerCase().includes(search.toLowerCase())
@@ -116,19 +114,16 @@ export default function Marketplace() {
   else if (sort === 'ราคา: มาก→น้อย') filtered = [...filtered].sort((a, b) => b.price - a.price);
 
   function getFirstImage(listing: Listing): string {
-    try {
-      const ids = JSON.parse(listing.imageFileIds || '[]');
-      return ids.length > 0 ? imgUrl(ids[0]) : '';
-    } catch { return ''; }
+    return listing.images && listing.images.length > 0 ? imgUrl(listing.images[0]) : '';
   }
 
   function ListingCard({ listing, idx }: { listing: Listing; idx: number }) {
-    const isCertified = isCertifiedMode(listing.sellingMode);
+    const isCertified = isCertifiedMode(listing.selling_mode);
     const firstImg    = getFirstImage(listing);
-    const isMyDeal    = listing.sellerId === myId || listing.buyerId === myId;
+    const isMyDeal    = listing.seller_id === myId || listing.buyer_id === myId;
     const c1 = CARD_BG[idx % 3 === 0 ? 0 : 2], c2 = CARD_BG[(idx % 5) + 1];
     const avatarBg = CARD_BG[(idx % 5) + 1];
-    const detailHref = `/marketplace/${listing.$id}`;
+    const detailHref = `/marketplace/${listing.id}`;
 
     return (
       <div className="lc-card reveal" style={{ ['--d' as string]: idx * 50 + 'ms', ...(isCertified ? { borderColor: 'var(--amber-400)' } : {}) }}>
@@ -159,8 +154,8 @@ export default function Marketplace() {
             <h3 className="lc-title">{listing.title}</h3>
           </Link>
           <div className="lc-seller">
-            <span className="avatar" style={{ width: 24, height: 24, fontSize: 11, background: avatarBg }}>{(listing.sellerName || 'ผู้ขาย').slice(0, 1)}</span>
-            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.sellerName || 'ผู้ขาย'}</span>
+            <span className="avatar" style={{ width: 24, height: 24, fontSize: 11, background: avatarBg }}>{(listing.seller_name || 'ผู้ขาย').slice(0, 1)}</span>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.seller_name || 'ผู้ขาย'}</span>
             {listing.location && <span style={{ fontSize: 12, color: 'var(--faint)' }}>📍 {listing.location}</span>}
           </div>
           <div className="lc-actions">
@@ -168,8 +163,8 @@ export default function Marketplace() {
               ดูรายละเอียด
             </Link>
             {isMyDeal && (
-              <Link href={`/deal/${listing.$id}`} className="btn btn-ghost btn-sm" style={{ flex: 1 }}>
-                {listing.sellerId === myId ? 'เปิดดีลของคุณ' : 'เข้าห้อง Deal'}
+              <Link href={`/deal/${listing.id}`} className="btn btn-ghost btn-sm" style={{ flex: 1 }}>
+                {listing.seller_id === myId ? 'เปิดดีลของคุณ' : 'เข้าห้อง Deal'}
               </Link>
             )}
           </div>
@@ -255,7 +250,7 @@ export default function Marketplace() {
             </div>
           ) : (
             <div className="mkt-grid">
-              {filtered.map((item, i) => <ListingCard key={item.$id} listing={item} idx={i} />)}
+              {filtered.map((item, i) => <ListingCard key={item.id} listing={item} idx={i} />)}
             </div>
           )}
         </div>

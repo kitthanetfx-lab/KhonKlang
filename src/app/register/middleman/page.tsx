@@ -8,7 +8,7 @@ import {
   ArrowRight, ArrowLeft, CheckCircle2,
   AlertTriangle, Copy, Check, Shield, ClipboardList,
 } from 'lucide-react';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders } from '@/lib/supabase';
 import { uploadKycFiles } from '@/lib/uploadKyc';
 import { FileUpload } from '@/components/FileUpload';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
@@ -144,36 +144,34 @@ function MiddlemanForm() {
   const ic = 'w-full bg-white/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-40';
 
   useEffect(() => {
-    account.get()
-      .then(async u => {
-        setDisplayName(u.name || '');
-        const em = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
-        setOauthEmail(em);
-        setFullNameId(u.name || '');
-        const prefs = (u.prefs as Record<string, string>) || {};
-        if (prefs.address) {
-          setProfileProvince(extractProvince(prefs.address));
-          setWorkProvince(extractProvince(prefs.address));
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.replace('/login'); return; }
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      setDisplayName(profile?.display_name || '');
+      const em = (!user.email || user.email.includes('@line.khonklang.app')) ? '' : user.email;
+      setOauthEmail(em || '');
+      setFullNameId(profile?.display_name || '');
+      if (profile?.address) {
+        setProfileProvince(extractProvince(profile.address));
+        setWorkProvince(extractProvince(profile.address));
+      }
+      if (profile?.bank_acct)  setBankAcct(profile.bank_acct);
+      if (profile?.bank_name)  setBankName(profile.bank_name);
+      if (profile?.bank_owner) setBankOwner(profile.bank_owner);
+      // เช็คจาก profile ก่อน ถ้าไม่มีให้ถาม API (เผื่อกรณี multi-account)
+      if (profile?.middleman_status) {
+        setExistingStatus(profile.middleman_status);
+      } else {
+        const headers = await authHeaders();
+        const res = await fetch('/api/register/middleman', { headers }).catch(() => null);
+        if (res?.ok) {
+          const data = await res.json();
+          if (data.status) setExistingStatus(data.status);
         }
-        if (prefs.bankAcct)  setBankAcct(prefs.bankAcct);
-        if (prefs.bankName)  setBankName(prefs.bankName);
-        if (prefs.bankOwner) setBankOwner(prefs.bankOwner);
-        // Check prefs first, then query DB (covers multi-account logins)
-        if (prefs.middlemanStatus) {
-          setExistingStatus(prefs.middlemanStatus);
-        } else {
-          const jwt = (await account.createJWT()).jwt;
-          const res = await fetch('/api/register/middleman', {
-            headers: { 'x-session-jwt': jwt },
-          }).catch(() => null);
-          if (res?.ok) {
-            const data = await res.json();
-            if (data.status) setExistingStatus(data.status);
-          }
-        }
-      })
-      .catch(() => router.replace('/login'))
-      .finally(() => setLoading(false));
+      }
+      setLoading(false);
+    })().catch(() => router.replace('/login'));
   }, [router]);
 
   const toggleCategory = (id: string) =>
@@ -221,7 +219,7 @@ function MiddlemanForm() {
       });
       setError('');
 
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const body = {
         type: 'middleman', fullNameId, idNumber,
         depositIntent: depositNum,
@@ -235,7 +233,7 @@ function MiddlemanForm() {
       };
       const res  = await fetch('/api/register/middleman', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       if (!res.ok) {

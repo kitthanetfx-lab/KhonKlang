@@ -2,12 +2,12 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders } from '@/lib/supabase';
 import { Nav, Footer } from '@/components/Site';
 import { Icon } from '@/components/Icon';
 
 interface Thread { threadId: string; otherId: string; otherName: string; lastContent: string; lastAt: string; fromMe: boolean; unread: number }
-interface Dm { $id: string; fromId: string; fromName: string; toId: string; toName: string; content: string; createdAt: string }
+interface Dm { id: string; from_id: string; from_name: string; to_id: string; to_name: string; content: string; created_at: string }
 
 function timeAgo(iso: string) {
   if (!iso) return '';
@@ -31,12 +31,12 @@ function MessagesInner() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const jwtRef = useRef('');
+  const headersRef = useRef<Record<string, string>>({});
 
-  const getJwt = useCallback(async () => {
-    const j = (await account.createJWT()).jwt;
-    jwtRef.current = j;
-    return j;
+  const getAuthHeaders = useCallback(async () => {
+    const h = await authHeaders();
+    headersRef.current = h;
+    return h;
   }, []);
 
   const currentReturnTo = useCallback(() => {
@@ -46,24 +46,27 @@ function MessagesInner() {
 
   const loadThreads = useCallback(async () => {
     try {
-      const j = await getJwt();
-      const r = await fetch('/api/dm', { headers: { 'x-session-jwt': j } });
+      const h = await getAuthHeaders();
+      const r = await fetch('/api/dm', { headers: h });
       if (r.ok) { const d = await r.json(); setThreads(d.threads || []); }
     } catch { router.push(`/login?returnTo=${encodeURIComponent(currentReturnTo())}`); }
-  }, [currentReturnTo, getJwt, router]);
+  }, [currentReturnTo, getAuthHeaders, router]);
 
   const loadThread = useCallback(async (otherId: string) => {
     try {
-      const j = jwtRef.current || await getJwt();
-      const r = await fetch(`/api/dm?with=${otherId}`, { headers: { 'x-session-jwt': j } });
+      const h = Object.keys(headersRef.current).length ? headersRef.current : await getAuthHeaders();
+      const r = await fetch(`/api/dm?with=${otherId}`, { headers: h });
       if (r.ok) { const d = await r.json(); setMsgs(d.messages || []); }
     } catch {}
-  }, [getJwt]);
+  }, [getAuthHeaders]);
 
   // init: ตัวตน + รายชื่อบทสนทนา + เปิดแชทจาก ?to=
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      account.get().then(u => setMyId(u.$id)).catch(() => router.push(`/login?returnTo=${encodeURIComponent(currentReturnTo())}`));
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) setMyId(user.id);
+        else router.push(`/login?returnTo=${encodeURIComponent(currentReturnTo())}`);
+      });
       void loadThreads();
     }, 0);
     return () => window.clearTimeout(timer);
@@ -90,10 +93,10 @@ function MessagesInner() {
     if (!text || !active || sending) return;
     setSending(true);
     try {
-      const j = jwtRef.current || await getJwt();
+      const h = Object.keys(headersRef.current).length ? headersRef.current : await getAuthHeaders();
       const r = await fetch('/api/dm', {
         method: 'POST',
-        headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
+        headers: { ...h, 'Content-Type': 'application/json' },
         body: JSON.stringify({ toId: active.id, toName: active.name, content: text }),
       });
       const d = await r.json();
@@ -163,11 +166,11 @@ function MessagesInner() {
                   <div className="dm-feed">
                     {msgs.length === 0 && <p className="dm-feed-empty">เริ่มบทสนทนากับ {active.name} — ข้อความจะถูกเก็บไว้ให้เปิดอ่านได้ตลอด</p>}
                     {msgs.map(m => {
-                      const mine = m.fromId === myId;
+                      const mine = m.from_id === myId;
                       return (
-                        <div key={m.$id} className={`dm-row ${mine ? 'mine' : ''}`}>
+                        <div key={m.id} className={`dm-row ${mine ? 'mine' : ''}`}>
                           <div className={`dm-bubble ${mine ? 'mine' : ''}`}>{m.content}</div>
-                          <small>{new Date(m.createdAt).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+                          <small>{new Date(m.created_at).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
                         </div>
                       );
                     })}

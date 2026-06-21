@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders } from '@/lib/supabase';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 
 export default function AdminSetupPage() {
@@ -12,18 +12,19 @@ export default function AdminSetupPage() {
   const [userName, setUserName] = useState('');
 
   useEffect(() => {
-    account.get()
-      .then(u => setUserName(u.name || u.email || 'คุณ'))
-      .catch(() => router.replace('/login'));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { router.replace('/login'); return; }
+      setUserName((user.user_metadata?.displayName as string) || user.email || 'คุณ');
+    });
   }, [router]);
 
   const makeAdmin = async () => {
     setStatus('loading');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const res = await fetch('/api/admin/setup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
+        headers: { ...headers, 'Content-Type': 'application/json' },
       });
       const data = await res.json();
       if (!res.ok) { setMsg(data.error || 'เกิดข้อผิดพลาด'); setStatus('error'); return; }

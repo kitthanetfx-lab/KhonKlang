@@ -1,4 +1,4 @@
-import { account } from './appwrite';
+import { authHeaders } from './supabase';
 import { compressImage } from './imageCompress';
 
 export interface KycFiles {
@@ -17,7 +17,7 @@ export interface KycFileIds {
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB หลังบีบอัด
 
-async function uploadOne(file: File | null | undefined, jwt: string, label: string): Promise<string> {
+async function uploadOne(file: File | null | undefined, headers: Record<string, string>, label: string): Promise<string> {
   if (!file) return '';
   // บีบอัดรูปก่อนส่ง — รูปจากกล้องมือถือมักใหญ่เกินลิมิต request ของเซิร์ฟเวอร์
   const prepared = await compressImage(file);
@@ -28,7 +28,7 @@ async function uploadOne(file: File | null | undefined, jwt: string, label: stri
   form.append('file', prepared);
   const res = await fetch('/api/upload-kyc', {
     method: 'POST',
-    headers: { 'x-session-jwt': jwt },
+    headers,
     body: form,
   });
   if (!res.ok) {
@@ -46,14 +46,13 @@ async function uploadOne(file: File | null | undefined, jwt: string, label: stri
  * คืนค่า object ที่มี fileId ของแต่ละไฟล์
  */
 export async function uploadKycFiles(files: KycFiles): Promise<KycFileIds> {
-  let jwt = '';
-  try { jwt = (await account.createJWT()).jwt; }
-  catch { throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง'); }
+  const headers = await authHeaders();
+  if (!headers.Authorization) throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง');
   const [idCard, bookbank, companyCert, slip] = await Promise.all([
-    uploadOne(files.idCard,      jwt, 'บัตรประชาชน'),
-    uploadOne(files.bookbank,    jwt, 'หน้าสมุดบัญชี'),
-    uploadOne(files.companyCert, jwt, 'หนังสือรับรองบริษัท'),
-    uploadOne(files.slip,        jwt, 'สลิปการโอนเงิน'),
+    uploadOne(files.idCard,      headers, 'บัตรประชาชน'),
+    uploadOne(files.bookbank,    headers, 'หน้าสมุดบัญชี'),
+    uploadOne(files.companyCert, headers, 'หนังสือรับรองบริษัท'),
+    uploadOne(files.slip,        headers, 'สลิปการโอนเงิน'),
   ]);
   return { idCard, bookbank, companyCert, slip };
 }

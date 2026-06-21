@@ -1,33 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Users } from 'node-appwrite';
+import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 
 export async function POST(req: NextRequest) {
   try {
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    // Verify user is logged in
-    const sessionClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setJWT(jwt);
-    const currentUser = await new Account(sessionClient).get();
-
-    // Set role = admin using admin API key
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.APPWRITE_API_KEY!);
-    const users = new Users(adminClient);
-
-    const full  = await users.get(currentUser.$id);
-    const prefs = (full.prefs || {}) as Record<string, string>;
-    prefs.role  = 'admin';
-    await users.updatePrefs(currentUser.$id, prefs);
-
+    const me = await verifyUser(req);
+    const db = getAdminClient();
+    const { error } = await db.from('profiles').update({ role: 'admin' }).eq('id', me.id);
+    if (error) throw new Error(error.message);
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

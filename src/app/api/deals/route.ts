@@ -1,235 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Databases, DatabasesIndexType, ID, OrderBy, Permission, Role, Query, Users } from 'node-appwrite';
+import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../_lib/notify';
 import { readServiceControlsConfig } from '../_lib/appConfig';
 import { syncDealLedger } from '../_lib/financeLedger';
 
-const DB_ID  = 'khonklang_db';
-const COL_ID = 'deals';
-
-function getAdminClient() {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return new Databases(client);
-}
-
-function getAdminUsers() {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return new Users(client);
-}
-
-async function ensureCollection(databases: Databases) {
-  try { await databases.get(DB_ID); } catch { await databases.create(DB_ID, 'Khonklang Database'); }
-  try { await databases.getCollection(DB_ID, COL_ID); return; } catch { /* create below */ }
-  await databases.createCollection(DB_ID, COL_ID, 'Deals', [
-    Permission.read(Role.users()),
-    Permission.create(Role.users()),
-    Permission.update(Role.users()),
-  ]);
-  await Promise.all([
-    databases.createStringAttribute(DB_ID, COL_ID, 'sellerId',      255, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'sellerName',    200, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'middlemanId',   255, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'middlemanName', 200, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'buyerId',       255, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'buyerName',     200, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'title',         200, true),
-    databases.createStringAttribute(DB_ID, COL_ID, 'description',   1000, false, ''),
-    databases.createIntegerAttribute(DB_ID, COL_ID, 'price', true, 0, 999999999),
-    databases.createStringAttribute(DB_ID, COL_ID, 'category',      100, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'condition',      50, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'location',      100, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'sellingMode',    50, false, 'normal'),
-    databases.createStringAttribute(DB_ID, COL_ID, 'imageFileIds',  2000, false, '[]'),
-    databases.createStringAttribute(DB_ID, COL_ID, 'status',         50, false, 'posted'),
-    databases.createBooleanAttribute(DB_ID, COL_ID, 'sellerAcceptedTerms',       false, false),
-    databases.createBooleanAttribute(DB_ID, COL_ID, 'middlemanAcceptedTerms',    false, false),
-    databases.createBooleanAttribute(DB_ID, COL_ID, 'buyerAcceptedTerms',        false, false),
-    databases.createBooleanAttribute(DB_ID, COL_ID, 'middlemanConfirmedPayment', false, false),
-    databases.createBooleanAttribute(DB_ID, COL_ID, 'buyerConfirmedCheck',       false, false),
-    databases.createStringAttribute(DB_ID, COL_ID, 'paymentSlipFileId',  255, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'evidenceData',      6000, false, '[]'),
-    databases.createStringAttribute(DB_ID, COL_ID, 'trackingToMiddleman', 100, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'trackingToBuyer',    100, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'rejectReason',       500, false, ''),
-    databases.createStringAttribute(DB_ID, COL_ID, 'createdAt',           30, false, ''),
-  ]);
-  await new Promise(r => setTimeout(r, 10000));
-  await Promise.all([
-    { key: 'idx_seller',    attrs: ['sellerId'],    orders: [OrderBy.Asc]  },
-    { key: 'idx_buyer',     attrs: ['buyerId'],     orders: [OrderBy.Asc]  },
-    { key: 'idx_middleman', attrs: ['middlemanId'], orders: [OrderBy.Asc]  },
-    { key: 'idx_status',    attrs: ['status'],      orders: [OrderBy.Asc]  },
-    { key: 'idx_created',   attrs: ['createdAt'],   orders: [OrderBy.Desc] },
-  ].map(i => databases.createIndex(DB_ID, COL_ID, i.key, DatabasesIndexType.Key, i.attrs, i.orders).catch(() => {})));
-}
-
-/** Add new attributes to existing collection (idempotent — ignores errors if attr already exists) */
-async function ensureExtraAttributes(databases: Databases) {
-  await Promise.all([
-    ensureAttributeReady(databases, 'condition', () => databases.createStringAttribute(DB_ID, COL_ID, 'condition', 50, false, '')),
-    ensureAttributeReady(databases, 'location', () => databases.createStringAttribute(DB_ID, COL_ID, 'location', 100, false, '')),
-    ensureAttributeReady(databases, 'sellingMode', () => databases.createStringAttribute(DB_ID, COL_ID, 'sellingMode', 50, false, 'normal')),
-    ensureAttributeReady(databases, 'imageFileIds', () => databases.createStringAttribute(DB_ID, COL_ID, 'imageFileIds', 2000, false, '[]')),
-    // source: 'listing' = ประกาศขายสาธารณะ (โชว์ในตลาด) / 'private' = ดีลส่วนตัว (แชร์ลิงก์เอง)
-    ensureAttributeReady(databases, 'source', () => databases.createStringAttribute(DB_ID, COL_ID, 'source', 20, false, '')),
-    // dealType: '' = ปกติ / 'meetup' = รับประกันเดินทาง (ไม่ใช้คนกลาง) + meetupData เก็บรายละเอียดการคำนวณ
-    ensureAttributeReady(databases, 'dealType', () => databases.createStringAttribute(DB_ID, COL_ID, 'dealType', 20, false, '')),
-    ensureAttributeReady(databases, 'meetupData', () => databases.createStringAttribute(DB_ID, COL_ID, 'meetupData', 2000, false, '')),
-    // ตกลงราคา + ผู้จ่ายค่าบริการ (เก็บสถานะการต่อรอง/ตกลงเป็น JSON)
-    ensureAttributeReady(databases, 'priceData', () => databases.createStringAttribute(DB_ID, COL_ID, 'priceData', 2000, false, '')),
-    ensureAttributeReady(databases, 'feePayer', () => databases.createStringAttribute(DB_ID, COL_ID, 'feePayer', 20, false, '')),
-  ]);
-}
-
-async function ensureIndexes(databases: Databases) {
-  await Promise.all([
-    { key: 'idx_seller',    attrs: ['sellerId'],    orders: [OrderBy.Asc]  },
-    { key: 'idx_buyer',     attrs: ['buyerId'],     orders: [OrderBy.Asc]  },
-    { key: 'idx_middleman', attrs: ['middlemanId'], orders: [OrderBy.Asc]  },
-    { key: 'idx_status',    attrs: ['status'],      orders: [OrderBy.Asc]  },
-    { key: 'idx_created',   attrs: ['createdAt'],   orders: [OrderBy.Desc] },
-  ].map(i => databases.createIndex(DB_ID, COL_ID, i.key, DatabasesIndexType.Key, i.attrs, i.orders).catch(() => {})));
-}
-
-function getUser(jwt: string) {
-  const c = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setJWT(jwt);
-  return new Account(c).get();
-}
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function hasScopeError(err: unknown, scope: string) {
-  const msg = String(err);
-  return msg.includes(`missing scopes ["${scope}"]`);
-}
-
-async function ensureAttributeReady(
-  databases: Databases,
-  key: string,
-  createAttribute: () => Promise<unknown>,
-) {
-  try {
-    const attr = await databases.getAttribute(DB_ID, COL_ID, key);
-    if (attr.status === 'available') return;
-  } catch {
-    // Attribute does not exist yet.
+// แนบ images: string[] (file_id เรียงตาม position) ให้แต่ละดีล — แทน imageFileIds JSON blob เดิมบน deals row
+async function attachImages<T extends { id: string }>(db: ReturnType<typeof getAdminClient>, deals: T[]): Promise<(T & { images: string[] })[]> {
+  const ids = deals.map(d => d.id);
+  if (!ids.length) return deals.map(d => ({ ...d, images: [] }));
+  const { data } = await db.from('deal_images').select('deal_id, file_id, position').in('deal_id', ids).order('position', { ascending: true });
+  const map = new Map<string, string[]>();
+  for (const row of data || []) {
+    const arr = map.get(row.deal_id) || [];
+    arr.push(row.file_id);
+    map.set(row.deal_id, arr);
   }
-
-  await createAttribute().catch(() => {});
-
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    try {
-      const attr = await databases.getAttribute(DB_ID, COL_ID, key);
-      if (attr.status === 'available') return;
-    } catch {
-      // Keep polling until Appwrite finishes creating the attribute.
-    }
-    await sleep(500);
-  }
-
-  throw new Error(`แอตทริบิวต์ ${key} ยังไม่พร้อมใช้งาน`);
-}
-
-async function ensureDealsSchemaBestEffort(databases: Databases) {
-  try {
-    await ensureCollection(databases);
-    await ensureExtraAttributes(databases);
-    await ensureIndexes(databases);
-  } catch (err) {
-    // In production we can keep working with an existing collection even if
-    // the API key is not allowed to mutate collection schema.
-    if (hasScopeError(err, 'collections.write')) return;
-    throw err;
-  }
+  return deals.map(d => ({ ...d, images: map.get(d.id) || [] }));
 }
 
 export async function GET(req: NextRequest) {
   try {
     const role = req.nextUrl.searchParams.get('role') || 'seller';
-    const databases = getAdminClient();
-    await ensureDealsSchemaBestEffort(databases);
+    const db = getAdminClient();
 
-    if (role === 'buyer' && !req.headers.get('x-session-jwt')) {
-      const posted = await databases.listDocuments(DB_ID, COL_ID, [
-        Query.equal('status', 'posted'),
-        Query.orderDesc('createdAt'),
-        Query.limit(100),
-      ]).catch(() => ({ documents: [] }));
-      return NextResponse.json({ deals: posted.documents });
+    const authHeader = req.headers.get('authorization') || req.headers.get('x-session-jwt');
+    if (role === 'buyer' && !authHeader) {
+      const { data } = await db.from('deals').select('*').eq('status', 'posted').order('created_at', { ascending: false }).limit(100);
+      return NextResponse.json({ deals: await attachImages(db, data || []) });
     }
 
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const currentUser = await getUser(jwt);
+    const me = await verifyUser(req);
 
     if (role === 'middleman') {
-      const result = await databases.listDocuments(DB_ID, COL_ID, [
-        Query.equal('middlemanId', currentUser.$id),
-        Query.orderDesc('createdAt'),
-        Query.limit(100),
-      ]).catch(() => ({ documents: [] }));
-      const usersApi = getAdminUsers();
-      const enriched = await Promise.all(result.documents.map(async doc => {
-        let buyerPhone = '', sellerPhone = '';
-        try { if (doc.buyerId)  { const u = await usersApi.get(doc.buyerId as string);  buyerPhone  = ((u.prefs||{}) as Record<string,string>).phone||''; } } catch {}
-        try { if (doc.sellerId) { const u = await usersApi.get(doc.sellerId as string); sellerPhone = ((u.prefs||{}) as Record<string,string>).phone||''; } } catch {}
-        return { ...doc, buyerPhone, sellerPhone };
-      }));
-      return NextResponse.json({ deals: enriched });
+      const { data: deals } = await db.from('deals').select('*').eq('middleman_id', me.id).order('created_at', { ascending: false }).limit(100);
+      const rows = deals || [];
+      const ids = Array.from(new Set(rows.flatMap(d => [d.buyer_id, d.seller_id]).filter(Boolean)));
+      const { data: profiles } = ids.length ? await db.from('profiles').select('id, phone').in('id', ids) : { data: [] };
+      const phoneOf = new Map((profiles || []).map(p => [p.id, p.phone || '']));
+      const enriched = rows.map(d => ({ ...d, buyerPhone: phoneOf.get(d.buyer_id) || '', sellerPhone: phoneOf.get(d.seller_id) || '' }));
+      return NextResponse.json({ deals: await attachImages(db, enriched) });
     }
 
     if (role === 'buyer') {
       const [posted, mine] = await Promise.all([
-        databases.listDocuments(DB_ID, COL_ID, [Query.equal('status','posted'), Query.orderDesc('createdAt'), Query.limit(100)]).catch(() => ({ documents: [] })),
-        databases.listDocuments(DB_ID, COL_ID, [Query.equal('buyerId', currentUser.$id), Query.orderDesc('createdAt'), Query.limit(100)]).catch(() => ({ documents: [] })),
+        db.from('deals').select('*').eq('status', 'posted').order('created_at', { ascending: false }).limit(100),
+        db.from('deals').select('*').eq('buyer_id', me.id).order('created_at', { ascending: false }).limit(100),
       ]);
       const seen = new Set<string>();
-      const unique = [...posted.documents, ...mine.documents].filter(d => {
-        if (seen.has(d.$id)) return false;
-        seen.add(d.$id); return true;
+      const unique = [...(posted.data || []), ...(mine.data || [])].filter(d => {
+        if (seen.has(d.id)) return false;
+        seen.add(d.id); return true;
       });
-      return NextResponse.json({ deals: unique });
+      return NextResponse.json({ deals: await attachImages(db, unique) });
     }
 
-    const result = await databases.listDocuments(DB_ID, COL_ID, [
-      Query.equal('sellerId', currentUser.$id),
-      Query.orderDesc('createdAt'),
-      Query.limit(100),
-    ]).catch(() => ({ documents: [] }));
-    return NextResponse.json({ deals: result.documents });
+    const { data } = await db.from('deals').select('*').eq('seller_id', me.id).order('created_at', { ascending: false }).limit(100);
+    return NextResponse.json({ deals: await attachImages(db, data || []) });
   } catch (err: unknown) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const jwt = req.headers.get('x-session-jwt');
-    if (!jwt) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const currentUser = await getUser(jwt);
+    const me = await verifyUser(req);
     const body = await req.json();
     const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isBuyer = creatorRole === 'buyer';
-    const prefs = ((currentUser.prefs || {}) as Record<string, string>);
-    const sellerStatus = prefs.sellerStatus || '';
-    const role = prefs.role || '';
-    if (!isBuyer && source === 'listing' && !['approved'].includes(sellerStatus) && !['seller', 'admin'].includes(role)) {
+
+    const db = getAdminClient();
+    const { data: profile } = await db.from('profiles').select('display_name, seller_status, role').eq('id', me.id).single();
+    const sellerStatus = profile?.seller_status || '';
+    const accountRole = profile?.role || '';
+    if (!isBuyer && source === 'listing' && sellerStatus !== 'approved' && !['seller', 'admin'].includes(accountRole)) {
       return NextResponse.json({ error: 'บัญชีนี้ยังไม่ได้รับอนุมัติเป็นผู้ขาย จึงยังลงประกาศขายสาธารณะไม่ได้' }, { status: 403 });
     }
-    const databases = getAdminClient();
-    const serviceControls = await readServiceControlsConfig(databases);
+
+    const serviceControls = await readServiceControlsConfig(db);
     if (dealType === 'simple' && !serviceControls.tradeSimple.enabled) {
       return NextResponse.json({ error: serviceControls.tradeSimple.note || 'บริการซื้อขายผ่านกลางแบบง่ายถูกปิดชั่วคราว' }, { status: 403 });
     }
@@ -242,49 +91,59 @@ export async function POST(req: NextRequest) {
     if (!dealType && serviceIntent !== 'safezone' && !serviceControls.tradeOnline.enabled) {
       return NextResponse.json({ error: serviceControls.tradeOnline.note || 'บริการซื้อขายผ่านกลางถูกปิดชั่วคราว' }, { status: 403 });
     }
-    await ensureDealsSchemaBestEffort(databases);
-    const doc = await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
-      sellerId: isBuyer ? '' : currentUser.$id,
-      sellerName: isBuyer ? '' : (currentUser.name || ''),
-      buyerId: isBuyer ? currentUser.$id : '',
-      buyerName: isBuyer ? (currentUser.name || '') : '',
-      middlemanId: '', middlemanName: '',
-      title, description: description || '', price: Number(price),
-      category: category || '',
-      condition: condition || '',
-      location: location || '',
-      sellingMode: sellingMode || 'normal',
-      source: source === 'listing' ? 'listing' : 'private',
-      dealType: dealType === 'meetup' ? 'meetup' : dealType === 'simple' ? 'simple' : '',
-      meetupData: dealType === 'meetup' ? String(meetupData || '').slice(0, 2000) : '',
-      imageFileIds: JSON.stringify(imageFileIds || []),
-      status: isBuyer ? 'waiting_seller' : 'posted',
-      sellerAcceptedTerms: false, middlemanAcceptedTerms: false, buyerAcceptedTerms: false,
-      middlemanConfirmedPayment: false, buyerConfirmedCheck: false,
-      paymentSlipFileId: '', evidenceData: '[]',
-      trackingToMiddleman: '', trackingToBuyer: '', rejectReason: '',
-      createdAt: new Date().toISOString(),
-    });
-    await syncDealLedger(databases, getAdminUsers(), doc as unknown as Record<string, unknown>).catch(() => {});
 
-    // ถูกชวนแบบเจาะจง (เช่น กดนัดรับจากหน้าสินค้า — รู้ตัวผู้ขายอยู่แล้ว) → แจ้งคนนั้นทันที
-    if (body.inviteUserId && typeof body.inviteUserId === 'string' && body.inviteUserId !== currentUser.$id) {
-      await notifyUsers(databases, [body.inviteUserId], {
+    const name = profile?.display_name || '';
+    const dealNumberSeed = crypto.randomUUID();
+    const { data: doc, error } = await db.from('deals').insert({
+      id: dealNumberSeed,
+      deal_number: `KKL-${dealNumberSeed.replace(/-/g, '').slice(-8).toUpperCase()}`,
+      seller_id: isBuyer ? null : me.id,
+      seller_name: isBuyer ? '' : name,
+      buyer_id: isBuyer ? me.id : null,
+      buyer_name: isBuyer ? name : '',
+      title, description: description || '', price: Number(price),
+      category: category || '', condition: condition || '', location: location || '',
+      selling_mode: sellingMode || 'normal',
+      source: source === 'listing' ? 'listing' : 'private',
+      deal_type: dealType === 'meetup' ? 'meetup' : dealType === 'simple' ? 'simple' : 'normal',
+      status: isBuyer ? 'waiting_seller' : 'posted',
+    }).select().single();
+    if (error || !doc) throw new Error(error?.message || 'create deal failed');
+
+    if (dealType === 'meetup' && meetupData) {
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(meetupData); } catch { /* malformed — fall back to empty */ }
+      await db.from('deal_meetup').insert({
+        deal_id: doc.id,
+        buyer_loc: parsed.buyerLoc || null,
+        seller_loc: parsed.sellerLoc || null,
+        buyer_fee: Math.round(Number(parsed.buyerFee) || 0),
+        seller_fee: Math.round(Number(parsed.sellerFee) || 0),
+        legacy_meta: { ratePerKm: parsed.ratePerKm, feeWho: parsed.feeWho, fee: parsed.fee },
+      });
+    }
+    if (imageFileIds?.length) {
+      await db.from('deal_images').insert(imageFileIds.map((fileId: string, position: number) => ({ deal_id: doc.id, file_id: fileId, position })));
+    }
+
+    await syncDealLedger(db, doc as Record<string, unknown>).catch(() => {});
+
+    if (body.inviteUserId && typeof body.inviteUserId === 'string' && body.inviteUserId !== me.id) {
+      await notifyUsers(db, [body.inviteUserId], {
         title: '🚗 คุณถูกชวนทำดีลนัดรับ',
-        body: `${currentUser.name || 'สมาชิก'} ชวนคุณนัดรับ "${title}" — เข้าไประบุที่อยู่ของคุณและตกลงจุดนัดพบได้เลย`,
-        link: `/deal/${doc.$id}`,
+        body: `${name || 'สมาชิก'} ชวนคุณนัดรับ "${title}" — เข้าไประบุที่อยู่ของคุณและตกลงจุดนัดพบได้เลย`,
+        link: `/deal/${doc.id}`,
       });
     }
 
-    // ดีลนี้ถูกสร้างเพื่อเสนอขายตาม "ประกาศหาสินค้า" → แจ้งเจ้าของประกาศทันที
     if (body.wantedId && typeof body.wantedId === 'string') {
       try {
-        const wanted = await databases.getDocument(DB_ID, 'wanted_posts', body.wantedId);
-        if (wanted.userId && wanted.userId !== currentUser.$id) {
-          await notifyUsers(databases, [wanted.userId as string], {
+        const { data: wanted } = await db.from('wanted_posts').select('user_id').eq('id', body.wantedId).single();
+        if (wanted?.user_id && wanted.user_id !== me.id) {
+          await notifyUsers(db, [wanted.user_id], {
             title: `📢 มีผู้เสนอขายตามประกาศหาของคุณ`,
-            body: `${currentUser.name || 'สมาชิก'} เสนอขาย "${title}" ราคา ฿${Number(price).toLocaleString()} — กดเข้าดูดีลและเข้าร่วมเป็นผู้ซื้อได้เลย`,
-            link: `/deal/${doc.$id}`,
+            body: `${name || 'สมาชิก'} เสนอขาย "${title}" ราคา ฿${Number(price).toLocaleString()} — กดเข้าดูดีลและเข้าร่วมเป็นผู้ซื้อได้เลย`,
+            link: `/deal/${doc.id}`,
           });
         }
       } catch { /* ประกาศอาจถูกลบ — ไม่กระทบการสร้างดีล */ }
@@ -292,6 +151,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ deal: doc });
   } catch (err: unknown) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

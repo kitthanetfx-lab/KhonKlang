@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { account } from '@/lib/appwrite';
+import { authHeaders, fileViewUrl, DEAL_BUCKET, KYC_BUCKET } from '@/lib/supabase';
 import {
   Wallet,
   Loader2,
@@ -24,9 +24,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
-const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const fileUrl = (bucket: string, id: string) => `${ENDPOINT}/storage/buckets/${bucket}/files/${id}/view?project=${PROJECT}`;
+// bucket ที่มาจาก API ยังเป็นชื่อแบบเดิม ('deal_files' / 'kyc_docs') — แมปไปยัง bucket จริงใน Supabase Storage
+const fileUrl = (bucket: string, id: string) => fileViewUrl(bucket === 'kyc_docs' ? KYC_BUCKET : DEAL_BUCKET, id);
 const baht = (n: number) => '฿' + Math.round(n || 0).toLocaleString();
 
 interface FeeLine { label: string; amount: number; }
@@ -211,7 +210,7 @@ function groupRowsByReference(rows: FinanceRow[]) {
 }
 
 export default function AdminFinance() {
-  const jwtRef = useRef('');
+  const headersRef = useRef<Record<string, string>>({});
   const [tab, setTab] = useState<FinanceTab>('incoming');
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -226,17 +225,17 @@ export default function AdminFinance() {
   const [selected, setSelected] = useState<FinanceGroup | null>(null);
   const [querySearch, setQuerySearch] = useState('');
 
-  const getJwt = useCallback(async (forceFresh = false) => {
-    if (!forceFresh && jwtRef.current) return jwtRef.current;
-    const jwt = (await account.createJWT()).jwt;
-    jwtRef.current = jwt;
-    return jwt;
+  const getAuthHeaders = useCallback(async (forceFresh = false) => {
+    if (!forceFresh && Object.keys(headersRef.current).length) return headersRef.current;
+    const headers = await authHeaders();
+    headersRef.current = headers;
+    return headers;
   }, []);
 
   const load = useCallback(async () => {
-    const jwt = await getJwt();
+    const headers = await getAuthHeaders();
     if (tab === 'summary') {
-      const r = await fetch('/api/admin/finance?tab=summary&page=1&pageSize=20&filter=all', { headers: { 'x-session-jwt': jwt } });
+      const r = await fetch('/api/admin/finance?tab=summary&page=1&pageSize=20&filter=all', { headers });
       const d = await r.json();
       setSummary(d.summary || null);
       setRows([]);
@@ -252,7 +251,7 @@ export default function AdminFinance() {
         pageSize: String(pagination.pageSize),
         search: querySearch,
       });
-      const r = await fetch(`/api/admin/finance?${params.toString()}`, { headers: { 'x-session-jwt': jwt } });
+      const r = await fetch(`/api/admin/finance?${params.toString()}`, { headers });
       const d = await r.json();
       if (!r.ok) {
         setRows([]);
@@ -270,7 +269,7 @@ export default function AdminFinance() {
     } catch {
       setRows([]);
     }
-  }, [filter, getJwt, pagination.page, pagination.pageSize, querySearch, tab]);
+  }, [filter, getAuthHeaders, pagination.page, pagination.pageSize, querySearch, tab]);
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0);
@@ -300,12 +299,12 @@ export default function AdminFinance() {
   }
 
   async function uploadDealFile(file: File) {
-    const jwt = await getJwt();
+    const headers = await getAuthHeaders();
     const form = new FormData();
     form.append('file', file);
     const response = await fetch('/api/upload-deal', {
       method: 'POST',
-      headers: { 'x-session-jwt': jwt },
+      headers,
       body: form,
     });
     const data = await response.json();
@@ -334,7 +333,7 @@ export default function AdminFinance() {
     }
     setActing(refId);
     try {
-      const jwt = await getJwt();
+      const headers = await getAuthHeaders();
       let fileId = '';
       if (action === 'mark_payout_sent' || action === 'mark_refund_sent') {
         const file = await pickSlipFile();
@@ -343,7 +342,7 @@ export default function AdminFinance() {
       }
       const r = await fetch('/api/admin/finance', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: refId, action, note, fileId }),
       });
       const data = await r.json().catch(() => ({}));
@@ -362,10 +361,10 @@ export default function AdminFinance() {
   async function verifySlip(row: FinanceRow) {
     setVerifying(row.key);
     try {
-      const jwt = await getJwt();
+      const headers = await getAuthHeaders();
       const r = await fetch('/api/admin/finance', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'verify_slip', fileId: row.fileId, bucket: row.bucket, expected: row.expected }),
       });
       const d = await r.json();
@@ -385,10 +384,10 @@ export default function AdminFinance() {
   async function refreshProjection() {
     setRefreshing(true);
     try {
-      const jwt = await getJwt(true);
+      const headers = await getAuthHeaders(true);
       const r = await fetch('/api/admin/finance', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'refresh_projection' }),
       });
       const data = await r.json().catch(() => ({}));
@@ -407,7 +406,7 @@ export default function AdminFinance() {
   async function exportFile(format: 'csv' | 'xlsx') {
     setExporting(format);
     try {
-      const jwt = await getJwt();
+      const headers = await getAuthHeaders();
       const params = new URLSearchParams({
         tab,
         filter,
@@ -417,7 +416,7 @@ export default function AdminFinance() {
         format,
       });
       const response = await fetch(`/api/admin/finance?${params.toString()}`, {
-        headers: { 'x-session-jwt': jwt },
+        headers,
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -864,8 +863,8 @@ function BankInfoBox({ bank, label }: { bank?: BankInfo | null; label: string })
         <p><span className="text-gray-400">ชื่อบัญชี:</span> {bank.bankOwner || '-'}</p>
       </div>
       {bank.bankQrFileId && (
-        <a href={fileUrl('deal_files', bank.bankQrFileId)} target="_blank" rel="noreferrer" className="shrink-0">
-          <img src={fileUrl('deal_files', bank.bankQrFileId)} alt="QR" className="w-20 h-20 object-contain rounded-lg border border-gray-200" />
+        <a href={fileViewUrl(DEAL_BUCKET, bank.bankQrFileId)} target="_blank" rel="noreferrer" className="shrink-0">
+          <img src={fileViewUrl(DEAL_BUCKET, bank.bankQrFileId)} alt="QR" className="w-20 h-20 object-contain rounded-lg border border-gray-200" />
         </a>
       )}
     </div>

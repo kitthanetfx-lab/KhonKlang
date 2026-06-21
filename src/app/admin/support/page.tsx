@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
 import {
   MessageCircle, Phone, PhoneOff, PhoneCall, Mic, MicOff, Send,
@@ -13,12 +13,12 @@ import { SUPPORT_CALLS_COMING_SOON, SUPPORT_CALLS_ENABLED, SUPPORT_CALLS_PREPARE
 type CallStatus = 'idle' | 'customer_requesting' | 'staff_ringing' | 'connecting' | 'active' | 'ended';
 
 interface ThreadRow {
-  $id: string; customerName: string; status: string; lastMessage: string; lastAt: string;
-  lastSender: string; unreadStaff: boolean; assignedStaffName: string;
-  callStatus: CallStatus; callId: string; callInitiator: string; callStaffName: string;
-  callUpdatedAt: string; lastReadByCustomerAt: string;
+  customer_id: string; customer_name: string; status: string; last_message: string; last_at: string;
+  last_sender: string; unread_staff: boolean; assigned_staff_name: string;
+  call_status: CallStatus; call_id: string; call_initiator: string; call_staff_name: string;
+  call_updated_at: string; last_read_by_customer_at: string;
 }
-interface Msg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string; pending?: boolean }
+interface Msg { id: string; sender_id: string; sender_name: string; sender_role: 'customer' | 'staff' | 'system'; content: string; image_url?: string; created_at: string; pending?: boolean }
 
 function timeShort(iso: string) {
   if (!iso) return '';
@@ -44,7 +44,7 @@ export default function AdminSupportPage() {
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const [nowTs, setNowTs] = useState(() => Date.now());
 
-  const jwtRef = useRef('');
+  const headersRef = useRef<Record<string, string> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,34 +57,34 @@ export default function AdminSupportPage() {
   useEffect(() => { threadRef.current = thread; }, [thread]);
   useEffect(() => { callStateRef.current = callState; }, [callState]);
 
-  const getJwt = useCallback(async () => {
-    const j = (await account.createJWT()).jwt;
-    jwtRef.current = j;
-    return j;
+  const getAuthHeaders = useCallback(async () => {
+    const h = await authHeaders();
+    headersRef.current = h;
+    return h;
   }, []);
 
   const loadThreads = useCallback(async () => {
     try {
-      const jwt = jwtRef.current || await getJwt();
-      const r = await fetch('/api/admin/support', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+      const headers = headersRef.current || await getAuthHeaders();
+      const r = await fetch('/api/admin/support', { headers, cache: 'no-store' });
       if (!r.ok) return;
       const d = await r.json();
       setThreads(d.threads || []);
     } catch { /* ลองใหม่รอบถัดไป */ }
-  }, [getJwt]);
+  }, [getAuthHeaders]);
 
   const loadThread = useCallback(async (customerId: string) => {
     if (!customerId) return;
     try {
-      const jwt = jwtRef.current || await getJwt();
-      const r = await fetch(`/api/admin/support?with=${encodeURIComponent(customerId)}`, { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+      const headers = headersRef.current || await getAuthHeaders();
+      const r = await fetch(`/api/admin/support?with=${encodeURIComponent(customerId)}`, { headers, cache: 'no-store' });
       if (!r.ok) return;
       const d = await r.json();
       if (selectedRef.current !== customerId) return; // ผู้ใช้สลับห้องไปแล้วระหว่างรอ
       setThread(d.thread || null);
       setMsgs(d.messages || []);
     } catch { /* ลองใหม่รอบถัดไป */ }
-  }, [getJwt]);
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     const t = window.setTimeout(() => { void loadThreads(); }, 0);
@@ -109,19 +109,19 @@ export default function AdminSupportPage() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs.length]);
 
   const filtered = (threads || []).filter(t =>
-    !search.trim() || t.customerName.toLowerCase().includes(search.trim().toLowerCase()));
+    !search.trim() || t.customer_name.toLowerCase().includes(search.trim().toLowerCase()));
   const elapsed = callStartedAt ? Math.max(0, Math.floor((nowTs - callStartedAt) / 1000)) : 0;
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
-  const callStatus = thread?.callStatus;
+  const callStatus = thread?.call_status;
   const callFeatureLocked = !SUPPORT_CALLS_ENABLED;
 
   const reportDebug = useCallback((hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) => {
     const customerId = selectedRef.current || '';
     if (!customerId) return;
-    const send = (jwt: string) => fetch('/api/admin/support/debug', {
+    const send = (headers: Record<string, string>) => fetch('/api/admin/support/debug', {
       method: 'POST',
-      headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId: 'support-call-fail',
         runId: 'pre-fix',
@@ -131,20 +131,20 @@ export default function AdminSupportPage() {
         data,
         ts: Date.now(),
         customerId,
-        callId: threadRef.current?.callId || '',
+        callId: threadRef.current?.call_id || '',
       }),
     }).catch(() => null);
-    const jwt = jwtRef.current;
-    if (jwt) {
-      void send(jwt);
+    const headers = headersRef.current;
+    if (headers) {
+      void send(headers);
       return;
     }
-    void getJwt().then(send).catch(() => null);
-  }, [getJwt]);
+    void getAuthHeaders().then(send).catch(() => null);
+  }, [getAuthHeaders]);
 
   const getIceServers = useCallback(async () => {
-    const jwt = jwtRef.current || await getJwt();
-    const r = await fetch('/api/admin/support/ice', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+    const headers = headersRef.current || await getAuthHeaders();
+    const r = await fetch('/api/admin/support/ice', { headers, cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
     reportDebug('A', 'src/app/admin/support/page.tsx:getIceServers', '[DEBUG] admin getIceServers', {
       ok: r.ok,
@@ -159,14 +159,14 @@ export default function AdminSupportPage() {
         : [],
     });
     return Array.isArray(d.iceServers) ? d.iceServers : [];
-  }, [getJwt, reportDebug]);
+  }, [getAuthHeaders, reportDebug]);
 
   const callAction = useCallback(async (action: string) => {
     if (!selected) return;
     try {
-      const jwt = jwtRef.current || await getJwt();
+      const headers = headersRef.current || await getAuthHeaders();
       const r = await fetch('/api/admin/support/call', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ customerId: selected, action }),
       });
       const d = await r.json().catch(() => ({}));
@@ -176,14 +176,14 @@ export default function AdminSupportPage() {
         ok: r.ok,
         status: r.status,
         response: d,
-        threadStatus: threadRef.current?.callStatus || '',
-        threadCallId: threadRef.current?.callId || '',
+        threadStatus: threadRef.current?.call_status || '',
+        threadCallId: threadRef.current?.call_id || '',
       });
       void loadThread(selected);
       return d as { callId?: string };
     } catch { /* แสดงผลรอบโพลถัดไป */ }
     return {};
-  }, [getJwt, loadThread, selected, reportDebug]);
+  }, [getAuthHeaders, loadThread, selected, reportDebug]);
 
   useEffect(() => {
     if (!callStartedAt) {
@@ -195,8 +195,8 @@ export default function AdminSupportPage() {
   }, [callStartedAt]);
 
   useEffect(() => {
-    const status = thread?.callStatus;
-    const callId = thread?.callId || '';
+    const status = thread?.call_status;
+    const callId = thread?.call_id || '';
     const customerId = selected;
     if (callFeatureLocked) {
       if (sessionRef.current) {
@@ -226,7 +226,7 @@ export default function AdminSupportPage() {
         callId,
         customerId,
         signalUrl: '/api/admin/support/signal',
-        getJwt,
+        getAuthHeaders,
         getIceServers,
         onState: (s) => {
           setCallState(s);
@@ -249,7 +249,7 @@ export default function AdminSupportPage() {
       setCallStartedAt(null);
       setMuted(false);
     }
-  }, [thread?.callStatus, thread?.callId, selected, getJwt, getIceServers, callAction, reportDebug, callFeatureLocked]);
+  }, [thread?.call_status, thread?.call_id, selected, getAuthHeaders, getIceServers, callAction, reportDebug, callFeatureLocked]);
 
   useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 
@@ -258,12 +258,12 @@ export default function AdminSupportPage() {
     if (!content || sending || !selected) return;
     const tempId = `tmp-${Date.now()}`;
     const tempMsg: Msg = {
-      $id: tempId,
-      senderId: 'me',
-      senderName: 'พนักงาน',
-      senderRole: 'staff',
+      id: tempId,
+      sender_id: 'me',
+      sender_name: 'พนักงาน',
+      sender_role: 'staff',
       content,
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
       pending: true,
     };
     setMsgs(prev => [...prev, tempMsg]);
@@ -271,22 +271,22 @@ export default function AdminSupportPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     setSending(true);
     try {
-      const jwt = jwtRef.current || await getJwt();
+      const headers = headersRef.current || await getAuthHeaders();
       const r = await fetch('/api/admin/support', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ customerId: selected, content }),
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.message) {
-        setMsgs(prev => prev.map(m => m.$id === tempId ? d.message : m));
+        setMsgs(prev => prev.map(m => m.id === tempId ? d.message : m));
         void loadThread(selected);
         void loadThreads();
       } else {
-        setMsgs(prev => prev.filter(m => m.$id !== tempId));
+        setMsgs(prev => prev.filter(m => m.id !== tempId));
         setInput(content);
       }
     } catch {
-      setMsgs(prev => prev.filter(m => m.$id !== tempId));
+      setMsgs(prev => prev.filter(m => m.id !== tempId));
       setInput(content);
     } finally { setSending(false); }
   }
@@ -298,15 +298,15 @@ export default function AdminSupportPage() {
     if (!file.type.startsWith('image/')) return;
     setUploading(true);
     try {
-      const jwt = jwtRef.current || await getJwt();
+      const headers = headersRef.current || await getAuthHeaders();
       const prepared = await compressImage(file); // บีบอัดรูปก่อนส่ง กันไฟล์ใหญ่เกินลิมิต body ของ API route บน Vercel
       const fd = new FormData();
       fd.append('file', prepared);
-      const up = await fetch('/api/support/upload', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd, cache: 'no-store' });
+      const up = await fetch('/api/support/upload', { method: 'POST', headers, body: fd, cache: 'no-store' });
       const upData = await up.json().catch(() => ({}));
       if (!up.ok || !upData.url) { alert(upData.error || 'อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
       const r = await fetch('/api/admin/support', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ customerId: selected, content: '', imageUrl: upData.url, mimeType: upData.mimeType }),
       });
       const d = await r.json().catch(() => ({}));
@@ -362,28 +362,28 @@ export default function AdminSupportPage() {
               </div>
             )}
             {filtered.map(t => {
-              const pendingCall = t.callStatus === 'customer_requesting';
-              const live = t.callStatus === 'active' || t.callStatus === 'connecting' || t.callStatus === 'staff_ringing';
+              const pendingCall = t.call_status === 'customer_requesting';
+              const live = t.call_status === 'active' || t.call_status === 'connecting' || t.call_status === 'staff_ringing';
               return (
-                <button key={t.$id} type="button" onClick={() => setSelected(t.$id)}
-                  aria-current={selected === t.$id ? 'true' : undefined}
+                <button key={t.customer_id} type="button" onClick={() => setSelected(t.customer_id)}
+                  aria-current={selected === t.customer_id ? 'true' : undefined}
                   className={`w-full text-left flex items-start gap-2.5 px-3 py-3 border-b border-gray-100 dark:border-gray-800/60 transition-colors
-                    ${selected === t.$id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}>
+                    ${selected === t.customer_id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}>
                   <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-gray-500 shrink-0 mt-0.5">
                     <User size={16} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-medium truncate">{t.customerName}</span>
+                      <span className="text-sm font-medium truncate">{t.customer_name}</span>
                       {(pendingCall || live) && (
                         <PhoneCall size={13} className={pendingCall ? 'text-rose-500 animate-pulse shrink-0' : 'text-green-600 shrink-0'} aria-label={pendingCall ? 'มีคำขอโทร' : 'กำลังโทร'} />
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 truncate">{t.lastMessage || 'ยังไม่มีข้อความ'}</p>
+                    <p className="text-xs text-gray-500 truncate">{t.last_message || 'ยังไม่มีข้อความ'}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="text-[11px] text-gray-400">{dayShort(t.lastAt)}</span>
-                    {t.unreadStaff && <span className="w-2 h-2 rounded-full bg-rose-500" aria-label="ข้อความใหม่" />}
+                    <span className="text-[11px] text-gray-400">{dayShort(t.last_at)}</span>
+                    {t.unread_staff && <span className="w-2 h-2 rounded-full bg-rose-500" aria-label="ข้อความใหม่" />}
                   </div>
                 </button>
               );
@@ -404,8 +404,8 @@ export default function AdminSupportPage() {
             <>
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
                 <div>
-                  <p className="font-medium text-sm">{thread?.customerName || '...'}</p>
-                  <p className="text-xs text-gray-400">{thread?.assignedStaffName ? `ดูแลโดย ${thread.assignedStaffName}` : 'ยังไม่มีพนักงานรับเรื่อง'}</p>
+                  <p className="font-medium text-sm">{thread?.customer_name || '...'}</p>
+                  <p className="text-xs text-gray-400">{thread?.assigned_staff_name ? `ดูแลโดย ${thread.assigned_staff_name}` : 'ยังไม่มีพนักงานรับเรื่อง'}</p>
                 </div>
                 {(!callStatus || callStatus === 'idle' || callStatus === 'ended') && (
                   <button type="button" onClick={() => { if (!callFeatureLocked) void callAction('call'); }}
@@ -470,22 +470,22 @@ export default function AdminSupportPage() {
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-gray-50 dark:bg-gray-950/40">
                 {msgs.length === 0 && <p className="text-center text-sm text-gray-400 mt-8">ยังไม่มีข้อความในห้องนี้</p>}
                 {msgs.map(m => {
-                  const mine = m.senderRole === 'staff';
-                  if (m.senderRole === 'system') {
-                    return <p key={m.$id} className="text-center text-xs text-gray-400 py-1">{m.content}</p>;
+                  const mine = m.sender_role === 'staff';
+                  if (m.sender_role === 'system') {
+                    return <p key={m.id} className="text-center text-xs text-gray-400 py-1">{m.content}</p>;
                   }
-                  const readByCustomer = !!(thread?.lastReadByCustomerAt && mine && !m.pending && m.createdAt <= thread.lastReadByCustomerAt);
+                  const readByCustomer = !!(thread?.last_read_by_customer_at && mine && !m.pending && m.created_at <= thread.last_read_by_customer_at);
                   return (
-                    <div key={m.$id} className={`flex flex-col max-w-[78%] ${mine ? 'items-end ml-auto' : 'items-start'}`}>
+                    <div key={m.id} className={`flex flex-col max-w-[78%] ${mine ? 'items-end ml-auto' : 'items-start'}`}>
                       <div className={`flex flex-col gap-1.5 px-3.5 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${mine ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-md'}`}>
-                        {m.imageUrl && (
-                          <a href={m.imageUrl} target="_blank" rel="noopener noreferrer">
-                            <img src={m.imageUrl} alt="รูปที่ส่งในแชท" className="max-w-[200px] max-h-[200px] rounded-lg object-cover" />
+                        {m.image_url && (
+                          <a href={m.image_url} target="_blank" rel="noopener noreferrer">
+                            <img src={m.image_url} alt="รูปที่ส่งในแชท" className="max-w-[200px] max-h-[200px] rounded-lg object-cover" />
                           </a>
                         )}
                         {m.content && <span>{m.content}</span>}
                       </div>
-                      <small className="text-[10.5px] text-gray-400 mt-0.5">{mine ? m.senderName : ''} {timeShort(m.createdAt)}{m.pending ? ' · กำลังส่ง...' : readByCustomer ? ' · อ่านแล้ว' : ''}</small>
+                      <small className="text-[10.5px] text-gray-400 mt-0.5">{mine ? m.sender_name : ''} {timeShort(m.created_at)}{m.pending ? ' · กำลังส่ง...' : readByCustomer ? ' · อ่านแล้ว' : ''}</small>
                     </div>
                   );
                 })}

@@ -2,18 +2,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
 import { Icon } from './Icon';
 import { CallSession, type CallSessionState } from '@/lib/callSession';
 import { SUPPORT_CALLS_COMING_SOON, SUPPORT_CALLS_ENABLED, SUPPORT_CALLS_PREPARE_TEXT } from '@/lib/supportCallFeature';
 
-interface SupportMsg { $id: string; senderId: string; senderName: string; senderRole: 'customer' | 'staff' | 'system'; content: string; imageUrl?: string; createdAt: string; pending?: boolean }
+interface SupportMsg { id: string; sender_id: string; sender_name: string; sender_role: 'customer' | 'staff' | 'system'; content: string; image_url?: string; created_at: string; pending?: boolean }
 interface SupportThread {
-  $id: string; unreadCustomer: boolean;
-  callStatus: 'idle' | 'customer_requesting' | 'staff_ringing' | 'connecting' | 'active' | 'ended';
-  callId: string; callStaffName: string; callUpdatedAt: string;
-  lastReadByStaffAt: string;
+  customer_id: string; unread_customer: boolean;
+  call_status: 'idle' | 'customer_requesting' | 'staff_ringing' | 'connecting' | 'active' | 'ended';
+  call_id: string; call_staff_name: string; call_updated_at: string;
+  last_read_by_staff_at: string;
 }
 
 function timeShort(iso: string) {
@@ -49,7 +49,7 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionRef = useRef<CallSession | null>(null);
-  const jwtRef = useRef('');
+  const headersRef = useRef<Record<string, string> | null>(null);
   const handledCallIdRef = useRef('');
   const threadRef = useRef<SupportThread | null>(null);
   const callStateRef = useRef<CallSessionState | null>(null);
@@ -57,20 +57,21 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
   useEffect(() => { threadRef.current = thread; }, [thread]);
   useEffect(() => { callStateRef.current = callState; }, [callState]);
 
-  const getJwt = useCallback(async (forceFresh = false) => {
-    if (!forceFresh && jwtRef.current) return jwtRef.current;
-    const j = (await account.createJWT()).jwt;
-    jwtRef.current = j;
-    return j;
+  const getAuthHeaders = useCallback(async (forceFresh = false) => {
+    if (forceFresh) await supabase.auth.refreshSession().catch(() => null);
+    if (!forceFresh && headersRef.current) return headersRef.current;
+    const h = await authHeaders();
+    headersRef.current = h;
+    return h;
   }, []);
 
   const loadThread = useCallback(async (markOpen: boolean) => {
     try {
-      let jwt = await getJwt();
-      let r = await fetch(`/api/support${markOpen ? '?open=1' : ''}`, { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+      let headers = await getAuthHeaders();
+      let r = await fetch(`/api/support${markOpen ? '?open=1' : ''}`, { headers, cache: 'no-store' });
       if (r.status === 401) {
-        jwt = await getJwt(true);
-        r = await fetch(`/api/support${markOpen ? '?open=1' : ''}`, { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+        headers = await getAuthHeaders(true);
+        r = await fetch(`/api/support${markOpen ? '?open=1' : ''}`, { headers, cache: 'no-store' });
       }
       if (r.status === 401) { setAuthed(false); return; }
       if (!r.ok) return;
@@ -79,12 +80,14 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
       setThread(d.thread || null);
       setMsgs(d.messages || []);
     } catch { /* network — ลองใหม่รอบถัดไป */ }
-  }, [getJwt]);
+  }, [getAuthHeaders]);
 
   // ตรวจสถานะล็อกอินครั้งแรก แต่ยังไม่โหลด thread จนกว่าผู้ใช้จะเปิด widget จริง
   useEffect(() => {
     const t = window.setTimeout(() => {
-      account.get().then(u => { setMyId(u.$id); setAuthed(true); }).catch(() => setAuthed(false));
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) { setMyId(user.id); setAuthed(true); } else setAuthed(false);
+      }).catch(() => setAuthed(false));
     }, 0);
     return () => window.clearTimeout(t);
   }, []);
@@ -114,17 +117,17 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  const unread = !!thread?.unreadCustomer;
-  const ringing = thread?.callStatus === 'staff_ringing';
+  const unread = !!thread?.unread_customer;
+  const ringing = thread?.call_status === 'staff_ringing';
   const callFeatureLocked = !SUPPORT_CALLS_ENABLED;
   const elapsed = callStartedAt ? Math.max(0, Math.floor((nowTs - callStartedAt) / 1000)) : 0;
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
 
   const reportDebug = useCallback((hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) => {
-    const send = (jwt: string) => fetch('/api/support/debug', {
+    const send = (headers: Record<string, string>) => fetch('/api/support/debug', {
       method: 'POST',
-      headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId: 'support-call-fail',
         runId: 'pre-fix',
@@ -133,20 +136,20 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
         msg,
         data,
         ts: Date.now(),
-        callId: threadRef.current?.callId || '',
+        callId: threadRef.current?.call_id || '',
       }),
     }).catch(() => null);
-    const jwt = jwtRef.current;
-    if (jwt) {
-      void send(jwt);
+    const headers = headersRef.current;
+    if (headers) {
+      void send(headers);
       return;
     }
-    void getJwt().then(send).catch(() => null);
-  }, [getJwt]);
+    void getAuthHeaders().then(send).catch(() => null);
+  }, [getAuthHeaders]);
 
   const getIceServers = useCallback(async () => {
-    const jwt = jwtRef.current || await getJwt();
-    const r = await fetch('/api/support/ice', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+    const headers = headersRef.current || await getAuthHeaders();
+    const r = await fetch('/api/support/ice', { headers, cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
     reportDebug('A', 'src/components/SupportWidget.tsx:getIceServers', '[DEBUG] customer getIceServers', {
       ok: r.ok,
@@ -161,13 +164,13 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
         : [],
     });
     return Array.isArray(d.iceServers) ? d.iceServers : [];
-  }, [getJwt, reportDebug]);
+  }, [getAuthHeaders, reportDebug]);
 
   const callAction = useCallback(async (action: string) => {
     try {
-      const jwt = jwtRef.current || await getJwt();
+      const headers = headersRef.current || await getAuthHeaders();
       const r = await fetch('/api/support/call', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ action }),
       });
       const d = await r.json().catch(() => ({}));
@@ -176,14 +179,14 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
         ok: r.ok,
         status: r.status,
         response: d,
-        threadStatus: threadRef.current?.callStatus || '',
-        threadCallId: threadRef.current?.callId || '',
+        threadStatus: threadRef.current?.call_status || '',
+        threadCallId: threadRef.current?.call_id || '',
       });
       void loadThread(open);
       return d as { callId?: string };
     } catch { /* แสดงผลรอบโพลถัดไป */ }
     return {};
-  }, [getJwt, loadThread, open, reportDebug]);
+  }, [getAuthHeaders, loadThread, open, reportDebug]);
 
   useEffect(() => {
     if (!callStartedAt) {
@@ -195,8 +198,8 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
   }, [callStartedAt]);
 
   useEffect(() => {
-    const status = thread?.callStatus;
-    const callId = thread?.callId || '';
+    const status = thread?.call_status;
+    const callId = thread?.call_id || '';
     if (callFeatureLocked) {
       if (sessionRef.current) {
         sessionRef.current.stop(false);
@@ -223,7 +226,7 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
         isOfferer: false,
         callId,
         signalUrl: '/api/support/signal',
-        getJwt,
+        getAuthHeaders,
         getIceServers,
         onState: (s) => {
           setCallState(s);
@@ -246,7 +249,7 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
       setCallStartedAt(null);
       setMuted(false);
     }
-  }, [thread?.callStatus, thread?.callId, getJwt, getIceServers, callAction, reportDebug, callFeatureLocked]);
+  }, [thread?.call_status, thread?.call_id, getAuthHeaders, getIceServers, callAction, reportDebug, callFeatureLocked]);
 
   useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 
@@ -255,12 +258,12 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
     if (!content || sending) return;
     const tempId = `tmp-${Date.now()}`;
     const tempMsg: SupportMsg = {
-      $id: tempId,
-      senderId: myId,
-      senderName: 'คุณ',
-      senderRole: 'customer',
+      id: tempId,
+      sender_id: myId,
+      sender_name: 'คุณ',
+      sender_role: 'customer',
       content,
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
       pending: true,
     };
     setMsgs(prev => [...prev, tempMsg]);
@@ -268,21 +271,21 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     setSending(true);
     try {
-      const jwt = jwtRef.current || await getJwt();
+      const headers = headersRef.current || await getAuthHeaders();
       const r = await fetch('/api/support', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ content }),
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.message) {
-        setMsgs(prev => prev.map(m => m.$id === tempId ? d.message : m));
+        setMsgs(prev => prev.map(m => m.id === tempId ? d.message : m));
         void loadThread(true);
       } else {
-        setMsgs(prev => prev.filter(m => m.$id !== tempId));
+        setMsgs(prev => prev.filter(m => m.id !== tempId));
         setInput(content);
       }
     } catch {
-      setMsgs(prev => prev.filter(m => m.$id !== tempId));
+      setMsgs(prev => prev.filter(m => m.id !== tempId));
       setInput(content);
     } finally { setSending(false); }
   }
@@ -294,15 +297,15 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
     if (!file.type.startsWith('image/')) return;
     setUploading(true);
     try {
-      const jwt = jwtRef.current || await getJwt();
+      const headers = headersRef.current || await getAuthHeaders();
       const prepared = await compressImage(file); // บีบอัดรูปก่อนส่ง กันไฟล์ใหญ่เกินลิมิต body ของ API route บน Vercel
       const fd = new FormData();
       fd.append('file', prepared);
-      const up = await fetch('/api/support/upload', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd, cache: 'no-store' });
+      const up = await fetch('/api/support/upload', { method: 'POST', headers, body: fd, cache: 'no-store' });
       const upData = await up.json().catch(() => ({}));
       if (!up.ok || !upData.url) { alert(upData.error || 'อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
       const r = await fetch('/api/support', {
-        method: 'POST', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, cache: 'no-store',
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ content: '', imageUrl: upData.url, mimeType: upData.mimeType }),
       });
       const d = await r.json().catch(() => ({}));
@@ -352,7 +355,7 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
                     <span><Icon name="phone" size={16} /> {SUPPORT_CALLS_PREPARE_TEXT} · {SUPPORT_CALLS_COMING_SOON}</span>
                   </div>
                 )}
-                {!callFeatureLocked && thread?.callStatus === 'customer_requesting' && (
+                {!callFeatureLocked && thread?.call_status === 'customer_requesting' && (
                   <div className="sw-callbar pending" role="status">
                     <span><Icon name="phone" size={16} /> กำลังขอให้พนักงานโทรกลับ…</span>
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => callAction('cancel')}>ยกเลิก</button>
@@ -360,20 +363,20 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
                 )}
                 {!callFeatureLocked && ringing && (
                   <div className="sw-callbar ring" role="alert">
-                    <span><Icon name="phone" size={16} /> พนักงาน{thread?.callStaffName ? ` ${thread.callStaffName}` : ''}กำลังโทรเข้า</span>
+                    <span><Icon name="phone" size={16} /> พนักงาน{thread?.call_staff_name ? ` ${thread.call_staff_name}` : ''}กำลังโทรเข้า</span>
                     <span className="sw-callbtns">
                       <button type="button" className="sw-roundbtn accept" onClick={() => callAction('answer')} aria-label="รับสาย"><Icon name="phoneCall" size={18} /></button>
                       <button type="button" className="sw-roundbtn decline" onClick={() => callAction('decline')} aria-label="ปฏิเสธสาย"><Icon name="phoneOff" size={18} /></button>
                     </span>
                   </div>
                 )}
-                {!callFeatureLocked && thread?.callStatus === 'connecting' && (
+                {!callFeatureLocked && thread?.call_status === 'connecting' && (
                   <div className="sw-callbar active" role="status">
                     <span><Icon name="phone" size={16} /> {callState === 'failed' ? 'เชื่อมต่อไม่สำเร็จ' : 'กำลังเชื่อมต่อสาย…'}</span>
                     <button type="button" className="sw-roundbtn decline" onClick={() => callAction('hangup')} aria-label="วางสาย"><Icon name="phoneOff" size={18} /></button>
                   </div>
                 )}
-                {!callFeatureLocked && (thread?.callStatus === 'active' || callState === 'active') && (
+                {!callFeatureLocked && (thread?.call_status === 'active' || callState === 'active') && (
                   <div className="sw-callbar active" role="status">
                     <span><Icon name="phone" size={16} /> สายกำลังคุยอยู่ · {mm}:{ss}</span>
                     <span className="sw-callbtns">
@@ -390,23 +393,23 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
                     <p className="sw-empty">สวัสดีครับ/ค่ะ มีอะไรให้ทีมงานช่วยไหม? พิมพ์คำถามได้เลย{callFeatureLocked ? ` ตอนนี้ระบบโทรอยู่ระหว่างเตรียมเปิดใช้งาน (${SUPPORT_CALLS_COMING_SOON})` : ' หรือกดโทรศัพท์ด้านบนเพื่อขอให้พนักงานโทรกลับ'}</p>
                   )}
                   {msgs.map(m => {
-                    const mine = m.senderRole !== 'staff';
-                    const readByStaff = !!(thread?.lastReadByStaffAt && mine && m.senderRole === 'customer' && !m.pending && m.createdAt <= thread.lastReadByStaffAt);
+                    const mine = m.sender_role !== 'staff';
+                    const readByStaff = !!(thread?.last_read_by_staff_at && mine && m.sender_role === 'customer' && !m.pending && m.created_at <= thread.last_read_by_staff_at);
                     return (
-                      <div key={m.$id} className={`sw-row ${mine ? 'mine' : ''} ${m.senderRole === 'system' ? 'sys' : ''}`}>
-                        {m.senderRole === 'system' ? (
+                      <div key={m.id} className={`sw-row ${mine ? 'mine' : ''} ${m.sender_role === 'system' ? 'sys' : ''}`}>
+                        {m.sender_role === 'system' ? (
                           <div className="sw-sys">{m.content}</div>
                         ) : (
                           <>
                             <div className={`sw-bubble ${mine ? 'mine' : ''}`}>
-                              {m.imageUrl && (
-                                <a href={m.imageUrl} target="_blank" rel="noopener noreferrer">
-                                  <img src={m.imageUrl} alt="รูปที่ส่งในแชท" className="sw-img" />
+                              {m.image_url && (
+                                <a href={m.image_url} target="_blank" rel="noopener noreferrer">
+                                  <img src={m.image_url} alt="รูปที่ส่งในแชท" className="sw-img" />
                                 </a>
                               )}
                               {m.content && <span>{m.content}</span>}
                             </div>
-                            <small>{m.senderRole === 'staff' ? `${m.senderName} · ` : ''}{timeShort(m.createdAt)}{m.pending ? ' · กำลังส่ง...' : readByStaff ? ' · อ่านแล้ว' : ''}</small>
+                            <small>{m.sender_role === 'staff' ? `${m.sender_name} · ` : ''}{timeShort(m.created_at)}{m.pending ? ' · กำลังส่ง...' : readByStaff ? ' · อ่านแล้ว' : ''}</small>
                           </>
                         )}
                       </div>
@@ -430,7 +433,7 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
                   <button
                     type="button" className="sw-iconbtn call" aria-label={callFeatureLocked ? `ระบบโทร ${SUPPORT_CALLS_COMING_SOON}` : 'ขอให้พนักงานโทรกลับ'}
                     title={callFeatureLocked ? `${SUPPORT_CALLS_PREPARE_TEXT} (${SUPPORT_CALLS_COMING_SOON})` : undefined}
-                    disabled={callFeatureLocked || (!!thread && thread.callStatus !== 'idle' && thread.callStatus !== 'ended')}
+                    disabled={callFeatureLocked || (!!thread && thread.call_status !== 'idle' && thread.call_status !== 'ended')}
                     onClick={() => { if (!callFeatureLocked) void callAction('request'); }}
                   >
                     <Icon name="phoneCall" size={18} />

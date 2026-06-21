@@ -1,44 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Account, Client, Databases, ID } from 'node-appwrite';
-import { DB_ID, COL_SIGNALS, ensureSupportCollections } from '../../_lib/support';
-
-function getAdmin() {
-  const c = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return new Databases(c);
-}
-
-async function getMe(req: NextRequest) {
-  const jwt = req.headers.get('x-session-jwt');
-  if (!jwt) throw Object.assign(new Error('Unauthorized'), { status: 401 });
-  const c = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setJWT(jwt);
-  return new Account(c).get();
-}
+import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
 
 export async function POST(req: NextRequest) {
   try {
-    const me = await getMe(req);
+    const me = await verifyUser(req);
     const body = await req.json().catch(() => ({}));
-    const db = getAdmin();
-    await ensureSupportCollections(db);
+    const db = getAdminClient();
 
-    const payload = JSON.stringify({
-      ...body,
-      actorId: me.$id,
-    }).slice(0, 8000);
+    const payload = { ...body, actorId: me.id };
 
-    await db.createDocument(DB_ID, COL_SIGNALS, ID.unique(), {
-      threadId: me.$id,
-      callId: 'debug',
-      fromRole: 'customer',
+    await db.from('call_signals').insert({
+      thread_id: me.id,
+      call_id: 'debug',
+      from_role: 'customer',
       type: 'debug',
       data: payload,
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     });
 
     return NextResponse.json({ ok: true });

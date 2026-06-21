@@ -2,26 +2,26 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { MapPin, Loader2, CheckCircle2, ExternalLink, RotateCcw, XCircle } from 'lucide-react';
 
 interface Job {
-  $id: string;
-  itemDescription: string;
-  itemPrice?: string;
-  maxBudget?: string;
+  id: string;
+  item_description: string;
+  item_price?: string;
+  max_budget?: string;
   status: string;
-  buyerName?: string;
-  sellerProvince?: string;
-  sellerLocation?: string;
-  middlemanName?: string;
-  middlemanTier?: string;
-  middlemanDeposit?: string;
-  travelFee?: string;
-  serviceFee?: string;
-  estimatedArrival?: string;
-  reportNotes?: string;
-  $createdAt: string;
+  buyer_name?: string;
+  seller_province?: string;
+  seller_location?: string;
+  middleman_name?: string;
+  middleman_tier?: string;
+  middleman_deposit?: string;
+  travel_fee?: string;
+  service_fee?: string;
+  estimated_arrival?: string;
+  report_notes?: string;
+  created_at: string;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -49,8 +49,8 @@ export default function AdminOnsiteJobs() {
   const load = useCallback(async (filter: string) => {
     setJobs(null);
     try {
-      const jwt = (await account.createJWT()).jwt;
-      const r = await fetch(`/api/admin/onsite-jobs?filter=${filter}`, { headers: { 'x-session-jwt': jwt } });
+      const headers = await authHeaders();
+      const r = await fetch(`/api/admin/onsite-jobs?filter=${filter}`, { headers });
       const d = await r.json();
       setJobs(d.documents || []);
     } catch { setJobs([]); }
@@ -66,10 +66,10 @@ export default function AdminOnsiteJobs() {
     if (note === null) return;
     setActing(id);
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const r = await fetch('/api/admin/onsite-jobs', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action, note }),
       });
       if (r.ok) load(tab);
@@ -103,44 +103,44 @@ export default function AdminOnsiteJobs() {
           const st = STATUS_LABEL[j.status] || { label: j.status, cls: 'bg-gray-100 text-gray-600' };
           const canCancel = !['completed', 'cancelled'].includes(j.status);
           return (
-            <div key={j.$id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+            <div key={j.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.label}</span>
-                    {j.sellerProvince && <span className="text-xs text-gray-400">📍 {j.sellerProvince}</span>}
-                    {Number(j.maxBudget) > 0 && <span className="font-mono text-sm font-bold text-green-600">งบ ฿{Number(j.maxBudget).toLocaleString()}</span>}
+                    {j.seller_province && <span className="text-xs text-gray-400">📍 {j.seller_province}</span>}
+                    {Number(j.max_budget) > 0 && <span className="font-mono text-sm font-bold text-green-600">งบ ฿{Number(j.max_budget).toLocaleString()}</span>}
                   </div>
-                  <p className="font-semibold mt-1 text-gray-900 dark:text-gray-100">{j.itemDescription}</p>
+                  <p className="font-semibold mt-1 text-gray-900 dark:text-gray-100">{j.item_description}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    ผู้ว่าจ้าง: {j.buyerName || '-'}{j.middlemanName ? ` · คนกลาง: ${j.middlemanName}${j.middlemanTier ? ` (${j.middlemanTier})` : ''}` : ' · ยังไม่มีคนกลางรับงาน'}
+                    ผู้ว่าจ้าง: {j.buyer_name || '-'}{j.middleman_name ? ` · คนกลาง: ${j.middleman_name}${j.middleman_tier ? ` (${j.middleman_tier})` : ''}` : ' · ยังไม่มีคนกลางรับงาน'}
                   </p>
-                  {(Number(j.middlemanDeposit) > 0 || Number(j.travelFee) > 0 || Number(j.serviceFee) > 0) && (
+                  {(Number(j.middleman_deposit) > 0 || Number(j.travel_fee) > 0 || Number(j.service_fee) > 0) && (
                     <p className="text-xs text-gray-400 mt-1">
-                      มัดจำคนกลาง ฿{Number(j.middlemanDeposit || 0).toLocaleString()} · ค่าเดินทาง ฿{Number(j.travelFee || 0).toLocaleString()} · ค่าบริการ ฿{Number(j.serviceFee || 0).toLocaleString()}
+                      มัดจำคนกลาง ฿{Number(j.middleman_deposit || 0).toLocaleString()} · ค่าเดินทาง ฿{Number(j.travel_fee || 0).toLocaleString()} · ค่าบริการ ฿{Number(j.service_fee || 0).toLocaleString()}
                     </p>
                   )}
-                  {j.reportNotes && <p className="text-xs text-gray-500 mt-1">📝 {j.reportNotes}</p>}
+                  {j.report_notes && <p className="text-xs text-gray-500 mt-1">📝 {j.report_notes}</p>}
                 </div>
-                <Link href={`/onsite/${j.$id}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">
+                <Link href={`/onsite/${j.id}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">
                   <ExternalLink size={12} /> เปิดงาน
                 </Link>
               </div>
 
               <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {canCancel && (
-                  <button onClick={() => act(j.$id, 'cancel', 'เหตุผลยกเลิกงาน + คืนเงินผู้ว่าจ้าง:')} disabled={!!acting}
+                  <button onClick={() => act(j.id, 'cancel', 'เหตุผลยกเลิกงาน + คืนเงินผู้ว่าจ้าง:')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 disabled:opacity-50">
-                    {acting === j.$id ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />} ยกเลิก + คืนเงิน
+                    {acting === j.id ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />} ยกเลิก + คืนเงิน
                   </button>
                 )}
                 {j.status === 'in_progress' && (
-                  <button onClick={() => act(j.$id, 'complete', 'หมายเหตุการปิดงานแทน (เช่น เหตุผล/ข้อสรุป):')} disabled={!!acting}
+                  <button onClick={() => act(j.id, 'complete', 'หมายเหตุการปิดงานแทน (เช่น เหตุผล/ข้อสรุป):')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 flex items-center gap-1 disabled:opacity-50">
-                    {acting === j.$id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ปิดงานแทน
+                    {acting === j.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ปิดงานแทน
                   </button>
                 )}
-                <button onClick={() => act(j.$id, 'mark_refunded', 'หมายเหตุการคืนมัดจำ (เช่น เลขอ้างอิงการโอน):')} disabled={!!acting}
+                <button onClick={() => act(j.id, 'mark_refunded', 'หมายเหตุการคืนมัดจำ (เช่น เลขอ้างอิงการโอน):')} disabled={!!acting}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
                   <RotateCcw size={14} /> บันทึกคืนมัดจำ
                 </button>

@@ -1,10 +1,10 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { Icon } from './Icon';
 
-interface Noti { $id: string; title: string; body: string; link: string; read: boolean; createdAt: string }
+interface Noti { id: string; title: string; body: string; link: string; read: boolean; created_at: string }
 
 function timeAgo(iso: string) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -24,8 +24,8 @@ export function NotifyBell() {
 
   const load = useCallback(async () => {
     try {
-      const jwt = (await account.createJWT()).jwt;
-      const r = await fetch('/api/notifications', { headers: { 'x-session-jwt': jwt } });
+      const headers = await authHeaders();
+      const r = await fetch('/api/notifications', { headers });
       if (!r.ok) return;
       const d = await r.json();
       setItems(d.notifications || []);
@@ -57,11 +57,11 @@ export function NotifyBell() {
   async function openItem(n: Noti) {
     setOpen(false);
     if (!n.read) {
-      setItems(prev => prev.map(i => (i.$id === n.$id ? { ...i, read: true } : i)));
+      setItems(prev => prev.map(i => (i.id === n.id ? { ...i, read: true } : i)));
       setUnread(u => Math.max(0, u - 1));
       try {
-        const jwt = (await account.createJWT()).jwt;
-        fetch('/api/notifications', { method: 'PATCH', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.$id }) }).catch(() => {});
+        const headers = await authHeaders();
+        fetch('/api/notifications', { method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id }) }).catch(() => {});
       } catch {}
     }
     if (n.link) router.push(n.link);
@@ -71,8 +71,8 @@ export function NotifyBell() {
     setItems(prev => prev.map(i => ({ ...i, read: true })));
     setUnread(0);
     try {
-      const jwt = (await account.createJWT()).jwt;
-      fetch('/api/notifications', { method: 'PATCH', headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) }).catch(() => {});
+      const headers = await authHeaders();
+      fetch('/api/notifications', { method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) }).catch(() => {});
     } catch {}
   }
 
@@ -102,12 +102,12 @@ export function NotifyBell() {
               </div>
             )}
             {items.map(n => (
-              <button key={n.$id} type="button" className={`nb-item ${n.read ? '' : 'unread'}`} onClick={() => openItem(n)}>
+              <button key={n.id} type="button" className={`nb-item ${n.read ? '' : 'unread'}`} onClick={() => openItem(n)}>
                 <span className={`nb-dot ${n.read ? '' : 'on'}`} />
                 <span className="nb-tx">
                   <b>{n.title}</b>
                   <span>{n.body}</span>
-                  <small>{timeAgo(n.createdAt)}ที่แล้ว</small>
+                  <small>{timeAgo(n.created_at)}ที่แล้ว</small>
                 </span>
               </button>
             ))}

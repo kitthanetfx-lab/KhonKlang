@@ -2,7 +2,7 @@
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { RATE_PER_KM } from '@/lib/provinceGeo';
@@ -42,7 +42,7 @@ function MeetupInner() {
     if (!myAddr.province || !myAddr.amphoe || !myAddr.tambon) { setError('กรุณาเลือกที่อยู่ของคุณให้ครบถึงระดับตำบล'); return; }
     setCreating(true); setError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       // v2: เก็บเฉพาะที่อยู่ของฝ่ายผู้สร้าง — อีกฝ่ายมากรอกที่อยู่ตัวเองในห้องดีล
       // จุดนัดพบ + ยอดประกัน ไปตกลงกัน (เสนอ-ยอมรับ) ในห้องดีล
       const meetupData = JSON.stringify({
@@ -53,7 +53,7 @@ function MeetupInner() {
       });
       const res = await fetch('/api/deals', {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: `นัดรับ+ประกันเดินทาง: ${title.trim()}`,
           description: `ฝั่ง${myRole === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}: ${addressLabel(myAddr)} — จุดนัดพบและยอดประกันตกลงกันในห้องดีล`,
@@ -69,7 +69,7 @@ function MeetupInner() {
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || 'สร้างดีลไม่สำเร็จ'); return; }
-      router.push(`/deal/${d.deal.$id}`);
+      router.push(`/deal/${d.deal.id}`);
     } catch {
       router.push(`/login?returnTo=${encodeURIComponent('/service/meetup')}`);
     } finally { setCreating(false); }

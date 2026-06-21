@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { PageShell } from '@/components/PageShell';
 import { Icon } from '@/components/Icon';
 
@@ -26,7 +26,7 @@ interface MyDeal {
   createdAt: string; myRole: string;
   lastMsg: { content: string; type: string; senderName: string; role: string; createdAt: string } | null;
 }
-interface MyWanted { $id: string; title: string; budgetMin: number; budgetMax: number; buyMode: string; status: string; createdAt: string }
+interface MyWanted { id: string; title: string; budget_min: number; budget_max: number; buy_mode: string; status: string; created_at: string }
 
 function timeAgo(iso: string) {
   if (!iso) return '';
@@ -54,30 +54,34 @@ export default function OrdersPage() {
 
   useEffect(() => {
     (async () => {
+      const headers = await authHeaders();
+      if (!headers.Authorization) {
+        router.push(`/login?returnTo=${encodeURIComponent('/orders')}`);
+        return;
+      }
       try {
-        const jwt = (await account.createJWT()).jwt;
         const [dr, wr] = await Promise.all([
-          fetch('/api/my-deals', { headers: { 'x-session-jwt': jwt } }),
-          fetch('/api/wanted?mine=1', { headers: { 'x-session-jwt': jwt } }),
+          fetch('/api/my-deals', { headers }),
+          fetch('/api/wanted?mine=1', { headers }),
         ]);
         if (dr.ok) { const d = await dr.json(); setDeals(d.deals || []); }
         else setError('โหลดข้อมูลไม่สำเร็จ');
         if (wr.ok) { const w = await wr.json(); setWanted(w.posts || []); }
       } catch {
-        router.push(`/login?returnTo=${encodeURIComponent('/orders')}`);
+        setError('โหลดข้อมูลไม่สำเร็จ');
       }
     })();
   }, [router]);
 
   async function toggleWanted(id: string, action: 'close' | 'reopen') {
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const r = await fetch('/api/wanted', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action }),
       });
-      if (r.ok) setWanted(prev => prev.map(p => (p.$id === id ? { ...p, status: action === 'close' ? 'closed' : 'open' } : p)));
+      if (r.ok) setWanted(prev => prev.map(p => (p.id === id ? { ...p, status: action === 'close' ? 'closed' : 'open' } : p)));
     } catch {}
   }
 
@@ -158,17 +162,17 @@ export default function OrdersPage() {
           <h2 style={{ fontSize: 19, margin: '36px 0 14px' }}>📢 ประกาศหาสินค้าของฉัน</h2>
           <div style={{ display: 'grid', gap: 10 }}>
             {wanted.map(p => (
-              <div key={p.$id} className="od-card" style={{ padding: '14px 18px' }}>
+              <div key={p.id} className="od-card" style={{ padding: '14px 18px' }}>
                 <div className="od-head">
                   <span className={`badge ${p.status === 'open' ? 'badge-green' : 'badge-gray'}`}>{p.status === 'open' ? 'เปิดอยู่' : 'ปิดแล้ว'}</span>
-                  <span style={{ fontSize: 12, color: 'var(--faint)' }}>{timeAgo(p.createdAt)}</span>
+                  <span style={{ fontSize: 12, color: 'var(--faint)' }}>{timeAgo(p.created_at)}</span>
                 </div>
                 <h3 className="od-title" style={{ fontSize: 15 }}>{p.title}</h3>
                 <div className="od-actions" style={{ marginTop: 10, paddingTop: 10 }}>
                   <Link className="btn btn-ghost btn-sm" href="/wanted">ดูหน้าประกาศหา</Link>
                   {p.status === 'open'
-                    ? <button className="btn btn-ghost btn-sm" onClick={() => toggleWanted(p.$id, 'close')}><Icon name="check" size={14} /> ปิดประกาศ</button>
-                    : <button className="btn btn-soft btn-sm" onClick={() => toggleWanted(p.$id, 'reopen')}><Icon name="refresh" size={14} /> เปิดประกาศอีกครั้ง</button>}
+                    ? <button className="btn btn-ghost btn-sm" onClick={() => toggleWanted(p.id, 'close')}><Icon name="check" size={14} /> ปิดประกาศ</button>
+                    : <button className="btn btn-soft btn-sm" onClick={() => toggleWanted(p.id, 'reopen')}><Icon name="refresh" size={14} /> เปิดประกาศอีกครั้ง</button>}
                 </div>
               </div>
             ))}

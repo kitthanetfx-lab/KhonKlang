@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases, ID } from 'node-appwrite';
 import { verifyAdmin, getAdminClient } from '../../_lib';
-import { DB_ID, COL_SIGNALS, ensureSupportCollections, listSignalsSince } from '../../../_lib/support';
+import { listSignalsSince } from '../../../_lib/support';
 
 /** GET — พนักงานโพลสัญญาณ WebRTC ใหม่ ๆ ของสายที่กำลังคุยอยู่ */
 export async function GET(req: NextRequest) {
@@ -11,10 +10,9 @@ export async function GET(req: NextRequest) {
     const callId = sp.get('callId') || '';
     const since = sp.get('since') || '';
     if (!callId) return NextResponse.json({ signals: [] });
-    const db = new Databases(getAdminClient());
-    await ensureSupportCollections(db);
+    const db = getAdminClient();
     const signals = await listSignalsSince(db, callId, since);
-    return NextResponse.json({ signals: signals.filter(s => s.fromRole !== 'staff') });
+    return NextResponse.json({ signals: signals.filter((s) => s.from_role !== 'staff') });
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status || 500;
     return NextResponse.json({ error: String((err as Error)?.message || err) }, { status });
@@ -29,14 +27,14 @@ export async function POST(req: NextRequest) {
     const customerId = String(body.customerId || '');
     const callId = String(body.callId || '');
     const type = String(body.type || '');
-    const data = String(body.data || '').slice(0, 8000);
+    const data = body.data ?? {};
     if (!customerId || !callId || !type) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
 
-    const db = new Databases(getAdminClient());
-    await ensureSupportCollections(db);
-    await db.createDocument(DB_ID, COL_SIGNALS, ID.unique(), {
-      threadId: customerId, callId, fromRole: 'staff', type, data, createdAt: new Date().toISOString(),
+    const db = getAdminClient();
+    const { error } = await db.from('call_signals').insert({
+      thread_id: customerId, call_id: callId, from_role: 'staff', type, data, created_at: new Date().toISOString(),
     });
+    if (error) throw new Error(error.message);
     return NextResponse.json({ ok: true, staffId });
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status || 500;

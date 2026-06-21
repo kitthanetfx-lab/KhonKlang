@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
@@ -46,15 +46,15 @@ export default function CreateOnsiteJob() {
     }
     setLoading(true); setError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const res = await fetch('/api/onsite-jobs', {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemDescription, itemPrice, sellerLocation, sellerProvince, sellerContact, maxBudget }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'เกิดข้อผิดพลาด'); return; }
-      router.push(`/onsite/${data.job.$id}`);
+      router.push(`/onsite/${data.job.id}`);
     } catch { setError('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
     finally { setLoading(false); }
   }

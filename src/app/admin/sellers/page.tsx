@@ -5,35 +5,35 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
-import { account, fileViewUrl } from '@/lib/appwrite';
+import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import {
   Search, CheckCircle2, XCircle, Eye,
   Store, RefreshCw, FileText, Download,
 } from 'lucide-react';
 
 interface SellerApp {
-  $id: string;
-  userId: string;
-  fullNameId: string;
-  idNumber: string;
-  sellerType: string;
+  id: string;
+  user_id: string;
+  full_name_id: string;
+  id_number: string;
+  seller_type: string;
   province: string;
   address: string;
-  onlineLink: string;
-  companyName: string;
-  companyRegNum: string;
-  bankAcct: string;
-  bankName: string;
-  bankOwner: string;
-  companyBankAcct: string;
-  companyBankName: string;
-  idCardFileId: string;
-  companyCertFileId: string;
-  bookbankFileId: string;
-  slipFileId: string;
+  online_link: string;
+  company_name: string;
+  company_reg_num: string;
+  bank_acct: string;
+  bank_name: string;
+  bank_owner: string;
+  company_bank_acct: string;
+  company_bank_name: string;
+  id_card_file_id: string;
+  company_cert_file_id: string;
+  bookbank_file_id: string;
+  slip_file_id: string;
   status: string;
-  rejectReason?: string;
-  $createdAt: string;
+  reject_reason?: string;
+  created_at: string;
 }
 
 const STATUS_TABS = [
@@ -100,8 +100,8 @@ function Row({ k, v, multiline }: { k: string; v: string; multiline?: boolean })
 function FileCard({ label, fileId }: { label: string; fileId: string }) {
   const [imgOk, setImgOk] = useState(true);
   if (!fileId) return null;
-  const url   = fileViewUrl(fileId);
-  const dlUrl = fileViewUrl(fileId) + '&output=attachment';
+  const url   = fileViewUrl(DEAL_BUCKET, fileId);
+  const dlUrl = url;
   return (
     <div className="px-4 py-3 space-y-2">
       <div className="flex items-center justify-between">
@@ -150,7 +150,7 @@ function DetailPanel({ app, onClose, onAction }: {
 
   const handle = async (action: 'approve' | 'reject') => {
     setActing(true);
-    await onAction(app.$id, action, action === 'reject' ? reason : undefined);
+    await onAction(app.id, action, action === 'reject' ? reason : undefined);
     setActing(false);
     setShowReject(false);
   };
@@ -169,51 +169,51 @@ function DetailPanel({ app, onClose, onAction }: {
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           <div className="flex items-center gap-3">
             <StatusBadge status={app.status} />
-            <span className="text-xs text-gray-400">{formatDate(app.$createdAt)}</span>
+            <span className="text-xs text-gray-400">{formatDate(app.created_at)}</span>
           </div>
 
           <Section label="ข้อมูลส่วนตัว">
-            <Row k="ชื่อ-นามสกุล"    v={app.fullNameId} />
-            <Row k="เลขบัตรประชาชน"  v={maskId(app.idNumber)} />
-            <Row k="ประเภทผู้ขาย"    v={SELLER_TYPE_LABEL[app.sellerType] ?? app.sellerType} />
+            <Row k="ชื่อ-นามสกุล"    v={app.full_name_id} />
+            <Row k="เลขบัตรประชาชน"  v={maskId(app.id_number)} />
+            <Row k="ประเภทผู้ขาย"    v={SELLER_TYPE_LABEL[app.seller_type] ?? app.seller_type} />
           </Section>
 
-          {app.sellerType === 'corporate' && (app.companyName || app.companyRegNum) && (
+          {app.seller_type === 'corporate' && (app.company_name || app.company_reg_num) && (
             <Section label="ข้อมูลบริษัท">
-              {app.companyName   && <Row k="ชื่อบริษัท"          v={app.companyName} />}
-              {app.companyRegNum && <Row k="เลขทะเบียนนิติบุคคล" v={maskId(app.companyRegNum)} />}
+              {app.company_name   && <Row k="ชื่อบริษัท"          v={app.company_name} />}
+              {app.company_reg_num && <Row k="เลขทะเบียนนิติบุคคล" v={maskId(app.company_reg_num)} />}
             </Section>
           )}
 
           <Section label="ที่อยู่และช่องทางขาย">
             <Row k="จังหวัด"          v={app.province} />
             <Row k="ที่อยู่"           v={app.address} multiline />
-            {app.onlineLink && <Row k="หน้าร้านออนไลน์" v={app.onlineLink} />}
+            {app.online_link && <Row k="หน้าร้านออนไลน์" v={app.online_link} />}
           </Section>
 
           <Section label="บัญชีธนาคาร">
-            <Row k="ธนาคาร"     v={app.bankName} />
-            <Row k="เลขที่บัญชี" v={app.bankAcct} />
-            <Row k="ชื่อบัญชี"   v={app.bankOwner} />
-            {app.companyBankAcct && (
+            <Row k="ธนาคาร"     v={app.bank_name} />
+            <Row k="เลขที่บัญชี" v={app.bank_acct} />
+            <Row k="ชื่อบัญชี"   v={app.bank_owner} />
+            {app.company_bank_acct && (
               <>
-                <Row k="บัญชีบริษัท (ธนาคาร)" v={app.companyBankName} />
-                <Row k="บัญชีบริษัท (เลข)"    v={app.companyBankAcct} />
+                <Row k="บัญชีบริษัท (ธนาคาร)" v={app.company_bank_name} />
+                <Row k="บัญชีบริษัท (เลข)"    v={app.company_bank_acct} />
               </>
             )}
           </Section>
 
           <Section label="เอกสารแนบ">
-            <FileCard label="บัตรประชาชน"         fileId={app.idCardFileId} />
-            <FileCard label="หนังสือรับรองบริษัท"  fileId={app.companyCertFileId} />
-            <FileCard label="สมุดบัญชีธนาคาร"      fileId={app.bookbankFileId} />
-            <FileCard label="สลิปโอนค่าสมัคร"      fileId={app.slipFileId} />
+            <FileCard label="บัตรประชาชน"         fileId={app.id_card_file_id} />
+            <FileCard label="หนังสือรับรองบริษัท"  fileId={app.company_cert_file_id} />
+            <FileCard label="สมุดบัญชีธนาคาร"      fileId={app.bookbank_file_id} />
+            <FileCard label="สลิปโอนค่าสมัคร"      fileId={app.slip_file_id} />
           </Section>
 
-          {app.rejectReason && (
+          {app.reject_reason && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
               <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">เหตุผลการปฏิเสธ</p>
-              <p className="text-sm text-red-700 dark:text-red-300">{app.rejectReason}</p>
+              <p className="text-sm text-red-700 dark:text-red-300">{app.reject_reason}</p>
             </div>
           )}
         </div>
@@ -266,42 +266,29 @@ function SellersContent() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [detail, setDetail]   = useState<SellerApp | null>(null);
-  const [jwt, setJwt]         = useState('');
 
   const statusFilter = searchParams.get('status') ?? '';
 
-  const load = useCallback(async (j?: string) => {
-    const token = j ?? jwt;
-    if (!token) return;
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
-      const res  = await fetch(`/api/admin/sellers?${params}`, { headers: { 'x-session-jwt': token } });
+      const headers = await authHeaders();
+      const res  = await fetch(`/api/admin/sellers?${params}`, { headers });
       const data = await res.json();
       setApps(data.documents ?? []);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [jwt, statusFilter]);
+  }, [statusFilter]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      const { jwt: j } = await account.createJWT().catch(() => ({ jwt: '' }));
-      if (!j || cancelled) return;
-      setJwt(j);
-      await load(j);
-    }, 0);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const handleAction = async (docId: string, action: 'approve' | 'reject', reason?: string) => {
+    const headers = await authHeaders();
     const res = await fetch('/api/admin/sellers', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ docId, action, reason }),
     });
     if (res.ok) { setDetail(null); load(); }
@@ -309,7 +296,7 @@ function SellersContent() {
 
   const filtered = apps.filter(a =>
     !search ||
-    a.fullNameId.toLowerCase().includes(search.toLowerCase()) ||
+    a.full_name_id.toLowerCase().includes(search.toLowerCase()) ||
     a.province?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -387,12 +374,12 @@ function SellersContent() {
                   <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">ไม่มีข้อมูล</td>
                 </tr>
               ) : filtered.map(app => (
-                <tr key={app.$id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                  <td className="px-5 py-3.5 font-medium">{app.fullNameId}</td>
-                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{SELLER_TYPE_LABEL[app.sellerType] ?? app.sellerType}</td>
+                <tr key={app.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                  <td className="px-5 py-3.5 font-medium">{app.full_name_id}</td>
+                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{SELLER_TYPE_LABEL[app.seller_type] ?? app.seller_type}</td>
                   <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.province || '—'}</td>
-                  <td className="px-4 py-3.5 font-mono text-xs text-gray-500">{maskId(app.idNumber)}</td>
-                  <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(app.$createdAt)}</td>
+                  <td className="px-4 py-3.5 font-mono text-xs text-gray-500">{maskId(app.id_number)}</td>
+                  <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(app.created_at)}</td>
                   <td className="px-4 py-3.5"><StatusBadge status={app.status} /></td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2 justify-end">
@@ -402,11 +389,11 @@ function SellersContent() {
                       </button>
                       {app.status === 'pending_review' && (
                         <>
-                          <button onClick={() => handleAction(app.$id, 'reject')}
+                          <button onClick={() => handleAction(app.id, 'reject')}
                             className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all">
                             ปฏิเสธ
                           </button>
-                          <button onClick={() => handleAction(app.$id, 'approve')}
+                          <button onClick={() => handleAction(app.id, 'approve')}
                             className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all">
                             อนุมัติ
                           </button>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { CheckCircle2, Loader2, SlidersHorizontal } from 'lucide-react';
 import {
   SERVICE_CONTROL_CATALOG,
@@ -20,8 +20,8 @@ export default function ServiceControlsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const jwt = (await account.createJWT()).jwt;
-        const r = await fetch('/api/admin/service-controls', { headers: { 'x-session-jwt': jwt } });
+        const headers = await authHeaders();
+        const r = await fetch('/api/admin/service-controls', { headers });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'โหลดสถานะบริการไม่สำเร็จ');
         setServices(sanitizeServiceControls(d.services));
@@ -47,10 +47,10 @@ export default function ServiceControlsPage() {
     setSaved(false);
     setError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const r = await fetch('/api/admin/service-controls', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ services }),
       });
       const d = await r.json();

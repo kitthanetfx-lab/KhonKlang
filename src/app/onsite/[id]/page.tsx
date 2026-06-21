@@ -1,22 +1,22 @@
 'use client';
 
 import { useEffect, useState, use, useCallback } from 'react';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface OnsiteJob {
-  $id: string;
-  buyerId: string; buyerName: string;
-  itemDescription: string; itemPrice: string;
-  sellerLocation: string; sellerProvince: string; sellerContact: string;
-  maxBudget: string; status: string;
-  middlemanId: string; middlemanName: string;
-  middlemanTier: string; middlemanDeposit: string;
-  travelFee: string; serviceFee: string;
-  estimatedArrival: string; conditions: string;
-  quotedAt: string; acceptedAt: string; startedAt: string;
-  completedAt: string; reportNotes: string; createdAt: string;
+  id: string;
+  buyer_id: string; buyer_name: string;
+  item_description: string; item_price: string;
+  seller_location: string; seller_province: string; seller_contact: string;
+  max_budget: string; status: string;
+  middleman_id: string; middleman_name: string;
+  middleman_tier: string; middleman_deposit: string;
+  travel_fee: string; service_fee: string;
+  estimated_arrival: string; conditions: string;
+  quoted_at: string; accepted_at: string; started_at: string;
+  completed_at: string; report_notes: string; created_at: string;
 }
 
 const STATUS_STEPS = [
@@ -58,12 +58,11 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
 
   const load = useCallback(async () => {
     try {
-      const user = await account.get();
-      setMyId(user.$id);
-      const jwt = (await account.createJWT()).jwt;
-      const res = await fetch(`/api/onsite-jobs/${id}`, {
-        headers: { 'x-session-jwt': jwt },
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.replace('/login'); return; }
+      setMyId(user.id);
+      const headers = await authHeaders();
+      const res = await fetch(`/api/onsite-jobs/${id}`, { headers });
       const data = await res.json();
       if (res.ok) setJob(data.job);
       else setError(data.error || 'โหลดไม่ได้');
@@ -79,10 +78,10 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
   async function doAction(action: string, extra: Record<string, string> = {}) {
     setActing(true); setError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const res = await fetch(`/api/onsite-jobs/${id}`, {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...extra }),
       });
       const data = await res.json();
@@ -102,11 +101,11 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
     </div>
   );
 
-  const isBuyer      = myId === job.buyerId;
-  const isMiddleman  = myId === job.middlemanId;
-  const totalFee     = Number(job.travelFee || 0) + Number(job.serviceFee || 0);
-  const totalPay     = Number(job.itemPrice || 0) + totalFee;
-  const depositAmt   = Number(job.middlemanDeposit || TIER_DEPOSIT[job.middlemanTier] || 1000);
+  const isBuyer      = myId === job.buyer_id;
+  const isMiddleman  = myId === job.middleman_id;
+  const totalFee     = Number(job.travel_fee || 0) + Number(job.service_fee || 0);
+  const totalPay     = Number(job.item_price || 0) + totalFee;
+  const depositAmt   = Number(job.middleman_deposit || TIER_DEPOSIT[job.middleman_tier] || 1000);
   const stepIdx      = STATUS_STEPS.findIndex(s => s.key === job.status);
 
   return (
@@ -114,7 +113,7 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
       {/* Header */}
       <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
         <button onClick={() => router.back()} className="text-gray-400 hover:text-white">←</button>
-        <h1 className="text-xl font-bold truncate">{job.itemDescription.slice(0, 40)}{job.itemDescription.length > 40 ? '...' : ''}</h1>
+        <h1 className="text-xl font-bold truncate">{job.item_description.slice(0, 40)}{job.item_description.length > 40 ? '...' : ''}</h1>
         <span className={`ml-auto text-xs px-2 py-1 rounded-full border whitespace-nowrap flex-shrink-0 ${STATUS_COLOR[job.status] || 'bg-gray-500/20 text-gray-300 border-gray-500/40'}`}>
           {STATUS_STEPS.find(s => s.key === job.status)?.label || job.status}
         </span>
@@ -154,32 +153,32 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
           <div className="space-y-2 text-sm">
             <div className="flex gap-2">
               <span className="text-gray-500 w-28 flex-shrink-0">สินค้า</span>
-              <span className="text-white">{job.itemDescription}</span>
+              <span className="text-white">{job.item_description}</span>
             </div>
-            {job.itemPrice && Number(job.itemPrice) > 0 && (
+            {job.item_price && Number(job.item_price) > 0 && (
               <div className="flex gap-2">
                 <span className="text-gray-500 w-28 flex-shrink-0">ราคาสินค้า</span>
-                <span className="text-green-400 font-semibold">{Number(job.itemPrice).toLocaleString()} บาท</span>
+                <span className="text-green-400 font-semibold">{Number(job.item_price).toLocaleString()} บาท</span>
               </div>
             )}
             <div className="flex gap-2">
               <span className="text-gray-500 w-28 flex-shrink-0">สถานที่</span>
-              <span className="text-white">{job.sellerLocation}</span>
+              <span className="text-white">{job.seller_location}</span>
             </div>
             <div className="flex gap-2">
               <span className="text-gray-500 w-28 flex-shrink-0">จังหวัด</span>
-              <span className="text-white">📍 {job.sellerProvince}</span>
+              <span className="text-white">📍 {job.seller_province}</span>
             </div>
-            {isBuyer && job.sellerContact && (
+            {isBuyer && job.seller_contact && (
               <div className="flex gap-2">
                 <span className="text-gray-500 w-28 flex-shrink-0">เบอร์ผู้ขาย</span>
-                <a href={`tel:${job.sellerContact}`} className="text-blue-400">📞 {job.sellerContact}</a>
+                <a href={`tel:${job.seller_contact}`} className="text-blue-400">📞 {job.seller_contact}</a>
               </div>
             )}
-            {job.maxBudget && Number(job.maxBudget) > 0 && (
+            {job.max_budget && Number(job.max_budget) > 0 && (
               <div className="flex gap-2">
                 <span className="text-gray-500 w-28 flex-shrink-0">งบบริการ</span>
-                <span className="text-gray-300">สูงสุด {Number(job.maxBudget).toLocaleString()} บาท</span>
+                <span className="text-gray-300">สูงสุด {Number(job.max_budget).toLocaleString()} บาท</span>
               </div>
             )}
           </div>
@@ -243,7 +242,7 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
                 <div>
                   <p className="font-semibold text-yellow-300">ปลอดภัย 100% — ระบบเงินประกัน</p>
                   <p className="text-sm text-gray-300 mt-1 leading-relaxed">
-                    คนกลาง <strong className="text-white">{job.middlemanName}</strong> มีเงินประกันกับระบบ
+                    คนกลาง <strong className="text-white">{job.middleman_name}</strong> มีเงินประกันกับระบบ
                     {' '}<strong className="text-yellow-300 text-base">{depositAmt.toLocaleString()} บาท</strong>
                   </p>
                   <p className="text-sm text-gray-400 mt-1 leading-relaxed">
@@ -260,20 +259,20 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-400">คนกลาง</span>
-                  <span className="text-white font-medium">{job.middlemanName}</span>
+                  <span className="text-white font-medium">{job.middleman_name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">ค่าเดินทาง</span>
-                  <span className="text-white">{Number(job.travelFee).toLocaleString()} บาท</span>
+                  <span className="text-white">{Number(job.travel_fee).toLocaleString()} บาท</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">ค่าบริการตรวจ</span>
-                  <span className="text-white">{Number(job.serviceFee).toLocaleString()} บาท</span>
+                  <span className="text-white">{Number(job.service_fee).toLocaleString()} บาท</span>
                 </div>
-                {Number(job.itemPrice) > 0 && (
+                {Number(job.item_price) > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-400">ราคาสินค้า</span>
-                    <span className="text-white">{Number(job.itemPrice).toLocaleString()} บาท</span>
+                    <span className="text-white">{Number(job.item_price).toLocaleString()} บาท</span>
                   </div>
                 )}
                 <div className="border-t border-white/10 pt-2 flex justify-between font-semibold">
@@ -281,9 +280,9 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
                   <span className="text-green-400 text-base">{totalPay.toLocaleString()} บาท</span>
                 </div>
               </div>
-              {job.estimatedArrival && (
+              {job.estimated_arrival && (
                 <div className="text-sm text-gray-400">
-                  🕐 คาดว่าจะถึง: {new Date(job.estimatedArrival).toLocaleString('th-TH')}
+                  🕐 คาดว่าจะถึง: {new Date(job.estimated_arrival).toLocaleString('th-TH')}
                 </div>
               )}
               {job.conditions && (
@@ -313,8 +312,8 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
           <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-5 space-y-3">
             <p className="font-semibold text-green-300">✅ ผู้ว่าจ้างอนุมัติแล้ว!</p>
             <p className="text-sm text-gray-300">
-              ติดต่อผู้ขายที่เบอร์ <strong className="text-white">{job.sellerContact || '—'}</strong> และเดินทางไปยัง{' '}
-              <strong className="text-white">{job.sellerLocation}</strong>
+              ติดต่อผู้ขายที่เบอร์ <strong className="text-white">{job.seller_contact || '—'}</strong> และเดินทางไปยัง{' '}
+              <strong className="text-white">{job.seller_location}</strong>
             </p>
             <button onClick={() => doAction('start_work')} disabled={acting}
               className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold transition"
@@ -347,14 +346,14 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
         {job.status === 'completed' && (
           <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-5 space-y-2">
             <p className="font-semibold text-emerald-300 text-lg">🎉 งานเสร็จสมบูรณ์</p>
-            {job.reportNotes && (
+            {job.report_notes && (
               <div className="bg-white/5 rounded-xl p-4 text-sm text-gray-300">
                 <p className="text-xs text-gray-500 mb-1">สรุปผลจากคนกลาง:</p>
-                {job.reportNotes}
+                {job.report_notes}
               </div>
             )}
             <p className="text-xs text-gray-500">
-              เสร็จเมื่อ {job.completedAt ? new Date(job.completedAt).toLocaleString('th-TH') : '—'}
+              เสร็จเมื่อ {job.completed_at ? new Date(job.completed_at).toLocaleString('th-TH') : '—'}
             </p>
           </div>
         )}

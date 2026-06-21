@@ -1,69 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases, Users, Query } from 'node-appwrite';
-import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
+import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { syncSellerApplicationLedger } from '../../_lib/financeLedger';
-
-const COL = 'seller_applications';
-
-async function ensureRejectReasonAttribute(databases: Databases) {
-  try {
-    await databases.getAttribute(DB_ID, COL, 'rejectReason');
-  } catch {
-    await databases.createStringAttribute(DB_ID, COL, 'rejectReason', 500, false, '').catch(() => {});
-  }
-}
 
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const client    = getAdminClient();
-    const databases = new Databases(client);
-
+    const db = getAdminClient();
     const status = req.nextUrl.searchParams.get('status');
-    const queries = [Query.limit(200), Query.orderDesc('$createdAt')];
-    if (status) queries.push(Query.equal('status', status));
-
-    const res = await databases.listDocuments(DB_ID, COL, queries);
-    return NextResponse.json(res);
+    let query = db.from('seller_applications').select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(200);
+    if (status) query = query.eq('status', status);
+    const { data, count } = await query;
+    return NextResponse.json({ documents: data || [], total: count || 0 });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const client    = getAdminClient();
-    const databases = new Databases(client);
-    const users     = new Users(client);
-    await ensureRejectReasonAttribute(databases);
-
+    const db = getAdminClient();
     const { docId, action, reason } = await req.json();
     if (!docId || !action) return NextResponse.json({ error: 'missing params' }, { status: 400 });
 
-    const doc = await databases.getDocument(DB_ID, COL, docId);
+    const { data: doc, error: getErr } = await db.from('seller_applications').select('*').eq('id', docId).single();
+    if (getErr || !doc) return NextResponse.json({ error: 'ไม่พบใบสมัคร' }, { status: 404 });
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
-    const updatedDoc = await databases.updateDocument(DB_ID, COL, docId, {
+    const { data: updatedDoc, error } = await db.from('seller_applications').update({
       status: newStatus,
-      ...(reason ? { rejectReason: reason } : {}),
-    });
+      ...(reason ? { reject_reason: reason } : {}),
+    }).eq('id', docId).select().single();
+    if (error) throw new Error(error.message);
 
-    // Update user prefs
-    try {
-      const user    = await users.get(doc.userId);
-      const prefs   = (user.prefs || {}) as Record<string, string>;
-      prefs.sellerStatus = newStatus;
-      if (action === 'approve') prefs.role = 'seller';
-      await users.updatePrefs(doc.userId, prefs);
-    } catch { /* user may not exist */ }
+    // Update profile
+    const profileUpdates: Record<string, unknown> = { seller_status: newStatus };
+    if (action === 'approve') profileUpdates.role = 'seller';
+    await db.from('profiles').update(profileUpdates).eq('id', doc.user_id);
 
-    await syncSellerApplicationLedger(databases, updatedDoc as unknown as Record<string, unknown>);
+    await syncSellerApplicationLedger(db, updatedDoc as Record<string, unknown>);
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

@@ -1,122 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, Account, Users, Databases, Query, ID, Permission, Role } from 'node-appwrite';
+import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
 
-const DB_ID  = 'khonklang_db';
-const COL_ID = 'profiles';
-
-function getAdminClient() {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
-  return { users: new Users(client), databases: new Databases(client) };
-}
-
-async function ensureCollection(databases: Databases) {
-  try { await databases.get(DB_ID); }
-  catch { await databases.create(DB_ID, 'Khonklang Database'); }
-
-  try {
-    await databases.getCollection(DB_ID, COL_ID);
-    // collection มีแล้ว — ลองเพิ่ม email attribute ถ้ายังไม่มี
-    try {
-      await databases.createStringAttribute(DB_ID, COL_ID, 'email', 255, false);
-      await new Promise((r) => setTimeout(r, 1500));
-      await databases.createIndex(DB_ID, COL_ID, 'email_idx', 'key' as any, ['email']); // eslint-disable-line @typescript-eslint/no-explicit-any
-    } catch { /* มีแล้ว skip */ }
-  } catch {
-    // สร้างใหม่
-    await databases.createCollection(DB_ID, COL_ID, 'User Profiles', [
-      Permission.read(Role.any()),
-      Permission.write(Role.users()),
-    ]);
-    await Promise.all([
-      databases.createStringAttribute(DB_ID, COL_ID, 'userId',         255, true),
-      databases.createStringAttribute(DB_ID, COL_ID, 'phone',           20, true),
-      databases.createStringAttribute(DB_ID, COL_ID, 'email',          255, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'firstName',      100, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'lastName',       100, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'address',        500, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'role',            20, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'displayName',    200, false),
-      databases.createStringAttribute(DB_ID, COL_ID, 'linkedAccounts', 2000, false),
-    ]);
-    await new Promise((r) => setTimeout(r, 3000));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await databases.createIndex(DB_ID, COL_ID, 'phone_idx', 'key' as any, ['phone']);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await databases.createIndex(DB_ID, COL_ID, 'email_idx', 'key' as any, ['email']);
-  }
-}
-
-function getJwt(req: NextRequest) {
-  return req.headers.get('x-session-jwt');
-}
-
-async function getUser(jwt: string) {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setJWT(jwt);
-  return new Account(client).get();
-}
-
-// ─── GET: ตรวจสอบว่า user นี้มีโปรไฟล์ตรงกับคนในระบบหรือเปล่า ───
+// ─── GET: ตรวจสอบว่า user นี้มีโปรไฟล์ตรงกับคนในระบบหรือเปล่า (auto-link ข้ามช่องทาง login) ───
 export async function GET(req: NextRequest) {
   try {
-    const jwt = getJwt(req);
-    if (!jwt) return NextResponse.json({ matched: false }, { status: 401 });
+    const me = await verifyUser(req);
+    const admin = getAdminClient();
+    const { data: mine } = await admin.from('profiles').select('*').eq('id', me.id).single();
+    if (!mine) return NextResponse.json({ matched: false });
 
-    const currentUser = await getUser(jwt);
-    const userId      = currentUser.$id;
-    const userName    = currentUser.name  || '';
-    const userEmail   = currentUser.email || '';
-    const isSyntheticEmail = userEmail.includes('@line.khonklang.app') || !userEmail;
+    const userName = mine.display_name || '';
+    const userEmail = mine.email || '';
+    const isSyntheticEmail = !userEmail || userEmail.includes('@line.khonklang.app');
 
-    const { users, databases } = getAdminClient();
-    await ensureCollection(databases);
-
-    // ค้นหาโปรไฟล์ที่ตรงกับ email หรือ displayName
-    const queries: string[][] = [];
-    if (!isSyntheticEmail) queries.push([Query.equal('email', userEmail)]);
-    if (userName)          queries.push([Query.equal('displayName', userName)]);
-
-    let matchedDoc = null;
-    for (const q of queries) {
-      const res = await databases.listDocuments(DB_ID, COL_ID, q);
-      if (res.documents.length > 0) {
-        // ต้องไม่ใช่ document ของ user คนเดิม
-        const doc = res.documents.find(d => d.userId !== userId);
-        if (doc) { matchedDoc = doc; break; }
-      }
+    let matched = null;
+    if (!isSyntheticEmail) {
+      const { data } = await admin.from('profiles').select('*').eq('email', userEmail).neq('id', me.id).limit(1);
+      matched = data?.[0] || null;
     }
+    if (!matched && userName) {
+      const { data } = await admin.from('profiles').select('*').eq('display_name', userName).neq('id', me.id).limit(1);
+      matched = data?.[0] || null;
+    }
+    if (!matched) return NextResponse.json({ matched: false });
 
-    if (!matchedDoc) return NextResponse.json({ matched: false });
-
-    // พบโปรไฟล์ที่ตรงกัน → auto-link
-    const prefs: Record<string, string> = {
-      firstName:   matchedDoc.firstName   || '',
-      lastName:    matchedDoc.lastName    || '',
-      email:       matchedDoc.email       || userEmail,
-      phone:       matchedDoc.phone       || '',
-      address:     matchedDoc.address     || '',
-      role:        matchedDoc.role        || 'user',
-      displayName: matchedDoc.displayName || userName,
-      linkedTo:    matchedDoc.userId,
+    const update = {
+      first_name: matched.first_name || '',
+      last_name: matched.last_name || '',
+      email: matched.email || userEmail,
+      phone: matched.phone || '',
+      address: matched.address || '',
+      role: matched.role || 'user',
+      display_name: matched.display_name || userName,
+      linked_to: matched.id,
     };
+    await admin.from('profiles').update(update).eq('id', me.id);
 
-    // อัปเดต linkedAccounts ใน document เดิม
-    const linkedAccounts: string[] = matchedDoc.linkedAccounts
-      ? JSON.parse(matchedDoc.linkedAccounts) : [matchedDoc.userId];
-    if (!linkedAccounts.includes(userId)) linkedAccounts.push(userId);
-    await databases.updateDocument(DB_ID, COL_ID, matchedDoc.$id, {
-      linkedAccounts: JSON.stringify(linkedAccounts),
-    });
-
-    await users.updatePrefs(userId, prefs);
-    await users.updateName(userId, prefs.displayName);
-
-    return NextResponse.json({ matched: true, profile: prefs });
+    return NextResponse.json({ matched: true, profile: update });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Register GET error:', msg);
@@ -127,85 +47,61 @@ export async function GET(req: NextRequest) {
 // ─── POST: บันทึกข้อมูลผู้ใช้ใหม่ ───
 export async function POST(req: NextRequest) {
   try {
-    const jwt = getJwt(req);
-    if (!jwt) return NextResponse.json({ error: 'ไม่ได้เข้าสู่ระบบ' }, { status: 401 });
-
-    const currentUser = await getUser(jwt);
-    const userId = currentUser.$id;
-
+    const me = await verifyUser(req);
     const { firstName, lastName, email, phone, address, role } = await req.json();
     if (!firstName || !lastName || !phone) {
       return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, { status: 400 });
     }
 
-    const { users, databases } = getAdminClient();
-    await ensureCollection(databases);
-
+    const admin = getAdminClient();
     const displayName = `${firstName} ${lastName}`.trim();
-    const prefs: Record<string, string> = {
-      firstName, lastName,
-      email:   email   || '',
+    const update: Record<string, string> = {
+      first_name: firstName,
+      last_name: lastName,
+      email: email || '',
       phone,
       address: address || '',
-      role:    role    || 'user',
-      displayName,
+      role: role || 'user',
+      display_name: displayName,
     };
 
     let linked = false;
     try {
-      // เช็ค phone ก่อน (เดิม)
-      const byPhone = await databases.listDocuments(DB_ID, COL_ID, [Query.equal('phone', phone)]);
-      let existingDoc = byPhone.documents.find(d => d.userId !== userId) || null;
+      let existing = null;
+      const byPhone = await admin.from('profiles').select('*').eq('phone', phone).neq('id', me.id).limit(1);
+      existing = byPhone.data?.[0] || null;
 
-      // เช็ค email ถ้าไม่เจอ phone
-      if (!existingDoc && email && !email.includes('@line.khonklang.app')) {
-        const byEmail = await databases.listDocuments(DB_ID, COL_ID, [Query.equal('email', email)]);
-        existingDoc = byEmail.documents.find(d => d.userId !== userId) || null;
+      if (!existing && email && !email.includes('@line.khonklang.app')) {
+        const byEmail = await admin.from('profiles').select('*').eq('email', email).neq('id', me.id).limit(1);
+        existing = byEmail.data?.[0] || null;
+      }
+      if (!existing) {
+        const byName = await admin.from('profiles').select('*').eq('display_name', displayName).neq('id', me.id).limit(1);
+        existing = byName.data?.[0] || null;
       }
 
-      // เช็ค displayName ถ้ายังไม่เจอ
-      if (!existingDoc) {
-        const byName = await databases.listDocuments(DB_ID, COL_ID, [Query.equal('displayName', displayName)]);
-        existingDoc = byName.documents.find(d => d.userId !== userId) || null;
-      }
-
-      if (existingDoc) {
-        prefs.firstName   = existingDoc.firstName   || firstName;
-        prefs.lastName    = existingDoc.lastName    || lastName;
-        prefs.email       = existingDoc.email       || email || '';
-        prefs.address     = existingDoc.address     || address || '';
-        prefs.role        = existingDoc.role        || role || 'user';
-        prefs.displayName = existingDoc.displayName || displayName;
-        prefs.linkedTo    = existingDoc.userId;
-
-        const linkedAccounts: string[] = existingDoc.linkedAccounts
-          ? JSON.parse(existingDoc.linkedAccounts) : [existingDoc.userId];
-        if (!linkedAccounts.includes(userId)) linkedAccounts.push(userId);
-        await databases.updateDocument(DB_ID, COL_ID, existingDoc.$id, {
-          linkedAccounts: JSON.stringify(linkedAccounts),
-        });
+      if (existing) {
+        update.first_name = existing.first_name || firstName;
+        update.last_name = existing.last_name || lastName;
+        update.email = existing.email || email || '';
+        update.address = existing.address || address || '';
+        update.role = existing.role || role || 'user';
+        update.display_name = existing.display_name || displayName;
+        (update as Record<string, unknown>).linked_to = existing.id;
         linked = true;
-      } else {
-        await databases.createDocument(DB_ID, COL_ID, ID.unique(), {
-          userId, phone,
-          email:   email   || '',
-          firstName, lastName,
-          address: address || '',
-          role:    role    || 'user',
-          displayName,
-        });
       }
     } catch (dbErr) {
       console.error('DB error (non-fatal):', dbErr);
     }
 
-    await users.updatePrefs(userId, prefs);
-    await users.updateName(userId, displayName);
+    const { error } = await admin.from('profiles').update(update).eq('id', me.id);
+    if (error) throw new Error(error.message);
 
     return NextResponse.json({ success: true, linked });
   } catch (err: unknown) {
+    const status = (err as { status?: number }).status ?? 500;
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Register POST error:', msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status });
   }
 }

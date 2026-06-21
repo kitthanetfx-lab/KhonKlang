@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { Megaphone, Star, Loader2, Trash2, EyeOff, CheckCircle2, Store, RotateCcw } from 'lucide-react';
 
-interface Wanted { $id: string; userName: string; title: string; detail: string; buyMode: string; status: string; province: string; createdAt: string }
-interface Review { $id: string; reviewerName: string; reviewerRole: string; targetRole: string; rating: number; comment: string; tags: string; createdAt: string }
-interface Listing { $id: string; title: string; price: number; status: string; sellerName: string; location: string; category: string; createdAt: string }
+interface Wanted { id: string; user_name: string; title: string; detail: string; buy_mode: string; status: string; province: string; created_at: string }
+interface Review { id: string; reviewer_name: string; reviewer_role: string; target_role: string; rating: number; comment: string; tags: string[]; created_at: string }
+interface Listing { id: string; title: string; price: number; status: string; seller_name: string; location: string; category: string; created_at: string }
 
 type ModTab = 'wanted' | 'reviews' | 'listings';
 
@@ -18,8 +18,8 @@ export default function AdminModerate() {
   const load = useCallback(async (type: string) => {
     setItems(null);
     try {
-      const jwt = (await account.createJWT()).jwt;
-      const r = await fetch(`/api/admin/moderate?type=${type}`, { headers: { 'x-session-jwt': jwt } });
+      const headers = await authHeaders();
+      const r = await fetch(`/api/admin/moderate?type=${type}`, { headers });
       const d = await r.json();
       setItems(d.documents || []);
     } catch { setItems([]); }
@@ -37,14 +37,14 @@ export default function AdminModerate() {
     if (!window.confirm(CONFIRM[action] || 'ยืนยันการดำเนินการ?')) return;
     setActing(id);
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const r = await fetch('/api/admin/moderate', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, id, action }),
       });
       // listings: เปลี่ยนสถานะ (ไม่ลบทิ้ง) จึงรีโหลดเพื่อให้เห็นสถานะใหม่ ; อื่น ๆ เอาออกจากรายการ
-      if (r.ok) { if (type === 'listings') load(tab); else setItems(prev => (prev || []).filter(x => x.$id !== id)); }
+      if (r.ok) { if (type === 'listings') load(tab); else setItems(prev => (prev || []).filter(x => x.id !== id)); }
     } finally { setActing(''); }
   }
 
@@ -69,7 +69,7 @@ export default function AdminModerate() {
 
       <div className="space-y-3">
         {tab === 'wanted' && (items as Wanted[] || []).map(w => (
-          <div key={w.$id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+          <div key={w.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -78,12 +78,12 @@ export default function AdminModerate() {
                 </div>
                 <p className="font-semibold mt-1">{w.title}</p>
                 {w.detail && <p className="text-sm text-gray-500 mt-1">{w.detail}</p>}
-                <p className="text-xs text-gray-400 mt-1">โดย {w.userName} · {new Date(w.createdAt).toLocaleDateString('th-TH')}</p>
+                <p className="text-xs text-gray-400 mt-1">โดย {w.user_name} · {new Date(w.created_at).toLocaleDateString('th-TH')}</p>
               </div>
               {w.status === 'open' && (
-                <button onClick={() => act(w.$id, 'wanted', 'remove')} disabled={!!acting}
+                <button onClick={() => act(w.id, 'wanted', 'remove')} disabled={!!acting}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 shrink-0 disabled:opacity-50">
-                  {acting === w.$id ? <Loader2 size={14} className="animate-spin" /> : <EyeOff size={14} />} ปิดประกาศ
+                  {acting === w.id ? <Loader2 size={14} className="animate-spin" /> : <EyeOff size={14} />} ปิดประกาศ
                 </button>
               )}
             </div>
@@ -91,19 +91,19 @@ export default function AdminModerate() {
         ))}
 
         {tab === 'reviews' && (items as Review[] || []).map(rv => (
-          <div key={rv.$id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+          <div key={rv.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-amber-500 font-bold">{'★'.repeat(rv.rating)}{'☆'.repeat(5 - rv.rating)}</span>
-                  <span className="text-xs text-gray-400">{rv.reviewerRole} → {rv.targetRole}</span>
+                  <span className="text-xs text-gray-400">{rv.reviewer_role} → {rv.target_role}</span>
                 </div>
                 {rv.comment && <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{rv.comment}</p>}
-                <p className="text-xs text-gray-400 mt-1">โดย {rv.reviewerName} · {new Date(rv.createdAt).toLocaleDateString('th-TH')}</p>
+                <p className="text-xs text-gray-400 mt-1">โดย {rv.reviewer_name} · {new Date(rv.created_at).toLocaleDateString('th-TH')}</p>
               </div>
-              <button onClick={() => act(rv.$id, 'reviews', 'delete')} disabled={!!acting}
+              <button onClick={() => act(rv.id, 'reviews', 'delete')} disabled={!!acting}
                 className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 shrink-0 disabled:opacity-50">
-                {acting === rv.$id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} ลบ
+                {acting === rv.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} ลบ
               </button>
             </div>
           </div>
@@ -112,7 +112,7 @@ export default function AdminModerate() {
         {tab === 'listings' && (items as Listing[] || []).map(l => {
           const removed = l.status !== 'posted';
           return (
-            <div key={l.$id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+            <div key={l.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -121,17 +121,17 @@ export default function AdminModerate() {
                     <span className="font-mono text-sm font-bold text-green-600">฿{Number(l.price || 0).toLocaleString()}</span>
                   </div>
                   <p className="font-semibold mt-1">{l.title}</p>
-                  <p className="text-xs text-gray-400 mt-1">โดย {l.sellerName || '-'} · {l.category || '-'} · {new Date(l.createdAt).toLocaleDateString('th-TH')}</p>
+                  <p className="text-xs text-gray-400 mt-1">โดย {l.seller_name || '-'} · {l.category || '-'} · {new Date(l.created_at).toLocaleDateString('th-TH')}</p>
                 </div>
                 {removed ? (
-                  <button onClick={() => act(l.$id, 'listings', 'restore')} disabled={!!acting}
+                  <button onClick={() => act(l.id, 'listings', 'restore')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-600 flex items-center gap-1 shrink-0 disabled:opacity-50">
-                    {acting === l.$id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} คืนประกาศ
+                    {acting === l.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} คืนประกาศ
                   </button>
                 ) : (
-                  <button onClick={() => act(l.$id, 'listings', 'remove')} disabled={!!acting}
+                  <button onClick={() => act(l.id, 'listings', 'remove')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 shrink-0 disabled:opacity-50">
-                    {acting === l.$id ? <Loader2 size={14} className="animate-spin" /> : <EyeOff size={14} />} ถอดประกาศ
+                    {acting === l.id ? <Loader2 size={14} className="animate-spin" /> : <EyeOff size={14} />} ถอดประกาศ
                   </button>
                 )}
               </div>

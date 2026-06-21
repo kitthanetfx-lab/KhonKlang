@@ -1,71 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases, Users, Query } from 'node-appwrite';
-import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
+import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { getMiddlemanWallet, syncMiddlemanApplicationLedger } from '../../_lib/financeLedger';
-
-const COL = 'middleman_applications';
 
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const client    = getAdminClient();
-    const databases = new Databases(client);
-    const users     = new Users(client);
-
+    const db = getAdminClient();
     const status = req.nextUrl.searchParams.get('status');
-    const queries = [Query.limit(200), Query.orderDesc('$createdAt')];
-    if (status) queries.push(Query.equal('status', status));
-
-    const res = await databases.listDocuments(DB_ID, COL, queries);
-    const documents = await Promise.all(res.documents.map(async doc => {
-      if (doc.status !== 'approved' || !doc.userId) return doc;
-      const wallet = await getMiddlemanWallet(databases, users, String(doc.userId)).catch(() => null);
+    let query = db.from('middleman_applications').select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(200);
+    if (status) query = query.eq('status', status);
+    const { data, count } = await query;
+    const documents = await Promise.all((data || []).map(async doc => {
+      if (doc.status !== 'approved' || !doc.user_id) return doc;
+      const wallet = await getMiddlemanWallet(db, String(doc.user_id)).catch(() => null);
       return { ...doc, wallet };
     }));
-    return NextResponse.json({ ...res, documents });
+    return NextResponse.json({ documents, total: count || 0 });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const client    = getAdminClient();
-    const databases = new Databases(client);
-    const users     = new Users(client);
-
+    const db = getAdminClient();
     const { docId, action, reason } = await req.json();
     if (!docId || !action) return NextResponse.json({ error: 'missing params' }, { status: 400 });
 
-    const doc = await databases.getDocument(DB_ID, COL, docId);
+    const { data: doc, error: getErr } = await db.from('middleman_applications').select('*').eq('id', docId).single();
+    if (getErr || !doc) return NextResponse.json({ error: 'ไม่พบใบสมัคร' }, { status: 404 });
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
-    const updatedDoc = await databases.updateDocument(DB_ID, COL, docId, {
+    const { data: updatedDoc, error } = await db.from('middleman_applications').update({
       status: newStatus,
-      ...(reason ? { rejectReason: reason } : {}),
-    });
+      ...(reason ? { reject_reason: reason } : {}),
+    }).eq('id', docId).select().single();
+    if (error) throw new Error(error.message);
 
-    // Update user prefs
-    try {
-      const user  = await users.get(doc.userId);
-      const prefs = (user.prefs || {}) as Record<string, string>;
-      prefs.middlemanStatus = newStatus;
-      if (action === 'approve') {
-        prefs.role             = 'middleman';
-        prefs.middlemanTier    = doc.tier || 'Bronze';
-        // ถ้าอนุมัติ → แสดงหน้าวางเงินประกันในโปรไฟล์
-        prefs.showDepositStep  = 'true';
-      }
-      await users.updatePrefs(doc.userId, prefs);
-    } catch { /* ignore */ }
+    // Update profile
+    const profileUpdates: Record<string, unknown> = { middleman_status: newStatus };
+    if (action === 'approve') {
+      profileUpdates.role = 'middleman';
+      profileUpdates.middleman_tier = doc.tier || 'Bronze';
+    }
+    await db.from('profiles').update(profileUpdates).eq('id', doc.user_id);
 
-    await syncMiddlemanApplicationLedger(databases, users, updatedDoc as unknown as Record<string, unknown>);
+    await syncMiddlemanApplicationLedger(db, updatedDoc as Record<string, unknown>);
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

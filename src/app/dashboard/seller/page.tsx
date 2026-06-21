@@ -3,17 +3,17 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState, useCallback } from 'react';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { DEFAULT_LISTING_MODE, isCertifiedMode, ListingModeState, serializeListingMode } from '@/lib/listingMode';
 
 interface Deal {
-  $id: string; sellerId: string; sellerName: string; middlemanId: string; middlemanName: string;
+  id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
   title: string; description: string; price: number; category: string; condition: string;
-  location: string; sellingMode: string; imageFileIds: string; status: string;
-  sellerConfirmed: boolean; middlemanConfirmed: boolean; rejectReason: string; createdAt: string;
+  location: string; selling_mode: string; images: string[]; status: string;
+  reject_reason: string; created_at: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -31,10 +31,7 @@ const CATEGORIES = ['สินค้าทั่วไป', 'อิเล็ก�
 const CONDITIONS = ['ของใหม่', 'มือสองสภาพดี', 'มือสองมีตำหนิ'];
 const PROVINCES = ['กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
-const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
-const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const BUCKET_ID = 'deal_files';
-function imgUrl(fileId: string) { return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${PROJECT}`; }
+function imgUrl(fileId: string) { return fileViewUrl(DEAL_BUCKET, fileId); }
 
 interface UploadedImage { fileId: string; url: string; name: string; }
 
@@ -63,20 +60,21 @@ export default function SellerDashboard() {
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
   }, []);
 
-  const fetchDeals = useCallback(async (jwt: string) => {
-    const res = await fetch('/api/deals?role=seller', { headers: { 'x-session-jwt': jwt } }).catch(() => null);
+  const fetchDeals = useCallback(async (headers: Record<string, string>) => {
+    const res = await fetch('/api/deals?role=seller', { headers }).catch(() => null);
     if (res?.ok) { const data = await res.json(); setDeals(data.deals || []); }
   }, []);
 
   useEffect(() => {
     (async () => {
       try {
-        const user = await account.get();
-        const prefs = user.prefs as Record<string, string>;
-        if (prefs.sellerStatus !== 'approved') { router.replace('/register/seller'); return; }
-        setMyId(user.$id);
-        const jwt = (await account.createJWT()).jwt;
-        await fetchDeals(jwt);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { router.replace('/login'); return; }
+        const { data: profile } = await supabase.from('profiles').select('seller_status').eq('id', user.id).maybeSingle();
+        if (profile?.seller_status !== 'approved') { router.replace('/register/seller'); return; }
+        setMyId(user.id);
+        const headers = await authHeaders();
+        await fetchDeals(headers);
       } catch { router.replace('/login'); }
       finally { setLoading(false); }
     })();
@@ -87,11 +85,11 @@ export default function SellerDashboard() {
     setUploading(true);
     setPostError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const uploaded: UploadedImage[] = [];
       for (const file of Array.from(files)) {
         const fd = new FormData(); fd.append('file', file);
-        const res = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: fd });
+        const res = await fetch('/api/upload-deal', { method: 'POST', headers, body: fd });
         const d = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(d.error || `อัปโหลดรูปไม่สำเร็จ (${file.name})`);
@@ -111,16 +109,16 @@ export default function SellerDashboard() {
     if (!listingMode.direct && !listingMode.escrow) { setPostError('กรุณาเลือกอย่างน้อย ซื้อทันที หรือ ซื้อผ่านคนกลาง'); return; }
     setPosting(true); setPostError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const res = await fetch('/api/deals', {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, description, price: Number(price), category, condition, location, sellingMode: serializeListingMode(listingMode), imageFileIds: images.map(i => i.fileId), creatorRole: 'seller', source: 'listing' }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
       setPostDone(true);
       setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation(''); setListingMode(DEFAULT_LISTING_MODE); setImages([]);
-      await fetchDeals(jwt);
+      await fetchDeals(headers);
       setTimeout(() => { setPostDone(false); setTab('active'); }, 1800);
     } catch (err: unknown) {
       setPostError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
@@ -129,8 +127,8 @@ export default function SellerDashboard() {
 
   const ACTIVE_STATUSES = ['posted', 'buyer_joined', 'terms_pending', 'payment_pending', 'payment_uploaded', 'packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered'];
   const DONE_STATUSES = ['completed', 'cancelled', 'disputed'];
-  const activeDeals = deals.filter(d => d.sellerId === myId && ACTIVE_STATUSES.includes(d.status));
-  const historyDeals = deals.filter(d => d.sellerId === myId && DONE_STATUSES.includes(d.status));
+  const activeDeals = deals.filter(d => d.seller_id === myId && ACTIVE_STATUSES.includes(d.status));
+  const historyDeals = deals.filter(d => d.seller_id === myId && DONE_STATUSES.includes(d.status));
   const totalRev = historyDeals.filter(d => d.status === 'completed').reduce((s, d) => s + (d.price || 0), 0);
 
   if (loading) return (
@@ -140,8 +138,7 @@ export default function SellerDashboard() {
   );
 
   function DealCard({ deal }: { deal: Deal }) {
-    let firstImg = '';
-    try { const ids = JSON.parse(deal.imageFileIds || '[]'); if (ids.length) firstImg = imgUrl(ids[0]); } catch {}
+    const firstImg = deal.images?.length ? imgUrl(deal.images[0]) : '';
     return (
       <div className="deal-card">
         <div className="deal-card-header">
@@ -153,13 +150,13 @@ export default function SellerDashboard() {
                 <span className="deal-card-price">฿{(deal.price || 0).toLocaleString()}</span>
                 {deal.condition && <span>{deal.condition}</span>}
                 {deal.location && <span>📍 {deal.location}</span>}
-                {isCertifiedMode(deal.sellingMode) && <span style={{ color: 'var(--amber-500)', fontWeight: 700 }}>⭐ Certified</span>}
+                {isCertifiedMode(deal.selling_mode) && <span style={{ color: 'var(--amber-500)', fontWeight: 700 }}>⭐ Certified</span>}
               </div>
             </div>
           </div>
           <span className={`sb ${STATUS_CLS[deal.status] || 'sb-gray'}`}>{STATUS_LABEL[deal.status] || deal.status}</span>
         </div>
-        <Link href={`/deal/${deal.$id}`} className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }}>💬 เข้าห้องดีล →</Link>
+        <Link href={`/deal/${deal.id}`} className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }}>💬 เข้าห้องดีล →</Link>
       </div>
     );
   }
@@ -193,7 +190,7 @@ export default function SellerDashboard() {
             <p>ยังไม่มีประกาศที่กำลังดำเนินการ</p>
             <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setTab('post')}>+ ลงประกาศใหม่</button>
           </div>
-        ) : activeDeals.map(d => <DealCard key={d.$id} deal={d} />))}
+        ) : activeDeals.map(d => <DealCard key={d.id} deal={d} />))}
 
         {tab === 'post' && (
           <div className="form-section">
@@ -287,7 +284,7 @@ export default function SellerDashboard() {
           </div>
         )}
 
-        {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.$id} deal={d} />))}
+        {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.id} deal={d} />))}
       </main>
     </div>
   );

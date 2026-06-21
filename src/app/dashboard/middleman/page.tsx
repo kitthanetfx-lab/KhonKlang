@@ -1,39 +1,39 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 
 interface Deal {
-  $id: string;
-  sellerId: string; sellerName: string; sellerPhone?: string;
-  buyerId: string;  buyerName: string;  buyerPhone?: string;
-  middlemanId: string; middlemanName: string;
+  id: string;
+  seller_id: string; seller_name: string; sellerPhone?: string;
+  buyer_id: string;  buyer_name: string;  buyerPhone?: string;
+  middleman_id: string; middleman_name: string;
   title: string; description: string;
   price: number; category: string;
-  status: string; createdAt: string;
+  status: string; created_at: string;
 }
 
 interface MiddlemanWallet {
   tier: string;
-  creditLimit: number;
-  availableCredit: number;
-  heldCredit: number;
-  releasedCredit: number;
-  penaltyCredit: number;
-  activeDealCount: number;
-  updatedAt: string;
+  credit_limit: number;
+  available_credit: number;
+  held_credit: number;
+  released_credit: number;
+  penalty_credit: number;
+  active_deal_count: number;
+  updated_at: string;
 }
 
 interface LedgerEntry {
-  $id?: string;
-  entryKey: string;
+  id?: string;
+  entry_key: string;
   purpose: string;
   amount: number;
   status: string;
-  dealNumber?: string;
+  deal_number?: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -89,22 +89,23 @@ export default function MiddlemanDashboard() {
     r.style.setProperty('--accent', '#10a566'); r.style.setProperty('--accent-strong', '#0a8654'); r.style.setProperty('--accent-soft', '#e9faf2');
   }, []);
 
-  const fetchDeals = useCallback(async (jwt: string) => {
-    const res = await fetch('/api/deals?role=middleman', { headers: { 'x-session-jwt': jwt } }).catch(() => null);
+  const fetchDeals = useCallback(async (headers: Record<string, string>) => {
+    const res = await fetch('/api/deals?role=middleman', { headers }).catch(() => null);
     if (res?.ok) { const data = await res.json(); setDeals(data.deals || []); }
   }, []);
 
   useEffect(() => {
     (async () => {
       try {
-        const user = await account.get();
-        const prefs = user.prefs as Record<string, string>;
-        if (prefs.middlemanStatus !== 'approved') { router.replace('/register/middleman'); return; }
-        setTier(prefs.middlemanTierIntent || 'Bronze');
-        const jwt = (await account.createJWT()).jwt;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { router.replace('/login'); return; }
+        const { data: profile } = await supabase.from('profiles').select('middleman_status, middleman_tier_intent').eq('id', user.id).maybeSingle();
+        if (profile?.middleman_status !== 'approved') { router.replace('/register/middleman'); return; }
+        setTier(profile?.middleman_tier_intent || 'Bronze');
+        const headers = await authHeaders();
         const [profileRes] = await Promise.all([
-          fetch('/api/profile', { headers: { 'x-session-jwt': jwt } }).catch(() => null),
-          fetchDeals(jwt),
+          fetch('/api/profile', { headers }).catch(() => null),
+          fetchDeals(headers),
         ]);
         const profileData = profileRes?.ok ? await profileRes.json() : null;
         setWallet(profileData?.wallet || null);
@@ -117,10 +118,10 @@ export default function MiddlemanDashboard() {
   async function refresh() {
     setRefreshing(true);
     try {
-      const jwt = (await account.createJWT()).jwt;
-      await fetchDeals(jwt);
+      const headers = await authHeaders();
+      await fetchDeals(headers);
       try {
-        const res = await fetch('/api/profile', { headers: { 'x-session-jwt': jwt } }).catch(() => null);
+        const res = await fetch('/api/profile', { headers }).catch(() => null);
         const data = res?.ok ? await res.json() : null;
         setWallet(data?.wallet || null);
         setLedger(data?.ledger || []);
@@ -153,16 +154,16 @@ export default function MiddlemanDashboard() {
         <div className="parties-row">
           <div className="party-box">
             <span className="party-box-role">ผู้ขาย</span>
-            <span className="party-box-name">{deal.sellerName || '—'}</span>
+            <span className="party-box-name">{deal.seller_name || '—'}</span>
             {deal.sellerPhone && <a href={`tel:${deal.sellerPhone}`} className="party-box-phone">📞 {deal.sellerPhone}</a>}
           </div>
           <div className="party-box">
             <span className="party-box-role">ผู้ซื้อ</span>
-            <span className="party-box-name">{deal.buyerName || '—'}</span>
+            <span className="party-box-name">{deal.buyer_name || '—'}</span>
             {deal.buyerPhone && <a href={`tel:${deal.buyerPhone}`} className="party-box-phone">📞 {deal.buyerPhone}</a>}
           </div>
         </div>
-        <Link href={`/deal/${deal.$id}`} className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }}>เข้าห้องดีล →</Link>
+        <Link href={`/deal/${deal.id}`} className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }}>เข้าห้องดีล →</Link>
       </div>
     );
   }
@@ -190,26 +191,26 @@ export default function MiddlemanDashboard() {
             <div className="deal-card-header">
               <div style={{ flex: 1 }}>
                 <div className="deal-card-title">เครดิตคนกลาง</div>
-                <div className="deal-card-meta"><span>วงเงิน {baht(wallet.creditLimit)}</span><span>อัปเดต {new Date(wallet.updatedAt).toLocaleString('th-TH')}</span></div>
+                <div className="deal-card-meta"><span>วงเงิน {baht(wallet.credit_limit)}</span><span>อัปเดต {new Date(wallet.updated_at).toLocaleString('th-TH')}</span></div>
               </div>
-              <span className="sb sb-green">พร้อมรับงาน {wallet.activeDealCount} รายการ</span>
+              <span className="sb sb-green">พร้อมรับงาน {wallet.active_deal_count} รายการ</span>
             </div>
             <div className="parties-row">
               <div className="party-box">
                 <span className="party-box-role">เครดิตคงเหลือ</span>
-                <span className="party-box-name" style={{ color: 'var(--accent-strong)' }}>{baht(wallet.availableCredit)}</span>
+                <span className="party-box-name" style={{ color: 'var(--accent-strong)' }}>{baht(wallet.available_credit)}</span>
               </div>
               <div className="party-box">
                 <span className="party-box-role">เครดิตที่ hold</span>
-                <span className="party-box-name">{baht(wallet.heldCredit)}</span>
+                <span className="party-box-name">{baht(wallet.held_credit)}</span>
               </div>
               <div className="party-box">
                 <span className="party-box-role">เครดิตปลดแล้ว</span>
-                <span className="party-box-name">{baht(wallet.releasedCredit)}</span>
+                <span className="party-box-name">{baht(wallet.released_credit)}</span>
               </div>
             </div>
-            {wallet.penaltyCredit > 0 && (
-              <div className="deal-action-needed">เครดิตถูกหักสะสม {baht(wallet.penaltyCredit)}</div>
+            {wallet.penalty_credit > 0 && (
+              <div className="deal-action-needed">เครดิตถูกหักสะสม {baht(wallet.penalty_credit)}</div>
             )}
           </div>
         )}
@@ -229,10 +230,10 @@ export default function MiddlemanDashboard() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {ledger.slice(0, 4).map(item => (
-                <div key={item.entryKey} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+                <div key={item.entry_key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700 }}>{item.purpose}</div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{item.dealNumber || item.entryKey}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{item.deal_number || item.entry_key}</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontWeight: 700 }}>{baht(item.amount)}</div>
@@ -257,8 +258,8 @@ export default function MiddlemanDashboard() {
             <p style={{ fontSize: 13, marginTop: 8 }}>รอผู้ซื้อเลือกคุณเป็นคนกลาง</p>
             <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={refresh} disabled={refreshing}>🔄 ตรวจสอบอีกครั้ง</button>
           </div>
-        ) : active.map(d => <DealCard key={d.$id} deal={d} />))}
-        {tab === 'history' && (history.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติ</p></div> : history.map(d => <DealCard key={d.$id} deal={d} />))}
+        ) : active.map(d => <DealCard key={d.id} deal={d} />))}
+        {tab === 'history' && (history.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติ</p></div> : history.map(d => <DealCard key={d.id} deal={d} />))}
       </main>
     </div>
   );

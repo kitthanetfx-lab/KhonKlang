@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, Suspense } from 'react';
-import { account } from '@/lib/appwrite';
+import { authHeaders } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
@@ -55,10 +55,10 @@ function CreateDealForm() {
     if (!title || !price) { setError('กรุณากรอกชื่อและราคา'); return; }
     setLoading(true); setError('');
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const res = await fetch('/api/deals', {
         method: 'POST',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
           description,
@@ -73,7 +73,7 @@ function CreateDealForm() {
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || 'เกิดข้อผิดพลาด'); return; }
-      router.push(`/deal/${d.deal.$id}`);
+      router.push(`/deal/${d.deal.id}`);
     } catch { setError('เกิดข้อผิดพลาด'); }
     finally { setLoading(false); }
   }

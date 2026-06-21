@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect } from 'react';
-import { account } from '@/lib/appwrite';
+import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { Settings, Loader2, CheckCircle2, ShoppingCart, Zap, Search, MapPin, Car, Shield, RotateCcw, Wallet } from 'lucide-react';
 import { THAI_BANKS } from '@/lib/banks';
 
@@ -22,9 +22,7 @@ interface FeeConfig {
 
 type StrKey = 'returnShippingBy' | 'companyPromptPay' | 'companyBankName' | 'companyBankAcct' | 'companyBankHolder' | 'companyQrFileId';
 type NumKey = Exclude<keyof FeeConfig, StrKey>;
-const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
-const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
-const qrUrl = (id: string) => `${ENDPOINT}/storage/buckets/deal_files/files/${id}/view?project=${PROJECT}`;
+const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
 // กลุ่มฟิลด์สำหรับแสดงผล: [key, label, หน่วย]
 const GROUPS: { title: string; icon: React.ReactNode; fields: [NumKey, string, string][] }[] = [
@@ -75,8 +73,8 @@ export default function SettingsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const jwt = (await account.createJWT()).jwt;
-        const r = await fetch('/api/admin/settings', { headers: { 'x-session-jwt': jwt } });
+        const headers = await authHeaders();
+        const r = await fetch('/api/admin/settings', { headers });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'โหลดค่าธรรมเนียมไม่สำเร็จ');
         setFees(d.fees);
@@ -98,9 +96,9 @@ export default function SettingsPage() {
   async function uploadQr(file: File) {
     setQrUploading(true);
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const form = new FormData(); form.append('file', file);
-      const r = await fetch('/api/upload-deal', { method: 'POST', headers: { 'x-session-jwt': jwt }, body: form });
+      const r = await fetch('/api/upload-deal', { method: 'POST', headers, body: form });
       const d = await r.json();
       if (r.ok && d.fileId) setStr('companyQrFileId', d.fileId);
       else setError(d.error || 'อัปโหลด QR ไม่สำเร็จ');
@@ -112,10 +110,10 @@ export default function SettingsPage() {
     if (!fees) return;
     setSaving(true); setError(''); setSaved(false);
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       const r = await fetch('/api/admin/settings', {
         method: 'PATCH',
-        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ fees }),
       });
       const d = await r.json();

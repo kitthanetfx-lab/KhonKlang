@@ -1,26 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Databases, Query } from 'node-appwrite';
-import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
-
-const COL = 'deals';
+import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 
 /** รายการดีลสำหรับแอดมิน: ?filter=disputed | active | completed | meetup_refund | all */
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
+    const db = getAdminClient();
     const filter = req.nextUrl.searchParams.get('filter') || 'disputed';
-    const queries = [Query.orderDesc('createdAt'), Query.limit(200)];
-    if (filter === 'disputed') queries.push(Query.equal('status', 'disputed'));
-    else if (filter === 'completed') queries.push(Query.equal('status', 'completed'));
-    else if (filter === 'meetup_refund') queries.push(Query.equal('dealType', 'meetup'), Query.equal('status', 'completed'));
-    else if (filter === 'confirm_pay') queries.push(Query.equal('status', 'payment_uploaded'));
-    else if (filter === 'active') queries.push(Query.notEqual('status', 'completed'));
-    const res = await db.listDocuments(DB_ID, COL, queries).catch(() => ({ documents: [], total: 0 }));
-    return NextResponse.json(res);
+    let query = db.from('deals').select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(200);
+    if (filter === 'disputed') query = query.eq('status', 'disputed');
+    else if (filter === 'completed') query = query.eq('status', 'completed');
+    else if (filter === 'meetup_refund') query = query.eq('deal_type', 'meetup').eq('status', 'completed');
+    else if (filter === 'confirm_pay') query = query.eq('status', 'payment_uploaded');
+    else if (filter === 'active') query = query.neq('status', 'completed');
+    const { data, count } = await query;
+    const deals = data || [];
+
+    // ดึง deal_meetup / deal_price_state ของทุกดีลที่เกี่ยวข้อง มาแนบ — แทน priceData/meetupData JSON blob เดิม
+    const dealIds = deals.map(d => d.id);
+    const [{ data: meetups }, { data: priceStates }] = dealIds.length
+      ? await Promise.all([
+        db.from('deal_meetup').select('*').in('deal_id', dealIds),
+        db.from('deal_price_state').select('*').in('deal_id', dealIds),
+      ])
+      : [{ data: [] }, { data: [] }];
+    const meetupMap = new Map((meetups || []).map(m => [m.deal_id, m]));
+    const priceMap = new Map((priceStates || []).map(p => [p.deal_id, p]));
+    const documents = deals.map(d => ({ ...d, meetup: meetupMap.get(d.id) || null, priceState: priceMap.get(d.id) || null }));
+
+    return NextResponse.json({ documents, total: count || 0 });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }
 
@@ -28,35 +39,34 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     await verifyAdmin(req);
-    const db = new Databases(getAdminClient());
+    const db = getAdminClient();
     const { id, action, note } = await req.json();
     if (!id || !action) return NextResponse.json({ error: 'missing params' }, { status: 400 });
 
-    const deal = await db.getDocument(DB_ID, COL, id);
+    const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('id', id).single();
+    if (dealErr || !deal) return NextResponse.json({ error: 'ไม่พบดีล' }, { status: 404 });
 
     if (action === 'resolve_dispute') {
       if (deal.status !== 'disputed') return NextResponse.json({ error: 'ดีลนี้ไม่ได้อยู่ในข้อพิพาท' }, { status: 400 });
-      const updated = await db.updateDocument(DB_ID, COL, id, {
-        status: 'completed',
-        rejectReason: `[แอดมินตัดสิน] ${String(note || '').slice(0, 400)}`,
-      });
+      const { data: updated } = await db.from('deals').update({
+        status: 'completed', reject_reason: `[แอดมินตัดสิน] ${String(note || '').slice(0, 400)}`,
+      }).eq('id', id).select().single();
       return NextResponse.json({ deal: updated });
     }
 
     if (action === 'cancel_refund') {
-      const updated = await db.updateDocument(DB_ID, COL, id, {
-        status: 'cancelled',
-        rejectReason: `[แอดมินยกเลิก+คืนเงิน] ${String(note || '').slice(0, 400)}`,
-      });
+      const { data: updated } = await db.from('deals').update({
+        status: 'cancelled', reject_reason: `[แอดมินยกเลิก+คืนเงิน] ${String(note || '').slice(0, 400)}`,
+      }).eq('id', id).select().single();
       return NextResponse.json({ deal: updated });
     }
 
     if (action === 'mark_refunded') {
-      // บันทึกว่าโอนเงินประกัน meetup คืนแล้ว ลงใน meetupData
-      const md = (() => { try { return JSON.parse(deal.meetupData || '{}'); } catch { return {}; } })();
-      md.refundedAt = new Date().toISOString();
-      md.refundNote = String(note || '').slice(0, 200);
-      const updated = await db.updateDocument(DB_ID, COL, id, { meetupData: JSON.stringify(md) });
+      // บันทึกว่าโอนเงินประกัน meetup คืนแล้ว
+      await db.from('deal_meetup').upsert({
+        deal_id: id, refunded_at: new Date().toISOString(), refund_note: String(note || '').slice(0, 200),
+      }, { onConflict: 'deal_id' });
+      const { data: updated } = await db.from('deals').select('*').eq('id', id).single();
       return NextResponse.json({ deal: updated });
     }
 
@@ -64,22 +74,22 @@ export async function PATCH(req: NextRequest) {
     if (action === 'confirm_payment' || action === 'confirm_simple_payment') {
       if (deal.status !== 'payment_uploaded')
         return NextResponse.json({ error: 'ดีลนี้ไม่อยู่ในสถานะรอยืนยันรับเงิน' }, { status: 400 });
-      const updated = await db.updateDocument(DB_ID, COL, id, {
+      const { data: updated } = await db.from('deals').update({
         status: 'packing',
-        middlemanConfirmedPayment: true,
-        rejectReason: note ? `[ศูนย์กลางยืนยันรับเงิน] ${String(note).slice(0, 200)}` : deal.rejectReason || '',
-      });
+        middleman_confirmed_payment: true,
+        reject_reason: note ? `[ศูนย์กลางยืนยันรับเงิน] ${String(note).slice(0, 200)}` : deal.reject_reason || '',
+      }).eq('id', id).select().single();
       return NextResponse.json({ deal: updated });
     }
 
     if (action === 'delete_deal') {
-      await db.deleteDocument(DB_ID, COL, id);
+      await db.from('deals').delete().eq('id', id);
       return NextResponse.json({ ok: true, deleted: true });
     }
 
     return NextResponse.json({ error: 'unknown action' }, { status: 400 });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
-    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

@@ -1,7 +1,6 @@
 'use client';
 
-import { account } from '@/lib/appwrite';
-import { OAuthProvider } from 'appwrite';
+import { supabase } from '@/lib/supabase';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
@@ -21,22 +20,20 @@ function LoginForm() {
 
   const returnTo = searchParams.get('returnTo') || '/register';
 
-  const handleLogin = async (provider: 'google' | 'facebook') => {
+  const handleLogin = async (provider: 'google') => {
     // Google ปฏิเสธ OAuth ในเบราว์เซอร์ภายในแอป (LINE/Messenger) — แนะนำ LINE login หรือเปิดเบราว์เซอร์หลัก
-    if (provider === 'google' && detectInApp()) {
+    if (detectInApp()) {
       alert('Google ไม่อนุญาตให้ล็อกอินผ่านเบราว์เซอร์ใน LINE/Messenger\n\nแนะนำ: เข้าสู่ระบบด้วย LINE (ใช้ได้เลย) หรือกด "เปิดในเบราว์เซอร์" จากแถบด้านบน');
       return;
     }
     try {
-      const authProvider = provider === 'google' ? OAuthProvider.Google : OAuthProvider.Facebook;
-      // ใช้ token flow (ไม่ใช่ session flow) — session flow ฝาก cookie ไว้ที่โดเมน Appwrite
-      // ซึ่งมือถือ/แท็บเล็ต (Safari, Chrome) บล็อก third-party cookie ทำให้ login แล้วเด้งออกตลอด
       const safeReturn = returnTo.startsWith('/') ? returnTo : '/register';
-      account.createOAuth2Token(
-        authProvider,
-        `${window.location.origin}/auth/oauth/complete?returnTo=${encodeURIComponent(safeReturn)}`,
-        `${window.location.origin}/login?error=oauth_failed`
-      );
+      await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/oauth/complete?returnTo=${encodeURIComponent(safeReturn)}`,
+        },
+      });
     } catch (e) {
       console.error('Error logging in:', e);
     }
@@ -78,13 +75,6 @@ function LoginForm() {
           </a>
 
           <div className="login-divider">หรือ</div>
-
-          <button onClick={() => handleLogin('facebook')} className="btn btn-fb btn-block" style={{ fontSize: 15, padding: '14px 24px' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style={{ flexShrink: 0 }}>
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-            </svg>
-            เข้าสู่ระบบด้วย Facebook
-          </button>
 
           <button onClick={() => handleLogin('google')} className="btn btn-google btn-block" style={{ fontSize: 15, padding: '14px 24px' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>

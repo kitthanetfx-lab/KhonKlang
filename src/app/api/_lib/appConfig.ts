@@ -1,47 +1,21 @@
-import { Databases, Permission, Role } from 'node-appwrite';
-import { SERVICE_CONTROL_DEFAULTS, ServiceControlMap, sanitizeServiceControls } from '@/lib/serviceControls';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { SERVICE_CONTROL_DEFAULTS, ServiceControlMap, ServiceControlKey, sanitizeServiceControls } from '@/lib/serviceControls';
 
-export const APP_CONFIG_COL = 'app_config';
-
-export async function ensureAppConfigCollection(db: Databases) {
-  try {
-    await db.getCollection('khonklang_db', APP_CONFIG_COL);
-  } catch {
-    await db.createCollection('khonklang_db', APP_CONFIG_COL, 'App Config', [Permission.read(Role.any())]).catch(() => {});
-    await db.createStringAttribute('khonklang_db', APP_CONFIG_COL, 'data', 4000, false, '').catch(() => {});
-  }
+/** อ่านสถานะเปิด/ปิดบริการทั้งหมดจากตาราง service_controls (เดิมเป็น JSON blob ใน app_config) */
+export async function readServiceControlsConfig(db: SupabaseClient): Promise<ServiceControlMap> {
+  const { data } = await db.from('service_controls').select('key, enabled, note');
+  const raw: Record<string, { enabled: boolean; note: string }> = {};
+  for (const row of data || []) raw[row.key] = { enabled: row.enabled, note: row.note || '' };
+  return sanitizeServiceControls(raw);
 }
 
-export async function readJsonConfig<T>(db: Databases, docId: string, defaults: T): Promise<T> {
-  try {
-    const doc = await db.getDocument('khonklang_db', APP_CONFIG_COL, docId) as unknown as { data?: string };
-    const saved = JSON.parse(doc.data || '{}');
-    return { ...defaults, ...saved };
-  } catch {
-    return defaults;
-  }
-}
-
-export async function writeJsonConfig(db: Databases, docId: string, payload: unknown) {
-  const data = JSON.stringify(payload).slice(0, 3900);
-  await ensureAppConfigCollection(db);
-  let lastErr: unknown = null;
-  for (let i = 0; i < 6; i += 1) {
-    try {
-      try {
-        await db.updateDocument('khonklang_db', APP_CONFIG_COL, docId, { data });
-      } catch {
-        await db.createDocument('khonklang_db', APP_CONFIG_COL, docId, { data });
-      }
-      return;
-    } catch (err) {
-      lastErr = err;
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-  throw lastErr;
-}
-
-export async function readServiceControlsConfig(db: Databases): Promise<ServiceControlMap> {
-  return sanitizeServiceControls(await readJsonConfig(db, 'service_controls', SERVICE_CONTROL_DEFAULTS));
+/** เขียนค่าทับทั้ง 8 รายการ (upsert ตาม key) */
+export async function writeServiceControlsConfig(db: SupabaseClient, map: ServiceControlMap) {
+  const rows = (Object.keys(map) as ServiceControlKey[]).map(key => ({
+    key,
+    enabled: map[key].enabled,
+    note: map[key].note,
+  }));
+  const { error } = await db.from('service_controls').upsert(rows, { onConflict: 'key' });
+  if (error) throw new Error(error.message);
 }

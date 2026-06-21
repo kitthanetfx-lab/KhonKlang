@@ -8,7 +8,7 @@ import {
   ArrowRight, ArrowLeft, CheckCircle2,
   AlertTriangle, Copy, Check, Store, ClipboardList, Plus, Trash2, MapPin,
 } from 'lucide-react';
-import { account } from '@/lib/appwrite';
+import { supabase, authHeaders } from '@/lib/supabase';
 import { uploadKycFiles } from '@/lib/uploadKyc';
 import { FileUpload } from '@/components/FileUpload';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
@@ -315,32 +315,36 @@ function SellerForm() {
   const ic = 'w-full bg-white/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-40';
 
   useEffect(() => {
-    account.get()
-      .then(async u => {
-        setDisplayName(u.name || '');
-        const em = (!u.email || u.email.includes('@line.khonklang.app')) ? '' : u.email;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { router.replace('/login'); return; }
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        const name = profile?.display_name || '';
+        setDisplayName(name);
+        const em = (!user.email || user.email.includes('@line.khonklang.app')) ? '' : user.email;
         setOauthEmail(em);
-        setFullNameId(u.name || '');
-        const prefs = (u.prefs as Record<string, string>) || {};
-        if (prefs.address) setProfileAddress(prefs.address);
-        if (prefs.bankAcct)  setBankAcct(prefs.bankAcct);
-        if (prefs.bankName)  setBankName(prefs.bankName);
-        if (prefs.bankOwner) setBankOwner(prefs.bankOwner);
-        if (prefs.sellerStatus) {
-          setExistingStatus(prefs.sellerStatus);
+        setFullNameId(name);
+        if (profile?.address) setProfileAddress(profile.address);
+        if (profile?.bank_acct)  setBankAcct(profile.bank_acct);
+        if (profile?.bank_name)  setBankName(profile.bank_name);
+        if (profile?.bank_owner) setBankOwner(profile.bank_owner);
+        if (profile?.seller_status) {
+          setExistingStatus(profile.seller_status);
         } else {
-          const jwt = (await account.createJWT()).jwt;
-          const res = await fetch('/api/register/seller', {
-            headers: { 'x-session-jwt': jwt },
-          }).catch(() => null);
+          const headers = await authHeaders();
+          const res = await fetch('/api/register/seller', { headers }).catch(() => null);
           if (res?.ok) {
             const data = await res.json();
             if (data.status) setExistingStatus(data.status);
           }
         }
-      })
-      .catch(() => router.replace('/login'))
-      .finally(() => setLoading(false));
+      } catch {
+        router.replace('/login');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [router]);
 
   // Branch helpers
@@ -401,7 +405,7 @@ function SellerForm() {
       });
       setError('');
 
-      const jwt = (await account.createJWT()).jwt;
+      const headers = await authHeaders();
       // Build address string from branches
       const address  = branches.map(b => `[${b.label}] ${branchToString(b)}`).filter(s => s.length > 10).join(' / ');
       const province = branches[0].provinceName;
@@ -420,7 +424,7 @@ function SellerForm() {
       };
       const res = await fetch('/api/register/seller', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-session-jwt': jwt },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       if (!res.ok) { const d = await res.json(); setError(d.error || 'เกิดข้อผิดพลาด'); return; }

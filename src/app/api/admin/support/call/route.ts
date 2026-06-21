@@ -1,25 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Account, Client, Databases, ID } from 'node-appwrite';
-import { verifyAdmin, getAdminClient, DB_ID } from '../../_lib';
-import { COL_THREADS, COL_MESSAGES, ensureSupportCollections, newCallId } from '../../../_lib/support';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { verifyAdmin, getAdminClient } from '../../_lib';
+import { newCallId } from '../../../_lib/support';
 
-async function getAdminName(req: NextRequest) {
-  try {
-    const jwt = req.headers.get('x-session-jwt')!;
-    const c = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setJWT(jwt);
-    const u = await new Account(c).get();
-    return ((u.prefs || {}) as Record<string, string>).displayName || u.name || 'พนักงาน';
-  } catch { return 'พนักงาน'; }
+async function getStaffName(db: SupabaseClient, staffId: string) {
+  const { data } = await db.from('profiles').select('display_name').eq('id', staffId).maybeSingle();
+  return data?.display_name || 'พนักงาน';
 }
 
-async function logSystem(db: Databases, threadId: string, content: string) {
-  await db.createDocument(DB_ID, COL_MESSAGES, ID.unique(), {
-    threadId, senderId: 'system', senderName: 'ระบบ', senderRole: 'system',
-    content, createdAt: new Date().toISOString(),
-  }).catch(() => null);
+async function logSystem(db: SupabaseClient, threadId: string, content: string) {
+  await db.from('support_messages').insert({
+    thread_id: threadId, sender_id: 'system', sender_name: 'ระบบ', sender_role: 'system',
+    content, created_at: new Date().toISOString(),
+  });
 }
 
 /**
@@ -35,53 +28,52 @@ export async function POST(req: NextRequest) {
     const action = String(body.action || '');
     if (!customerId) return NextResponse.json({ error: 'ไม่พบลูกค้า' }, { status: 400 });
 
-    const db = new Databases(getAdminClient());
-    await ensureSupportCollections(db);
-    const thread = await db.getDocument(DB_ID, COL_THREADS, customerId).catch(() => null);
+    const db = getAdminClient();
+    const { data: thread } = await db.from('support_threads').select('*').eq('customer_id', customerId).maybeSingle();
     if (!thread) return NextResponse.json({ error: 'ไม่พบห้องแชท' }, { status: 404 });
-    const staffName = await getAdminName(req);
+    const staffName = await getStaffName(db, staffId);
     const now = new Date().toISOString();
 
     if (action === 'call') {
-      if (thread.callStatus !== 'idle' && thread.callStatus !== 'ended') {
+      if (thread.call_status !== 'idle' && thread.call_status !== 'ended') {
         return NextResponse.json({ error: 'มีสาย/คำขออยู่แล้ว' }, { status: 409 });
       }
       const callId = newCallId();
-      await db.updateDocument(DB_ID, COL_THREADS, customerId, {
-        callStatus: 'staff_ringing', callId, callInitiator: 'staff',
-        callStaffId: staffId, callStaffName: staffName, callUpdatedAt: now, updatedAt: now,
-      });
+      await db.from('support_threads').update({
+        call_status: 'staff_ringing', call_id: callId, call_initiator: 'staff',
+        call_staff_id: staffId, call_staff_name: staffName, call_updated_at: now, updated_at: now,
+      }).eq('customer_id', customerId);
       await logSystem(db, customerId, `พนักงาน ${staffName} กำลังโทรหาลูกค้า`);
       return NextResponse.json({ ok: true, callId });
     }
 
     if (action === 'approve') {
-      if (thread.callStatus !== 'customer_requesting') return NextResponse.json({ error: 'ไม่มีคำขอโทรรอดำเนินการ' }, { status: 409 });
-      await db.updateDocument(DB_ID, COL_THREADS, customerId, {
-        callStatus: 'connecting', callStaffId: staffId, callStaffName: staffName, callUpdatedAt: now, updatedAt: now,
-      });
+      if (thread.call_status !== 'customer_requesting') return NextResponse.json({ error: 'ไม่มีคำขอโทรรอดำเนินการ' }, { status: 409 });
+      await db.from('support_threads').update({
+        call_status: 'connecting', call_staff_id: staffId, call_staff_name: staffName, call_updated_at: now, updated_at: now,
+      }).eq('customer_id', customerId);
       await logSystem(db, customerId, `พนักงาน ${staffName} รับคำขอโทรกลับและกำลังเชื่อมต่อเสียง`);
-      return NextResponse.json({ ok: true, callId: thread.callId, callStatus: 'connecting' });
+      return NextResponse.json({ ok: true, callId: thread.call_id, callStatus: 'connecting' });
     }
 
     if (action === 'active') {
-      if (!['connecting', 'staff_ringing', 'active'].includes(thread.callStatus)) return NextResponse.json({ ok: true });
-      await db.updateDocument(DB_ID, COL_THREADS, customerId, {
-        callStatus: 'active', callStaffId: staffId, callStaffName: staffName, callUpdatedAt: now, updatedAt: now,
-      });
-      return NextResponse.json({ ok: true, callId: thread.callId, callStatus: 'active' });
+      if (!['connecting', 'staff_ringing', 'active'].includes(thread.call_status)) return NextResponse.json({ ok: true });
+      await db.from('support_threads').update({
+        call_status: 'active', call_staff_id: staffId, call_staff_name: staffName, call_updated_at: now, updated_at: now,
+      }).eq('customer_id', customerId);
+      return NextResponse.json({ ok: true, callId: thread.call_id, callStatus: 'active' });
     }
 
     if (action === 'decline') {
-      if (thread.callStatus !== 'customer_requesting') return NextResponse.json({ ok: true });
-      await db.updateDocument(DB_ID, COL_THREADS, customerId, { callStatus: 'ended', callUpdatedAt: now, updatedAt: now });
+      if (thread.call_status !== 'customer_requesting') return NextResponse.json({ ok: true });
+      await db.from('support_threads').update({ call_status: 'ended', call_updated_at: now, updated_at: now }).eq('customer_id', customerId);
       await logSystem(db, customerId, `พนักงาน ${staffName} ไม่สามารถรับสายได้ในขณะนี้`);
       return NextResponse.json({ ok: true });
     }
 
     if (action === 'hangup') {
-      if (thread.callStatus === 'idle' || thread.callStatus === 'ended') return NextResponse.json({ ok: true });
-      await db.updateDocument(DB_ID, COL_THREADS, customerId, { callStatus: 'ended', callUpdatedAt: now, updatedAt: now });
+      if (thread.call_status === 'idle' || thread.call_status === 'ended') return NextResponse.json({ ok: true });
+      await db.from('support_threads').update({ call_status: 'ended', call_updated_at: now, updated_at: now }).eq('customer_id', customerId);
       await logSystem(db, customerId, `พนักงาน ${staffName} วางสาย`);
       return NextResponse.json({ ok: true });
     }
