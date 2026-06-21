@@ -190,28 +190,34 @@ export async function getOrCreateThread(db: Databases, customerId: string, custo
     return doc as unknown as SupportThreadDoc;
   } catch {
     const now = new Date().toISOString();
-    const doc = await db.createDocument(DB_ID, COL_THREADS, customerId, {
-      customerName: customerName.slice(0, 200) || 'ลูกค้า',
-      status: 'open',
-      lastMessage: '',
-      lastAt: now,
-      lastSender: '',
-      unreadCustomer: false,
-      unreadStaff: false,
-      assignedStaffId: '',
-      assignedStaffName: '',
-      callStatus: 'idle',
-      callId: '',
-      callInitiator: '',
-      callStaffId: '',
-      callStaffName: '',
-      callUpdatedAt: now,
-      lastReadByCustomerAt: '',
-      lastReadByStaffAt: '',
-      createdAt: now,
-      updatedAt: now,
-    });
-    return doc as unknown as SupportThreadDoc;
+    try {
+      const doc = await db.createDocument(DB_ID, COL_THREADS, customerId, {
+        customerName: customerName.slice(0, 200) || 'ลูกค้า',
+        status: 'open',
+        lastMessage: '',
+        lastAt: now,
+        lastSender: '',
+        unreadCustomer: false,
+        unreadStaff: false,
+        assignedStaffId: '',
+        assignedStaffName: '',
+        callStatus: 'idle',
+        callId: '',
+        callInitiator: '',
+        callStaffId: '',
+        callStaffName: '',
+        callUpdatedAt: now,
+        lastReadByCustomerAt: '',
+        lastReadByStaffAt: '',
+        createdAt: now,
+        updatedAt: now,
+      });
+      return doc as unknown as SupportThreadDoc;
+    } catch (createErr) {
+      if (!String(createErr).includes('already exists')) throw createErr;
+      const existing = await db.getDocument(DB_ID, COL_THREADS, customerId);
+      return existing as unknown as SupportThreadDoc;
+    }
   }
 }
 

@@ -112,13 +112,17 @@ async function hasCollection(db: Databases, collectionId: string) {
   }
 }
 
-async function hasAttribute(db: Databases, collectionId: string, key: string) {
+async function getAttributeStatus(db: Databases, collectionId: string, key: string) {
   try {
     const attr = await db.getAttribute(DB_ID, collectionId, key);
-    return (attr as unknown as { status?: string }).status === 'available';
+    return (attr as unknown as { status?: string }).status || 'unknown';
   } catch {
-    return false;
+    return '';
   }
+}
+
+async function hasAttribute(db: Databases, collectionId: string, key: string) {
+  return (await getAttributeStatus(db, collectionId, key)) === 'available';
 }
 
 async function waitForAttribute(db: Databases, collectionId: string, key: string, maxAttempts = 20) {
@@ -129,34 +133,70 @@ async function waitForAttribute(db: Databases, collectionId: string, key: string
   throw new Error(`Finance attribute not ready: ${collectionId}.${key}`);
 }
 
+async function ensureCollection(db: Databases, collectionId: string, name: string) {
+  if (await hasCollection(db, collectionId)) return;
+  try {
+    await db.createCollection(DB_ID, collectionId, name, [
+      Permission.read(Role.users()),
+      Permission.write(Role.users()),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || '');
+    if (!(await hasCollection(db, collectionId)) && !/already exists/i.test(message)) {
+      throw new Error(`Unable to create finance collection: ${collectionId}: ${message}`);
+    }
+  }
+  if (!(await hasCollection(db, collectionId))) {
+    throw new Error(`Finance collection not ready: ${collectionId}`);
+  }
+}
+
 async function ensureStringAttribute(db: Databases, collectionId: string, key: string, size: number, required = false, defaultValue = '') {
   if (await hasAttribute(db, collectionId, key)) return;
   try {
     await db.createStringAttribute(DB_ID, collectionId, key, size, required, defaultValue);
-  } catch {
-    if (!(await hasAttribute(db, collectionId, key))) throw new Error(`Unable to create finance string attribute: ${collectionId}.${key}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || '');
+    const status = await getAttributeStatus(db, collectionId, key);
+    if (status) {
+      await waitForAttribute(db, collectionId, key, 40);
+      return;
+    }
+    throw new Error(`Unable to create finance string attribute: ${collectionId}.${key}: ${message}`);
   }
-  await waitForAttribute(db, collectionId, key);
+  await waitForAttribute(db, collectionId, key, 40);
 }
 
 async function ensureIntegerAttribute(db: Databases, collectionId: string, key: string, min = 0, max = 999999999, defaultValue = 0) {
   if (await hasAttribute(db, collectionId, key)) return;
   try {
     await db.createIntegerAttribute(DB_ID, collectionId, key, false, min, max, defaultValue);
-  } catch {
-    if (!(await hasAttribute(db, collectionId, key))) throw new Error(`Unable to create finance integer attribute: ${collectionId}.${key}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || '');
+    const status = await getAttributeStatus(db, collectionId, key);
+    if (status) {
+      await waitForAttribute(db, collectionId, key, 40);
+      return;
+    }
+    throw new Error(`Unable to create finance integer attribute: ${collectionId}.${key}: ${message}`);
   }
-  await waitForAttribute(db, collectionId, key);
+  await waitForAttribute(db, collectionId, key, 40);
 }
 
 async function ensureBooleanAttribute(db: Databases, collectionId: string, key: string, defaultValue = false) {
   if (await hasAttribute(db, collectionId, key)) return;
   try {
     await db.createBooleanAttribute(DB_ID, collectionId, key, false, defaultValue);
-  } catch {
-    if (!(await hasAttribute(db, collectionId, key))) throw new Error(`Unable to create finance boolean attribute: ${collectionId}.${key}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || '');
+    const status = await getAttributeStatus(db, collectionId, key);
+    if (status) {
+      await waitForAttribute(db, collectionId, key, 40);
+      return;
+    }
+    throw new Error(`Unable to create finance boolean attribute: ${collectionId}.${key}: ${message}`);
   }
-  await waitForAttribute(db, collectionId, key);
+  await waitForAttribute(db, collectionId, key, 40);
 }
 
 async function ensureIndex(db: Databases, collectionId: string, key: string, attrs: string[], orders: OrderBy[]) {
@@ -164,18 +204,8 @@ async function ensureIndex(db: Databases, collectionId: string, key: string, att
 }
 
 export async function ensureFinanceCollections(db: Databases) {
-  if (!(await hasCollection(db, COL_LEDGER))) {
-    await db.createCollection(DB_ID, COL_LEDGER, 'Finance Ledger', [
-      Permission.read(Role.users()),
-      Permission.write(Role.users()),
-    ]).catch(() => {});
-  }
-  if (!(await hasCollection(db, COL_WALLETS))) {
-    await db.createCollection(DB_ID, COL_WALLETS, 'Middleman Wallets', [
-      Permission.read(Role.users()),
-      Permission.write(Role.users()),
-    ]).catch(() => {});
-  }
+  await ensureCollection(db, COL_LEDGER, 'Finance Ledger');
+  await ensureCollection(db, COL_WALLETS, 'Middleman Wallets');
 
   await ensureStringAttribute(db, COL_LEDGER, 'entryKey', 120);
   await ensureStringAttribute(db, COL_LEDGER, 'referenceType', 40);
