@@ -17,8 +17,10 @@ export interface DealPriceState {
   sellerFeeSlip?: string;
   // บัญชี/สถานะการโอนเงิน "ออก" จากศูนย์กลาง — จ่ายคืนผู้ขายเมื่อจบดีล / คืนเงินผู้ซื้อเมื่อยกเลิก
   payoutSentAt?: string;
+  payoutSlipFileId?: string;
   payoutNote?: string;
   refundSentAt?: string;
+  refundSlipFileId?: string;
   refundNote?: string;
 }
 
@@ -65,8 +67,10 @@ function normalizeDealPriceState(value: JsonRecord): DealPriceState {
     evidenceDoneMiddleman: asBoolean(value.evidenceDoneMiddleman),
     sellerFeeSlip: typeof value.sellerFeeSlip === 'string' ? value.sellerFeeSlip : undefined,
     payoutSentAt: typeof value.payoutSentAt === 'string' ? value.payoutSentAt : undefined,
+    payoutSlipFileId: typeof value.payoutSlipFileId === 'string' ? value.payoutSlipFileId : undefined,
     payoutNote: typeof value.payoutNote === 'string' ? value.payoutNote : undefined,
     refundSentAt: typeof value.refundSentAt === 'string' ? value.refundSentAt : undefined,
+    refundSlipFileId: typeof value.refundSlipFileId === 'string' ? value.refundSlipFileId : undefined,
     refundNote: typeof value.refundNote === 'string' ? value.refundNote : undefined,
   };
 }

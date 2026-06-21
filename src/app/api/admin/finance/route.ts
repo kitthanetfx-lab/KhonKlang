@@ -673,10 +673,14 @@ export async function PATCH(req: NextRequest) {
       const pd: DealPriceState = readDealPriceState({ priceData: String(deal.priceData || ''), meetupData: String(deal.meetupData || '') });
       const now = new Date().toISOString();
       if (action === 'mark_payout_sent') {
+        if (!fileId) return NextResponse.json({ error: 'กรุณาแนบสลิปหลักฐานการโอนให้ผู้ขาย' }, { status: 400 });
         pd.payoutSentAt = now;
+        pd.payoutSlipFileId = String(fileId);
         pd.payoutNote = String(note || '').slice(0, 300);
       } else {
+        if (!fileId) return NextResponse.json({ error: 'กรุณาแนบสลิปหลักฐานการคืนเงินให้ผู้ซื้อ' }, { status: 400 });
         pd.refundSentAt = now;
+        pd.refundSlipFileId = String(fileId);
         pd.refundNote = String(note || '').slice(0, 300);
       }
       const serialized = writeDealPriceState(pd, String(deal.meetupData || ''));

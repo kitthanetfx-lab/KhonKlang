@@ -84,6 +84,8 @@ export default function AdminDeals() {
     if (d.paymentSlipFileId) slips.push({ label: 'สลิปผู้ซื้อ (ค่าสินค้า)', fileId: d.paymentSlipFileId });
     const pd = readDealPriceState({ priceData: d.priceData || '', meetupData: d.meetupData || '' });
     if (pd.sellerFeeSlip) slips.push({ label: 'สลิปผู้ขาย (ค่าบริการ)', fileId: pd.sellerFeeSlip });
+    if (pd.payoutSlipFileId) slips.push({ label: 'สลิปศูนย์กลางโอนให้ผู้ขาย', fileId: pd.payoutSlipFileId });
+    if (pd.refundSlipFileId) slips.push({ label: 'สลิปศูนย์กลางคืนให้ผู้ซื้อ', fileId: pd.refundSlipFileId });
     if (d.dealType === 'meetup') {
       try {
         const md = JSON.parse(d.meetupData || '{}');

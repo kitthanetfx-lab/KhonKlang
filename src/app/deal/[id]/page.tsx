@@ -1118,6 +1118,8 @@ export default function DealRoom() {
     const slips: { label: string; fileId: string }[] = [];
     if (deal!.paymentSlipFileId) slips.push({ label: 'สลิปโอนเงินค่าสินค้า (ผู้ซื้อ)', fileId: deal!.paymentSlipFileId });
     if (pd.sellerFeeSlip) slips.push({ label: 'สลิปค่าบริการ (ผู้ขาย)', fileId: pd.sellerFeeSlip });
+    if (pd.payoutSlipFileId) slips.push({ label: 'สลิปโอนเงินจากศูนย์กลางถึงผู้ขาย', fileId: pd.payoutSlipFileId });
+    if (pd.refundSlipFileId) slips.push({ label: 'สลิปคืนเงินจากศูนย์กลางถึงผู้ซื้อ', fileId: pd.refundSlipFileId });
     if (md.buyerSlip) slips.push({ label: 'สลิปเงินประกันนัดเจอ (ผู้ซื้อ)', fileId: md.buyerSlip });
     if (md.sellerSlip) slips.push({ label: 'สลิปเงินประกันนัดเจอ (ผู้ขาย)', fileId: md.sellerSlip });
     if (slips.length === 0) return null;

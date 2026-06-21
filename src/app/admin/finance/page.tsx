@@ -275,6 +275,32 @@ export default function AdminFinance() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
+  function pickSlipFile() {
+    return new Promise<File | null>(resolve => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*,.pdf';
+      input.onchange = () => resolve(input.files?.[0] || null);
+      input.click();
+    });
+  }
+
+  async function uploadDealFile(file: File) {
+    const jwt = (await account.createJWT()).jwt;
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch('/api/upload-deal', {
+      method: 'POST',
+      headers: { 'x-session-jwt': jwt },
+      body: form,
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'อัปโหลดสลิปไม่สำเร็จ');
+    }
+    return String(data.fileId || '');
+  }
+
   async function act(refId: string, action: string) {
     let note = '';
     if (action === 'reject_payment') {
@@ -295,12 +321,25 @@ export default function AdminFinance() {
     setActing(refId);
     try {
       const jwt = (await account.createJWT()).jwt;
+      let fileId = '';
+      if (action === 'mark_payout_sent' || action === 'mark_refund_sent') {
+        const file = await pickSlipFile();
+        if (!file) return;
+        fileId = await uploadDealFile(file);
+      }
       const r = await fetch('/api/admin/finance', {
         method: 'PATCH',
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: refId, action, note }),
+        body: JSON.stringify({ id: refId, action, note, fileId }),
       });
-      if (r.ok) await load();
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        alert(data.error || 'บันทึกรายการไม่สำเร็จ');
+        return;
+      }
+      await load();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'บันทึกรายการไม่สำเร็จ');
     } finally {
       setActing('');
     }
@@ -723,7 +762,7 @@ export default function AdminFinance() {
                                   className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
                                 >
                                   {acting === item.refId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                                  บันทึกว่าโอนแล้ว
+                                  แนบสลิปและบันทึกว่าโอนแล้ว
                                 </button>
                               )}
                               <Link href={item.detailUrl} target="_blank" className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50">
