@@ -112,6 +112,14 @@ async function hasCollection(db: Databases, collectionId: string) {
   }
 }
 
+async function waitForCollection(db: Databases, collectionId: string, maxAttempts = 40) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (await hasCollection(db, collectionId)) return;
+    await sleep(500);
+  }
+  throw new Error(`Finance collection not ready: ${collectionId}`);
+}
+
 async function getAttributeStatus(db: Databases, collectionId: string, key: string) {
   try {
     const attr = await db.getAttribute(DB_ID, collectionId, key);
@@ -146,9 +154,7 @@ async function ensureCollection(db: Databases, collectionId: string, name: strin
       throw new Error(`Unable to create finance collection: ${collectionId}: ${message}`);
     }
   }
-  if (!(await hasCollection(db, collectionId))) {
-    throw new Error(`Finance collection not ready: ${collectionId}`);
-  }
+  await waitForCollection(db, collectionId, 40);
 }
 
 async function ensureStringAttribute(db: Databases, collectionId: string, key: string, size: number, required = false, defaultValue = '') {

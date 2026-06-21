@@ -133,6 +133,8 @@ export function SupportWidget() {
     void getJwt().then(send).catch(() => null);
   }, [getJwt]);
 
+  if (pathname?.startsWith('/admin')) return null;
+
   const getIceServers = useCallback(async () => {
     const jwt = jwtRef.current || await getJwt();
     const r = await fetch('/api/support/ice', { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
