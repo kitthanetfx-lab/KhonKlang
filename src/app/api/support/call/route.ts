@@ -4,10 +4,12 @@ import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
 import { getOrCreateThread, newCallId } from '../../_lib/support';
 
 async function logSystem(db: SupabaseClient, threadId: string, content: string) {
-  await db.from('support_messages').insert({
-    thread_id: threadId, sender_id: 'system', sender_name: 'ระบบ', sender_role: 'system',
-    content, created_at: new Date().toISOString(),
-  }).then(() => null).catch(() => null);
+  try {
+    await db.from('support_messages').insert({
+      thread_id: threadId, sender_id: 'system', sender_name: 'ระบบ', sender_role: 'system',
+      content, created_at: new Date().toISOString(),
+    });
+  } catch { /* best-effort logging only */ }
 }
 
 /**
