@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Databases, Query, ID, Users } from 'node-appwrite';
 import * as XLSX from 'xlsx';
+import { readFile } from 'node:fs/promises';
 import { verifyAdmin, getAdminClient, DB_ID } from '../../admin/_lib';
 import { notifyUsers } from '../../_lib/notify';
 import { readDealPriceState, writeDealPriceState, type DealPriceState } from '@/lib/dealPriceState';
@@ -17,6 +18,23 @@ import {
 const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
 const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '';
 const slipUrl = (bucket: string, fileId: string) => `${ENDPOINT}/storage/buckets/${bucket}/files/${fileId}/view?project=${PROJECT}`;
+
+// #region debug-point A:reporter
+async function reportDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown> = {}, traceId = '') {
+  let url = 'http://127.0.0.1:7777/event';
+  let sessionId = 'admin-api-500';
+  try {
+    const env = await readFile('.dbg/admin-api-500.env', 'utf8');
+    url = env.match(/DEBUG_SERVER_URL=(.+)/)?.[1]?.trim() || url;
+    sessionId = env.match(/DEBUG_SESSION_ID=(.+)/)?.[1]?.trim() || sessionId;
+  } catch {}
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, runId: 'pre-fix', hypothesisId, location, msg: `[DEBUG] ${msg}`, data, traceId, ts: Date.now() }),
+  }).catch(() => {});
+}
+// #endregion
 
 const COL_DEALS = 'deals';
 const COL_MSGS = 'messages';
@@ -493,11 +511,32 @@ async function buildFinanceResponse(
   users: Users,
   params: { tab: FinanceTab; filter: string; page: number; pageSize: number; search: string; exportFormat?: ExportFormat | null },
 ) {
+  const traceId = `finance-get-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  // #region debug-point A:build-start
+  await reportDebug('A', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:start', 'build finance response start', {
+    tab: params.tab,
+    filter: params.filter,
+    page: params.page,
+    pageSize: params.pageSize,
+    search: params.search,
+    exportFormat: params.exportFormat || '',
+  }, traceId);
+  // #endregion
   await syncFinanceProjection(db, users);
+  // #region debug-point A:after-sync
+  await reportDebug('A', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:after-sync', 'sync finance projection completed', {}, traceId);
+  // #endregion
   const fees = await readFeesConfig(db);
   const tabKey = params.tab === 'outgoing' ? 'outgoing' : 'incoming';
   const entryTypes = ENTRY_TYPE_FILTERS[tabKey][params.filter] || ENTRY_TYPE_FILTERS[tabKey].all;
   const base = await fetchLedgerEntries(db, entryTypes, params.page, params.pageSize, params.search, !!params.exportFormat);
+  // #region debug-point B:base-ledger
+  await reportDebug('B', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:base-ledger', 'fetched base ledger entries', {
+    entryTypes,
+    ledgerCount: base.ledger.length,
+    total: base.total,
+  }, traceId);
+  // #endregion
   const refs = await loadReferenceContext(db, base.ledger);
   const ownerIds = Array.from(new Set(
     base.ledger
@@ -520,6 +559,11 @@ async function buildFinanceResponse(
     Query.limit(1000),
   ]).catch(() => ({ documents: [] }));
   const summaryLedger = summaryLedgerRes.documents as unknown as LedgerDoc[];
+  // #region debug-point B:summary-ledger
+  await reportDebug('B', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:summary-ledger', 'fetched summary ledger entries', {
+    summaryCount: summaryLedger.length,
+  }, traceId);
+  // #endregion
   const summaryRefs = await loadReferenceContext(db, summaryLedger);
   const summaryBankIds = Array.from(new Set(
     summaryLedger
@@ -592,6 +636,12 @@ async function buildFinanceResponse(
 
 export async function GET(req: NextRequest) {
   try {
+    const traceId = `finance-route-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    // #region debug-point C:get-entry
+    await reportDebug('C', 'src/app/api/admin/finance/route.ts:GET:entry', 'admin finance GET entry', {
+      searchParams: req.nextUrl.searchParams.toString(),
+    }, traceId);
+    // #endregion
     await verifyAdmin(req);
     const tab = (req.nextUrl.searchParams.get('tab') || 'incoming') as FinanceTab;
     const filter = req.nextUrl.searchParams.get('filter') || 'all';
@@ -637,6 +687,13 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
+    // #region debug-point D:get-error
+    await reportDebug('D', 'src/app/api/admin/finance/route.ts:GET:catch', 'admin finance GET failed', {
+      status: e.status ?? 500,
+      message: e.message ?? 'error',
+      stack: err instanceof Error ? err.stack : String(err),
+    });
+    // #endregion
     return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
   }
 }

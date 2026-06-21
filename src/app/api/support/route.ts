@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Account, Databases, ID, Query } from 'node-appwrite';
+import { readFile } from 'node:fs/promises';
 import { DB_ID, COL_THREADS, COL_MESSAGES, ensureSupportCollections, getOrCreateThread } from '../_lib/support';
+
+// #region debug-point E:reporter
+async function reportDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown> = {}, traceId = '') {
+  let url = 'http://127.0.0.1:7777/event';
+  let sessionId = 'admin-api-500';
+  try {
+    const env = await readFile('.dbg/admin-api-500.env', 'utf8');
+    url = env.match(/DEBUG_SERVER_URL=(.+)/)?.[1]?.trim() || url;
+    sessionId = env.match(/DEBUG_SESSION_ID=(.+)/)?.[1]?.trim() || sessionId;
+  } catch {}
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, runId: 'pre-fix', hypothesisId, location, msg: `[DEBUG] ${msg}`, data, traceId, ts: Date.now() }),
+  }).catch(() => {});
+}
+// #endregion
 
 function getAdmin() {
   const c = new Client()
@@ -22,8 +40,20 @@ async function getMe(req: NextRequest) {
 
 /** GET — ห้องแชทของฉัน (ลูกค้า) พร้อมข้อความล่าสุด */
 export async function GET(req: NextRequest) {
+  const traceId = `support-get-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   try {
+    // #region debug-point E:get-entry
+    await reportDebug('E', 'src/app/api/support/route.ts:GET:entry', 'support GET entry', {
+      searchParams: req.nextUrl.searchParams.toString(),
+      hasJwt: !!req.headers.get('x-session-jwt'),
+    }, traceId);
+    // #endregion
     const me = await getMe(req);
+    // #region debug-point E:after-auth
+    await reportDebug('E', 'src/app/api/support/route.ts:GET:after-auth', 'support GET authenticated', {
+      userId: me.$id,
+    }, traceId);
+    // #endregion
     const db = getAdmin();
     await ensureSupportCollections(db);
     let thread = await getOrCreateThread(db, me.$id, ((me.prefs || {}) as Record<string, string>).displayName || me.name || 'ลูกค้า');
@@ -47,6 +77,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ thread, messages: r.documents });
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status || 500;
+    // #region debug-point F:get-error
+    await reportDebug('F', 'src/app/api/support/route.ts:GET:catch', 'support GET failed', {
+      status,
+      message: String((err as Error)?.message || err),
+      stack: err instanceof Error ? err.stack : String(err),
+    }, traceId);
+    // #endregion
     return NextResponse.json({ error: String((err as Error)?.message || err) }, { status });
   }
 }
