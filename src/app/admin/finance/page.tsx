@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { account } from '@/lib/appwrite';
 import {
@@ -21,6 +21,7 @@ import {
   PanelRightOpen,
   FileImage,
   Download,
+  RefreshCw,
 } from 'lucide-react';
 
 const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '';
@@ -210,6 +211,7 @@ function groupRowsByReference(rows: FinanceRow[]) {
 }
 
 export default function AdminFinance() {
+  const jwtRef = useRef('');
   const [tab, setTab] = useState<FinanceTab>('incoming');
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -219,22 +221,30 @@ export default function AdminFinance() {
   const [acting, setActing] = useState('');
   const [verifying, setVerifying] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'xlsx' | ''>('');
+  const [refreshing, setRefreshing] = useState(false);
   const [slipResults, setSlipResults] = useState<Record<string, SlipCheck>>({});
   const [selected, setSelected] = useState<FinanceGroup | null>(null);
   const [querySearch, setQuerySearch] = useState('');
 
+  const getJwt = useCallback(async (forceFresh = false) => {
+    if (!forceFresh && jwtRef.current) return jwtRef.current;
+    const jwt = (await account.createJWT()).jwt;
+    jwtRef.current = jwt;
+    return jwt;
+  }, []);
+
   const load = useCallback(async () => {
+    const jwt = await getJwt();
     if (tab === 'summary') {
-      const jwt = (await account.createJWT()).jwt;
-      const r = await fetch('/api/admin/finance?tab=incoming&page=1&pageSize=20&filter=all', { headers: { 'x-session-jwt': jwt } });
+      const r = await fetch('/api/admin/finance?tab=summary&page=1&pageSize=20&filter=all', { headers: { 'x-session-jwt': jwt } });
       const d = await r.json();
       setSummary(d.summary || null);
+      setRows([]);
       return;
     }
 
     setRows(null);
     try {
-      const jwt = (await account.createJWT()).jwt;
       const params = new URLSearchParams({
         tab,
         filter,
@@ -244,6 +254,10 @@ export default function AdminFinance() {
       });
       const r = await fetch(`/api/admin/finance?${params.toString()}`, { headers: { 'x-session-jwt': jwt } });
       const d = await r.json();
+      if (!r.ok) {
+        setRows([]);
+        return;
+      }
       setRows(d.rows || []);
       setSummary(d.summary || null);
       setPagination(prev => ({
@@ -256,7 +270,7 @@ export default function AdminFinance() {
     } catch {
       setRows([]);
     }
-  }, [filter, pagination.page, pagination.pageSize, querySearch, tab]);
+  }, [filter, getJwt, pagination.page, pagination.pageSize, querySearch, tab]);
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0);
@@ -286,7 +300,7 @@ export default function AdminFinance() {
   }
 
   async function uploadDealFile(file: File) {
-    const jwt = (await account.createJWT()).jwt;
+    const jwt = await getJwt();
     const form = new FormData();
     form.append('file', file);
     const response = await fetch('/api/upload-deal', {
@@ -320,7 +334,7 @@ export default function AdminFinance() {
     }
     setActing(refId);
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const jwt = await getJwt();
       let fileId = '';
       if (action === 'mark_payout_sent' || action === 'mark_refund_sent') {
         const file = await pickSlipFile();
@@ -348,7 +362,7 @@ export default function AdminFinance() {
   async function verifySlip(row: FinanceRow) {
     setVerifying(row.key);
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const jwt = await getJwt();
       const r = await fetch('/api/admin/finance', {
         method: 'PATCH',
         headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
@@ -368,10 +382,32 @@ export default function AdminFinance() {
     }
   }
 
+  async function refreshProjection() {
+    setRefreshing(true);
+    try {
+      const jwt = await getJwt(true);
+      const r = await fetch('/api/admin/finance', {
+        method: 'PATCH',
+        headers: { 'x-session-jwt': jwt, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'refresh_projection' }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        alert(data.error || 'รีเฟรชข้อมูลการเงินไม่สำเร็จ');
+        return;
+      }
+      await load();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'รีเฟรชข้อมูลการเงินไม่สำเร็จ');
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   async function exportFile(format: 'csv' | 'xlsx') {
     setExporting(format);
     try {
-      const jwt = (await account.createJWT()).jwt;
+      const jwt = await getJwt();
       const params = new URLSearchParams({
         tab,
         filter,
@@ -383,6 +419,11 @@ export default function AdminFinance() {
       const response = await fetch(`/api/admin/finance?${params.toString()}`, {
         headers: { 'x-session-jwt': jwt },
       });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        alert(data.error || 'ส่งออกไฟล์ไม่สำเร็จ');
+        return;
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -482,6 +523,14 @@ export default function AdminFinance() {
                   <option value={50}>50 แถว</option>
                   <option value={100}>100 แถว</option>
                 </select>
+                <button
+                  onClick={() => void refreshProjection()}
+                  disabled={refreshing || exporting !== ''}
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {refreshing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                  รีเฟรชข้อมูล
+                </button>
                 <button
                   onClick={() => void exportFile('csv')}
                   disabled={exporting !== ''}

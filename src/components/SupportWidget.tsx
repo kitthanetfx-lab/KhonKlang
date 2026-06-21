@@ -24,6 +24,11 @@ function timeShort(iso: string) {
 /** ปุ่มลอย "ติดต่อทีมงาน" — แสดงทุกหน้า (ยกเว้นหลังบ้าน /admin) เปิดแชท + ขอให้พนักงานโทรกลับได้ */
 export function SupportWidget() {
   const pathname = usePathname();
+  if (pathname?.startsWith('/admin')) return null;
+  return <SupportWidgetPanel pathname={pathname || '/'} />;
+}
+
+function SupportWidgetPanel({ pathname }: { pathname: string }) {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [myId, setMyId] = useState('');
   const [open, setOpen] = useState(false);
@@ -52,7 +57,8 @@ export function SupportWidget() {
   useEffect(() => { threadRef.current = thread; }, [thread]);
   useEffect(() => { callStateRef.current = callState; }, [callState]);
 
-  const getJwt = useCallback(async () => {
+  const getJwt = useCallback(async (forceFresh = false) => {
+    if (!forceFresh && jwtRef.current) return jwtRef.current;
     const j = (await account.createJWT()).jwt;
     jwtRef.current = j;
     return j;
@@ -60,8 +66,12 @@ export function SupportWidget() {
 
   const loadThread = useCallback(async (markOpen: boolean) => {
     try {
-      const jwt = jwtRef.current || await getJwt();
-      const r = await fetch(`/api/support${markOpen ? '?open=1' : ''}`, { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+      let jwt = await getJwt();
+      let r = await fetch(`/api/support${markOpen ? '?open=1' : ''}`, { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+      if (r.status === 401) {
+        jwt = await getJwt(true);
+        r = await fetch(`/api/support${markOpen ? '?open=1' : ''}`, { headers: { 'x-session-jwt': jwt }, cache: 'no-store' });
+      }
       if (r.status === 401) { setAuthed(false); return; }
       if (!r.ok) return;
       const d = await r.json();
@@ -71,16 +81,17 @@ export function SupportWidget() {
     } catch { /* network — ลองใหม่รอบถัดไป */ }
   }, [getJwt]);
 
-  // ตรวจสถานะล็อกอินครั้งแรก + เริ่มโพลเบื้องหลัง
+  // ตรวจสถานะล็อกอินครั้งแรก แต่ยังไม่โหลด thread จนกว่าผู้ใช้จะเปิด widget จริง
   useEffect(() => {
     const t = window.setTimeout(() => {
-      account.get().then(u => { setMyId(u.$id); void loadThread(false); }).catch(() => setAuthed(false));
+      account.get().then(u => { setMyId(u.$id); setAuthed(true); }).catch(() => setAuthed(false));
     }, 0);
     return () => window.clearTimeout(t);
-  }, [loadThread]);
+  }, []);
 
   useEffect(() => {
-    const iv = setInterval(() => { void loadThread(open); }, open ? 1000 : 8000);
+    if (!open) return;
+    const iv = setInterval(() => { void loadThread(true); }, 5000);
     return () => clearInterval(iv);
   }, [open, loadThread]);
 
@@ -132,8 +143,6 @@ export function SupportWidget() {
     }
     void getJwt().then(send).catch(() => null);
   }, [getJwt]);
-
-  if (pathname?.startsWith('/admin')) return null;
 
   const getIceServers = useCallback(async () => {
     const jwt = jwtRef.current || await getJwt();
@@ -311,9 +320,6 @@ export function SupportWidget() {
     setMuted(next);
     sessionRef.current?.setMuted(next);
   }
-
-  // ไม่แสดงในหลังบ้านแอดมิน — แอดมินมีแดชบอร์ดแชทของตัวเองแล้ว
-  if (pathname?.startsWith('/admin')) return null;
 
   return (
     <>

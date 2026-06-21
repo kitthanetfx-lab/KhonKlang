@@ -271,6 +271,10 @@ function readDealTab(input: string | null): DealTab {
   return input === 'chat' || input === 'evidence' || input === 'steps' ? input : 'steps';
 }
 
+function isFinishedStatus(status?: string) {
+  return status === 'completed' || status === 'cancelled' || status === 'disputed';
+}
+
 export default function DealRoom() {
   const router = useRouter();
   const params = useParams();
@@ -301,13 +305,22 @@ export default function DealRoom() {
   const [payOpen, setPayOpen] = useState(false); // เปิดกล่องช่องทางชำระเงินก่อนอัปสลิป
   const [sharingLoc, setSharingLoc] = useState(false); // กำลังแชร์ตำแหน่งระหว่างเดินทาง
   const shareLocTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const jwtRef = useRef('');
+
+  const getJwt = useCallback(async (forceFresh = false) => {
+    if (!forceFresh && jwtRef.current) return jwtRef.current;
+    const j = (await account.createJWT()).jwt;
+    jwtRef.current = j;
+    setJwt(j);
+    return j;
+  }, []);
 
   // ส่งตำแหน่งแบบเงียบ (ไม่ลงแชท/ไม่แจ้งเตือน) — อีกฝ่ายเห็นในแผงนัดรับผ่านรอบโพลปกติ
   const sendPosition = useCallback(async () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(async pos => {
       try {
-        const j = (await account.createJWT()).jwt;
+        const j = await getJwt();
         await fetch(`/api/deals/${dealId}`, {
           method: 'PATCH',
           headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
@@ -315,7 +328,7 @@ export default function DealRoom() {
         });
       } catch { /* เงียบ */ }
     }, () => { /* ผู้ใช้ไม่อนุญาต */ }, { enableHighAccuracy: false, maximumAge: 30000, timeout: 15000 });
-  }, [dealId]);
+  }, [dealId, getJwt]);
 
   const stopShareLoc = useCallback(() => {
     if (shareLocTimer.current) { clearInterval(shareLocTimer.current); shareLocTimer.current = null; }
@@ -377,28 +390,46 @@ export default function DealRoom() {
   }, [dealId, setDeal, setDealError]);
 
   const fetchMsgs = useCallback(async (j: string) => {
+    if (!j) return;
     const r = await fetch(`/api/messages?dealId=${dealId}`, { headers: { 'x-session-jwt': j } }).catch(() => null);
     if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); }
   }, [dealId, setMsgs]);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval>;
     (async () => {
       await fetchDeal();
       try {
         const user = await account.get();
         setMyId(user.$id); setMyName(user.name || '');
-        const j = (await account.createJWT()).jwt;
-        setJwt(j); fetchMsgs(j);
-        timer = setInterval(async () => {
-          const j2 = (await account.createJWT().catch(() => ({ jwt: '' }))).jwt;
-          if (j2) { setJwt(j2); fetchMsgs(j2); fetchDeal(j2); }
-        }, 4000);
+        const j = await getJwt();
+        if (readDealTab(requestedTab) === 'chat' || requestedCall) await fetchMsgs(j);
       } catch { /* guest */ }
       finally { setLoading(false); }
     })();
-    return () => clearInterval(timer);
-  }, [dealId, fetchDeal, fetchMsgs]);
+  }, [dealId, fetchDeal, fetchMsgs, getJwt, requestedCall, requestedTab]);
+
+  useEffect(() => {
+    if (!dealId) return;
+    const timer = window.setInterval(() => { void fetchDeal(jwtRef.current || undefined); }, isFinishedStatus(deal?.status) ? 45000 : 15000);
+    return () => window.clearInterval(timer);
+  }, [deal?.status, dealId, fetchDeal]);
+
+  useEffect(() => {
+    if (tab !== 'chat' && !showJitsi) return;
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const j = await getJwt();
+        if (!stopped) await fetchMsgs(j);
+      } catch { /* เงียบ */ }
+    };
+    void poll();
+    const timer = window.setInterval(() => { void poll(); }, showJitsi ? 4000 : 8000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [fetchMsgs, showJitsi, tab]);
 
   // แจ้งผู้ร่วมดีลว่ามีคนเข้ามาดูห้องนี้ — ครั้งเดียวต่อ session ต่อดีล กันสแปม
   const visitSent = useRef(false);
@@ -412,7 +443,7 @@ export default function DealRoom() {
     } catch { /* sessionStorage ใช้ไม่ได้ก็ยังแจ้งได้ */ }
     (async () => {
       try {
-        const j = (await account.createJWT()).jwt;
+        const j = await getJwt();
         await fetch(`/api/deals/${dealId}`, {
           method: 'PATCH',
           headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' },
@@ -420,7 +451,7 @@ export default function DealRoom() {
         });
       } catch { /* ไม่กระทบการใช้งาน */ }
     })();
-  }, [deal, myId, dealId]);
+  }, [deal, myId, dealId, getJwt]);
 
   const loadMiddlemen = useCallback(async (j: string, f = mmFilter) => {
     setMmLoading(true);
@@ -449,15 +480,16 @@ export default function DealRoom() {
     return () => window.clearInterval(timer);
   }, []);
 
-  async function getJwt() { const j = (await account.createJWT()).jwt; setJwt(j); return j; }
-
   async function doAction(action: string, extra: Record<string, unknown> = {}) {
     setActing(true);
     try {
       const j = await getJwt();
       const r = await fetch(`/api/deals/${dealId}`, { method: 'PATCH', headers: { 'x-session-jwt': j, 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...extra }) });
       const d = await r.json();
-      if (r.ok) { setDeal(d.deal); fetchMsgs(j); } else alert(d.error || 'เกิดข้อผิดพลาด');
+      if (r.ok) {
+        setDeal(d.deal);
+        if (tab === 'chat' || showJitsi) await fetchMsgs(j);
+      } else alert(d.error || 'เกิดข้อผิดพลาด');
     } finally { setActing(false); }
   }
 

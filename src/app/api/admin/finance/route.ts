@@ -506,6 +506,50 @@ function buildRow(
   };
 }
 
+function buildSummary(summaryLedger: LedgerDoc[]) {
+  const activeLedger = summaryLedger.filter(entry => entry.active !== false);
+  const incomingEntries = activeLedger.filter(entry => ENTRY_TYPE_FILTERS.incoming.all.includes(entry.entryType));
+  const outgoingEntries = activeLedger.filter(entry => ENTRY_TYPE_FILTERS.outgoing.all.includes(entry.entryType));
+  const completedDealIds = new Set(
+    activeLedger
+      .filter(entry => entry.entryType === 'seller_payout')
+      .map(entry => entry.referenceId),
+  );
+  const completedVolume = activeLedger.reduce((sum, entry) => {
+    if (entry.entryType !== 'buyer_payment' || !completedDealIds.has(entry.referenceId)) return sum;
+    const meta = parseMeta(entry);
+    return sum + (Number(meta.price) || 0);
+  }, 0);
+  const estRevenue = activeLedger.reduce((sum, entry) => {
+    if (!['platform_fee', 'platform_cut', 'meetup_buyer_fee', 'meetup_seller_fee', 'seller_registration', 'middleman_registration'].includes(entry.entryType)) {
+      return sum;
+    }
+    if (entry.status === 'cancelled' || entry.status === 'void') return sum;
+    return sum + (Number(entry.amount) || 0);
+  }, 0);
+
+  return {
+    incomingCount: incomingEntries.length,
+    escrowPendingCount: incomingEntries.filter(entry => entry.entryType === 'buyer_payment' && entry.status === 'pending_review').length,
+    heldEscrow: activeLedger
+      .filter(entry => entry.entryType === 'buyer_payment' && ['pending_review', 'confirmed'].includes(entry.status))
+      .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
+    heldMeetupDeposit: activeLedger
+      .filter(entry => ['meetup_buyer_deposit', 'meetup_seller_deposit'].includes(entry.entryType) && entry.status === 'confirmed')
+      .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
+    completedVolume,
+    completedCount: completedDealIds.size,
+    estRevenue,
+    outgoingCount: outgoingEntries.length,
+    pendingPayoutAmount: activeLedger
+      .filter(entry => ['seller_payout', 'middleman_fee_net', 'onsite_service_fee', 'onsite_travel_fee'].includes(entry.entryType) && entry.status !== 'paid')
+      .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
+    pendingRefundAmount: activeLedger
+      .filter(entry => ['buyer_refund', 'meetup_buyer_refund', 'meetup_seller_refund'].includes(entry.entryType) && !['paid', 'refunded'].includes(entry.status))
+      .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
+  };
+}
+
 async function buildFinanceResponse(
   db: Databases,
   users: Users,
@@ -532,13 +576,38 @@ async function buildFinanceResponse(
     exportFormat: params.exportFormat || '',
   }, traceId);
   // #endregion
-  debugStage = 'syncFinanceProjection';
-  await syncFinanceProjection(db, users);
-  // #region debug-point A:after-sync
-  await reportDebug('A', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:after-sync', 'sync finance projection completed', {}, traceId);
-  // #endregion
   debugStage = 'readFeesConfig';
   const fees = await readFeesConfig(db);
+  debugStage = 'summaryLedger';
+  const summaryLedgerRes = await db.listDocuments(DB_ID, COL_LEDGER, [
+    Query.equal('active', true),
+    Query.orderDesc('updatedAt'),
+    Query.limit(1000),
+  ]).catch(() => ({ documents: [] }));
+  const summaryLedger = summaryLedgerRes.documents as unknown as LedgerDoc[];
+  // #region debug-point B:summary-ledger
+  await reportDebug('B', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:summary-ledger', 'fetched summary ledger entries', {
+    summaryCount: summaryLedger.length,
+  }, traceId);
+  // #endregion
+  debugInfo.summaryLedgerCount = summaryLedger.length;
+  const summary = buildSummary(summaryLedger);
+
+  if (params.tab === 'summary') {
+    return {
+      rows: [],
+      allRows: [],
+      summary,
+      fees,
+      pagination: {
+        page: 1,
+        pageSize: params.pageSize,
+        total: 0,
+        hasNext: false,
+      },
+    };
+  }
+
   const tabKey = params.tab === 'outgoing' ? 'outgoing' : 'incoming';
   const entryTypes = ENTRY_TYPE_FILTERS[tabKey][params.filter] || ENTRY_TYPE_FILTERS[tabKey].all;
   debugInfo.entryTypes = entryTypes;
@@ -572,79 +641,7 @@ async function buildFinanceResponse(
   const pagedRows = params.exportFormat
     ? allRows
     : allRows.slice((params.page - 1) * params.pageSize, params.page * params.pageSize);
-
-  debugStage = 'summaryLedger';
-  const summaryLedgerRes = await db.listDocuments(DB_ID, COL_LEDGER, [
-    Query.equal('active', true),
-    Query.orderDesc('updatedAt'),
-    Query.limit(1000),
-  ]).catch(() => ({ documents: [] }));
-  const summaryLedger = summaryLedgerRes.documents as unknown as LedgerDoc[];
-  // #region debug-point B:summary-ledger
-  await reportDebug('B', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:summary-ledger', 'fetched summary ledger entries', {
-    summaryCount: summaryLedger.length,
-  }, traceId);
-  // #endregion
-  debugInfo.summaryLedgerCount = summaryLedger.length;
-  debugStage = 'loadReferenceContext:summary';
-  const summaryRefs = await loadReferenceContext(db, summaryLedger);
-  const summaryBankIds = Array.from(new Set(
-    summaryLedger
-      .map(entry => String(entry.ownerId || ''))
-      .filter(ownerId => ownerId && ownerId !== 'platform' && ownerId !== 'system'),
-  ));
-  debugInfo.summaryOwnerIds = summaryBankIds.length;
-  debugStage = 'getBankInfoMap:summary';
-  const summaryBankMap = summaryBankIds.length === ownerIds.length
-    && summaryBankIds.every(id => ownerIds.includes(id))
-    ? bankMap
-    : await getBankInfoMap(summaryBankIds);
-  debugStage = 'buildSummaryRows';
-  const incoming = summaryLedger
-    .filter(entry => entry.direction === 'incoming')
-    .map(entry => buildRow(entry, summaryBankMap, summaryRefs))
-    .filter((row): row is Row => !!row);
-  const outgoing = summaryLedger
-    .filter(entry => entry.direction === 'outgoing')
-    .map(entry => buildRow(entry, summaryBankMap, summaryRefs))
-    .filter((row): row is Row => !!row);
-  const completedDealIds = new Set(
-    summaryLedger
-      .filter(entry => entry.entryType === 'seller_payout' && entry.active !== false)
-      .map(entry => entry.referenceId),
-  );
-  const completedVolume = summaryLedger.reduce((sum, entry) => {
-    if (entry.entryType !== 'buyer_payment' || !completedDealIds.has(entry.referenceId)) return sum;
-    const meta = parseMeta(entry);
-    return sum + (Number(meta.price) || 0);
-  }, 0);
-  const estRevenue = summaryLedger.reduce((sum, entry) => {
-    if (!['platform_fee', 'platform_cut', 'meetup_buyer_fee', 'meetup_seller_fee', 'seller_registration', 'middleman_registration'].includes(entry.entryType)) {
-      return sum;
-    }
-    if (entry.status === 'cancelled' || entry.status === 'void') return sum;
-    return sum + (Number(entry.amount) || 0);
-  }, 0);
-  const summary = {
-    incomingCount: incoming.length,
-    escrowPendingCount: incoming.filter(row => row.canApprove).length,
-    heldEscrow: summaryLedger
-      .filter(entry => entry.entryType === 'buyer_payment' && ['pending_review', 'confirmed'].includes(entry.status))
-      .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
-    heldMeetupDeposit: summaryLedger
-      .filter(entry => ['meetup_buyer_deposit', 'meetup_seller_deposit'].includes(entry.entryType) && entry.status === 'confirmed')
-      .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
-    completedVolume,
-    completedCount: completedDealIds.size,
-    estRevenue,
-    outgoingCount: outgoing.length,
-    pendingPayoutAmount: outgoing
-      .filter(row => ['payout', 'middleman_fee', 'onsite_payout'].includes(row.source) && row.txnStatus === 'pending')
-      .reduce((sum, row) => sum + row.expected, 0),
-    pendingRefundAmount: outgoing
-      .filter(row => ['refund', 'meetup_refund'].includes(row.source) && row.txnStatus !== 'refunded')
-      .reduce((sum, row) => sum + row.expected, 0),
-  };
+  const totalRows = params.search || params.exportFormat ? allRows.length : base.total;
 
   return {
     rows: pagedRows,
@@ -654,8 +651,8 @@ async function buildFinanceResponse(
     pagination: {
       page: params.page,
       pageSize: params.pageSize,
-      total: allRows.length,
-      hasNext: params.page * params.pageSize < allRows.length,
+      total: totalRows,
+      hasNext: params.page * params.pageSize < totalRows,
     },
   };
   } catch (error) {
@@ -757,6 +754,11 @@ export async function PATCH(req: NextRequest) {
     const db = new Databases(client);
     const users = new Users(client);
     const { id, action, note, fileId, bucket, expected } = await req.json();
+
+    if (action === 'refresh_projection') {
+      await syncFinanceProjection(db, users);
+      return NextResponse.json({ ok: true });
+    }
 
     if (action === 'verify_slip') {
       if (!fileId) return NextResponse.json({ error: 'ไม่มีไฟล์สลิป' }, { status: 400 });
