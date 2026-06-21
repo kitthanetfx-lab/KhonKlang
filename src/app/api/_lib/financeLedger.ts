@@ -103,11 +103,28 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function appwriteMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error || '');
+}
+
+function isMissingCollectionError(error: unknown) {
+  const status = (error as { code?: number; status?: number } | undefined)?.code ?? (error as { status?: number } | undefined)?.status;
+  const message = appwriteMessage(error);
+  return status === 404 || /collection.*not found|could not be found|document with the requested id.*not found/i.test(message);
+}
+
+function isMissingAttributeError(error: unknown) {
+  const status = (error as { code?: number; status?: number } | undefined)?.code ?? (error as { status?: number } | undefined)?.status;
+  const message = appwriteMessage(error);
+  return status === 404 || /attribute.*not found|attribute with the requested id.*not found|unknown attribute/i.test(message);
+}
+
 async function hasCollection(db: Databases, collectionId: string) {
   try {
     await db.getCollection(DB_ID, collectionId);
     return true;
-  } catch {
+  } catch (error) {
+    if (!isMissingCollectionError(error)) throw error;
     return false;
   }
 }
@@ -124,7 +141,8 @@ async function getAttributeStatus(db: Databases, collectionId: string, key: stri
   try {
     const attr = await db.getAttribute(DB_ID, collectionId, key);
     return (attr as unknown as { status?: string }).status || 'unknown';
-  } catch {
+  } catch (error) {
+    if (!isMissingAttributeError(error)) throw error;
     return '';
   }
 }
@@ -209,7 +227,9 @@ async function ensureIndex(db: Databases, collectionId: string, key: string, att
   await db.createIndex(DB_ID, collectionId, key, DatabasesIndexType.Key, attrs, orders).catch(() => {});
 }
 
-export async function ensureFinanceCollections(db: Databases) {
+let ensureFinanceCollectionsPromise: Promise<void> | null = null;
+
+async function ensureFinanceCollectionsOnce(db: Databases) {
   await ensureCollection(db, COL_LEDGER, 'Finance Ledger');
   await ensureCollection(db, COL_WALLETS, 'Middleman Wallets');
 
@@ -257,6 +277,16 @@ export async function ensureFinanceCollections(db: Databases) {
     ensureIndex(db, COL_WALLETS, 'idx_middleman_wallet', ['middlemanId'], [OrderBy.Asc]),
     ensureIndex(db, COL_WALLETS, 'idx_wallet_updated', ['updatedAt'], [OrderBy.Desc]),
   ]);
+}
+
+export async function ensureFinanceCollections(db: Databases) {
+  if (!ensureFinanceCollectionsPromise) {
+    ensureFinanceCollectionsPromise = ensureFinanceCollectionsOnce(db).catch(error => {
+      ensureFinanceCollectionsPromise = null;
+      throw error;
+    });
+  }
+  return ensureFinanceCollectionsPromise;
 }
 
 export async function readFeesConfig(db: Databases): Promise<FeeConfig> {
