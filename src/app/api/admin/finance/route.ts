@@ -512,6 +512,16 @@ async function buildFinanceResponse(
   params: { tab: FinanceTab; filter: string; page: number; pageSize: number; search: string; exportFormat?: ExportFormat | null },
 ) {
   const traceId = `finance-get-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let debugStage = 'start';
+  const debugInfo: Record<string, unknown> = {
+    tab: params.tab,
+    filter: params.filter,
+    page: params.page,
+    pageSize: params.pageSize,
+    search: params.search,
+    exportFormat: params.exportFormat || '',
+  };
+  try {
   // #region debug-point A:build-start
   await reportDebug('A', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:start', 'build finance response start', {
     tab: params.tab,
@@ -522,13 +532,17 @@ async function buildFinanceResponse(
     exportFormat: params.exportFormat || '',
   }, traceId);
   // #endregion
+  debugStage = 'syncFinanceProjection';
   await syncFinanceProjection(db, users);
   // #region debug-point A:after-sync
   await reportDebug('A', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:after-sync', 'sync finance projection completed', {}, traceId);
   // #endregion
+  debugStage = 'readFeesConfig';
   const fees = await readFeesConfig(db);
   const tabKey = params.tab === 'outgoing' ? 'outgoing' : 'incoming';
   const entryTypes = ENTRY_TYPE_FILTERS[tabKey][params.filter] || ENTRY_TYPE_FILTERS[tabKey].all;
+  debugInfo.entryTypes = entryTypes;
+  debugStage = 'fetchLedgerEntries';
   const base = await fetchLedgerEntries(db, entryTypes, params.page, params.pageSize, params.search, !!params.exportFormat);
   // #region debug-point B:base-ledger
   await reportDebug('B', 'src/app/api/admin/finance/route.ts:buildFinanceResponse:base-ledger', 'fetched base ledger entries', {
@@ -537,22 +551,29 @@ async function buildFinanceResponse(
     total: base.total,
   }, traceId);
   // #endregion
+  debugInfo.baseLedgerCount = base.ledger.length;
+  debugStage = 'loadReferenceContext:base';
   const refs = await loadReferenceContext(db, base.ledger);
   const ownerIds = Array.from(new Set(
     base.ledger
       .map(entry => String(entry.ownerId || ''))
       .filter(ownerId => ownerId && ownerId !== 'platform' && ownerId !== 'system'),
   ));
+  debugInfo.baseOwnerIds = ownerIds.length;
+  debugStage = 'getBankInfoMap:base';
   const bankMap = await getBankInfoMap(ownerIds);
+  debugStage = 'buildRows';
   const allRows = base.ledger
     .map(entry => buildRow(entry, bankMap, refs))
     .filter((row): row is Row => !!row)
     .filter(row => matchesSearch(row, params.search));
+  debugInfo.allRowsCount = allRows.length;
 
   const pagedRows = params.exportFormat
     ? allRows
     : allRows.slice((params.page - 1) * params.pageSize, params.page * params.pageSize);
 
+  debugStage = 'summaryLedger';
   const summaryLedgerRes = await db.listDocuments(DB_ID, COL_LEDGER, [
     Query.equal('active', true),
     Query.orderDesc('updatedAt'),
@@ -564,16 +585,21 @@ async function buildFinanceResponse(
     summaryCount: summaryLedger.length,
   }, traceId);
   // #endregion
+  debugInfo.summaryLedgerCount = summaryLedger.length;
+  debugStage = 'loadReferenceContext:summary';
   const summaryRefs = await loadReferenceContext(db, summaryLedger);
   const summaryBankIds = Array.from(new Set(
     summaryLedger
       .map(entry => String(entry.ownerId || ''))
       .filter(ownerId => ownerId && ownerId !== 'platform' && ownerId !== 'system'),
   ));
+  debugInfo.summaryOwnerIds = summaryBankIds.length;
+  debugStage = 'getBankInfoMap:summary';
   const summaryBankMap = summaryBankIds.length === ownerIds.length
     && summaryBankIds.every(id => ownerIds.includes(id))
     ? bankMap
     : await getBankInfoMap(summaryBankIds);
+  debugStage = 'buildSummaryRows';
   const incoming = summaryLedger
     .filter(entry => entry.direction === 'incoming')
     .map(entry => buildRow(entry, summaryBankMap, summaryRefs))
@@ -632,9 +658,20 @@ async function buildFinanceResponse(
       hasNext: params.page * params.pageSize < allRows.length,
     },
   };
+  } catch (error) {
+    Object.assign(error as Record<string, unknown>, {
+      debugStage: `buildFinanceResponse:${debugStage}`,
+      debugInfo,
+    });
+    throw error;
+  }
 }
 
 export async function GET(req: NextRequest) {
+  let debugStage = 'entry';
+  const debugInfo: Record<string, unknown> = {
+    searchParams: req.nextUrl.searchParams.toString(),
+  };
   try {
     const traceId = `finance-route-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     // #region debug-point C:get-entry
@@ -642,19 +679,26 @@ export async function GET(req: NextRequest) {
       searchParams: req.nextUrl.searchParams.toString(),
     }, traceId);
     // #endregion
+    debugStage = 'verifyAdmin';
     await verifyAdmin(req);
+    debugStage = 'parseParams';
     const tab = (req.nextUrl.searchParams.get('tab') || 'incoming') as FinanceTab;
     const filter = req.nextUrl.searchParams.get('filter') || 'all';
     const page = Math.max(1, Number(req.nextUrl.searchParams.get('page')) || 1);
     const pageSize = Math.min(100, Math.max(20, Number(req.nextUrl.searchParams.get('pageSize')) || 50));
     const search = String(req.nextUrl.searchParams.get('search') || '').trim();
     const exportFormat = req.nextUrl.searchParams.get('format') as ExportFormat | null;
+    Object.assign(debugInfo, { tab, filter, page, pageSize, search, exportFormat: exportFormat || '' });
+    debugStage = 'getAdminClient';
     const client = getAdminClient();
+    debugStage = 'constructServices';
     const db = new Databases(client);
     const users = new Users(client);
+    debugStage = 'buildFinanceResponse';
     const data = await buildFinanceResponse(db, users, { tab, filter, page, pageSize, search, exportFormat });
 
     if (exportFormat === 'csv' || exportFormat === 'xlsx') {
+      debugStage = 'export';
       const records = exportRows(data.allRows);
       const worksheet = XLSX.utils.json_to_sheet(records);
       const workbook = XLSX.utils.book_new();
@@ -686,15 +730,23 @@ export async function GET(req: NextRequest) {
       pagination: data.pagination,
     });
   } catch (err: unknown) {
-    const e = err as { status?: number; message?: string };
+    const e = err as { status?: number; message?: string; debugStage?: string; debugInfo?: Record<string, unknown> };
     // #region debug-point D:get-error
     await reportDebug('D', 'src/app/api/admin/finance/route.ts:GET:catch', 'admin finance GET failed', {
       status: e.status ?? 500,
       message: e.message ?? 'error',
       stack: err instanceof Error ? err.stack : String(err),
+      debugStage: e.debugStage || debugStage,
+      debugInfo: e.debugInfo || debugInfo,
     });
     // #endregion
-    return NextResponse.json({ error: e.message ?? 'error' }, { status: e.status ?? 500 });
+    return NextResponse.json({
+      error: e.message ?? 'error',
+      debugStage: e.debugStage || debugStage,
+      debugInfo: e.debugInfo || debugInfo,
+      debugName: err instanceof Error ? err.name : typeof err,
+      debugStack: err instanceof Error ? err.stack : String(err),
+    }, { status: e.status ?? 500 });
   }
 }
 

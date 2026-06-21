@@ -41,6 +41,11 @@ async function getMe(req: NextRequest) {
 /** GET — ห้องแชทของฉัน (ลูกค้า) พร้อมข้อความล่าสุด */
 export async function GET(req: NextRequest) {
   const traceId = `support-get-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let debugStage = 'entry';
+  const debugInfo: Record<string, unknown> = {
+    searchParams: req.nextUrl.searchParams.toString(),
+    hasJwt: !!req.headers.get('x-session-jwt'),
+  };
   try {
     // #region debug-point E:get-entry
     await reportDebug('E', 'src/app/api/support/route.ts:GET:entry', 'support GET entry', {
@@ -48,25 +53,33 @@ export async function GET(req: NextRequest) {
       hasJwt: !!req.headers.get('x-session-jwt'),
     }, traceId);
     // #endregion
+    debugStage = 'getMe';
     const me = await getMe(req);
+    debugInfo.userId = me.$id;
     // #region debug-point E:after-auth
     await reportDebug('E', 'src/app/api/support/route.ts:GET:after-auth', 'support GET authenticated', {
       userId: me.$id,
     }, traceId);
     // #endregion
+    debugStage = 'getAdmin';
     const db = getAdmin();
+    debugStage = 'ensureSupportCollections';
     await ensureSupportCollections(db);
+    debugStage = 'getOrCreateThread';
     let thread = await getOrCreateThread(db, me.$id, ((me.prefs || {}) as Record<string, string>).displayName || me.name || 'ลูกค้า');
 
+    debugStage = 'listMessages';
     const r = await db.listDocuments(DB_ID, COL_MESSAGES, [
       Query.equal('threadId', me.$id), Query.orderAsc('createdAt'), Query.limit(200),
     ]).catch(() => ({ documents: [] as unknown[] }));
+    debugInfo.messageCount = r.documents.length;
 
     // ทำเครื่องหมายอ่านแล้วเฉพาะตอนลูกค้าเปิดดูแชทจริง ๆ (ไม่ใช่ทุกครั้งที่โพลพื้นหลัง)
     if (
       req.nextUrl.searchParams.get('open') === '1'
       && (thread.unreadCustomer || (thread.lastSender === 'staff' && (!thread.lastReadByCustomerAt || thread.lastReadByCustomerAt < thread.lastAt)))
     ) {
+      debugStage = 'markRead';
       const now = new Date().toISOString();
       thread = await db.updateDocument(DB_ID, COL_THREADS, me.$id, {
         unreadCustomer: false,
@@ -82,9 +95,17 @@ export async function GET(req: NextRequest) {
       status,
       message: String((err as Error)?.message || err),
       stack: err instanceof Error ? err.stack : String(err),
+      debugStage,
+      debugInfo,
     }, traceId);
     // #endregion
-    return NextResponse.json({ error: String((err as Error)?.message || err) }, { status });
+    return NextResponse.json({
+      error: String((err as Error)?.message || err),
+      debugStage,
+      debugInfo,
+      debugName: err instanceof Error ? err.name : typeof err,
+      debugStack: err instanceof Error ? err.stack : String(err),
+    }, { status });
   }
 }
 
