@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { readFeesConfig } from '../../_lib/financeLedger';
+import type { FeeConfig } from '@/lib/fees';
 
 // ค่าธรรมเนียม/ค่าบริการแบบตัวเลข (แอดมินปรับได้ในหน้าตั้งค่า)
 const NUM_DEFAULTS = {
@@ -40,9 +41,11 @@ const COLUMN_OF: Record<string, string> = {
   companyBankAcct: 'company_bank_acct', companyBankHolder: 'company_bank_holder', companyQrFileId: 'company_qr_file_id',
 };
 
-async function writeFeesConfig(db: SupabaseClient, fees: Record<string, number | string>) {
+type FeeConfigKey = keyof FeeConfig;
+
+async function writeFeesConfig(db: SupabaseClient, fees: FeeConfig) {
   const row: Record<string, unknown> = { id: true };
-  for (const [camel, col] of Object.entries(COLUMN_OF)) row[col] = fees[camel];
+  for (const [camel, col] of Object.entries(COLUMN_OF)) row[col] = fees[camel as FeeConfigKey];
   const { error } = await db.from('fee_config').upsert(row, { onConflict: 'id' });
   if (error) throw new Error(error.message);
 }
@@ -69,7 +72,7 @@ export async function PATCH(req: NextRequest) {
     const hasFeePayload = feeBody && typeof feeBody === 'object' && NUM_KEYS.some(key => key in feeBody);
 
     // sanitize: เก็บเฉพาะ key ที่รู้จัก ตัวเลข >= 0 และตัวเลือกที่ถูกต้อง
-    const cleanFees: Record<string, number | string> = {};
+    const cleanFees: Partial<FeeConfig> = {};
     for (const k of NUM_KEYS) {
       const v = Number(feeBody?.[k]);
       cleanFees[k] = (isFinite(v) && v >= 0) ? v : NUM_DEFAULTS[k];
@@ -79,7 +82,7 @@ export async function PATCH(req: NextRequest) {
 
     const nextFees = hasFeePayload ? { ...currentFees, ...cleanFees } : currentFees;
 
-    if (hasFeePayload) await writeFeesConfig(db, nextFees as Record<string, number | string>);
+    if (hasFeePayload) await writeFeesConfig(db, nextFees);
 
     return NextResponse.json({ fees: nextFees, ok: true });
   } catch (err: unknown) {
