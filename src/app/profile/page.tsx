@@ -261,6 +261,40 @@ function ProfilePage() {
           </div>
         </div>
 
+        {/* Bank info — บัญชีรับเงินของผู้ใช้ (แก้ไขได้ทุก role) — ขึ้นก่อนเพราะสำคัญที่สุด */}
+        <div className="pf-card">
+          <div className="pf-card-title">บัญชีธนาคาร (สำหรับรับเงิน)</div>
+          {editing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <select className="pf-edit-input" value={editBankName} onChange={e => setEditBankName(e.target.value)}>
+                <option value="">เลือกธนาคาร</option>
+                {THAI_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+              <input className="pf-edit-input" value={editBankAcct} onChange={e => setEditBankAcct(e.target.value)} placeholder="เลขที่บัญชี" />
+              <input className="pf-edit-input" value={editBankOwner} onChange={e => setEditBankOwner(e.target.value)} placeholder="ชื่อบัญชี" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                {editBankQr && <img src={qrUrl(editBankQr)} alt="QR" style={{ width: 80, height: 80, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />}
+                <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer' }}>
+                  {qrUploading ? 'กำลังอัปโหลด...' : editBankQr ? '🖼️ เปลี่ยนรูป QR' : '🖼️ อัปโหลดรูป QR (พร้อมเพย์)'}
+                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadBankQr(f); e.target.value = ''; }} />
+                </label>
+                {editBankQr && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditBankQr('')}>ลบรูป</button>}
+              </div>
+            </div>
+          ) : (
+            (prefs.bank_acct || prefs.bank_name || prefs.bank_qr_file_id) ? (
+              <>
+                {prefs.bank_name && <div className="pf-row"><span className="pf-row-lbl">ธนาคาร</span><span className="pf-row-val">{prefs.bank_name}</span></div>}
+                {prefs.bank_acct && <div className="pf-row"><span className="pf-row-lbl">เลขที่บัญชี</span><span className="pf-row-val mono">{prefs.bank_acct}</span></div>}
+                {prefs.bank_owner && <div className="pf-row"><span className="pf-row-lbl">ชื่อบัญชี</span><span className="pf-row-val">{prefs.bank_owner}</span></div>}
+                {prefs.bank_qr_file_id && <div style={{ marginTop: 10 }}><img src={qrUrl(prefs.bank_qr_file_id)} alt="QR พร้อมเพย์" style={{ width: 120, height: 120, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} /></div>}
+              </>
+            ) : (
+              <p style={{ color: 'var(--muted)', fontSize: 13 }}>ยังไม่ได้กรอกบัญชีรับเงิน — กด &quot;แก้ไข&quot; เพื่อเพิ่มบัญชีและรูป QR สำหรับรับเงิน</p>
+            )
+          )}
+        </div>
+
         {/* Personal info */}
         <div className="pf-card">
           <div className="pf-card-title">ข้อมูลส่วนตัว</div>
@@ -342,40 +376,6 @@ function ProfilePage() {
             )}
           </div>
         )}
-
-        {/* Bank info — บัญชีรับเงินของผู้ใช้ (แก้ไขได้ทุก role) */}
-        <div className="pf-card">
-          <div className="pf-card-title">บัญชีธนาคาร (สำหรับรับเงิน)</div>
-          {editing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <select className="pf-edit-input" value={editBankName} onChange={e => setEditBankName(e.target.value)}>
-                <option value="">เลือกธนาคาร</option>
-                {THAI_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <input className="pf-edit-input" value={editBankAcct} onChange={e => setEditBankAcct(e.target.value)} placeholder="เลขที่บัญชี" />
-              <input className="pf-edit-input" value={editBankOwner} onChange={e => setEditBankOwner(e.target.value)} placeholder="ชื่อบัญชี" />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                {editBankQr && <img src={qrUrl(editBankQr)} alt="QR" style={{ width: 80, height: 80, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />}
-                <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer' }}>
-                  {qrUploading ? 'กำลังอัปโหลด...' : editBankQr ? '🖼️ เปลี่ยนรูป QR' : '🖼️ อัปโหลดรูป QR (พร้อมเพย์)'}
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadBankQr(f); e.target.value = ''; }} />
-                </label>
-                {editBankQr && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditBankQr('')}>ลบรูป</button>}
-              </div>
-            </div>
-          ) : (
-            (prefs.bank_acct || prefs.bank_name || prefs.bank_qr_file_id) ? (
-              <>
-                {prefs.bank_name && <div className="pf-row"><span className="pf-row-lbl">ธนาคาร</span><span className="pf-row-val">{prefs.bank_name}</span></div>}
-                {prefs.bank_acct && <div className="pf-row"><span className="pf-row-lbl">เลขที่บัญชี</span><span className="pf-row-val mono">{prefs.bank_acct}</span></div>}
-                {prefs.bank_owner && <div className="pf-row"><span className="pf-row-lbl">ชื่อบัญชี</span><span className="pf-row-val">{prefs.bank_owner}</span></div>}
-                {prefs.bank_qr_file_id && <div style={{ marginTop: 10 }}><img src={qrUrl(prefs.bank_qr_file_id)} alt="QR พร้อมเพย์" style={{ width: 120, height: 120, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} /></div>}
-              </>
-            ) : (
-              <p style={{ color: 'var(--muted)', fontSize: 13 }}>ยังไม่ได้กรอกบัญชีรับเงิน — กด &quot;แก้ไข&quot; เพื่อเพิ่มบัญชีและรูป QR สำหรับรับเงิน</p>
-            )
-          )}
-        </div>
 
         {/* Quick links / upgrade */}
         <div className="pf-links">

@@ -5,6 +5,7 @@ import { CookieConsent } from "@/components/CookieConsent";
 import { DialogProvider } from "@/components/Dialog";
 import { SupportWidget } from "@/components/SupportWidget";
 import { HomeButton } from "@/components/HomeButton";
+import { AuthGate } from "@/components/AuthGate";
 
 const displayFont = Anuphan({
   subsets: ["latin", "thai"],
@@ -38,7 +39,7 @@ export default function RootLayout({
   return (
     <html lang="th" className={`h-full antialiased ${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`}>
       <body className={bodyFont.className}>
-        <DialogProvider>{children}<HomeButton /><SupportWidget /><CookieConsent /></DialogProvider>
+        <DialogProvider><AuthGate>{children}<HomeButton /><SupportWidget /><CookieConsent /></AuthGate></DialogProvider>
       </body>
     </html>
   );

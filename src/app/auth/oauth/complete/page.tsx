@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -12,30 +12,19 @@ import { supabase } from '@/lib/supabase';
  */
 function OAuthCompleteInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [status, setStatus] = useState('กำลังเข้าสู่ระบบ...');
 
   useEffect(() => {
     async function finish() {
-      const returnTo = searchParams.get('returnTo') || '/register';
       try {
         // ให้เวลา supabase-js อ่าน token จาก URL hash ก่อน (เกิดทันทีตอนโหลดสคริปต์
         // แต่ getSession() รอ promise นั้นให้เสร็จก่อนคืนค่าอยู่แล้ว)
         const { data, error } = await supabase.auth.getSession();
         if (error || !data.session) throw new Error(error?.message || 'no_session');
 
-        setStatus('กำลังโหลดข้อมูล...');
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name')
-          .eq('id', data.session.user.id)
-          .single();
-
         setStatus('เข้าสู่ระบบสำเร็จ...');
-        const dest = profile?.first_name
-          ? (returnTo.startsWith('/') ? returnTo : '/')
-          : '/register';
-        router.replace(dest);
+        // บังคับเข้าหน้าโปรไฟล์ทันทีหลังล็อกอินเสมอ ไม่ว่าจะมีข้อมูลโปรไฟล์แล้วหรือไม่
+        router.replace('/profile');
       } catch (err: unknown) {
         console.error('OAuth complete error:', err);
         const message = err instanceof Error ? err.message : 'session_invalid';
@@ -43,7 +32,7 @@ function OAuthCompleteInner() {
       }
     }
     finish();
-  }, [router, searchParams]);
+  }, [router]);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: '#0a0f1e', color: '#fff' }}>

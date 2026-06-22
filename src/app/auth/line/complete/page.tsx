@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 function LineCompleteInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const returnTo = searchParams.get('returnTo') || '/';
   const [status, setStatus] = useState('กำลังเข้าสู่ระบบด้วย LINE...');
 
   useEffect(() => {
@@ -49,20 +47,12 @@ function LineCompleteInner() {
 
     async function routeAfterLogin() {
       setStatus('เข้าสู่ระบบสำเร็จ...');
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('first_name')
-        .eq('id', user?.id)
-        .single();
-      const dest = profile?.first_name
-        ? (returnTo.startsWith('/') ? returnTo : '/')
-        : '/register';
-      router.replace(dest);
+      // บังคับเข้าหน้าโปรไฟล์ทันทีหลังล็อกอินเสมอ ไม่ว่าจะมีข้อมูลโปรไฟล์แล้วหรือไม่
+      router.replace('/profile');
     }
 
     finish();
-  }, [router, returnTo]);
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center gap-4 text-white">
