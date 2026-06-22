@@ -15,6 +15,7 @@ interface DealMeetup {
 interface DealPriceState {
   seller_fee_slip?: string; payout_slip_file_id?: string; refund_slip_file_id?: string;
 }
+interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
 interface Deal {
   id: string; title: string; price: number; status: string; deal_type?: string;
   buyer_name: string; seller_name: string; middleman_name: string;
@@ -22,6 +23,8 @@ interface Deal {
   payment_slip_file_id?: string;
   meetup?: DealMeetup | null;
   priceState?: DealPriceState | null;
+  buyerBank?: BankInfo | null;
+  sellerBank?: BankInfo | null;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -82,6 +85,8 @@ export default function AdminDeals() {
       input.type = 'file';
       input.accept = 'image/*,.pdf';
       input.onchange = () => resolve(input.files?.[0] || null);
+      // ถ้าผู้ใช้กดยกเลิกหน้าต่างเลือกไฟล์ — ต้องเคลียร์สถานะ "กำลังทำงาน" ด้วย ไม่งั้นปุ่มจะหมุนค้าง
+      input.oncancel = () => resolve(null);
       input.click();
     });
   }
@@ -89,15 +94,18 @@ export default function AdminDeals() {
   // โอนเงินให้ผู้ขาย (ดีลสำเร็จ) / คืนเงินให้ผู้ซื้อ (ดีลยกเลิก) — ต้องแนบสลิปจริงเสมอ
   // ใช้ endpoint เดิมที่ /api/admin/finance (มีอยู่แล้ว) แค่เพิ่มปุ่ม+อัปโหลดให้ทำได้จากหน้าดีลนี้โดยตรง
   async function markMoneySent(id: string, action: 'mark_payout_sent' | 'mark_refund_sent') {
-    const promptMsg = action === 'mark_payout_sent'
-      ? 'โอนเงินให้ผู้ขายแล้ว — ใส่บันทึกช่วยจำ (เช่น เลขอ้างอิงการโอน) ได้ถ้าต้องการ:'
-      : 'คืนเงินให้ผู้ซื้อแล้ว — ใส่บันทึกช่วยจำ (เช่น เลขอ้างอิงการโอน) ได้ถ้าต้องการ:';
-    const note = window.prompt(promptMsg, '');
-    if (note === null) return;
+    // ต้องเปิดตัวเลือกไฟล์เป็นอย่างแรกเสมอ (synchronous กับการคลิกปุ่ม) — ถ้ามี window.prompt
+    // หรือ await อื่นแทรกก่อนหน้านี้ เบราว์เซอร์จะถือว่า user activation หมดอายุแล้ว
+    // ทำให้ input.click() ไม่เปิดหน้าต่างเลือกไฟล์ (เงียบ ไม่มี error) และปุ่มหมุนค้างตลอดไป
     setActing(id);
     try {
       const file = await pickSlipFile();
       if (!file) return;
+      const promptMsg = action === 'mark_payout_sent'
+        ? 'โอนเงินให้ผู้ขายแล้ว — ใส่บันทึกช่วยจำ (เช่น เลขอ้างอิงการโอน) ได้ถ้าต้องการ:'
+        : 'คืนเงินให้ผู้ซื้อแล้ว — ใส่บันทึกช่วยจำ (เช่น เลขอ้างอิงการโอน) ได้ถ้าต้องการ:';
+      const note = window.prompt(promptMsg, '');
+      if (note === null) return;
       const headers = await authHeaders();
       const form = new FormData();
       form.append('file', file);
@@ -184,6 +192,17 @@ export default function AdminDeals() {
                       เงินประกัน ฿{refund.deposit.toLocaleString()}/ฝ่าย · {refund.bothMet ? 'เจอกันสำเร็จ' : 'ยังไม่ครบ'} ·
                       {refund.refundedAt ? <span className="text-green-600"> ✅ คืนเงินแล้ว</span> : <span className="text-amber-600"> ⏳ ยังไม่คืนเงิน</span>}
                     </p>
+                  )}
+                  {/* บัญชีที่ต้องโอนเงินเข้า — แสดงให้แอดมินเห็นตรงนี้เลย ไม่ต้องเปิดดีลแยกไปหา */}
+                  {d.deal_type !== 'meetup' && (d.status === 'completed' || d.status === 'disputed') && !d.priceState?.payout_slip_file_id && (
+                    d.sellerBank?.bankAcct
+                      ? <p className="text-xs mt-1 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 โอนให้ผู้ขาย: {d.sellerBank.bankName} {d.sellerBank.bankAcct} ({d.sellerBank.bankOwner || '-'})</p>
+                      : <p className="text-xs mt-1 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ ผู้ขายยังไม่ผูกบัญชีธนาคาร — ติดต่อผู้ขายก่อนโอนเงิน</p>
+                  )}
+                  {d.deal_type !== 'meetup' && (d.status === 'cancelled' || d.status === 'disputed') && !d.priceState?.refund_slip_file_id && (
+                    d.buyerBank?.bankAcct
+                      ? <p className="text-xs mt-1 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 คืนให้ผู้ซื้อ: {d.buyerBank.bankName} {d.buyerBank.bankAcct} ({d.buyerBank.bankOwner || '-'})</p>
+                      : <p className="text-xs mt-1 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ ผู้ซื้อยังไม่ผูกบัญชีธนาคาร — ติดต่อผู้ซื้อก่อนคืนเงิน</p>
                   )}
                 </div>
                 <Link href={`/deal/${d.id}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">

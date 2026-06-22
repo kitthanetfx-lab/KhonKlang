@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 
+async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string | null) {
+  if (!uid) return null;
+  const { data: u } = await db.from('profiles')
+    .select('bank_name, bank_acct, bank_owner, display_name')
+    .eq('id', uid).maybeSingle();
+  if (!u) return null;
+  const bankName = u.bank_name || '';
+  const bankAcct = u.bank_acct || '';
+  const bankOwner = u.bank_owner || u.display_name || '';
+  if (!bankName && !bankAcct) return null;
+  return { bankName, bankAcct, bankOwner };
+}
+
 /** รายการดีลสำหรับแอดมิน: ?filter=disputed | active | completed | meetup_refund | all */
 export async function GET(req: NextRequest) {
   try {
@@ -26,7 +39,19 @@ export async function GET(req: NextRequest) {
       : [{ data: [] }, { data: [] }];
     const meetupMap = new Map((meetups || []).map(m => [m.deal_id, m]));
     const priceMap = new Map((priceStates || []).map(p => [p.deal_id, p]));
-    const documents = deals.map(d => ({ ...d, meetup: meetupMap.get(d.id) || null, priceState: priceMap.get(d.id) || null }));
+
+    // เลขบัญชีผู้ซื้อ/ผู้ขาย — แอดมินต้องเห็นตรงนี้เวลาโอนเงินจริงด้วยมือ (ไม่ต้องเปิดดีลแยก)
+    const uids = Array.from(new Set(deals.flatMap(d => [d.buyer_id, d.seller_id]).filter(Boolean)));
+    const bankPairs = await Promise.all(uids.map(async uid => [uid, await getBankInfo(db, uid)] as const));
+    const bankMap = new Map(bankPairs);
+
+    const documents = deals.map(d => ({
+      ...d,
+      meetup: meetupMap.get(d.id) || null,
+      priceState: priceMap.get(d.id) || null,
+      buyerBank: bankMap.get(d.buyer_id) || null,
+      sellerBank: bankMap.get(d.seller_id) || null,
+    }));
 
     return NextResponse.json({ documents, total: count || 0 });
   } catch (err: unknown) {
