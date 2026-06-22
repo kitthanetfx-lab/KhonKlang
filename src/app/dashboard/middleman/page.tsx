@@ -1,10 +1,31 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
 import { useEffect, useState, useCallback } from 'react';
-import { supabase, authHeaders } from '@/lib/supabase';
+import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
+
+const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
+
+interface DepositRow {
+  id: string;
+  amount: number;
+  status: 'pending_review' | 'approved' | 'rejected';
+  slip_file_id?: string;
+  reject_reason?: string;
+  created_at: string;
+}
+
+interface CompanyFees {
+  companyBankName: string; companyBankAcct: string; companyBankHolder: string;
+  companyQrFileId: string; companyPromptPay: string;
+}
+
+const DEPOSIT_STATUS_LABEL: Record<string, string> = {
+  pending_review: '⏳ รอตรวจสอบ', approved: '✅ อนุมัติแล้ว', rejected: '❌ ไม่อนุมัติ',
+};
 
 interface Deal {
   id: string;
@@ -84,6 +105,28 @@ export default function MiddlemanDashboard() {
   const [wallet, setWallet] = useState<MiddlemanWallet | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
 
+  const [deposits, setDeposits] = useState<DepositRow[]>([]);
+  const [confirmedTotal, setConfirmedTotal] = useState(0);
+  const [tierTarget, setTierTarget] = useState(0);
+  const [companyFees, setCompanyFees] = useState<CompanyFees | null>(null);
+  const [showDepositForm, setShowDepositForm] = useState(false);
+  const [depAmount, setDepAmount] = useState('');
+  const [depSlip, setDepSlip] = useState('');
+  const [depUploading, setDepUploading] = useState(false);
+  const [depSubmitting, setDepSubmitting] = useState(false);
+  const [depError, setDepError] = useState('');
+  const [depOk, setDepOk] = useState(false);
+
+  const fetchDeposits = useCallback(async (headers: Record<string, string>) => {
+    const res = await fetch('/api/middleman/deposits', { headers }).catch(() => null);
+    if (res?.ok) {
+      const d = await res.json();
+      setDeposits(d.deposits || []);
+      setConfirmedTotal(d.confirmedTotal || 0);
+      setTierTarget(d.tierTarget || 0);
+    }
+  }, []);
+
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#10a566'); r.style.setProperty('--accent-strong', '#0a8654'); r.style.setProperty('--accent-soft', '#e9faf2');
@@ -103,23 +146,27 @@ export default function MiddlemanDashboard() {
         if (profile?.middleman_status !== 'approved') { router.replace('/register/middleman'); return; }
         setTier(profile?.middleman_tier_intent || 'Bronze');
         const headers = await authHeaders();
-        const [profileRes] = await Promise.all([
+        const [profileRes, feesRes] = await Promise.all([
           fetch('/api/profile', { headers }).catch(() => null),
+          fetch('/api/fees').catch(() => null),
           fetchDeals(headers),
+          fetchDeposits(headers),
         ]);
         const profileData = profileRes?.ok ? await profileRes.json() : null;
         setWallet(profileData?.wallet || null);
         setLedger(profileData?.ledger || []);
+        const feesData = feesRes?.ok ? await feesRes.json() : null;
+        if (feesData?.fees) setCompanyFees(feesData.fees);
       } catch { router.replace('/login'); }
       finally { setLoading(false); }
     })();
-  }, [router, fetchDeals]);
+  }, [router, fetchDeals, fetchDeposits]);
 
   async function refresh() {
     setRefreshing(true);
     try {
       const headers = await authHeaders();
-      await fetchDeals(headers);
+      await Promise.all([fetchDeals(headers), fetchDeposits(headers)]);
       try {
         const res = await fetch('/api/profile', { headers }).catch(() => null);
         const data = res?.ok ? await res.json() : null;
@@ -127,6 +174,40 @@ export default function MiddlemanDashboard() {
         setLedger(data?.ledger || []);
       } catch { /* ignore */ }
     } finally { setRefreshing(false); }
+  }
+
+  async function uploadDepSlip(file: File) {
+    setDepUploading(true);
+    try {
+      const headers = await authHeaders();
+      const form = new FormData(); form.append('file', file);
+      const r = await fetch('/api/upload-deal', { method: 'POST', headers, body: form });
+      const d = await r.json();
+      if (r.ok && d.fileId) setDepSlip(d.fileId);
+      else setDepError(d.error || 'อัปโหลดสลิปไม่สำเร็จ');
+    } catch { setDepError('อัปโหลดสลิปไม่สำเร็จ'); }
+    finally { setDepUploading(false); }
+  }
+
+  async function submitDeposit() {
+    const amt = Math.round(Number(depAmount) || 0);
+    if (!amt || amt <= 0) return setDepError('กรุณากรอกจำนวนเงินที่โอน');
+    if (!depSlip) return setDepError('กรุณาอัปโหลดสลิปการโอนเงิน');
+    setDepSubmitting(true); setDepError('');
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/middleman/deposits', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amt, slipFileId: depSlip }),
+      });
+      if (!res.ok) { const d = await res.json(); setDepError(d.error || 'เกิดข้อผิดพลาด'); return; }
+      setDepOk(true);
+      setDepAmount(''); setDepSlip('');
+      await fetchDeposits(headers);
+      setTimeout(() => { setShowDepositForm(false); setDepOk(false); }, 1500);
+    } catch { setDepError('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
+    finally { setDepSubmitting(false); }
   }
 
   const active = deals.filter(d => ACTIVE_STATUSES.includes(d.status));
@@ -183,7 +264,82 @@ export default function MiddlemanDashboard() {
       <main className="dash-body">
         <div className="tier-card" style={{ background: ti.bg }}>
           <div><div className="tier-card-name" style={{ color: ti.color }}>{tier}</div><div className="tier-card-sub">ระดับคนกลางของคุณ</div></div>
-          <div className="tier-card-right"><div className="tier-card-dep-lbl">เงินประกัน</div><div className="tier-card-dep-val" style={{ color: ti.color }}>฿{ti.deposit.toLocaleString()}</div></div>
+          <div className="tier-card-right"><div className="tier-card-dep-lbl">เงินประกันที่ต้องวาง</div><div className="tier-card-dep-val" style={{ color: ti.color }}>฿{(tierTarget || ti.deposit).toLocaleString()}</div></div>
+        </div>
+
+        <div className="deal-card" style={{ gap: 14 }}>
+          <div className="deal-card-header">
+            <div style={{ flex: 1 }}>
+              <div className="deal-card-title">💰 เงินค้ำประกัน</div>
+              <div className="deal-card-meta">
+                <span>ยืนยันแล้ว {baht(confirmedTotal)} / ฿{(tierTarget || ti.deposit).toLocaleString()}</span>
+              </div>
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowDepositForm(v => !v)}>
+              {showDepositForm ? 'ปิด' : '+ เพิ่มเงินค้ำประกัน'}
+            </button>
+          </div>
+
+          {confirmedTotal < tierTarget && (
+            <div className="info-banner">
+              <Icon name="info" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>เครดิตที่ใช้รับงานได้จะเท่ากับยอดเงินค้ำประกันที่ admin ตรวจสอบและยืนยันแล้วเท่านั้น ไม่ใช่ยอดตาม Tier อัตโนมัติ — โอนเงินค้ำประกันเข้ามาให้ครบเพื่อปลดวงเงินรับงาน</span>
+            </div>
+          )}
+
+          {showDepositForm && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+              {companyFees?.companyBankAcct || companyFees?.companyQrFileId ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+                  {companyFees.companyQrFileId && (
+                    <div style={{ textAlign: 'center' }}>
+                      <img src={qrUrl(companyFees.companyQrFileId)} alt="QR พร้อมเพย์" style={{ width: 200, height: 200, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />
+                    </div>
+                  )}
+                  {companyFees.companyBankAcct && (
+                    <>
+                      <div className="party-box"><span className="party-box-role">ธนาคาร</span><span className="party-box-name">{companyFees.companyBankName}</span></div>
+                      <div className="party-box"><span className="party-box-role">เลขที่บัญชี</span><span className="party-box-name mono">{companyFees.companyBankAcct}</span></div>
+                      <div className="party-box"><span className="party-box-role">ชื่อบัญชี</span><span className="party-box-name">{companyFees.companyBankHolder}</span></div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <p style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center' }}>⚠️ ทีมงานยังไม่ได้ตั้งบัญชีรับเงิน กรุณาติดต่อแอดมินก่อนโอนเงิน</p>
+              )}
+
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>จำนวนเงินที่โอน (บาท) *</div>
+                <input className="pf-edit-input" type="number" min={1} value={depAmount} onChange={e => setDepAmount(e.target.value)} placeholder="เช่น 1000" />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                {depSlip && <img src={qrUrl(depSlip)} alt="สลิป" style={{ width: 70, height: 70, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />}
+                <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer' }}>
+                  {depUploading ? 'กำลังอัปโหลด...' : depSlip ? '🖼️ เปลี่ยนสลิป' : '🖼️ แนบสลิปการโอนเงิน *'}
+                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadDepSlip(f); e.target.value = ''; }} />
+                </label>
+              </div>
+
+              {depError && <div style={{ color: '#b22441', fontSize: 13, background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>⚠️ {depError}</div>}
+              {depOk && <div style={{ color: 'var(--green-700)', fontSize: 13, background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>✅ ส่งคำขอแล้ว รอ admin ตรวจสอบ</div>}
+
+              <button className="btn btn-primary" onClick={submitDeposit} disabled={depSubmitting}>{depSubmitting ? 'กำลังส่ง...' : 'ยืนยันการโอนเงินค้ำประกัน'}</button>
+            </div>
+          )}
+
+          {deposits.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>ประวัติการโอนเงินค้ำประกัน</div>
+              {deposits.slice(0, 5).map(d => (
+                <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
+                  <span>{new Date(d.created_at).toLocaleDateString('th-TH')}</span>
+                  <span style={{ fontWeight: 700 }}>{baht(d.amount)}</span>
+                  <span>{DEPOSIT_STATUS_LABEL[d.status] || d.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {wallet && (

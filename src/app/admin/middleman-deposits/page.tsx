@@ -1,0 +1,187 @@
+'use client';
+
+/* eslint-disable @next/next/no-img-element */
+
+import { useState, useEffect, useCallback } from 'react';
+import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
+import { Banknote, CheckCircle2, XCircle, RefreshCw, Eye, FileText } from 'lucide-react';
+
+interface MiddlemanInfo {
+  display_name?: string;
+  phone?: string;
+  middleman_tier?: string;
+}
+
+interface DepositDoc {
+  id: string;
+  middleman_id: string;
+  amount: number;
+  slip_file_id?: string;
+  status: 'pending_review' | 'approved' | 'rejected';
+  reject_reason?: string;
+  created_at: string;
+  reviewed_at?: string;
+  middleman: MiddlemanInfo | null;
+}
+
+const STATUS_TABS = [
+  { key: '',               label: 'ทั้งหมด' },
+  { key: 'pending_review', label: 'รอตรวจสอบ' },
+  { key: 'approved',       label: 'อนุมัติแล้ว' },
+  { key: 'rejected',       label: 'ปฏิเสธ' },
+];
+
+const STATUS_CFG: Record<string, { label: string; cls: string }> = {
+  pending_review: { label: 'รอตรวจสอบ', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  approved:       { label: 'อนุมัติแล้ว', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  rejected:       { label: 'ปฏิเสธ',     cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+};
+
+function baht(amount: number) {
+  return `฿${Number(amount || 0).toLocaleString()}`;
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_CFG[status] ?? { label: status, cls: 'bg-gray-100 text-gray-600' };
+  return <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${s.cls}`}>{s.label}</span>;
+}
+
+export default function MiddlemanDepositsPage() {
+  const [docs, setDocs] = useState<DepositDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [acting, setActing] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter) params.set('status', statusFilter);
+      const headers = await authHeaders();
+      const res = await fetch(`/api/admin/middleman-deposits?${params}`, { headers });
+      const data = await res.json();
+      setDocs(data.documents ?? []);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [statusFilter]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function act(docId: string, action: 'approve' | 'reject', r?: string) {
+    setActing(true);
+    try {
+      const headers = await authHeaders();
+      await fetch('/api/admin/middleman-deposits', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docId, action, reason: r }),
+      });
+      setRejectingId(null); setReason('');
+      await load();
+    } finally { setActing(false); }
+  }
+
+  const pendingCount = docs.filter(d => d.status === 'pending_review').length;
+
+  return (
+    <div className="space-y-5 max-w-5xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold flex items-center gap-2"><Banknote size={20} /> เงินค้ำประกันคนกลาง</h1>
+          <p className="text-sm text-gray-500 mt-0.5">ตรวจสอบและอนุมัติเงินค้ำประกันที่คนกลางโอนเข้ามาจริง — เครดิตรับงานของคนกลางจะถูกปลดให้เฉพาะยอดที่อนุมัติแล้วเท่านั้น</p>
+        </div>
+        <button onClick={() => load()} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+          <RefreshCw size={15} /> รีเฟรช
+        </button>
+      </div>
+
+      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
+        {STATUS_TABS.map(t => (
+          <button key={t.key} onClick={() => setStatusFilter(t.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${statusFilter === t.key ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+            {t.label}
+            {t.key === 'pending_review' && pendingCount > 0 && (
+              <span className="ml-1.5 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full">{pendingCount}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                <th className="text-left px-5 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">คนกลาง</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">จำนวนเงิน</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">สลิป</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">วันที่แจ้ง</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">สถานะ</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {loading ? (
+                <tr><td colSpan={6} className="text-center py-12 text-gray-400"><div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" /></td></tr>
+              ) : docs.length === 0 ? (
+                <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">ไม่มีข้อมูล</td></tr>
+              ) : docs.map(d => (
+                <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors align-top">
+                  <td className="px-5 py-3.5">
+                    <div className="font-medium">{d.middleman?.display_name || d.middleman_id}</div>
+                    <div className="text-xs text-gray-400">{d.middleman?.phone || ''} {d.middleman?.middleman_tier ? `· ${d.middleman.middleman_tier}` : ''}</div>
+                  </td>
+                  <td className="px-4 py-3.5 font-semibold">{baht(d.amount)}</td>
+                  <td className="px-4 py-3.5">
+                    {d.slip_file_id ? (
+                      <a href={fileViewUrl(DEAL_BUCKET, d.slip_file_id)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                        <Eye size={12} /> ดูสลิป
+                      </a>
+                    ) : <span className="text-xs text-gray-400 flex items-center gap-1"><FileText size={12} /> ไม่มีสลิป</span>}
+                  </td>
+                  <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(d.created_at)}</td>
+                  <td className="px-4 py-3.5">
+                    <StatusBadge status={d.status} />
+                    {d.status === 'rejected' && d.reject_reason && <div className="text-xs text-red-500 mt-1 max-w-[180px]">{d.reject_reason}</div>}
+                  </td>
+                  <td className="px-4 py-3.5">
+                    {d.status === 'pending_review' && (
+                      rejectingId === d.id ? (
+                        <div className="flex flex-col gap-2 min-w-[200px]">
+                          <textarea className="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs outline-none resize-none bg-white dark:bg-gray-800"
+                            rows={2} placeholder="เหตุผลการปฏิเสธ (ไม่บังคับ)" value={reason} onChange={e => setReason(e.target.value)} />
+                          <div className="flex gap-2">
+                            <button onClick={() => { setRejectingId(null); setReason(''); }} className="flex-1 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-xs hover:bg-gray-50 dark:hover:bg-gray-800">ยกเลิก</button>
+                            <button onClick={() => act(d.id, 'reject', reason)} disabled={acting} className="flex-1 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium disabled:opacity-60">ยืนยัน</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 justify-end">
+                          <button onClick={() => setRejectingId(d.id)} className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex items-center gap-1">
+                            <XCircle size={13} /> ปฏิเสธ
+                          </button>
+                          <button onClick={() => act(d.id, 'approve')} disabled={acting} className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all flex items-center gap-1 disabled:opacity-60">
+                            <CheckCircle2 size={13} /> อนุมัติ
+                          </button>
+                        </div>
+                      )
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {docs.length > 0 && (
+          <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400">แสดง {docs.length} รายการ</div>
+        )}
+      </div>
+    </div>
+  );
+}

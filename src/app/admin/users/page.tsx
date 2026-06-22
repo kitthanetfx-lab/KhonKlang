@@ -13,6 +13,8 @@ interface AppUser {
   created_at: string;
   role?: string;
   phone?: string;
+  seller_status?: string;
+  middleman_status?: string;
 }
 
 const ROLE_CFG: Record<string, { label: string; cls: string }> = {
@@ -22,10 +24,27 @@ const ROLE_CFG: Record<string, { label: string; cls: string }> = {
   user:     { label: 'ผู้ใช้ทั่วไป', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
 };
 
-function RoleBadge({ role }: { role?: string }) {
-  const r = role || 'user';
-  const c = ROLE_CFG[r] ?? ROLE_CFG.user;
-  return <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${c.cls}`}>{c.label}</span>;
+// ผู้ใช้คนเดียวอาจเป็นได้หลายอย่างพร้อมกัน (เช่น admin ที่สมัครเป็นผู้ขาย+คนกลางด้วยเพื่อทดสอบ)
+// เดิมหน้านี้ดูแค่ profiles.role (ค่าเดียว) ทำให้นับ/แสดงไม่ตรงกับหน้า admin/sellers, admin/middlemen
+// ที่ดูจาก seller_status/middleman_status — เปลี่ยนมาคำนวณ badge ทั้งหมดจากสถานะอนุมัติจริงแทน
+function userBadgeKeys(u: AppUser): string[] {
+  const keys: string[] = [];
+  if ((u.role || 'user') === 'admin') keys.push('admin');
+  if (u.seller_status === 'approved') keys.push('seller');
+  if (u.middleman_status === 'approved') keys.push('middleman');
+  if (keys.length === 0) keys.push('user');
+  return keys;
+}
+
+function RoleBadges({ user }: { user: AppUser }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {userBadgeKeys(user).map(k => {
+        const c = ROLE_CFG[k] ?? ROLE_CFG.user;
+        return <span key={k} className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${c.cls}`}>{c.label}</span>;
+      })}
+    </div>
+  );
 }
 
 function formatDate(iso: string) {
@@ -135,7 +154,7 @@ function UsersContent() {
     const email = (u.email || '').toLowerCase();
     const q     = search.toLowerCase();
     if (search && !name.includes(q) && !email.includes(q)) return false;
-    if (roleFilter && (u.role || 'user') !== roleFilter) return false;
+    if (roleFilter && !userBadgeKeys(u).includes(roleFilter)) return false;
     return true;
   });
 
@@ -172,7 +191,7 @@ function UsersContent() {
       {/* Stats row */}
       <div className="flex gap-3 flex-wrap">
         {Object.entries(ROLE_CFG).map(([key, cfg]) => {
-          const count = users.filter(u => (u.role || 'user') === key).length;
+          const count = users.filter(u => userBadgeKeys(u).includes(key)).length;
           return (
             <button key={key} onClick={() => setRoleFilter(roleFilter === key ? '' : key)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm border transition-all
@@ -224,7 +243,7 @@ function UsersContent() {
                       <span className="text-gray-400 italic">LINE ({u.id.slice(0, 12)}...)</span>
                     ) : u.email || '—'}
                   </td>
-                  <td className="px-4 py-3.5"><RoleBadge role={u.role} /></td>
+                  <td className="px-4 py-3.5"><RoleBadges user={u} /></td>
                   <td className="px-4 py-3.5">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
                       ${u.active

@@ -34,9 +34,10 @@ export type LedgerEntryType =
   | 'seller_registration'
   | 'middleman_registration'
   | 'onsite_service_fee'
-  | 'onsite_travel_fee';
+  | 'onsite_travel_fee'
+  | 'middleman_deposit';
 
-export type LedgerReferenceType = 'deal' | 'seller_application' | 'middleman_application' | 'onsite_job';
+export type LedgerReferenceType = 'deal' | 'seller_application' | 'middleman_application' | 'onsite_job' | 'middleman_deposit';
 export type LedgerOwnerType = 'platform' | 'buyer' | 'seller' | 'middleman' | 'system';
 
 export interface LedgerFeeComponent {
@@ -64,6 +65,7 @@ export function financeReferenceCode(referenceType: LedgerReferenceType, referen
   if (referenceType === 'deal') return dealCode(dealId || referenceId);
   if (referenceType === 'seller_application') return `SELLER-${referenceId.slice(-8).toUpperCase()}`;
   if (referenceType === 'middleman_application') return `MM-${referenceId.slice(-8).toUpperCase()}`;
+  if (referenceType === 'middleman_deposit') return `DEP-${referenceId.slice(-8).toUpperCase()}`;
   return `ONSITE-${referenceId.slice(-8).toUpperCase()}`;
 }
 

@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { FEE_DEFAULTS, computeDealFees, effectiveRegFee, type FeeConfig, type FeeLine } from '@/lib/fees';
 import {
   financeReferenceCode,
-  getTierCreditLimit,
   splitDealFeeComponents,
   splitFeeByPayer,
   type LedgerDirection,
@@ -425,6 +424,33 @@ export async function syncMiddlemanApplicationLedger(db: SupabaseClient, app: Re
   }
 }
 
+/** บันทึกรายการเงินค้ำประกันคนกลางลง finance_ledger ให้เห็นในหน้า "การเงิน" ของ admin ด้วย
+ *  แล้ว sync wallet ใหม่ทุกครั้งที่สถานะ deposit เปลี่ยน (โดยเฉพาะตอน approved — ปลดเครดิตให้จริง) */
+export async function syncMiddlemanDepositLedger(db: SupabaseClient, deposit: Record<string, unknown>, feesConfig?: FeeConfig) {
+  const fees = feesConfig || await readFeesConfig(db);
+  const referenceId = String(deposit.id || '');
+  const middlemanId = text(deposit.middleman_id, 255);
+  const profile = await getMiddlemanProfile(db, middlemanId);
+  const middlemanName = profile?.display_name || middlemanId;
+  const status = String(deposit.status || '') === 'approved'
+    ? 'confirmed'
+    : String(deposit.status || '') === 'rejected'
+      ? 'cancelled'
+      : 'pending_review';
+  const entry = buildEntry({
+    entry_key: `middleman-deposit:${referenceId}`, reference_type: 'middleman_deposit', reference_id: referenceId, deal_id: null,
+    deal_number: financeReferenceCode('middleman_deposit', referenceId),
+    owner_type: 'middleman', owner_id: middlemanId || null, owner_name: middlemanName,
+    entry_type: 'middleman_deposit', direction: 'incoming', amount: Number(deposit.amount) || 0, status,
+    title: `เงินค้ำประกันคนกลาง — ${middlemanName}`,
+    purpose: 'เงินค้ำประกันคนกลาง', counterparty_name: 'ศูนย์กลาง', bucket: 'deal-files', file_id: text(deposit.slip_file_id, 255),
+    approve_link: '/admin/middleman-deposits', active: true,
+    meta: { rejectReason: text(deposit.reject_reason, 300) },
+  });
+  await upsertLedgerEntry(db, entry);
+  if (middlemanId) await syncMiddlemanWallet(db, middlemanId, middlemanName, undefined, fees);
+}
+
 export async function syncOnsiteJobLedger(db: SupabaseClient, job: Record<string, unknown>, feesConfig?: FeeConfig) {
   const fees = feesConfig || await readFeesConfig(db);
   const referenceId = String(job.id || '');
@@ -484,6 +510,17 @@ export async function syncOnsiteJobLedger(db: SupabaseClient, job: Record<string
   await deactivateMissingEntries(db, 'onsite_job', referenceId, activeKeys);
 }
 
+/** ยอดเงินค้ำประกันที่ "ยืนยันแล้ว" (admin อนุมัติแล้วจริง) ของคนกลางคนนี้ — ใช้เป็น credit_limit
+ *  แทนการปล่อยวงเงินอัตโนมัติตาม tier แบบเดิม (ซึ่งให้เครดิตทั้งที่ยังไม่ได้โอนเงินประกันเข้ามาจริง) */
+export async function getConfirmedDepositTotal(db: SupabaseClient, middlemanId: string): Promise<number> {
+  const { data } = await db
+    .from('middleman_deposits')
+    .select('amount')
+    .eq('middleman_id', middlemanId)
+    .eq('status', 'approved');
+  return (data || []).reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+}
+
 export async function syncMiddlemanWallet(
   db: SupabaseClient,
   middlemanId: string,
@@ -495,7 +532,8 @@ export async function syncMiddlemanWallet(
   const profile = await getMiddlemanProfile(db, middlemanId);
   const tier = tierHint || profile?.middleman_tier || profile?.middleman_tier_intent || 'Bronze';
   const middlemanName = profile?.display_name || fallbackName || middlemanId;
-  const creditLimit = getTierCreditLimit(fees, tier);
+  // เปลี่ยนจาก auto-grant ตาม tier (getTierCreditLimit) เป็นยอดเงินประกันที่โอนเข้ามาจริงและอนุมัติแล้วเท่านั้น
+  const creditLimit = await getConfirmedDepositTotal(db, middlemanId);
 
   const { data: entries } = await db
     .from('finance_ledger')
