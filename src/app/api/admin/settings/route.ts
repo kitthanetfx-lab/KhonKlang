@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { readFeesConfig } from '../../_lib/financeLedger';
 import type { FeeConfig } from '@/lib/fees';
+import { toYouTubeEmbedUrl } from '@/lib/youtube';
 
 // ค่าธรรมเนียม/ค่าบริการแบบตัวเลข (แอดมินปรับได้ในหน้าตั้งค่า)
 const NUM_DEFAULTS = {
@@ -108,6 +109,8 @@ export async function PATCH(req: NextRequest) {
       if (!feeBody || !(k in feeBody)) continue;
       cleanFees[k] = String(feeBody[k] ?? '').slice(0, 500);
     }
+    // กันพลาด: ถ้ามาเป็นลิงก์ YouTube ปกติ (watch?v=, youtu.be ฯลฯ) แปลงเป็น embed URL เสมอ ไม่งั้น iframe จะถูกปฏิเสธการเชื่อมต่อ
+    if (cleanFees.promoVideoUrl) cleanFees.promoVideoUrl = toYouTubeEmbedUrl(cleanFees.promoVideoUrl);
     for (const k of BOOL_KEYS) {
       if (!feeBody || !(k in feeBody)) continue;
       cleanFees[k] = !!feeBody[k];

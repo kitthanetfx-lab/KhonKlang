@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabaseServer';
+import { toYouTubeEmbedUrl } from '@/lib/youtube';
 
 export const revalidate = 60; // cache 60s — public homepage stats
 
@@ -63,7 +64,10 @@ export async function GET() {
       if (ratings.length) middlemanRating = Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10;
     }
 
-    const promoVideoUrl = feeConfigRes.status === 'fulfilled' ? (feeConfigRes.value.data?.promo_video_url || '') : '';
+    // กันพลาด: เผื่อมีลิงก์ YouTube รูปแบบ watch?v=/youtu.be ตกค้างจากก่อนแก้ไข ให้แปลงเป็น embed URL เสมอ
+    const promoVideoUrl = feeConfigRes.status === 'fulfilled'
+      ? toYouTubeEmbedUrl(feeConfigRes.value.data?.promo_video_url || '')
+      : '';
 
     return NextResponse.json({
       completedDeals, protectedValue, middlemen, satisfaction, reviewCount,

@@ -10,6 +10,7 @@ import {
   ServiceControlMap,
   sanitizeServiceControls,
 } from '@/lib/serviceControls';
+import { toYouTubeEmbedUrl } from '@/lib/youtube';
 
 export default function ServiceControlsPage() {
   const [services, setServices] = useState<ServiceControlMap | null>(null);
@@ -59,7 +60,7 @@ export default function ServiceControlsPage() {
       const r = await fetch('/api/admin/settings', {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fees: { promoVideoUrl: videoUrl.trim() } }),
+        body: JSON.stringify({ fees: { promoVideoUrl: toYouTubeEmbedUrl(videoUrl.trim()) } }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
@@ -115,13 +116,13 @@ export default function ServiceControlsPage() {
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-3">
         <div>
           <h2 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2"><Film size={17} /> วีดีโอแนะนำการใช้งาน (หน้าแรก)</h2>
-          <p className="text-sm text-gray-500 mt-1">ใส่ลิงก์ YouTube embed (เช่น https://www.youtube.com/embed/VIDEO_ID) เพื่อแสดงในช่องวีดีโอเล็ก ๆ บนหน้าแรก ถ้าเว้นว่างจะแสดง placeholder แทน</p>
+          <p className="text-sm text-gray-500 mt-1">วางลิงก์ YouTube รูปแบบไหนก็ได้ (ลิงก์จากแถบที่อยู่, youtu.be, Shorts ฯลฯ) ระบบจะแปลงเป็น embed URL ให้อัตโนมัติตอนบันทึก เพื่อแสดงในช่องวีดีโอเล็ก ๆ บนหน้าแรก ถ้าเว้นว่างจะแสดง placeholder แทน</p>
         </div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
           <input
             value={videoUrl}
             onChange={e => { setVideoUrl(e.target.value); setVideoSaved(false); }}
-            placeholder="https://www.youtube.com/embed/VIDEO_ID"
+            placeholder="https://www.youtube.com/watch?v=... หรือ https://youtu.be/..."
             disabled={!videoLoaded}
             className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm disabled:opacity-50"
           />
