@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { Icon } from '@/components/Icon';
 import { THAI_BANKS } from '@/lib/banks';
+import { isProfileComplete } from '@/lib/profileComplete';
 
 const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -122,6 +123,9 @@ function ProfilePage() {
         const em = (!user.email || user.email.includes('@line.khonklang.app')) ? '' : user.email;
         setEmail(em);
         setPrefs(p);
+        // ข้อมูลบังคับ (ชื่อ-นามสกุล-เบอร์-บัญชีธนาคาร) ยังไม่ครบ — บังคับเข้าโหมดกรอกข้อมูลทันที
+        // ไม่ต้องให้กดปุ่ม "แก้ไข" เอง
+        if (!isProfileComplete(p)) openEditWith(p);
         try {
           const headers = await authHeaders();
           const [sellerRes, middlemanRes, profileRes] = await Promise.all([
@@ -147,13 +151,16 @@ function ProfilePage() {
     })();
   }, [router]);
 
-  const openEdit = () => {
-    setEditFirst(prefs.first_name || ''); setEditLast(prefs.last_name || '');
-    setEditPhone(prefs.phone || ''); setEditAddr(parseAddress(prefs.address || ''));
-    setEditBankName(prefs.bank_name || ''); setEditBankAcct(prefs.bank_acct || '');
-    setEditBankOwner(prefs.bank_owner || ''); setEditBankQr(prefs.bank_qr_file_id || '');
+  const openEditWith = (p: Record<string, string>) => {
+    setEditFirst(p.first_name || ''); setEditLast(p.last_name || '');
+    setEditPhone(p.phone || ''); setEditAddr(parseAddress(p.address || ''));
+    setEditBankName(p.bank_name || ''); setEditBankAcct(p.bank_acct || '');
+    setEditBankOwner(p.bank_owner || ''); setEditBankQr(p.bank_qr_file_id || '');
     setError(''); setSaveOk(false); setEditing(true);
   };
+  const openEdit = () => openEditWith(prefs);
+  // ข้อมูลบังคับยังไม่ครบ — ต้องล็อกหน้าไว้ในโหมดกรอกข้อมูล ซ่อนทางออกทั้งหมดจนกว่าจะบันทึกสำเร็จ
+  const locked = !isProfileComplete(prefs);
 
   async function uploadBankQr(file: File) {
     setQrUploading(true);
@@ -167,7 +174,10 @@ function ProfilePage() {
     } catch { setError('อัปโหลด QR ไม่สำเร็จ'); }
     finally { setQrUploading(false); }
   }
-  const cancelEdit = () => { setEditing(false); setError(''); };
+  const cancelEdit = () => {
+    if (locked) return; // ข้อมูลบังคับยังไม่ครบ — ห้ามยกเลิกออกจากโหมดกรอกข้อมูล
+    setEditing(false); setError('');
+  };
 
   useEffect(() => {
     if (!editAddr.provinceName) return;
@@ -198,8 +208,12 @@ function ProfilePage() {
   const onTambon = (val: string) => { const [n, z] = val.split('|'); setEditAddr(a => ({ ...a, tambonName: n, postalCode: z })); };
 
   const handleSave = async () => {
+    if (!editBankName.trim() || !editBankAcct.trim() || !editBankOwner.trim()) {
+      return setError('กรุณากรอกข้อมูลบัญชีธนาคารให้ครบ (ธนาคาร, เลขที่บัญชี, ชื่อบัญชี) — จำเป็นสำหรับรับเงินจากระบบ');
+    }
     if (!editFirst.trim() || !editLast.trim()) return setError('กรุณากรอกชื่อ-นามสกุล');
     if (!editPhone.trim()) return setError('กรุณากรอกเบอร์โทรศัพท์');
+    const wasLocked = locked;
     setSaving(true); setError('');
     try {
       const headers = await authHeaders();
@@ -212,7 +226,12 @@ function ProfilePage() {
       if (!res.ok) { const d = await res.json(); setError(d.error || 'เกิดข้อผิดพลาด'); return; }
       const newPrefs = { ...prefs, first_name: editFirst, last_name: editLast, phone: editPhone, address, display_name: `${editFirst} ${editLast}`.trim(), bank_name: editBankName, bank_acct: editBankAcct, bank_owner: editBankOwner, bank_qr_file_id: editBankQr };
       setPrefs(newPrefs); setDisplayName(`${editFirst} ${editLast}`.trim()); setSaveOk(true);
-      setTimeout(() => { setEditing(false); setSaveOk(false); }, 1200);
+      if (wasLocked) {
+        // กรอกข้อมูลบังคับครบแล้วเป็นครั้งแรก — ปลดล็อกให้เข้าใช้งานเว็บไซต์ส่วนอื่นได้
+        setTimeout(() => { router.replace('/'); }, 1200);
+      } else {
+        setTimeout(() => { setEditing(false); setSaveOk(false); }, 1200);
+      }
     } catch { setError('เกิดข้อผิดพลาด กรุณาลองใหม่'); } finally { setSaving(false); }
   };
 
@@ -237,12 +256,14 @@ function ProfilePage() {
   return (
     <div className="sub-page">
       <header className="sub-header">
-        <Link href="/" className="sub-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
-        <span className="sub-htitle" style={{ flex: 1 }}>โปรไฟล์ของฉัน</span>
+        {locked
+          ? <span style={{ width: 18, display: 'inline-block' }} />
+          : <Link href="/" className="sub-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>}
+        <span className="sub-htitle" style={{ flex: 1 }}>{locked ? 'กรอกข้อมูลให้ครบเพื่อใช้งานเว็บไซต์' : 'โปรไฟล์ของฉัน'}</span>
         {!editing
           ? <button className="btn btn-ghost btn-sm" onClick={openEdit}><Icon name="user" size={14} /> แก้ไข</button>
           : <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-ghost btn-sm" onClick={cancelEdit}>ยกเลิก</button>
+              {!locked && <button className="btn btn-ghost btn-sm" onClick={cancelEdit}>ยกเลิก</button>}
               <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
             </div>}
       </header>
@@ -260,6 +281,12 @@ function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {locked && (
+          <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 'var(--r-md)', padding: '12px 14px', fontSize: 13, color: '#7a5c00' }}>
+            ⚠️ กรุณากรอกข้อมูลบัญชีธนาคารและข้อมูลส่วนตัวให้ครบก่อนใช้งานเว็บไซต์ — ระบบจะปลดล็อกให้เข้าหน้าอื่นได้ทันทีหลังบันทึกสำเร็จ
+          </div>
+        )}
 
         {/* Bank info — บัญชีรับเงินของผู้ใช้ (แก้ไขได้ทุก role) — ขึ้นก่อนเพราะสำคัญที่สุด */}
         <div className="pf-card">
@@ -339,7 +366,7 @@ function ProfilePage() {
         </div>
 
         {/* Application status */}
-        {(sellerStatus || middlemanStatus) && (
+        {!locked && (sellerStatus || middlemanStatus) && (
           <div className="pf-card">
             <div className="pf-card-title">สถานะการสมัคร</div>
             {sellerStatus && <div className="pf-row"><span className="pf-row-lbl">ผู้ขาย 🛒</span><StatusBadge status={sellerStatus} /></div>}
@@ -347,7 +374,7 @@ function ProfilePage() {
           </div>
         )}
 
-        {wallet && (
+        {!locked && wallet && (
           <div className="pf-card">
             <div className="pf-card-title">Middleman Credit Wallet</div>
             <div className="pf-row"><span className="pf-row-lbl">Tier</span><span className="pf-row-val">{wallet.tier}</span></div>
@@ -378,7 +405,7 @@ function ProfilePage() {
         )}
 
         {/* Quick links / upgrade */}
-        <div className="pf-links">
+        {!locked && <div className="pf-links">
           {sellerStatus === 'approved' && (
             <Link href="/dashboard/seller" className="pf-link">
               <div className="pf-link-left"><div className="pf-link-icon" style={{ background: 'var(--blue-50)' }}>🛒</div><div><span className="pf-link-t">บอร์ดผู้ขาย</span><span className="pf-link-d">จัดการประกาศและดีลของคุณ</span></div></div>
@@ -407,12 +434,12 @@ function ProfilePage() {
             <div className="pf-link-left"><div className="pf-link-icon" style={{ background: '#fef5e3' }}>🛡️</div><div><span className="pf-link-t">เช็คคนโกง</span><span className="pf-link-d">ตรวจสอบประวัติก่อนทำธุรกรรม</span></div></div>
             <span style={{ color: 'var(--faint)', fontSize: 18 }}>›</span>
           </Link>
-        </div>
+        </div>}
 
         <button className="pf-logout" onClick={logout}><Icon name="logout" size={16} /> ออกจากระบบ</button>
 
         {/* PDPA: สิทธิ์ขอลบข้อมูลส่วนบุคคล */}
-        <button
+        {!locked && <button
           onClick={() => {
             const subject = encodeURIComponent('ขอลบข้อมูลส่วนบุคคล (PDPA)');
             const body = encodeURIComponent('ข้าพเจ้าขอใช้สิทธิ์ลบข้อมูลส่วนบุคคลตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล\nอีเมลบัญชี: ');
@@ -421,7 +448,7 @@ function ProfilePage() {
           style={{ width: '100%', marginTop: 10, padding: '11px', borderRadius: 'var(--r-md)', border: '1px solid var(--line)', background: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}
         >
           🗑️ ขอลบข้อมูลส่วนบุคคลของฉัน (สิทธิ์ตาม PDPA)
-        </button>
+        </button>}
       </div>
     </div>
   );

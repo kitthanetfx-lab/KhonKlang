@@ -39,6 +39,10 @@ export async function PATCH(req: NextRequest) {
     if (!phone?.trim()) {
       return NextResponse.json({ error: 'กรุณากรอกเบอร์โทรศัพท์' }, { status: 400 });
     }
+    // บัญชีธนาคารเป็นข้อมูลบังคับ — ใช้รับเงินจากระบบ escrow จึงต้องมีก่อนใช้งานเว็บไซต์ได้
+    if (!bankName?.trim() || !bankAcct?.trim() || !bankOwner?.trim()) {
+      return NextResponse.json({ error: 'กรุณากรอกข้อมูลบัญชีธนาคารให้ครบ (ธนาคาร, เลขที่บัญชี, ชื่อบัญชี)' }, { status: 400 });
+    }
 
     const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
     const update: Record<string, string> = {
@@ -47,9 +51,9 @@ export async function PATCH(req: NextRequest) {
       phone: phone.trim(),
       address: address || '',
       display_name: displayName,
-      ...(bankName !== undefined ? { bank_name: String(bankName).slice(0, 100) } : {}),
-      ...(bankAcct !== undefined ? { bank_acct: String(bankAcct).slice(0, 50) } : {}),
-      ...(bankOwner !== undefined ? { bank_owner: String(bankOwner).slice(0, 100) } : {}),
+      bank_name: String(bankName).trim().slice(0, 100),
+      bank_acct: String(bankAcct).trim().slice(0, 50),
+      bank_owner: String(bankOwner).trim().slice(0, 100),
       ...(bankQrFileId !== undefined ? { bank_qr_file_id: String(bankQrFileId).slice(0, 255) } : {}),
     };
 
