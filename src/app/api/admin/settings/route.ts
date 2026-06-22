@@ -18,10 +18,11 @@ const NUM_DEFAULTS = {
   sellerRegFee: 199, middlemanRegFee: 499,
   promoPercent: 0,
 };
-const STR_DEFAULTS = { returnShippingBy: 'buyer' as 'buyer' | 'seller' | 'split' };
 const COMPANY_DEFAULTS = {
   companyPromptPay: '', companyBankName: '', companyBankAcct: '', companyBankHolder: '', companyQrFileId: '',
   promoStart: '', promoEnd: '', promoLabel: '',
+  // ลิงก์วีดีโอ (YouTube embed URL) แนะนำการใช้งานหน้าแรก — ตั้งจากหน้าควบคุมสถานะบริการ
+  promoVideoUrl: '',
 };
 const BOOL_DEFAULTS = { promoEnabled: false, promoFree: false };
 const PROMO_SCOPE_OPTIONS = ['all', 'seller', 'middleman'];
@@ -46,6 +47,7 @@ const COLUMN_OF: Record<string, string> = {
   companyBankAcct: 'company_bank_acct', companyBankHolder: 'company_bank_holder', companyQrFileId: 'company_qr_file_id',
   promoEnabled: 'promo_enabled', promoScope: 'promo_scope', promoPercent: 'promo_percent', promoFree: 'promo_free',
   promoStart: 'promo_start', promoEnd: 'promo_end', promoLabel: 'promo_label',
+  promoVideoUrl: 'promo_video_url',
 };
 
 type FeeConfigKey = keyof FeeConfig;
@@ -75,20 +77,41 @@ export async function PATCH(req: NextRequest) {
     const db = getAdminClient();
     const body = await req.json();
     const currentFees = await readFeesConfig(db);
-    const feeBody = body?.fees ?? body;
-    const hasFeePayload = feeBody && typeof feeBody === 'object' && NUM_KEYS.some(key => key in feeBody);
+    const feeBody = (body?.fees ?? body) as Record<string, unknown> | undefined;
+    const hasFeePayload = !!feeBody && typeof feeBody === 'object' && (
+      NUM_KEYS.some(key => key in feeBody) ||
+      COMPANY_KEYS.some(key => key in feeBody) ||
+      BOOL_KEYS.some(key => key in feeBody) ||
+      'returnShippingBy' in feeBody ||
+      'promoScope' in feeBody
+    );
 
-    // sanitize: เก็บเฉพาะ key ที่รู้จัก ตัวเลข >= 0 และตัวเลือกที่ถูกต้อง
+    // sanitize: อัปเดตเฉพาะ key ที่ส่งมาจริง — key ที่ไม่ได้ส่งต้องคงค่าเดิมไว้ ไม่ใช่รีเซ็ตเป็นค่า default
     const cleanFees: Partial<FeeConfig> = {};
     for (const k of NUM_KEYS) {
-      const v = Number(feeBody?.[k]);
-      cleanFees[k] = (isFinite(v) && v >= 0) ? v : NUM_DEFAULTS[k];
+      if (!feeBody || !(k in feeBody)) continue;
+      const v = Number(feeBody[k]);
+      cleanFees[k] = (isFinite(v) && v >= 0) ? v : currentFees[k];
     }
-    cleanFees.promoPercent = Math.min(100, Math.max(0, Number(cleanFees.promoPercent) || 0));
-    cleanFees.returnShippingBy = RETURN_OPTIONS.includes(feeBody?.returnShippingBy) ? feeBody.returnShippingBy : STR_DEFAULTS.returnShippingBy;
-    cleanFees.promoScope = PROMO_SCOPE_OPTIONS.includes(feeBody?.promoScope) ? feeBody.promoScope : 'all';
-    for (const k of COMPANY_KEYS) cleanFees[k] = String(feeBody?.[k] ?? '').slice(0, 200);
-    for (const k of BOOL_KEYS) cleanFees[k] = !!feeBody?.[k];
+    if (feeBody && 'promoPercent' in feeBody) {
+      cleanFees.promoPercent = Math.min(100, Math.max(0, Number(feeBody.promoPercent) || 0));
+    }
+    if (feeBody && 'returnShippingBy' in feeBody) {
+      cleanFees.returnShippingBy = RETURN_OPTIONS.includes(feeBody.returnShippingBy as string)
+        ? (feeBody.returnShippingBy as FeeConfig['returnShippingBy']) : currentFees.returnShippingBy;
+    }
+    if (feeBody && 'promoScope' in feeBody) {
+      cleanFees.promoScope = PROMO_SCOPE_OPTIONS.includes(feeBody.promoScope as string)
+        ? (feeBody.promoScope as FeeConfig['promoScope']) : currentFees.promoScope;
+    }
+    for (const k of COMPANY_KEYS) {
+      if (!feeBody || !(k in feeBody)) continue;
+      cleanFees[k] = String(feeBody[k] ?? '').slice(0, 500);
+    }
+    for (const k of BOOL_KEYS) {
+      if (!feeBody || !(k in feeBody)) continue;
+      cleanFees[k] = !!feeBody[k];
+    }
 
     const nextFees = hasFeePayload ? { ...currentFees, ...cleanFees } : currentFees;
 

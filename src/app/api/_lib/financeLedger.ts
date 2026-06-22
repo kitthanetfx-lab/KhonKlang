@@ -92,6 +92,7 @@ export async function readFeesConfig(db: SupabaseClient): Promise<FeeConfig> {
     promoStart: data.promo_start || '',
     promoEnd: data.promo_end || '',
     promoLabel: data.promo_label || '',
+    promoVideoUrl: data.promo_video_url || '',
   };
 }
 

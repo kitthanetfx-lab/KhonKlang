@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const db = getAdminClient();
 
-    const [dealsRes, middlemenRes, platformRes, listingsRes, meetupRes, scamRes, mmReviewRes, sellersRes, membersRes] = await Promise.allSettled([
+    const [dealsRes, middlemenRes, platformRes, listingsRes, meetupRes, scamRes, mmReviewRes, sellersRes, membersRes, feeConfigRes] = await Promise.allSettled([
       db.from('deals').select('price', { count: 'exact' }).eq('status', 'completed').limit(1000),
       db.from('middleman_applications').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
       db.from('reviews').select('rating', { count: 'exact' }).eq('target_role', 'platform').limit(1000),
@@ -23,6 +23,8 @@ export async function GET() {
       db.from('seller_applications').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
       // สมาชิกทั้งหมดที่ลงทะเบียนในระบบ
       db.from('profiles').select('id', { count: 'exact', head: true }),
+      // ลิงก์วีดีโอโปรโมตหน้าแรก (ตั้งจากหน้าควบคุมสถานะบริการ)
+      db.from('fee_config').select('promo_video_url').eq('id', true).maybeSingle(),
     ]);
 
     const completedDeals = dealsRes.status === 'fulfilled' ? (dealsRes.value.count || 0) : 0;
@@ -61,10 +63,12 @@ export async function GET() {
       if (ratings.length) middlemanRating = Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10;
     }
 
+    const promoVideoUrl = feeConfigRes.status === 'fulfilled' ? (feeConfigRes.value.data?.promo_video_url || '') : '';
+
     return NextResponse.json({
       completedDeals, protectedValue, middlemen, satisfaction, reviewCount,
       categories, listingTotal, meetupDeals, scamRecords, middlemanRating, middlemanReviews,
-      sellers, totalMembers,
+      sellers, totalMembers, promoVideoUrl,
     });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

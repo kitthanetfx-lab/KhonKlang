@@ -12,7 +12,7 @@ interface SiteStats {
   completedDeals: number; protectedValue: number; middlemen: number; satisfaction: number; reviewCount: number;
   categories?: Record<string, number>; listingTotal?: number; meetupDeals?: number;
   scamRecords?: number; middlemanRating?: number; middlemanReviews?: number;
-  sellers?: number; totalMembers?: number;
+  sellers?: number; totalMembers?: number; promoVideoUrl?: string;
 }
 
 /** สถิติจริงจากระบบ — ดึงจาก /api/stats (นับจากดีลที่เสร็จสมบูรณ์, คนกลางที่อนุมัติ, รีวิวจริง) */
@@ -45,8 +45,8 @@ function buildStatItems(s: SiteStats | null) {
   ];
 }
 
-// วางลิงก์วิดีโอ (YouTube embed URL) หรือรูปภาพโปรโมตที่นี่ — ถ้าว่างจะแสดง placeholder แทน
-const PROMO_VIDEO_URL = '';
+// ลิงก์วิดีโอตั้งได้จากหน้าแอดมิน admin/service-controls (เก็บใน fee_config.promo_video_url)
+// ส่วนรูปภาพยังไม่มี UI ตั้งค่า ถ้าต้องใช้ให้แก้ค่าคงที่นี้ตรง ๆ ได้
 const PROMO_IMAGE = '';
 
 function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: string; lead?: string; center?: boolean }) {
@@ -114,9 +114,9 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
         <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
           <EscrowStage speed={1} />
           <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '200ms' }}>
-            {PROMO_VIDEO_URL ? (
+            {stats?.promoVideoUrl ? (
               <div className="promo-video-wrap">
-                <iframe src={PROMO_VIDEO_URL} title="วีดีโอแนะนำการใช้งาน" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                <iframe src={stats.promoVideoUrl} title="วีดีโอแนะนำการใช้งาน" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
               </div>
             ) : PROMO_IMAGE ? (
               // eslint-disable-next-line @next/next/no-img-element

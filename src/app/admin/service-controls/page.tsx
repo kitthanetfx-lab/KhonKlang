@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { authHeaders } from '@/lib/supabase';
-import { CheckCircle2, Loader2, SlidersHorizontal } from 'lucide-react';
+import { CheckCircle2, Film, Loader2, SlidersHorizontal } from 'lucide-react';
 import {
   SERVICE_CONTROL_CATALOG,
   SERVICE_CONTROL_GROUPS,
@@ -17,6 +17,13 @@ export default function ServiceControlsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
+  // ลิงก์วีดีโอโปรโมตหน้าแรก (เก็บแยกใน fee_config ผ่าน /api/admin/settings)
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoSaving, setVideoSaving] = useState(false);
+  const [videoSaved, setVideoSaved] = useState(false);
+  const [videoError, setVideoError] = useState('');
+
   useEffect(() => {
     (async () => {
       try {
@@ -29,7 +36,41 @@ export default function ServiceControlsPage() {
         setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
       }
     })();
+    (async () => {
+      try {
+        const headers = await authHeaders();
+        const r = await fetch('/api/admin/settings', { headers });
+        const d = await r.json();
+        if (r.ok) setVideoUrl(d.fees?.promoVideoUrl || '');
+      } catch {
+        // ไม่บล็อกหน้าหลักถ้าโหลดลิงก์วีดีโอไม่สำเร็จ
+      } finally {
+        setVideoLoaded(true);
+      }
+    })();
   }, []);
+
+  async function saveVideoUrl() {
+    setVideoSaving(true);
+    setVideoSaved(false);
+    setVideoError('');
+    try {
+      const headers = await authHeaders();
+      const r = await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fees: { promoVideoUrl: videoUrl.trim() } }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
+      setVideoUrl(d.fees?.promoVideoUrl || '');
+      setVideoSaved(true);
+    } catch (e) {
+      setVideoError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setVideoSaving(false);
+    }
+  }
 
   function setServiceEnabled(key: ServiceControlKey, enabled: boolean) {
     setServices(current => current ? { ...current, [key]: { ...current[key], enabled } } : current);
@@ -69,6 +110,32 @@ export default function ServiceControlsPage() {
       <div>
         <h1 className="text-xl font-bold flex items-center gap-2"><SlidersHorizontal size={20} /> ควบคุมสถานะบริการ</h1>
         <p className="text-sm text-gray-500 mt-0.5">เปิดหรือปิดบริการแต่ละส่วนได้จากหลังบ้าน พร้อมตั้งข้อความแจ้งผู้ใช้ช่วงเมนเทนแนนซ์หรือเปิดใช้แบบทดลอง</p>
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-3">
+        <div>
+          <h2 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2"><Film size={17} /> วีดีโอแนะนำการใช้งาน (หน้าแรก)</h2>
+          <p className="text-sm text-gray-500 mt-1">ใส่ลิงก์ YouTube embed (เช่น https://www.youtube.com/embed/VIDEO_ID) เพื่อแสดงในช่องวีดีโอเล็ก ๆ บนหน้าแรก ถ้าเว้นว่างจะแสดง placeholder แทน</p>
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <input
+            value={videoUrl}
+            onChange={e => { setVideoUrl(e.target.value); setVideoSaved(false); }}
+            placeholder="https://www.youtube.com/embed/VIDEO_ID"
+            disabled={!videoLoaded}
+            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={saveVideoUrl}
+            disabled={videoSaving || !videoLoaded}
+            className="px-4 py-2.5 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap"
+          >
+            {videoSaving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} บันทึกลิงก์วีดีโอ
+          </button>
+        </div>
+        {videoSaved && <span className="text-sm text-green-600 flex items-center gap-1"><CheckCircle2 size={14} /> บันทึกแล้ว</span>}
+        {videoError && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">⚠️ {videoError}</div>}
       </div>
 
       {services === null && !error && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}

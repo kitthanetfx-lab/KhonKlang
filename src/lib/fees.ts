@@ -18,6 +18,8 @@ export interface FeeConfig {
   promoEnabled: boolean; promoScope: 'all' | 'seller' | 'middleman';
   promoPercent: number; promoFree: boolean;
   promoStart: string; promoEnd: string; promoLabel: string;
+  // ลิงก์วีดีโอ (YouTube embed URL) แนะนำการใช้งานที่แสดงในหน้าแรก — ตั้งได้จากหน้าควบคุมสถานะบริการ
+  promoVideoUrl: string;
 }
 
 export const FEE_DEFAULTS: FeeConfig = {
@@ -35,6 +37,7 @@ export const FEE_DEFAULTS: FeeConfig = {
   promoEnabled: false, promoScope: 'all',
   promoPercent: 0, promoFree: false,
   promoStart: '', promoEnd: '', promoLabel: '',
+  promoVideoUrl: '',
 };
 
 /** โปรโมชันค่าสมัครกำลังใช้งานอยู่กับ scope นี้ไหม (เช็คทั้ง toggle + ขอบเขต + ช่วงวันที่) */
