@@ -531,7 +531,8 @@ export default function DealRoom() {
       if (file.type.startsWith('video/')) {
         // วิดีโอมักใหญ่เกินลิมิต body ของ API route บน Vercel (~4.5MB) → อัปโหลดตรงเข้า Supabase Storage จากเบราว์เซอร์
         const ext = (file.name.split('.').pop() || 'webm').toLowerCase();
-        const path = `${myId || 'guest'}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        // โฟลเดอร์ตาม user id — กันชื่อไฟล์ของคนละคนไปกองรวมกันจนแยกไม่ออกในหน้า Storage
+        const path = `${myId || 'guest'}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { error } = await supabase.storage.from(DEAL_BUCKET).upload(path, file, { contentType: file.type || 'video/webm' });
         if (error) { alert(`อัปโหลดวิดีโอไม่สำเร็จ: ${error.message}`); return; }
         fileId = path;

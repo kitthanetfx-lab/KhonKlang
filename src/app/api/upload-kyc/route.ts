@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
     const db = getAdminClient();
     const buf = Buffer.from(await file.arrayBuffer());
     const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
-    const fileId = `${me.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    // โฟลเดอร์ตาม user id — กันชื่อไฟล์ของคนละคนไปกองรวมกันจนแยกไม่ออกในหน้า Storage
+    const fileId = `${me.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     const { error } = await db.storage.from(BUCKET_ID).upload(fileId, buf, {
       contentType: file.type,

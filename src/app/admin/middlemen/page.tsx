@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
+import { authHeaders, fileViewUrl, KYC_BUCKET } from '@/lib/supabase';
 import {
   Search, CheckCircle2, XCircle, Eye, Shield, RefreshCw, FileText, Download,
 } from 'lucide-react';
@@ -129,7 +129,7 @@ function Row({ k, v, multiline }: { k: string; v: string; multiline?: boolean })
 function FileCard({ label, fileId }: { label: string; fileId: string }) {
   const [imgOk, setImgOk] = useState(true);
   if (!fileId) return null;
-  const url   = fileViewUrl(DEAL_BUCKET, fileId);
+  const url   = fileViewUrl(KYC_BUCKET, fileId);
   const dlUrl = url;
   return (
     <div className="px-4 py-3 space-y-2">

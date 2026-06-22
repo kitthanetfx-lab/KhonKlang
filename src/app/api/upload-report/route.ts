@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminClient } from '@/lib/supabaseServer';
+import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 
 const BUCKET_ID = 'report-files';
 const MAX_SIZE = 10 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   try {
-    const jwt = req.headers.get('x-session-jwt') || req.headers.get('authorization');
-    if (!jwt) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบก่อน' }, { status: 401 });
+    const me = await verifyUser(req);
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -21,7 +20,8 @@ export async function POST(req: NextRequest) {
     const db = getAdminClient();
     const buf = Buffer.from(await file.arrayBuffer());
     const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
-    const fileId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    // โฟลเดอร์ตาม user id — กันชื่อไฟล์ของคนละคนไปกองรวมกันจนแยกไม่ออกในหน้า Storage
+    const fileId = `${me.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     const { error } = await db.storage.from(BUCKET_ID).upload(fileId, buf, {
       contentType: file.type,
@@ -31,8 +31,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ fileId, fileName: file.name });
   } catch (err: unknown) {
+    const status = err instanceof HttpError ? err.status : 500;
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[upload-report]', msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: status === 401 ? 'กรุณาเข้าสู่ระบบก่อน' : msg }, { status });
   }
 }
