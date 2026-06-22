@@ -575,7 +575,7 @@ function MiddlemanForm() {
                 <div className="text-center space-y-3">
                   <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">สแกน QR PromptPay (ค่าสมัคร ฿{membershipFee.toLocaleString()})</p>
                   <div className="inline-block bg-white p-3 rounded-2xl shadow-lg border border-gray-200">
-                    <img src={qrSrc} alt="PromptPay QR Code" width={200} height={200} className="rounded-lg" />
+                    <img src={qrSrc} alt="PromptPay QR Code" width={400} height={400} className="rounded-lg max-w-full h-auto" />
                   </div>
                   {ppDigits && (
                     <div className="flex items-center justify-center gap-2 text-sm text-gray-500">

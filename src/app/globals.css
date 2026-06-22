@@ -1894,7 +1894,7 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .pm-amount { font-size: 13.5px; color: var(--ink-2); margin-bottom: 12px; }
 .pm-amount b { font-family: var(--font-display); font-size: 18px; color: var(--green-600); }
 .pm-qr-wrap { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; padding: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); }
-.pm-qr { width: 150px; height: 150px; max-width: 100%; border-radius: 8px; background: #fff; border: 1px solid var(--line); flex: 0 0 auto; }
+.pm-qr { width: 300px; height: 300px; max-width: 100%; border-radius: 8px; background: #fff; border: 1px solid var(--line); flex: 0 0 auto; }
 .pm-qr-acts { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 8px; }
 .pm-label { font-size: 12px; font-weight: 700; color: var(--muted); font-family: var(--font-display); letter-spacing: .02em; }
 .pm-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--ink-2); }
