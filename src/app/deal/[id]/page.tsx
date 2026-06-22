@@ -1425,7 +1425,7 @@ export default function DealRoom() {
     const pd: DealPriceState = priceState || {};
     const fpName = (fp?: string) => fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
     const currentPrice = pd.proposed_price || deal!.price;
-    const currentFeePayer = pd.proposed_fee_payer || deal!.fee_payer || 'split';
+    const currentFeePayer = (pd.proposed_fee_payer || deal!.fee_payer || 'split') as 'buyer' | 'seller' | 'split';
     const selectedFeePayer = feePayerInput || currentFeePayer;
     const sellerReady = !!pd.seller_agreed && !!pd.evidence_done_seller;
     const buyerReady = !!pd.buyer_agreed && !!pd.evidence_done_buyer;
