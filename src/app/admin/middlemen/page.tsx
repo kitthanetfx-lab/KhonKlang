@@ -200,7 +200,7 @@ function DetailPanel({ app, onClose, onAction }: {
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           <div className="flex items-center gap-3 flex-wrap">
             <StatusBadge status={app.status} />
-            <TierBadge tier={app.tier} />
+            <TierBadge tier={app.wallet?.tier || 'Bronze'} />
             <span className="text-xs text-gray-400">{formatDate(app.created_at)}</span>
           </div>
 
@@ -210,16 +210,15 @@ function DetailPanel({ app, onClose, onAction }: {
           </Section>
 
           <Section label="ข้อมูลคนกลาง">
-            <Row k="Tier (ที่ประกาศ)"   v={`${TIER_ICON[app.tier] ?? ''} ${app.tier}`} />
-            <Row k="เงินประกัน (เจตนา)" v={`฿${app.deposit_intent.toLocaleString()}`} />
             <Row k="จังหวัดรับงาน"      v={app.work_province} />
             <Row k="ประเภทสินค้า"       v={cats} multiline />
             {app.terms && <Row k="เงื่อนไขเพิ่มเติม" v={app.terms} multiline />}
           </Section>
 
           {app.wallet && (
-            <Section label="เครดิตคนกลาง">
-              <Row k="วงเงินเครดิต" v={baht(app.wallet.credit_limit)} />
+            <Section label="เครดิตคนกลาง (Tier เป็นป้ายแสดงผล คำนวณจากยอดเงินค้ำประกันจริงเท่านั้น)">
+              <Row k="Tier"          v={`${TIER_ICON[app.wallet.tier] ?? ''} ${app.wallet.tier}`} />
+              <Row k="วงเงินเครดิต (= ยอดเงินประกันที่ยืนยันแล้ว)" v={baht(app.wallet.credit_limit)} />
               <Row k="เครดิตคงเหลือ" v={baht(app.wallet.available_credit)} />
               <Row k="เครดิตที่ hold" v={baht(app.wallet.held_credit)} />
               <Row k="เครดิตปลดแล้ว" v={baht(app.wallet.released_credit)} />
@@ -251,7 +250,7 @@ function DetailPanel({ app, onClose, onAction }: {
           {app.status === 'approved' && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-sm text-blue-700 dark:text-blue-300">
               <p className="font-semibold mb-1">อนุมัติแล้ว</p>
-              <p>คนกลางรายนี้จะเห็นหน้าวางเงินประกัน (Tier) ในโปรไฟล์ของตนเอง</p>
+              <p>คนกลางรายนี้จะเห็นหน้าโอนเงินค้ำประกันในบอร์ดคนกลางของตนเอง — ตรวจสอบและอนุมัติได้ที่เมนู &quot;เงินค้ำประกันคนกลาง&quot;</p>
             </div>
           )}
         </div>
@@ -391,7 +390,7 @@ function MiddlemenContent() {
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">Tier</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">เครดิตคงเหลือ</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">เครดิต Hold</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">เงินประกัน</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">เงินประกัน (ยืนยันแล้ว)</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">จังหวัด</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">วันที่สมัคร</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">สถานะ</th>
@@ -412,10 +411,10 @@ function MiddlemenContent() {
               ) : filtered.map(app => (
                 <tr key={app.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                   <td className="px-5 py-3.5 font-medium">{app.full_name_id}</td>
-                  <td className="px-4 py-3.5"><TierBadge tier={app.tier} /></td>
+                  <td className="px-4 py-3.5"><TierBadge tier={app.wallet?.tier || 'Bronze'} /></td>
                   <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.wallet ? baht(app.wallet.available_credit) : '—'}</td>
                   <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.wallet ? baht(app.wallet.held_credit) : '—'}</td>
-                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">฿{app.deposit_intent.toLocaleString()}</td>
+                  <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.wallet ? baht(app.wallet.credit_limit) : '฿0'}</td>
                   <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">{app.work_province || '—'}</td>
                   <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(app.created_at)}</td>
                   <td className="px-4 py-3.5"><StatusBadge status={app.status} /></td>

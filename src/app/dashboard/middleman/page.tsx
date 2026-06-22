@@ -107,7 +107,6 @@ export default function MiddlemanDashboard() {
 
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
   const [confirmedTotal, setConfirmedTotal] = useState(0);
-  const [tierTarget, setTierTarget] = useState(0);
   const [companyFees, setCompanyFees] = useState<CompanyFees | null>(null);
   const [showDepositForm, setShowDepositForm] = useState(false);
   const [depAmount, setDepAmount] = useState('');
@@ -123,7 +122,7 @@ export default function MiddlemanDashboard() {
       const d = await res.json();
       setDeposits(d.deposits || []);
       setConfirmedTotal(d.confirmedTotal || 0);
-      setTierTarget(d.tierTarget || 0);
+      if (d.tier) setTier(d.tier);
     }
   }, []);
 
@@ -263,8 +262,8 @@ export default function MiddlemanDashboard() {
 
       <main className="dash-body">
         <div className="tier-card" style={{ background: ti.bg }}>
-          <div><div className="tier-card-name" style={{ color: ti.color }}>{tier}</div><div className="tier-card-sub">ระดับคนกลางของคุณ</div></div>
-          <div className="tier-card-right"><div className="tier-card-dep-lbl">เงินประกันที่ต้องวาง</div><div className="tier-card-dep-val" style={{ color: ti.color }}>฿{(tierTarget || ti.deposit).toLocaleString()}</div></div>
+          <div><div className="tier-card-name" style={{ color: ti.color }}>{tier}</div><div className="tier-card-sub">ระดับคนกลางของคุณ (คำนวณจากยอดเงินค้ำประกันจริง)</div></div>
+          <div className="tier-card-right"><div className="tier-card-dep-lbl">เงินค้ำประกันที่ยืนยันแล้ว</div><div className="tier-card-dep-val" style={{ color: ti.color }}>{baht(confirmedTotal)}</div></div>
         </div>
 
         <div className="deal-card" style={{ gap: 14 }}>
@@ -272,7 +271,7 @@ export default function MiddlemanDashboard() {
             <div style={{ flex: 1 }}>
               <div className="deal-card-title">💰 เงินค้ำประกัน</div>
               <div className="deal-card-meta">
-                <span>ยืนยันแล้ว {baht(confirmedTotal)} / ฿{(tierTarget || ti.deposit).toLocaleString()}</span>
+                <span>ยืนยันแล้ว {baht(confirmedTotal)} — ใช้เป็นเครดิตรับงานได้เต็มจำนวนนี้</span>
               </div>
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => setShowDepositForm(v => !v)}>
@@ -280,12 +279,10 @@ export default function MiddlemanDashboard() {
             </button>
           </div>
 
-          {confirmedTotal < tierTarget && (
-            <div className="info-banner">
-              <Icon name="info" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-              <span>เครดิตที่ใช้รับงานได้จะเท่ากับยอดเงินค้ำประกันที่ admin ตรวจสอบและยืนยันแล้วเท่านั้น ไม่ใช่ยอดตาม Tier อัตโนมัติ — โอนเงินค้ำประกันเข้ามาให้ครบเพื่อปลดวงเงินรับงาน</span>
-            </div>
-          )}
+          <div className="info-banner">
+            <Icon name="info" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>ไม่มีขั้นต่ำและไม่มีเพดานต่อดีล — โอนเงินค้ำประกันเข้ามาเท่าไหร่ (และ admin ตรวจสอบยืนยันแล้ว) ใช้เป็นเครดิตรับงานได้เต็มจำนวนนั้นทันที</span>
+          </div>
 
           {showDepositForm && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--line)', paddingTop: 14 }}>

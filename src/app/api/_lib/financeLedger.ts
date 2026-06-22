@@ -4,6 +4,7 @@ import {
   financeReferenceCode,
   splitDealFeeComponents,
   splitFeeByPayer,
+  tierForDeposit,
   type LedgerDirection,
   type LedgerEntryType,
   type LedgerOwnerType,
@@ -525,15 +526,18 @@ export async function syncMiddlemanWallet(
   db: SupabaseClient,
   middlemanId: string,
   fallbackName = '',
-  tierHint?: string,
+  /** @deprecated ไม่ใช้แล้ว — tier คำนวณจากยอดเงินประกันจริงเท่านั้น เก็บพารามิเตอร์ไว้เพื่อไม่ต้องแก้จุดเรียกใช้เดิมทั้งหมด */
+  _tierHint?: string,
   feesConfig?: FeeConfig,
 ): Promise<MiddlemanWalletSnapshot> {
   const fees = feesConfig || await readFeesConfig(db);
   const profile = await getMiddlemanProfile(db, middlemanId);
-  const tier = tierHint || profile?.middleman_tier || profile?.middleman_tier_intent || 'Bronze';
   const middlemanName = profile?.display_name || fallbackName || middlemanId;
   // เปลี่ยนจาก auto-grant ตาม tier (getTierCreditLimit) เป็นยอดเงินประกันที่โอนเข้ามาจริงและอนุมัติแล้วเท่านั้น
+  // ใช้เครดิตได้เต็มยอดที่วางจริงเสมอ ไม่มีขั้นต่ำ ไม่มี cap ต่อ tier
   const creditLimit = await getConfirmedDepositTotal(db, middlemanId);
+  // tier เป็นแค่ป้ายแสดงผล คำนวณจากยอดเงินประกันจริง ไม่ใช่ค่าที่ self-declare ตอนสมัครอีกต่อไป
+  const tier = tierForDeposit(fees, creditLimit);
 
   const { data: entries } = await db
     .from('finance_ledger')
@@ -568,6 +572,12 @@ export async function syncMiddlemanWallet(
     active_deal_count: wallet.activeDealCount,
     updated_at: wallet.updatedAt,
   }, { onConflict: 'middleman_id' });
+
+  // sync tier ที่คำนวณได้กลับเข้า profiles ด้วย เผื่อจุดอื่นในระบบอ่าน profiles.middleman_tier ตรง ๆ
+  // (เป็นแค่ป้ายแสดงผล ไม่ใช่ค่าที่ใครเลือกเอง — เปลี่ยนอัตโนมัติตามยอดเงินประกันจริงเสมอ)
+  if (profile && profile.middleman_tier !== tier) {
+    await db.from('profiles').update({ middleman_tier: tier }).eq('id', middlemanId);
+  }
 
   return wallet;
 }

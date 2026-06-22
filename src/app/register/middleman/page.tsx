@@ -48,13 +48,6 @@ function extractProvince(addr: string): string {
   return PROVINCES.find(p => addr.includes(p)) || '';
 }
 
-function getTier(amount: number): { label: string; color: string; icon: string; maxDeal: string } {
-  if (amount >= 100_000) return { label: 'Platinum', color: 'text-purple-600 bg-purple-50 border-purple-200', icon: '💎', maxDeal: 'ไม่จำกัด' };
-  if (amount >= 50_000)  return { label: 'Gold',     color: 'text-yellow-600 bg-yellow-50 border-yellow-200', icon: '🥇', maxDeal: '฿50,000 / ดีล' };
-  if (amount >= 10_000)  return { label: 'Silver',   color: 'text-slate-600 bg-slate-50 border-slate-200',   icon: '🥈', maxDeal: '฿10,000 / ดีล' };
-  return                        { label: 'Bronze',   color: 'text-orange-600 bg-orange-50 border-orange-200', icon: '🥉', maxDeal: '฿3,000 / ดีล' };
-}
-
 const STEPS = ['ข้อมูลพื้นฐาน', 'ข้อมูลคนกลาง', 'ยืนยันตัวตน', 'ชำระค่าสมาชิก'];
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
@@ -128,7 +121,6 @@ function MiddlemanForm() {
   const [idNumber, setIdNumber]     = useState('');
 
   // Step 2 – Middleman specific
-  const [depositIntent, setDepositIntent] = useState('');  // declared intent (actual deposit after KYC)
   const [categories, setCategories] = useState<string[]>([]);
   const [workProvince, setWorkProvince] = useState('');
   const [terms, setTerms]           = useState('');
@@ -144,9 +136,6 @@ function MiddlemanForm() {
   const [slipFile, setSlipFile] = useState<File | null>(null);
 
   const [existingStatus, setExistingStatus] = useState('');
-
-  const depositNum = parseInt(depositIntent.replace(/,/g, ''), 10) || 0;
-  const tier = getTier(depositNum);
 
   const ic = 'w-full bg-white/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-40';
 
@@ -229,8 +218,6 @@ function MiddlemanForm() {
       const headers = await authHeaders();
       const body = {
         type: 'middleman', fullNameId, idNumber,
-        depositIntent: depositNum,
-        tier: tier.label,
         categories,
         workProvince, terms,
         bankAcct, bankName, bankOwner,
@@ -309,7 +296,7 @@ function MiddlemanForm() {
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 text-sm text-blue-700 dark:text-blue-300 mb-6 text-left space-y-1">
             <p className="font-semibold">ขั้นตอนถัดไปหลังผ่าน KYC</p>
             <p>• ทีมงานแจ้งผลทาง LINE / อีเมล</p>
-            <p>• เข้าหน้าโปรไฟล์เพื่อวางเงินประกัน (Tier {tier.label})</p>
+            <p>• เข้าหน้าบอร์ดคนกลางเพื่อโอนเงินค้ำประกัน (โอนเท่าไหร่ ได้เครดิตเต็มจำนวนนั้น ไม่มีขั้นต่ำ)</p>
             <p>• เริ่มรับงานคนกลางได้ทันที</p>
           </div>
           <button onClick={() => router.push('/')}
@@ -375,42 +362,12 @@ function MiddlemanForm() {
                 <p className="text-sm text-gray-500">ระบุความเชี่ยวชาญและพื้นที่รับงาน</p>
               </div>
 
-              {/* Deposit intent + Tier preview */}
-              <div>
-                <label className="block text-sm font-medium mb-1.5 opacity-75">
-                  จำนวนเงินประกันที่ต้องการวาง (บาท)
-                  <span className="ml-2 text-xs text-gray-400 font-normal">ชำระจริงหลังผ่าน KYC</span>
-                </label>
-                <input className={ic} value={depositIntent}
-                  onChange={e => setDepositIntent(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="เช่น 10000" inputMode="numeric" />
-
-                {depositNum > 0 && (
-                  <div className={`mt-2 flex items-center gap-3 border rounded-xl px-4 py-3 ${tier.color}`}>
-                    <span className="text-2xl">{tier.icon}</span>
-                    <div>
-                      <p className="font-bold text-sm">ระดับ {tier.label}</p>
-                      <p className="text-xs opacity-75">รับงานสูงสุด {tier.maxDeal}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Tier table */}
-                <div className="mt-3 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
-                  {[
-                    { icon: '🥉', name: 'Bronze',   range: '< ฿10,000',          max: '฿3,000 / ดีล' },
-                    { icon: '🥈', name: 'Silver',   range: '฿10,000 – ฿49,999',  max: '฿10,000 / ดีล' },
-                    { icon: '🥇', name: 'Gold',     range: '฿50,000 – ฿99,999',  max: '฿50,000 / ดีล' },
-                    { icon: '💎', name: 'Platinum', range: '฿100,000 ขึ้นไป',    max: 'ไม่จำกัด' },
-                  ].map(t => (
-                    <div key={t.name} className={`flex items-center gap-2 px-3 py-2 border-b last:border-0 border-gray-100 dark:border-gray-800
-                      ${tier.label === t.name ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : ''}`}>
-                      <span>{t.icon}</span>
-                      <span className="w-16">{t.name}</span>
-                      <span className="flex-1 text-gray-500">{t.range}</span>
-                      <span className="text-gray-500">{t.max}</span>
-                    </div>
-                  ))}
+              {/* เงินค้ำประกัน — วางหลังผ่าน KYC ผ่านหน้าบอร์ดคนกลาง ไม่ต้องระบุตรงนี้ */}
+              <div className="flex items-start gap-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+                <Shield className="w-5 h-5 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">เรื่องเงินค้ำประกัน</p>
+                  <p className="opacity-80 mt-0.5">โอนเงินค้ำประกันได้ทีหลัง หลังผ่านการอนุมัติ KYC แล้ว ผ่านหน้าบอร์ดคนกลาง — โอนเท่าไหร่ใช้เป็นเครดิตรับงานได้เต็มจำนวนนั้นเลย ไม่มีขั้นต่ำ ไม่มีเพดานต่อดีล</p>
                 </div>
               </div>
 
@@ -556,19 +513,8 @@ function MiddlemanForm() {
                   <p className="text-sm text-gray-400 line-through">฿{fees.middlemanRegFee.toLocaleString()}</p>
                 )}
                 <p className="text-4xl font-bold text-purple-600">฿{membershipFee.toLocaleString()}</p>
-                <p className="text-xs text-gray-400 mt-1">ชำระครั้งเดียว (ต่ออายุรายปี) — ไม่รวมเงินประกัน Tier</p>
+                <p className="text-xs text-gray-400 mt-1">ชำระครั้งเดียว (ต่ออายุรายปี) — ไม่รวมเงินค้ำประกัน (โอนทีหลังที่หน้าบอร์ดคนกลาง)</p>
               </div>
-
-              {/* Tier summary */}
-              {depositNum > 0 && (
-                <div className={`flex items-center gap-3 border rounded-xl px-4 py-3 ${tier.color}`}>
-                  <span className="text-2xl">{tier.icon}</span>
-                  <div className="text-sm">
-                    <p className="font-bold">Tier ที่ประกาศไว้: {tier.label}</p>
-                    <p className="opacity-75">เงินประกัน ฿{depositNum.toLocaleString()} — วางจริงหลังผ่าน KYC</p>
-                  </div>
-                </div>
-              )}
 
               {/* QR Code */}
               {qrSrc && (

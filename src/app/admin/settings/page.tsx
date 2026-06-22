@@ -46,11 +46,11 @@ const GROUPS: { title: string; icon: React.ReactNode; fields: [NumKey, string, s
     ['inspectionFee', 'ค่าตรวจสอบสินค้า', 'บาท'],
     ['packingFee', 'ค่าแพ็คสินค้า', 'บาท'],
   ] },
-  { title: 'เครดิตประกันคนกลาง (ตามเทียร์)', icon: <Shield size={16} className="text-emerald-600" />, fields: [
-    ['depositBronze', 'Bronze', 'บาท'],
-    ['depositSilver', 'Silver', 'บาท'],
-    ['depositGold', 'Gold', 'บาท'],
-    ['depositPlatinum', 'Platinum', 'บาท'],
+  { title: 'เกณฑ์ Tier คนกลาง (ป้ายแสดงผลตามยอดเงินค้ำประกันจริง ไม่ใช่วงเงินที่ปล่อยอัตโนมัติ)', icon: <Shield size={16} className="text-emerald-600" />, fields: [
+    ['depositBronze', 'Bronze (ขั้นต่ำ)', 'บาท'],
+    ['depositSilver', 'Silver (ขั้นต่ำ)', 'บาท'],
+    ['depositGold', 'Gold (ขั้นต่ำ)', 'บาท'],
+    ['depositPlatinum', 'Platinum (ขั้นต่ำ)', 'บาท'],
   ] },
   { title: 'เมื่อดีลไม่สำเร็จ / ตีกลับ', icon: <RotateCcw size={16} className="text-rose-600" />, fields: [
     ['failedDealFee', 'ค่าจัดการดีลไม่สำเร็จ', 'บาท'],

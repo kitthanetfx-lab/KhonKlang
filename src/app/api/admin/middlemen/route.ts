@@ -39,11 +39,11 @@ export async function PATCH(req: NextRequest) {
     }).eq('id', docId).select().single();
     if (error) throw new Error(error.message);
 
-    // Update profile
+    // Update profile — หมายเหตุ: ไม่ set middleman_tier ตรงนี้แล้ว เพราะ tier ต้องคำนวณจากยอดเงินค้ำประกัน
+    // จริงที่โอนเข้ามาและ admin อนุมัติแล้วเท่านั้น (ดู syncMiddlemanWallet) ไม่ใช่ตามที่ self-declare ไว้ตอนสมัคร
     const profileUpdates: Record<string, unknown> = { middleman_status: newStatus };
     if (action === 'approve') {
       profileUpdates.role = 'middleman';
-      profileUpdates.middleman_tier = doc.tier || 'Bronze';
     }
     await db.from('profiles').update(profileUpdates).eq('id', doc.user_id);
 

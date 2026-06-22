@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUser, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { syncMiddlemanDepositLedger, getConfirmedDepositTotal, readFeesConfig } from '../../_lib/financeLedger';
-import { getTierCreditLimit } from '@/lib/financeLedger';
+import { tierForDeposit } from '@/lib/financeLedger';
 
-/** GET — ดูประวัติการโอนเงินค้ำประกันของตัวเอง + ยอดที่ยืนยันแล้ว/ยอดที่ tier ตัวเองต้องค้ำ */
+/** GET — ดูประวัติการโอนเงินค้ำประกันของตัวเอง + ยอดที่ยืนยันแล้ว (ใช้เป็นเครดิตได้เต็มจำนวน ไม่มีขั้นต่ำ/เพดาน) */
 export async function GET(req: NextRequest) {
   try {
     const me = await verifyUser(req);
     const db = getAdminClient();
 
-    const { data: profile } = await db.from('profiles').select('middleman_status, middleman_tier, middleman_tier_intent').eq('id', me.id).maybeSingle();
+    const { data: profile } = await db.from('profiles').select('middleman_status').eq('id', me.id).maybeSingle();
     if (!profile || profile.middleman_status !== 'approved') {
       return NextResponse.json({ error: 'เฉพาะคนกลางที่ได้รับอนุมัติแล้วเท่านั้น' }, { status: 403 });
     }
@@ -20,10 +20,10 @@ export async function GET(req: NextRequest) {
       readFeesConfig(db),
     ]);
 
-    const tier = profile.middleman_tier || profile.middleman_tier_intent || 'Bronze';
-    const tierTarget = getTierCreditLimit(fees, tier);
+    // tier เป็นแค่ป้ายแสดงผล คำนวณจากยอดเงินประกันที่ยืนยันแล้วจริงเท่านั้น ไม่มีขั้นต่ำที่ต้องวางถึงจะใช้เครดิตได้
+    const tier = tierForDeposit(fees, confirmedTotal);
 
-    return NextResponse.json({ deposits: deposits || [], confirmedTotal, tier, tierTarget });
+    return NextResponse.json({ deposits: deposits || [], confirmedTotal, tier });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;
     const msg = err instanceof Error ? err.message : String(err);

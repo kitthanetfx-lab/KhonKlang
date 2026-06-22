@@ -82,6 +82,17 @@ export function getTierCreditLimit(config: FeeConfig, tier: string) {
   }
 }
 
+/** Tier เป็นแค่ "ป้ายแสดงผล" ตามยอดเงินค้ำประกันที่ยืนยันแล้วทั้งหมดเท่านั้น — ไม่มีขั้นต่ำที่ต้องวาง
+ *  และไม่จำกัดว่าวางเท่าไหร่แล้วใช้ได้แค่บางส่วน คนกลางใช้เครดิตได้เต็มยอดที่วางจริงเสมอ ไม่ว่า tier จะเป็นอะไร
+ *  ฟังก์ชันนี้แค่เลือก label ที่ "high" สุดที่ยอดเงินถึงเกณฑ์ (admin ปรับเกณฑ์ได้ที่หน้า settings) */
+export function tierForDeposit(config: FeeConfig, confirmedTotal: number): string {
+  const amount = Number(confirmedTotal) || 0;
+  if (amount >= (Number(config.depositPlatinum) || Infinity) && Number(config.depositPlatinum) > 0) return 'Platinum';
+  if (amount >= (Number(config.depositGold) || Infinity) && Number(config.depositGold) > 0) return 'Gold';
+  if (amount >= (Number(config.depositSilver) || Infinity) && Number(config.depositSilver) > 0) return 'Silver';
+  return 'Bronze';
+}
+
 export function splitDealFeeComponents(config: FeeConfig, lines: FeeLine[]): LedgerFeeComponent {
   const middlemanGrossFee = lines
     .filter(line => line.label === 'ค่าบริการคนกลาง')
