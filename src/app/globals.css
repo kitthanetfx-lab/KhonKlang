@@ -1961,11 +1961,11 @@ html, body { overflow-x: hidden; max-width: 100%; }
 .cc-btn:hover { background: var(--accent-strong); }
 
 /* ---- ปุ่มลอยกลับหน้าหลัก ---- */
-.home-fab { position: fixed; left: 18px; bottom: 18px; z-index: 140; width: 50px; height: 50px; border-radius: 50%; background: var(--surface); color: var(--ink-2); border: 1px solid var(--line); display: grid; place-items: center; box-shadow: var(--sh-lg); transition: transform .2s, background .2s, color .2s; }
+.home-fab { position: fixed; left: 18px; bottom: 18px; z-index: 140; width: 64px; height: 64px; border-radius: 50%; background: var(--surface); color: var(--ink-2); border: 1px solid var(--line); display: grid; place-items: center; box-shadow: var(--sh-lg); transition: transform .2s, background .2s, color .2s; }
 .home-fab:hover { background: var(--accent); color: #fff; transform: translateY(-2px); }
 .home-fab:focus-visible { outline: none; box-shadow: var(--ring), var(--sh-lg); }
 @media (max-width: 480px) {
-  .home-fab { left: 12px; bottom: 12px; width: 46px; height: 46px; }
+  .home-fab { left: 12px; bottom: 12px; width: 56px; height: 56px; }
 }
 
 /* ---- Support widget (ปุ่มลอยติดต่อทีมงาน) ---- */

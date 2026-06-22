@@ -14,7 +14,7 @@ export function HomeButton() {
 
   return (
     <Link href="/" className="home-fab" aria-label="กลับหน้าหลัก" title="กลับหน้าหลัก">
-      <Icon name="home" size={22} />
+      <Icon name="home" size={28} />
     </Link>
   );
 }

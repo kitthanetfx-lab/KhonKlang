@@ -372,6 +372,10 @@ export default function DealRoom() {
   const callFileInputRef = useRef<HTMLInputElement>(null);
   // wizard แบบง่าย: สถานะ local อย่างเดียว (ไม่บันทึกลง DB) ว่าฉันกด "คุยกันจบแล้ว" ไปดูหน้าหลักฐานหรือยัง
   const [chatReviewReady, setChatReviewReady] = useState(false);
+  // wizard แบบง่าย: ขั้นที่กำลังดูอยู่ (ปุ่มย้อนกลับ/ถัดไป) — null แปลว่าให้ตามขั้นจริงปัจจุบันเสมอ
+  const [wzViewStep, setWzViewStep] = useState<number | null>(null);
+  // รีเซ็ตกลับไปดูขั้นปัจจุบันทุกครั้งที่สถานะดีลเปลี่ยน (เช่น แอดมินอนุมัติ ขยับไปขั้นถัดไปจริง)
+  useEffect(() => { setWzViewStep(null); }, [deal?.status]);
 
   useEffect(() => {
     const r = document.documentElement;
@@ -1339,7 +1343,15 @@ export default function DealRoom() {
       if (evReady) return { step: 5 }; // ทั้งคู่ยืนยันหลักฐานแล้ว → โอนเงินได้
       return { step: chatReviewReady ? 4 : 3 }; // คุย/วิดีโอคอล หรือ กำลังตรวจหลักฐาน
     }
-    if (s === 'payment_uploaded') return { step: 6 };
+    if (s === 'payment_uploaded') {
+      // บั๊กที่เจอ: ถ้าผู้ขายต้องโอนค่าบริการส่วนของตนเองด้วย (fee_payer = seller/split) แต่ยังไม่ได้โอน
+      // ห้ามข้ามไปขั้น "ทีมงานตรวจสอบ" ทันทีที่ผู้ซื้ออัปโหลดสลิป — ต้องรอผู้ขายโอนค่าบริการก่อน ไม่งั้นปุ่มผู้ขายจะหายไปเฉยๆ
+      const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
+      const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
+      const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+      if (sellerShare > 0 && !pd.seller_fee_slip) return { step: 5 };
+      return { step: 6 };
+    }
     if (s === 'packing') return { step: 7 };
     if (s === 'shipped_to_buyer') return { step: 8 };
     if (s === 'completed') return { step: pd.payout_slip_file_id ? 10 : 9, outcome: 'success' };
@@ -1691,22 +1703,41 @@ export default function DealRoom() {
   }
 
   function renderSimpleWizard() {
-    const { step, outcome } = getSimpleStep();
+    const { step: actualStep, outcome } = getSimpleStep();
+    const step = Math.min(wzViewStep ?? actualStep, actualStep); // กันดูล้ำหน้ากว่าความเป็นจริง
+    const isReviewing = step < actualStep; // กำลังย้อนดูขั้นที่ผ่านมาแล้ว — ปิดปฏิสัมพันธ์ กันกดซ้ำย้อนสถานะดีล
     return (
       <div className="dr-inner">
         {step > 0 && renderWizardProgress(step)}
         {step > 0 && step < 9 && renderWizardPartiesMini()}
-        {step === 0 && renderWizardStep0()}
-        {step === 1 && renderWizardStep1()}
-        {step === 2 && renderWizardStepPrice()}
-        {step === 3 && renderWizardStepChat()}
-        {step === 4 && renderWizardStepEvidenceReview()}
-        {step === 5 && renderPaymentSection()}
-        {step === 6 && renderWizardStep4()}
-        {step === 7 && renderWizardStep5()}
-        {step === 8 && renderWizardStep6()}
-        {step === 9 && renderWizardStep7(outcome)}
-        {step === 10 && renderWizardStep8(outcome)}
+        {isReviewing && (
+          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '8px 12px', marginBottom: 12, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>
+            👀 กำลังดูขั้นตอนที่ผ่านมาแล้ว (ดูอย่างเดียว) — กด &quot;ถัดไป&quot; เพื่อกลับไปขั้นตอนปัจจุบัน
+          </div>
+        )}
+        <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
+          {step === 0 && renderWizardStep0()}
+          {step === 1 && renderWizardStep1()}
+          {step === 2 && renderWizardStepPrice()}
+          {step === 3 && renderWizardStepChat()}
+          {step === 4 && renderWizardStepEvidenceReview()}
+          {step === 5 && renderPaymentSection()}
+          {step === 6 && renderWizardStep4()}
+          {step === 7 && renderWizardStep5()}
+          {step === 8 && renderWizardStep6()}
+          {step === 9 && renderWizardStep7(outcome)}
+          {step === 10 && renderWizardStep8(outcome)}
+        </div>
+        {step >= 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>
+            {step > 1
+              ? <button type="button" className="btn btn-ghost" onClick={() => setWzViewStep(Math.max(1, step - 1))}>← ย้อนกลับ</button>
+              : <span />}
+            {step < actualStep && (
+              <button type="button" className="btn btn-primary" onClick={() => setWzViewStep(Math.min(actualStep, step + 1))}>ถัดไป →</button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -1721,7 +1752,8 @@ export default function DealRoom() {
         <div className="dr-hctas">
           {myId && <NotifyBell />}
           <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
-          <button className="dr-cta-green" onClick={toggleCall}>📹 Video</button>
+          {/* ดีลแบบง่าย: ปุ่มวิดีโอคอลอยู่ในขั้นตอน "คุย/วิดีโอคอล" ของ wizard อยู่แล้ว ไม่ต้องมีซ้ำที่นี่ */}
+          {!isSimple && <button className="dr-cta-green" onClick={toggleCall}>📹 Video</button>}
         </div>
       </header>
 
@@ -1811,6 +1843,8 @@ export default function DealRoom() {
             );
           })()}
 
+          {/* ดีลแบบง่าย: แชทและหลักฐานถูกฝังอยู่ในขั้นตอนของ wizard แล้ว ไม่ต้องมีแท็บแยก */}
+          {!isSimple && (
           <nav className="dr-tabs">
             {(['steps', 'chat', 'evidence'] as const).map(k => (
               <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
@@ -1818,6 +1852,7 @@ export default function DealRoom() {
               </button>
             ))}
           </nav>
+          )}
 
           <main className="dr-body">
             {tab === 'steps' && isSimple && renderSimpleWizard()}
