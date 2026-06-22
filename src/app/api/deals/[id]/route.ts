@@ -177,19 +177,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'add_evidence': {
         const { evidenceType, fileId, fileName, content } = body;
+        // chat_text เก็บประวัติการสนทนาทั้งหมดเป็นหลักฐานชิ้นเดียว (ไม่ใช่ทีละข้อความ) จึงต้องยาวกว่าแคปทั่วไป 200 ตัวอักษร
+        const contentCap = evidenceType === 'chat_text' ? 4000 : 200;
         evidenceInsert = {
           deal_id: id,
           type: evidenceType,
           file_id: fileId || '',
           file_name: fileName || '',
-          content: content ? String(content).slice(0, 200) : '',
+          content: content ? String(content).slice(0, contentCap) : '',
           uploaded_by: me.id,
           uploader_name: myName,
         };
         const label: Record<string, string> = {
           packing: 'วิดีโอแพ็คของ', testing: 'วิดีโอทดสอบสินค้า',
           receive: 'วิดีโอรับสินค้า', check: 'วิดีโอตรวจสินค้า',
-          chat: 'หลักฐานจากแชท', chat_text: 'ข้อความแชท', call: 'วิดีโอคอลที่บันทึก',
+          chat: 'หลักฐานจากแชท', chat_text: 'ประวัติการสนทนา', call: 'วิดีโอคอลที่บันทึก',
         };
         systemMsg = `เก็บ${label[evidenceType] || evidenceType}เป็นหลักฐานแล้ว`;
         break;

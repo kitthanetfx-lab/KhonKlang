@@ -370,6 +370,8 @@ export default function DealRoom() {
   const [feePayerInput, setFeePayerInput] = useState<'buyer' | 'seller' | 'split' | ''>('');
   const [showPriceProposal, setShowPriceProposal] = useState(false);
   const callFileInputRef = useRef<HTMLInputElement>(null);
+  // wizard แบบง่าย: สถานะ local อย่างเดียว (ไม่บันทึกลง DB) ว่าฉันกด "คุยกันจบแล้ว" ไปดูหน้าหลักฐานหรือยัง
+  const [chatReviewReady, setChatReviewReady] = useState(false);
 
   useEffect(() => {
     const r = document.documentElement;
@@ -1319,11 +1321,12 @@ export default function DealRoom() {
   // โฟกัสทีละขั้นตอน (การ์ดเดียว) แทนการแสดงทุกการ์ดพร้อมกันแบบเดิม — ลดความสับสน
   // ═══════════════════════════════════════════════════════════════════════
   const WIZARD_STEP_TITLES = [
-    'ยอมรับเงื่อนไข', 'คุย/ตกลงราคา', 'โอนเงิน', 'ตรวจสอบ',
-    'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
+    'ยอมรับเงื่อนไข', 'ตกลงราคา', 'คุย/วิดีโอคอล', 'ตรวจหลักฐาน', 'โอนเงิน',
+    'ตรวจสอบ', 'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
   ];
+  const WZ_TOTAL = WIZARD_STEP_TITLES.length;
 
-  /** คำนวณว่าตอนนี้อยู่ขั้นไหนของ wizard (1-8) จากสถานะที่มีอยู่จริง — ไม่เพิ่ม status ใหม่ในฐานข้อมูล */
+  /** คำนวณว่าตอนนี้อยู่ขั้นไหนของ wizard (1-10) จากสถานะที่มีอยู่จริง — ไม่เพิ่ม status ใหม่ในฐานข้อมูล */
   function getSimpleStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
     const s = deal!.status;
     const pd: DealPriceState = priceState || {};
@@ -1331,25 +1334,27 @@ export default function DealRoom() {
     const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
     if (s === 'payment_pending') {
-      const ready = !!pd.agreed && !!pd.evidence_done_buyer && !!pd.evidence_done_seller;
-      return { step: ready ? 3 : 2 };
+      if (!pd.agreed) return { step: 2 }; // ยังไม่ตกลงราคา/ค่าบริการ
+      const evReady = !!pd.evidence_done_buyer && !!pd.evidence_done_seller;
+      if (evReady) return { step: 5 }; // ทั้งคู่ยืนยันหลักฐานแล้ว → โอนเงินได้
+      return { step: chatReviewReady ? 4 : 3 }; // คุย/วิดีโอคอล หรือ กำลังตรวจหลักฐาน
     }
-    if (s === 'payment_uploaded') return { step: 4 };
-    if (s === 'packing') return { step: 5 };
-    if (s === 'shipped_to_buyer') return { step: 6 };
-    if (s === 'completed') return { step: pd.payout_slip_file_id ? 8 : 7, outcome: 'success' };
-    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 8 : 7, outcome: 'cancelled' };
-    if (s === 'disputed') return { step: 7, outcome: 'disputed' };
+    if (s === 'payment_uploaded') return { step: 6 };
+    if (s === 'packing') return { step: 7 };
+    if (s === 'shipped_to_buyer') return { step: 8 };
+    if (s === 'completed') return { step: pd.payout_slip_file_id ? 10 : 9, outcome: 'success' };
+    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 10 : 9, outcome: 'cancelled' };
+    if (s === 'disputed') return { step: 9, outcome: 'disputed' };
     return { step: 1 };
   }
 
   function renderWizardProgress(step: number) {
-    const clamped = Math.max(1, Math.min(8, step));
+    const clamped = Math.max(1, Math.min(WZ_TOTAL, step));
     return (
       <div style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-          <b style={{ fontSize: 13, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>ขั้นที่ {clamped} จาก 8 · {WIZARD_STEP_TITLES[clamped - 1]}</b>
-          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{Math.round((clamped / 8) * 100)}%</span>
+          <b style={{ fontSize: 13, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>ขั้นที่ {clamped} จาก {WZ_TOTAL} · {WIZARD_STEP_TITLES[clamped - 1]}</b>
+          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{Math.round((clamped / WZ_TOTAL) * 100)}%</span>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           {WIZARD_STEP_TITLES.map((t, i) => (
@@ -1420,71 +1425,84 @@ export default function DealRoom() {
     );
   }
 
-  // ─── ขั้น 2: คุย/วิดีโอคอล/ตกลงราคา-ค่าบริการ-สินค้า (redesign รวมเป็นการ์ดเดียว) ──
-  function renderWizardStep2() {
+  // ─── ขั้น 2: ตกลงราคา-สินค้าและค่าบริการ (เฉพาะส่วนราคา ไม่รวมแชท) ─────────
+  function renderWizardStepPrice() {
     const pd: DealPriceState = priceState || {};
     const fpName = (fp?: string) => fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
     const currentPrice = pd.proposed_price || deal!.price;
     const currentFeePayer = (pd.proposed_fee_payer || deal!.fee_payer || 'split') as 'buyer' | 'seller' | 'split';
     const selectedFeePayer = feePayerInput || currentFeePayer;
-    const sellerReady = !!pd.seller_agreed && !!pd.evidence_done_seller;
-    const buyerReady = !!pd.buyer_agreed && !!pd.evidence_done_buyer;
+    const sellerReady = !!pd.seller_agreed;
+    const buyerReady = !!pd.buyer_agreed;
     const meReady = myRole === 'seller' ? sellerReady : buyerReady;
-    const chatMsgs = msgs.filter(m => m.role !== 'system').slice(-20);
-
-    async function confirmAllReady() {
-      await doAction('price_agree', { feePayer: selectedFeePayer });
-      await doAction('evidence_done');
-    }
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="dr-card">
-          <div className="dr-card-title">💬 ตกลงราคา ค่าบริการ และสินค้า</div>
-          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>คุยรายละเอียดสินค้าและดูหลักฐานในแชต/วิดีโอคอลด้านล่างให้พอใจทั้งสองฝ่าย แล้วกดยืนยันครั้งเดียวด้านล่างสุด</p>
+      <div className="dr-card">
+        <div className="dr-card-title">💰 ตกลงราคาสินค้าและค่าบริการ</div>
+        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>ยืนยันราคาและผู้จ่ายค่าบริการก่อนเริ่มคุยรายละเอียดสินค้า</p>
 
-          <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}><span>ราคาปัจจุบัน</span><span>฿{currentPrice.toLocaleString()}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', marginTop: 2 }}><span>ค่าบริการ</span><span>{fpName(currentFeePayer)}</span></div>
-          </div>
-
-          {!showPriceProposal ? (
-            <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => { setShowPriceProposal(true); setPriceInput(String(currentPrice)); setFeePayerInput(currentFeePayer); }}>✏️ เสนอราคาหรือค่าบริการใหม่</button>
-          ) : (
-            <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: 12, marginBottom: 4 }}>
-              <input type="number" className="dr-select" value={priceInput} onChange={e => setPriceInput(e.target.value)} placeholder="ราคา (บาท)" style={{ marginBottom: 8 }} />
-              <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-                {(['buyer', 'seller', 'split'] as const).map(fp => (
-                  <button key={fp} type="button" onClick={() => setFeePayerInput(fp)} className={`btn btn-sm ${selectedFeePayer === fp ? 'btn-primary' : 'btn-ghost'}`}>{fpName(fp)}</button>
-                ))}
-              </div>
-              <div style={{ display: 'grid', gap: 8 }}>
-                <button className="btn btn-primary btn-block btn-sm" disabled={acting} onClick={() => { const p = Math.round(Number(priceInput)); if (!(p >= 1)) { alert('กรอกราคาให้ถูกต้อง'); return; } doAction('price_propose', { price: p, feePayer: selectedFeePayer }); setShowPriceProposal(false); }}>ส่งข้อเสนอ</button>
-                <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => setShowPriceProposal(false)}>ยกเลิก</button>
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '12px 0' }}>
-            {[['ผู้ขาย', sellerReady], ['ผู้ซื้อ', buyerReady]].map(([l, ok]) => (
-              <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ พร้อมแล้ว' : '⏳ รอ'}</span></div>
-            ))}
-          </div>
-
-          {!meReady
-            ? <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={confirmAllReady}>✅ ตกลงทุกอย่างแล้ว พร้อมโอนเงิน</button>
-            : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายกดยืนยัน</p>}
+        <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}><span>ราคาปัจจุบัน</span><span>฿{currentPrice.toLocaleString()}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', marginTop: 2 }}><span>ค่าบริการ</span><span>{fpName(currentFeePayer)}</span></div>
         </div>
 
+        {!showPriceProposal ? (
+          <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => { setShowPriceProposal(true); setPriceInput(String(currentPrice)); setFeePayerInput(currentFeePayer); }}>✏️ เสนอราคาหรือค่าบริการใหม่</button>
+        ) : (
+          <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: 12, marginBottom: 4 }}>
+            <input type="number" className="dr-select" value={priceInput} onChange={e => setPriceInput(e.target.value)} placeholder="ราคา (บาท)" style={{ marginBottom: 8 }} />
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              {(['buyer', 'seller', 'split'] as const).map(fp => (
+                <button key={fp} type="button" onClick={() => setFeePayerInput(fp)} className={`btn btn-sm ${selectedFeePayer === fp ? 'btn-primary' : 'btn-ghost'}`}>{fpName(fp)}</button>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <button className="btn btn-primary btn-block btn-sm" disabled={acting} onClick={() => { const p = Math.round(Number(priceInput)); if (!(p >= 1)) { alert('กรอกราคาให้ถูกต้อง'); return; } doAction('price_propose', { price: p, feePayer: selectedFeePayer }); setShowPriceProposal(false); }}>ส่งข้อเสนอ</button>
+              <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => setShowPriceProposal(false)}>ยกเลิก</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '12px 0' }}>
+          {[['ผู้ขาย', sellerReady], ['ผู้ซื้อ', buyerReady]].map(([l, ok]) => (
+            <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ตกลงแล้ว' : '⏳ รอ'}</span></div>
+          ))}
+        </div>
+
+        {!meReady
+          ? <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>✅ ตกลงราคานี้ — ไปคุยรายละเอียดสินค้า</button>
+          : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณตกลงแล้ว — รออีกฝ่ายยืนยัน</p>}
+      </div>
+    );
+  }
+
+  /** รวมประวัติแชท (ข้อความล้วน ไม่รวมรูป/ไฟล์ที่ดูได้จากแท็บแชทอยู่แล้ว) เป็นหลักฐาน "ชิ้นเดียว" — ไม่เก็บทีละข้อความ */
+  async function bundleChatTranscriptAsEvidence() {
+    const lines = msgs.filter(m => m.role !== 'system' && m.type === 'text' && m.content?.trim());
+    if (lines.length === 0) return;
+    let transcript = lines.map(m => `${m.sender_name || '-'} (${new Date(m.created_at).toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}): ${m.content}`).join('\n');
+    if (transcript.length > 4000) transcript = `…(ตัดข้อความเก่าบางส่วน)\n${transcript.slice(-4000)}`;
+    await doAction('add_evidence', { evidenceType: 'chat_text', content: transcript });
+  }
+
+  // ─── ขั้น 3: คุย/วิดีโอคอลรายละเอียดสินค้า ────────────────────────────────
+  function renderWizardStepChat() {
+    const chatMsgs = msgs.filter(m => m.role !== 'system').slice(-30);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
+          <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6 }}>💬 คุยรายละเอียดสินค้า ส่งรูปหรือเริ่มวิดีโอคอลให้พอใจทั้งสองฝ่าย (วิดีโอคอลถูกบันทึกเป็นหลักฐานได้) แล้วกด &quot;คุยกันจบแล้ว&quot; ด้านล่างเพื่อไปตรวจหลักฐานและยืนยัน</div>
+        </div>
         <div className="dr-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div className="dr-card-title" style={{ margin: 0 }}>💬 แชทคุยกัน</div>
             <button type="button" className="btn btn-green btn-sm" onClick={toggleCall}>📹 เริ่มวิดีโอคอล</button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto', marginBottom: 10, padding: '4px 2px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto', marginBottom: 10, padding: '4px 2px' }}>
             {chatMsgs.length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12.5, padding: '14px 0' }}>ยังไม่มีข้อความ — เริ่มคุยกับอีกฝ่ายได้เลย</p>}
             {chatMsgs.map(m => {
               const isMe = m.sender_id === myId;
+              const isMedia = m.type === 'image' || m.type === 'file';
               return (
                 <div key={m.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
                   {!isMe && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 2 }}>{m.sender_name}</div>}
@@ -1493,6 +1511,10 @@ export default function DealRoom() {
                       : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.file_name}</a>
                       : m.content}
                   </div>
+                  {/* รูป/ไฟล์เก็บเป็นหลักฐานได้ทีละชิ้นตามต้องการ — ส่วนข้อความพิมพ์คุยกันถูกรวมเป็นหลักฐานชิ้นเดียวอัตโนมัติตอนกด "คุยกันจบแล้ว" ด้านล่าง ไม่ต้องเก็บทีละคำ */}
+                  {isMedia && (
+                    <button type="button" onClick={() => saveMsgEvidence(m)} disabled={acting} style={{ fontSize: 10.5, color: isMe ? 'rgba(255,255,255,.85)' : 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0', display: 'block', marginLeft: isMe ? 'auto' : 0 }}>📌 เก็บเป็นหลักฐาน</button>
+                  )}
                 </div>
               );
             })}
@@ -1504,6 +1526,35 @@ export default function DealRoom() {
             <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="พิมพ์ข้อความ..." onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) sendMsg(chatInput); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, minWidth: 0 }} />
             <button className="dr-chat-send" onClick={() => { if (chatInput.trim()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending}><Icon name="arrowRight" size={16} /></button>
           </div>
+        </div>
+        <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={async () => { await bundleChatTranscriptAsEvidence(); setChatReviewReady(true); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</button>
+      </div>
+    );
+  }
+
+  // ─── ขั้น 4: ตรวจหลักฐาน + ยืนยัน ─────────────────────────────────────────
+  function renderWizardStepEvidenceReview() {
+    const pd: DealPriceState = priceState || {};
+    const meDone = myRole === 'seller' ? !!pd.evidence_done_seller : !!pd.evidence_done_buyer;
+    const sellerDone = !!pd.evidence_done_seller;
+    const buyerDone = !!pd.evidence_done_buyer;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="dr-card">
+          <div className="dr-card-title">📁 ตรวจหลักฐานก่อนโอนเงิน</div>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4, lineHeight: 1.6 }}>ตรวจดูประวัติการคุย รูป และวิดีโอคอลที่บันทึกไว้ด้านล่าง ถ้าครบถ้วนถูกต้องแล้วให้กดยืนยัน</p>
+        </div>
+        {renderEvidencePanel()}
+        <div className="dr-card">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+            {[['ผู้ขาย', sellerDone], ['ผู้ซื้อ', buyerDone]].map(([l, ok]) => (
+              <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ยืนยันถูกต้องแล้ว' : '⏳ รอ'}</span></div>
+            ))}
+          </div>
+          {!meDone
+            ? <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => doAction('evidence_done')}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</button>
+            : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
+          <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => setChatReviewReady(false)}>⬅ ย้อนกลับไปคุยต่อ</button>
         </div>
       </div>
     );
@@ -1644,16 +1695,18 @@ export default function DealRoom() {
     return (
       <div className="dr-inner">
         {step > 0 && renderWizardProgress(step)}
-        {step > 0 && step < 7 && renderWizardPartiesMini()}
+        {step > 0 && step < 9 && renderWizardPartiesMini()}
         {step === 0 && renderWizardStep0()}
         {step === 1 && renderWizardStep1()}
-        {step === 2 && renderWizardStep2()}
-        {step === 3 && renderPaymentSection()}
-        {step === 4 && renderWizardStep4()}
-        {step === 5 && renderWizardStep5()}
-        {step === 6 && renderWizardStep6()}
-        {step === 7 && renderWizardStep7(outcome)}
-        {step === 8 && renderWizardStep8(outcome)}
+        {step === 2 && renderWizardStepPrice()}
+        {step === 3 && renderWizardStepChat()}
+        {step === 4 && renderWizardStepEvidenceReview()}
+        {step === 5 && renderPaymentSection()}
+        {step === 6 && renderWizardStep4()}
+        {step === 7 && renderWizardStep5()}
+        {step === 8 && renderWizardStep6()}
+        {step === 9 && renderWizardStep7(outcome)}
+        {step === 10 && renderWizardStep8(outcome)}
       </div>
     );
   }
