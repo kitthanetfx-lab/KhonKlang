@@ -15,14 +15,19 @@ const NUM_DEFAULTS = {
   failedDealFee: 50,
   onsiteBaseFee: 300, onsitePerKm: 5,
   meetupFeePercent: 0, meetupFeeMin: 50,
-  sellerRegFee: 0, middlemanRegFee: 0,
+  sellerRegFee: 199, middlemanRegFee: 499,
+  promoPercent: 0,
 };
 const STR_DEFAULTS = { returnShippingBy: 'buyer' as 'buyer' | 'seller' | 'split' };
 const COMPANY_DEFAULTS = {
   companyPromptPay: '', companyBankName: '', companyBankAcct: '', companyBankHolder: '', companyQrFileId: '',
+  promoStart: '', promoEnd: '', promoLabel: '',
 };
+const BOOL_DEFAULTS = { promoEnabled: false, promoFree: false };
+const PROMO_SCOPE_OPTIONS = ['all', 'seller', 'middleman'];
 const NUM_KEYS = Object.keys(NUM_DEFAULTS) as (keyof typeof NUM_DEFAULTS)[];
 const COMPANY_KEYS = Object.keys(COMPANY_DEFAULTS) as (keyof typeof COMPANY_DEFAULTS)[];
+const BOOL_KEYS = Object.keys(BOOL_DEFAULTS) as (keyof typeof BOOL_DEFAULTS)[];
 const RETURN_OPTIONS = ['buyer', 'seller', 'split'];
 
 const COLUMN_OF: Record<string, string> = {
@@ -39,6 +44,8 @@ const COLUMN_OF: Record<string, string> = {
   returnShippingBy: 'return_shipping_by',
   companyPromptPay: 'company_prompt_pay', companyBankName: 'company_bank_name',
   companyBankAcct: 'company_bank_acct', companyBankHolder: 'company_bank_holder', companyQrFileId: 'company_qr_file_id',
+  promoEnabled: 'promo_enabled', promoScope: 'promo_scope', promoPercent: 'promo_percent', promoFree: 'promo_free',
+  promoStart: 'promo_start', promoEnd: 'promo_end', promoLabel: 'promo_label',
 };
 
 type FeeConfigKey = keyof FeeConfig;
@@ -77,8 +84,11 @@ export async function PATCH(req: NextRequest) {
       const v = Number(feeBody?.[k]);
       cleanFees[k] = (isFinite(v) && v >= 0) ? v : NUM_DEFAULTS[k];
     }
+    cleanFees.promoPercent = Math.min(100, Math.max(0, Number(cleanFees.promoPercent) || 0));
     cleanFees.returnShippingBy = RETURN_OPTIONS.includes(feeBody?.returnShippingBy) ? feeBody.returnShippingBy : STR_DEFAULTS.returnShippingBy;
+    cleanFees.promoScope = PROMO_SCOPE_OPTIONS.includes(feeBody?.promoScope) ? feeBody.promoScope : 'all';
     for (const k of COMPANY_KEYS) cleanFees[k] = String(feeBody?.[k] ?? '').slice(0, 200);
+    for (const k of BOOL_KEYS) cleanFees[k] = !!feeBody?.[k];
 
     const nextFees = hasFeePayload ? { ...currentFees, ...cleanFees } : currentFees;
 

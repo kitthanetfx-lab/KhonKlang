@@ -470,14 +470,22 @@ create table fee_config (
   onsite_per_km           integer not null default 5,
   meetup_fee_percent      numeric(5,2) not null default 0,
   meetup_fee_min          integer not null default 50,
-  seller_reg_fee          integer not null default 0,
-  middleman_reg_fee       integer not null default 0,
+  seller_reg_fee          integer not null default 199,
+  middleman_reg_fee       integer not null default 499,
   return_shipping_by      fee_payer not null default 'buyer',
   company_prompt_pay      text not null default '',
   company_bank_name       text not null default '',
   company_bank_acct       text not null default '',
   company_bank_holder     text not null default '',
   company_qr_file_id      text not null default '',
+  -- โปรโมชัน/ส่วนลดค่าสมัคร (ผู้ขาย/คนกลาง) ตามช่วงเวลาที่กำหนด — ดู 0006_promo_and_reg_fee_defaults.sql
+  promo_enabled           boolean not null default false,
+  promo_scope             text not null default 'all' check (promo_scope in ('all', 'seller', 'middleman')),
+  promo_percent           numeric(5,2) not null default 0 check (promo_percent >= 0 and promo_percent <= 100),
+  promo_free              boolean not null default false,
+  promo_start             timestamptz,
+  promo_end               timestamptz,
+  promo_label             text not null default '',
   -- Slip verification (SlipOK) — admin-configurable instead of env-var-only.
   -- Store the API key via Supabase Vault in production; this column exists
   -- so the settings UI has somewhere to read/write it through an RPC that

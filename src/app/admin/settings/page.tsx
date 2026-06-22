@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
-import { Settings, Loader2, CheckCircle2, ShoppingCart, Zap, Search, MapPin, Car, Shield, RotateCcw, Wallet } from 'lucide-react';
+import { Settings, Loader2, CheckCircle2, ShoppingCart, Zap, Search, MapPin, Car, Shield, RotateCcw, Wallet, Tag } from 'lucide-react';
 import { THAI_BANKS } from '@/lib/banks';
 
 interface FeeConfig {
@@ -18,10 +18,15 @@ interface FeeConfig {
   sellerRegFee: number; middlemanRegFee: number;
   returnShippingBy: 'buyer' | 'seller' | 'split';
   companyPromptPay: string; companyBankName: string; companyBankAcct: string; companyBankHolder: string; companyQrFileId: string;
+  promoEnabled: boolean; promoScope: 'all' | 'seller' | 'middleman';
+  promoPercent: number; promoFree: boolean;
+  promoStart: string; promoEnd: string; promoLabel: string;
 }
 
-type StrKey = 'returnShippingBy' | 'companyPromptPay' | 'companyBankName' | 'companyBankAcct' | 'companyBankHolder' | 'companyQrFileId';
-type NumKey = Exclude<keyof FeeConfig, StrKey>;
+type BoolKey = 'promoEnabled' | 'promoFree';
+type StrKey = 'returnShippingBy' | 'companyPromptPay' | 'companyBankName' | 'companyBankAcct' | 'companyBankHolder' | 'companyQrFileId'
+  | 'promoScope' | 'promoStart' | 'promoEnd' | 'promoLabel';
+type NumKey = Exclude<keyof FeeConfig, StrKey | BoolKey>;
 const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
 // กลุ่มฟิลด์สำหรับแสดงผล: [key, label, หน่วย]
@@ -88,6 +93,11 @@ export default function SettingsPage() {
   }
 
   function setStr(k: StrKey, v: string) {
+    setFees(f => f ? { ...f, [k]: v } : f);
+    setSaved(false);
+  }
+
+  function setBool(k: BoolKey, v: boolean) {
     setFees(f => f ? { ...f, [k]: v } : f);
     setSaved(false);
   }
@@ -201,6 +211,60 @@ export default function SettingsPage() {
               </div>
               <p className="text-xs text-gray-400 mt-2">* ถ้าไม่อัปโหลด QR ระบบจะสร้าง QR พร้อมเพย์พร้อมยอดให้อัตโนมัติจากเลขพร้อมเพย์ด้านบน</p>
             </div>
+          </div>
+
+          {/* โปรโมชัน/ส่วนลดค่าสมัคร — มีผลกับยอดที่แสดงในหน้าสมัครผู้ขาย/คนกลางทันที */}
+          <div className="bg-white dark:bg-gray-900 border-2 border-amber-200 dark:border-amber-900 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="font-semibold text-sm flex items-center gap-2"><Tag size={16} className="text-amber-600" /> โปรโมชัน/ส่วนลดค่าสมัคร</h2>
+              <button type="button" onClick={() => setBool('promoEnabled', !fees.promoEnabled)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${fees.promoEnabled ? 'bg-amber-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-500'}`}>
+                {fees.promoEnabled ? 'เปิดใช้งานอยู่' : 'ปิดอยู่'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">ลดราคา หรือฟรีค่าสมัครผู้ขาย/คนกลางในช่วงเวลาที่กำหนด — มีผลกับยอดที่ลูกค้าเห็นในหน้าสมัครทันทีที่บันทึก</p>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-sm text-gray-600 dark:text-gray-300">ใช้กับ</span>
+                <select value={fees.promoScope} onChange={e => setStr('promoScope', e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
+                  <option value="all">ผู้ขาย + คนกลาง (ทั้งหมด)</option>
+                  <option value="seller">ผู้ขายเท่านั้น</option>
+                  <option value="middleman">คนกลางเท่านั้น</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-2 mt-6 sm:mt-7 cursor-pointer">
+                <input type="checkbox" checked={fees.promoFree} onChange={e => setBool('promoFree', e.target.checked)}
+                  className="w-4 h-4 accent-amber-500" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">ฟรีค่าสมัครทั้งหมด (ไม่คิดเลย % ด้านล่าง)</span>
+              </label>
+              <label className="block">
+                <span className="text-sm text-gray-600 dark:text-gray-300">ส่วนลด (ใช้ถ้าไม่ได้ติ๊ก &ldquo;ฟรี&rdquo;)</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <input type="number" min="0" max="100" step="any" value={fees.promoPercent} disabled={fees.promoFree}
+                    onChange={e => setField('promoPercent', e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-40" />
+                  <span className="text-xs text-gray-400 shrink-0 w-20">% ส่วนลด</span>
+                </div>
+              </label>
+              <label className="block">
+                <span className="text-sm text-gray-600 dark:text-gray-300">ข้อความโปรโมชัน (แสดงให้ลูกค้าเห็น)</span>
+                <input value={fees.promoLabel} onChange={e => setStr('promoLabel', e.target.value)} placeholder="เช่น โปรปีใหม่ ลด 50%"
+                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
+              </label>
+              <label className="block">
+                <span className="text-sm text-gray-600 dark:text-gray-300">วันที่เริ่ม</span>
+                <input type="date" value={fees.promoStart ? fees.promoStart.slice(0, 10) : ''} onChange={e => setStr('promoStart', e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
+              </label>
+              <label className="block">
+                <span className="text-sm text-gray-600 dark:text-gray-300">วันที่สิ้นสุด</span>
+                <input type="date" value={fees.promoEnd ? fees.promoEnd.slice(0, 10) : ''} onChange={e => setStr('promoEnd', e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
+              </label>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">* เว้นวันที่เริ่ม/สิ้นสุดไว้ว่างได้ถ้าต้องการให้โปรไม่มีกำหนดสิ้นสุด (จนกว่าจะปิดสวิตช์เอง)</p>
           </div>
 
           <div className="flex items-center gap-3 sticky bottom-4">

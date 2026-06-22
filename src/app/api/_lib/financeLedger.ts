@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { FEE_DEFAULTS, computeDealFees, type FeeConfig, type FeeLine } from '@/lib/fees';
+import { FEE_DEFAULTS, computeDealFees, effectiveRegFee, type FeeConfig, type FeeLine } from '@/lib/fees';
 import {
   financeReferenceCode,
   getTierCreditLimit,
@@ -77,14 +77,21 @@ export async function readFeesConfig(db: SupabaseClient): Promise<FeeConfig> {
     onsitePerKm: Number(data.onsite_per_km) || FEE_DEFAULTS.onsitePerKm,
     meetupFeePercent: Number(data.meetup_fee_percent) || FEE_DEFAULTS.meetupFeePercent,
     meetupFeeMin: Number(data.meetup_fee_min) || FEE_DEFAULTS.meetupFeeMin,
-    sellerRegFee: Number(data.seller_reg_fee) || FEE_DEFAULTS.sellerRegFee,
-    middlemanRegFee: Number(data.middleman_reg_fee) || FEE_DEFAULTS.middlemanRegFee,
+    sellerRegFee: data.seller_reg_fee != null ? Number(data.seller_reg_fee) : FEE_DEFAULTS.sellerRegFee,
+    middlemanRegFee: data.middleman_reg_fee != null ? Number(data.middleman_reg_fee) : FEE_DEFAULTS.middlemanRegFee,
     returnShippingBy: data.return_shipping_by || FEE_DEFAULTS.returnShippingBy,
     companyPromptPay: data.company_prompt_pay || '',
     companyBankName: data.company_bank_name || '',
     companyBankAcct: data.company_bank_acct || '',
     companyBankHolder: data.company_bank_holder || '',
     companyQrFileId: data.company_qr_file_id || '',
+    promoEnabled: !!data.promo_enabled,
+    promoScope: (['all', 'seller', 'middleman'].includes(data.promo_scope) ? data.promo_scope : FEE_DEFAULTS.promoScope),
+    promoPercent: data.promo_percent != null ? Number(data.promo_percent) : FEE_DEFAULTS.promoPercent,
+    promoFree: !!data.promo_free,
+    promoStart: data.promo_start || '',
+    promoEnd: data.promo_end || '',
+    promoLabel: data.promo_label || '',
   };
 }
 
@@ -374,7 +381,7 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
 export async function syncSellerApplicationLedger(db: SupabaseClient, app: Record<string, unknown>, feesConfig?: FeeConfig) {
   const fees = feesConfig || await readFeesConfig(db);
   const referenceId = String(app.id || '');
-  const amount = Number(fees.sellerRegFee) || 0;
+  const amount = effectiveRegFee(fees, 'seller');
   const activeKeys = new Set<string>();
   if (amount > 0 || app.slip_file_id) {
     const status = String(app.status || '') === 'approved' ? 'confirmed' : String(app.status || '') === 'rejected' ? 'cancelled' : 'pending_review';
@@ -396,7 +403,7 @@ export async function syncSellerApplicationLedger(db: SupabaseClient, app: Recor
 export async function syncMiddlemanApplicationLedger(db: SupabaseClient, app: Record<string, unknown>, feesConfig?: FeeConfig) {
   const fees = feesConfig || await readFeesConfig(db);
   const referenceId = String(app.id || '');
-  const amount = Number(fees.middlemanRegFee) || 0;
+  const amount = effectiveRegFee(fees, 'middleman');
   const activeKeys = new Set<string>();
   if (amount > 0 || app.slip_file_id) {
     const status = String(app.status || '') === 'approved' ? 'confirmed' : String(app.status || '') === 'rejected' ? 'cancelled' : 'pending_review';

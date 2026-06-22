@@ -14,6 +14,10 @@ export interface FeeConfig {
   returnShippingBy: 'buyer' | 'seller' | 'split';
   // บัญชีรับเงินของบริษัท (ลูกค้าโอนเข้าตรงนี้)
   companyPromptPay: string; companyBankName: string; companyBankAcct: string; companyBankHolder: string; companyQrFileId: string;
+  // โปรโมชัน/ส่วนลดค่าสมัคร (ผู้ขาย/คนกลาง) ตามช่วงเวลาที่กำหนด
+  promoEnabled: boolean; promoScope: 'all' | 'seller' | 'middleman';
+  promoPercent: number; promoFree: boolean;
+  promoStart: string; promoEnd: string; promoLabel: string;
 }
 
 export const FEE_DEFAULTS: FeeConfig = {
@@ -25,10 +29,38 @@ export const FEE_DEFAULTS: FeeConfig = {
   failedDealFee: 50,
   onsiteBaseFee: 300, onsitePerKm: 5,
   meetupFeePercent: 0, meetupFeeMin: 50,
-  sellerRegFee: 0, middlemanRegFee: 0,
+  sellerRegFee: 199, middlemanRegFee: 499,
   returnShippingBy: 'buyer',
   companyPromptPay: '', companyBankName: '', companyBankAcct: '', companyBankHolder: '', companyQrFileId: '',
+  promoEnabled: false, promoScope: 'all',
+  promoPercent: 0, promoFree: false,
+  promoStart: '', promoEnd: '', promoLabel: '',
 };
+
+/** โปรโมชันค่าสมัครกำลังใช้งานอยู่กับ scope นี้ไหม (เช็คทั้ง toggle + ขอบเขต + ช่วงวันที่) */
+export function isPromoActive(c: FeeConfig, scope: 'seller' | 'middleman'): boolean {
+  if (!c.promoEnabled) return false;
+  if (c.promoScope !== 'all' && c.promoScope !== scope) return false;
+  const now = Date.now();
+  if (c.promoStart) {
+    const t = new Date(c.promoStart).getTime();
+    if (isFinite(t) && now < t) return false;
+  }
+  if (c.promoEnd) {
+    const t = new Date(c.promoEnd).getTime();
+    if (isFinite(t) && now > t) return false;
+  }
+  return true;
+}
+
+/** ค่าสมัคร "จริง" หลังหักโปรโมชัน (ถ้ามี) — ใช้ทั้งฝั่งแสดงผลและฝั่งบันทึกบัญชี */
+export function effectiveRegFee(c: FeeConfig, scope: 'seller' | 'middleman'): number {
+  const base = scope === 'seller' ? c.sellerRegFee : c.middlemanRegFee;
+  if (!isPromoActive(c, scope)) return Math.max(0, Math.round(base));
+  if (c.promoFree) return 0;
+  const pct = Math.min(100, Math.max(0, Number(c.promoPercent) || 0));
+  return Math.max(0, Math.round(base * (1 - pct / 100)));
+}
 
 export interface FeeLine { label: string; amount: number; }
 export interface FeeBreakdown { lines: FeeLine[]; total: number; note?: string; }

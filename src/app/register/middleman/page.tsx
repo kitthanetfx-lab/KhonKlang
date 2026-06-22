@@ -8,11 +8,12 @@ import {
   ArrowRight, ArrowLeft, CheckCircle2,
   AlertTriangle, Copy, Check, Shield, ClipboardList,
 } from 'lucide-react';
-import { supabase, authHeaders } from '@/lib/supabase';
+import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { uploadKycFiles } from '@/lib/uploadKyc';
 import { FileUpload } from '@/components/FileUpload';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { FEE_DEFAULTS, effectiveRegFee, isPromoActive, type FeeConfig } from '@/lib/fees';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -53,12 +54,6 @@ function getTier(amount: number): { label: string; color: string; icon: string; 
   if (amount >= 10_000)  return { label: 'Silver',   color: 'text-slate-600 bg-slate-50 border-slate-200',   icon: '🥈', maxDeal: '฿10,000 / ดีล' };
   return                        { label: 'Bronze',   color: 'text-orange-600 bg-orange-50 border-orange-200', icon: '🥉', maxDeal: '฿3,000 / ดีล' };
 }
-
-const MEMBERSHIP_FEE = 499;
-const BANK_NAME   = 'ธนาคารกสิกรไทย (KBANK)';
-const BANK_ACCT   = '123-4-56789-0';
-const BANK_OWNER  = 'บริษัท คนกลาง จำกัด';
-const PROMPTPAY   = '0000000000'; // TODO: ใส่หมายเลข PromptPay จริง
 
 const STEPS = ['ข้อมูลพื้นฐาน', 'ข้อมูลคนกลาง', 'ยืนยันตัวตน', 'ชำระค่าสมาชิก'];
 
@@ -107,6 +102,18 @@ function MiddlemanForm() {
   const [error, setError]     = useState('');
   const [done, setDone]       = useState(false);
   const [copied, setCopied]   = useState<'acct' | 'pp' | null>(null);
+  const [fees, setFees]       = useState<FeeConfig>(FEE_DEFAULTS);
+
+  useEffect(() => {
+    fetch('/api/fees').then(r => r.json()).then(d => { if (d.fees) setFees(d.fees); }).catch(() => {});
+  }, []);
+
+  const membershipFee = effectiveRegFee(fees, 'middleman');
+  const promoActive = isPromoActive(fees, 'middleman');
+  const ppDigits = (fees.companyPromptPay || '').replace(/\D/g, '');
+  const qrSrc = fees.companyQrFileId
+    ? fileViewUrl(DEAL_BUCKET, fees.companyQrFileId)
+    : (ppDigits ? `https://promptpay.io/${ppDigits}/${Math.max(0, membershipFee)}.png` : '');
 
   if (!controls.loading && !controls.isEnabled('middlemanRegistration')) {
     return <ServiceDisabledNotice title="สมัครเป็นคนกลาง" message={controls.message('middlemanRegistration')} backHref="/register" backLabel="กลับไปหน้าเลือกประเภท" />;
@@ -195,7 +202,7 @@ function MiddlemanForm() {
       if (!bankOwner.trim()) return setError('กรุณากรอกชื่อบัญชีธนาคาร'), false;
     }
     if (step === 4) {
-      if (!slipFile) return setError('กรุณาอัปโหลดสลิปการโอนเงิน'), false;
+      if (membershipFee > 0 && !slipFile) return setError('กรุณาอัปโหลดสลิปการโอนเงิน'), false;
     }
     return true;
   };
@@ -537,10 +544,18 @@ function MiddlemanForm() {
                 </div>
               </div>
 
+              {promoActive && fees.promoLabel && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-3 text-center text-sm text-amber-800 dark:text-amber-200 font-medium">
+                  🎉 {fees.promoLabel}
+                </div>
+              )}
               {/* Fee */}
               <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 text-center">
                 <p className="text-sm text-gray-500 mb-1">ค่าสมัครคนกลาง</p>
-                <p className="text-4xl font-bold text-purple-600">฿{MEMBERSHIP_FEE.toLocaleString()}</p>
+                {promoActive && membershipFee !== fees.middlemanRegFee && (
+                  <p className="text-sm text-gray-400 line-through">฿{fees.middlemanRegFee.toLocaleString()}</p>
+                )}
+                <p className="text-4xl font-bold text-purple-600">฿{membershipFee.toLocaleString()}</p>
                 <p className="text-xs text-gray-400 mt-1">ชำระครั้งเดียว (ต่ออายุรายปี) — ไม่รวมเงินประกัน Tier</p>
               </div>
 
@@ -556,64 +571,71 @@ function MiddlemanForm() {
               )}
 
               {/* QR Code */}
-              <div className="text-center space-y-3">
-                <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">สแกน QR PromptPay (ค่าสมัคร ฿{MEMBERSHIP_FEE})</p>
-                <div className="inline-block bg-white p-3 rounded-2xl shadow-lg border border-gray-200">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${PROMPTPAY}&bgcolor=ffffff`}
-                    alt="PromptPay QR Code"
-                    width={200} height={200}
-                    className="rounded-lg"
-                  />
+              {qrSrc && (
+                <div className="text-center space-y-3">
+                  <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">สแกน QR PromptPay (ค่าสมัคร ฿{membershipFee.toLocaleString()})</p>
+                  <div className="inline-block bg-white p-3 rounded-2xl shadow-lg border border-gray-200">
+                    <img src={qrSrc} alt="PromptPay QR Code" width={200} height={200} className="rounded-lg" />
+                  </div>
+                  {ppDigits && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                      <span>หมายเลข PromptPay:</span>
+                      <code className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{fees.companyPromptPay}</code>
+                      <button type="button" onClick={() => copyText(fees.companyPromptPay, 'pp')}
+                        className="p-1 hover:text-blue-600 transition-colors">
+                        {copied === 'pp' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-                  <span>หมายเลข PromptPay:</span>
-                  <code className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{PROMPTPAY}</code>
-                  <button type="button" onClick={() => copyText(PROMPTPAY, 'pp')}
-                    className="p-1 hover:text-blue-600 transition-colors">
-                    {copied === 'pp' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+              )}
 
               {/* Bank transfer */}
-              <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2 text-sm">
-                <p className="font-semibold mb-2">หรือโอนผ่านธนาคาร</p>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">ธนาคาร</span>
-                  <span className="font-medium">{BANK_NAME}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">เลขบัญชี</span>
-                  <div className="flex items-center gap-2">
-                    <code className="font-mono font-medium">{BANK_ACCT}</code>
-                    <button type="button" onClick={() => copyText(BANK_ACCT, 'acct')}
-                      className="p-1 hover:text-blue-600 transition-colors">
-                      {copied === 'acct' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                    </button>
+              {fees.companyBankAcct ? (
+                <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2 text-sm">
+                  <p className="font-semibold mb-2">หรือโอนผ่านธนาคาร</p>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">ธนาคาร</span>
+                    <span className="font-medium">{fees.companyBankName}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">เลขบัญชี</span>
+                    <div className="flex items-center gap-2">
+                      <code className="font-mono font-medium">{fees.companyBankAcct}</code>
+                      <button type="button" onClick={() => copyText(fees.companyBankAcct, 'acct')}
+                        className="p-1 hover:text-blue-600 transition-colors">
+                        {copied === 'acct' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">ชื่อบัญชี</span>
+                    <span className="font-medium">{fees.companyBankHolder}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">จำนวนเงิน</span>
+                    <span className="font-bold text-purple-600">฿{membershipFee.toLocaleString()} (ค่าสมัคร)</span>
                   </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">ชื่อบัญชี</span>
-                  <span className="font-medium">{BANK_OWNER}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">จำนวนเงิน</span>
-                  <span className="font-bold text-purple-600">฿{MEMBERSHIP_FEE} (ค่าสมัคร)</span>
-                </div>
-              </div>
+              ) : !qrSrc && (
+                <p className="text-sm text-amber-600 text-center">⚠️ ทีมงานยังไม่ได้ตั้งบัญชีรับเงิน กรุณาติดต่อแอดมินก่อนโอนเงิน</p>
+              )}
 
               {/* Slip upload */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-                <FileUpload
-                  label="แนบสลิปการโอนเงิน"
-                  accept="image/*,.pdf"
-                  file={slipFile}
-                  onChange={setSlipFile}
-                  hint="JPG / PNG / PDF — ภาพหน้าจอหรือสลิปโอนเงินจากแอปธนาคาร"
-                  required
-                />
-              </div>
+              {membershipFee > 0 ? (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
+                  <FileUpload
+                    label="แนบสลิปการโอนเงิน"
+                    accept="image/*,.pdf"
+                    file={slipFile}
+                    onChange={setSlipFile}
+                    hint="JPG / PNG / PDF — ภาพหน้าจอหรือสลิปโอนเงินจากแอปธนาคาร"
+                    required
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-green-600 text-center border-t border-gray-200 dark:border-gray-700 pt-5">✅ ฟรีค่าสมัคร — ไม่ต้องโอนเงินหรือแนบสลิป</p>
+              )}
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
@@ -621,9 +643,9 @@ function MiddlemanForm() {
                 <input type="checkbox" checked={pdpaConsent} onChange={e => setPdpaConsent(e.target.checked)} className="mt-0.5 w-4 h-4 accent-blue-600 shrink-0" />
                 <span className="text-gray-600 dark:text-gray-300 leading-relaxed">ข้าพเจ้ายินยอมให้ บริษัท คนกลาง จำกัด เก็บและใช้ข้อมูลส่วนบุคคล (รวมถึงบัตรประชาชน บัญชีธนาคาร) เพื่อยืนยันตัวตนและให้บริการ ตาม<a href="/privacy" target="_blank" className="text-blue-600 underline">นโยบายความเป็นส่วนตัว</a></span>
               </label>
-              <button onClick={handleSubmit} disabled={submitting || !slipFile || !pdpaConsent}
+              <button onClick={handleSubmit} disabled={submitting || (membershipFee > 0 && !slipFile) || !pdpaConsent}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2">
-                {submitting ? 'กำลังส่งใบสมัคร...' : <>ยืนยันการสมัครและแนบสลิปแล้ว <CheckCircle2 className="w-5 h-5" /></>}
+                {submitting ? 'กำลังส่งใบสมัคร...' : <>{membershipFee > 0 ? 'ยืนยันการสมัครและแนบสลิปแล้ว' : 'ยืนยันการสมัคร'} <CheckCircle2 className="w-5 h-5" /></>}
               </button>
             </div>
           )}
