@@ -25,6 +25,9 @@ export async function GET(req: NextRequest) {
     else if (filter === 'completed') query = query.eq('status', 'completed');
     else if (filter === 'meetup_refund') query = query.eq('deal_type', 'meetup').eq('status', 'completed');
     else if (filter === 'confirm_pay') query = query.eq('status', 'payment_uploaded');
+    else if (filter === 'pay_seller') query = query.eq('status', 'completed').neq('deal_type', 'meetup');
+    else if (filter === 'refund_pending') query = query.eq('status', 'cancelled').neq('deal_type', 'meetup');
+    else if (filter === 'middleman_fee') query = query.eq('status', 'completed').not('middleman_id', 'is', null);
     else if (filter === 'active') query = query.neq('status', 'completed');
     const { data, count } = await query;
     const deals = data || [];
@@ -40,20 +43,27 @@ export async function GET(req: NextRequest) {
     const meetupMap = new Map((meetups || []).map(m => [m.deal_id, m]));
     const priceMap = new Map((priceStates || []).map(p => [p.deal_id, p]));
 
-    // เลขบัญชีผู้ซื้อ/ผู้ขาย — แอดมินต้องเห็นตรงนี้เวลาโอนเงินจริงด้วยมือ (ไม่ต้องเปิดดีลแยก)
-    const uids = Array.from(new Set(deals.flatMap(d => [d.buyer_id, d.seller_id]).filter(Boolean)));
+    // เลขบัญชีผู้ซื้อ/ผู้ขาย/คนกลาง — แอดมินต้องเห็นตรงนี้เวลาโอนเงินจริงด้วยมือ (ไม่ต้องเปิดดีลแยก)
+    const uids = Array.from(new Set(deals.flatMap(d => [d.buyer_id, d.seller_id, d.middleman_id]).filter(Boolean)));
     const bankPairs = await Promise.all(uids.map(async uid => [uid, await getBankInfo(db, uid)] as const));
     const bankMap = new Map(bankPairs);
 
-    const documents = deals.map(d => ({
+    let documents = deals.map(d => ({
       ...d,
       meetup: meetupMap.get(d.id) || null,
       priceState: priceMap.get(d.id) || null,
       buyerBank: bankMap.get(d.buyer_id) || null,
       sellerBank: bankMap.get(d.seller_id) || null,
+      middlemanBank: bankMap.get(d.middleman_id) || null,
     }));
 
-    return NextResponse.json({ documents, total: count || 0 });
+    // กรองเพิ่มฝั่ง JS เพราะต้องเช็คฟิลด์ที่อยู่ใน deal_price_state (join แล้วถึงรู้) ไม่ใช่ deals ตรงๆ
+    const jsFiltered = filter === 'pay_seller' || filter === 'refund_pending' || filter === 'middleman_fee';
+    if (filter === 'pay_seller') documents = documents.filter(d => !d.priceState?.payout_slip_file_id);
+    else if (filter === 'refund_pending') documents = documents.filter(d => !!d.payment_slip_file_id && !d.priceState?.refund_slip_file_id);
+    else if (filter === 'middleman_fee') documents = documents.filter(d => !d.priceState?.middleman_fee_sent_at);
+
+    return NextResponse.json({ documents, total: jsFiltered ? documents.length : (count || 0) });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;
     return NextResponse.json({ error: String(err) }, { status });

@@ -323,10 +323,10 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
         entry_key: `deal:${dealId}:middleman_fee_net`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
         owner_type: 'middleman', owner_id: String(deal.middleman_id), owner_name: text(deal.middleman_name, 200),
         entry_type: 'middleman_fee_net', direction: 'outgoing', amount: feeParts.middlemanNetFee,
-        status: status === 'completed' ? 'scheduled' : status === 'cancelled' ? 'cancelled' : 'expected', title,
-        purpose: 'รายได้สุทธิของคนกลางหลังหักเข้าแอป', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: '',
+        status: status === 'completed' ? (pd.middleman_fee_sent_at ? 'paid' : 'scheduled') : status === 'cancelled' ? 'cancelled' : 'expected', title,
+        purpose: 'รายได้สุทธิของคนกลางหลังหักเข้าแอป', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: text(pd.middleman_fee_slip_file_id, 255),
         approve_link: `/deal/${dealId}`, active: feeParts.middlemanNetFee > 0,
-        meta: { grossFee: feeParts.middlemanGrossFee, platformCut: feeParts.platformCutFromMiddleman },
+        meta: { grossFee: feeParts.middlemanGrossFee, platformCut: feeParts.platformCutFromMiddleman, payoutNote: text(pd.middleman_fee_note, 300) },
       }));
     }
 

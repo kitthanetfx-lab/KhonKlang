@@ -1593,13 +1593,39 @@ export default function DealRoom() {
   }
 
   // ─── ขั้น 5: ผู้ขายแพ็ค + วิดีโอ + เลขพัสดุ ───────────────────────────────
+  /** แกลเลอรีย่อรูป/วิดีโอหลักฐาน — ใช้ซ้ำให้ทั้งสองฝ่ายเห็นหลักฐานแพ็ค/แกะกล่องชุดเดียวกัน */
+  function renderWizardEvidenceThumbs(items: EvidenceItem[]) {
+    if (items.length === 0) return null;
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8, marginTop: 10 }}>
+        {items.map((item, i) => {
+          const url = item.file_id ? fileUrl(item.file_id) : '';
+          const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
+          return (
+            <a key={item.id || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', position: 'relative' }}>
+              {isVid
+                ? <video src={url} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
+                : <img src={url} alt={item.file_name} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8 }} />}
+              {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 20, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>▶</span>}
+            </a>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ─── ขั้น 7: ผู้ขายแพ็ค + วิดีโอ + เลขพัสดุ ───────────────────────────────
   function renderWizardStep5() {
+    const packingEvidence = evidence.filter(e => e.type === 'packing');
     if (myRole !== 'seller') {
       return (
         <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
           <div style={{ fontSize: 38, marginBottom: 10 }}>📦</div>
           <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอผู้ขายแพ็คสินค้าและจัดส่ง</div>
           <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ขายกำลังถ่ายวิดีโอแพ็คของและจัดส่งตรงถึงคุณ — ระบบจะแจ้งเลขพัสดุให้ทันทีที่ส่งแล้ว</p>
+          {packingEvidence.length > 0
+            ? renderWizardEvidenceThumbs(packingEvidence)
+            : <p style={{ fontSize: 12.5, color: 'var(--faint)', marginTop: 10 }}>ยังไม่มีรูป/วิดีโอแพ็คของ</p>}
         </div>
       );
     }
@@ -1612,7 +1638,8 @@ export default function DealRoom() {
           <div className="dr-card-title">อัปโหลดวิดีโอแพ็คของ</div>
           <button onClick={() => evidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> เลือกไฟล์ (รูป/วิดีโอ)</button>
           <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'packing'); e.target.value = ''; }} />
-          {evidence.filter(e => e.type === 'packing').length > 0 && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 10 }}>✅ อัปโหลดแล้ว {evidence.filter(e => e.type === 'packing').length} ไฟล์</p>}
+          {packingEvidence.length > 0 && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 10 }}>✅ อัปโหลดแล้ว {packingEvidence.length} ไฟล์ — ผู้ซื้อเห็นชุดนี้ด้วย</p>}
+          {renderWizardEvidenceThumbs(packingEvidence)}
         </div>
         <div className="dr-card">
           <div className="dr-card-title">เลขพัสดุ</div>
@@ -1623,8 +1650,9 @@ export default function DealRoom() {
     );
   }
 
-  // ─── ขั้น 6: ผู้ซื้อแกะกล่อง + ถ่ายวิดีโอ + ยืนยันรับ/แจ้งปัญหา ───────────
+  // ─── ขั้น 8: ผู้ซื้อแกะกล่อง + ถ่ายวิดีโอ + ยืนยันรับ/แจ้งปัญหา ───────────
   function renderWizardStep6() {
+    const unboxEvidence = evidence.filter(e => e.type === 'receive');
     if (myRole !== 'buyer') {
       return (
         <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
@@ -1632,10 +1660,13 @@ export default function DealRoom() {
           <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>ส่งสินค้าแล้ว — รอผู้ซื้อยืนยันรับ</div>
           {deal!.tracking_to_buyer && <div className="dr-track-code" style={{ marginBottom: 8 }}>📦 {deal!.tracking_to_buyer}</div>}
           <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่อง แล้วกดยืนยันรับสินค้า ดีลจะเสร็จสมบูรณ์อัตโนมัติ</p>
+          {unboxEvidence.length > 0
+            ? renderWizardEvidenceThumbs(unboxEvidence)
+            : <p style={{ fontSize: 12.5, color: 'var(--faint)', marginTop: 10 }}>ยังไม่มีรูป/วิดีโอแกะกล่องจากผู้ซื้อ</p>}
         </div>
       );
     }
-    const hasUnboxEvidence = evidence.some(e => e.type === 'receive');
+    const hasUnboxEvidence = unboxEvidence.length > 0;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {deal!.tracking_to_buyer && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ</div><div className="dr-track-code">{deal!.tracking_to_buyer}</div></div>}
@@ -1644,7 +1675,8 @@ export default function DealRoom() {
           <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
           <button onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดวิดีโอก่อนแกะ</button>
           <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
-          {hasUnboxEvidence && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 10 }}>✅ อัปโหลดวิดีโอแล้ว</p>}
+          {hasUnboxEvidence && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 10 }}>✅ อัปโหลดแล้ว {unboxEvidence.length} ไฟล์ — ผู้ขายเห็นชุดนี้ด้วย</p>}
+          {renderWizardEvidenceThumbs(unboxEvidence)}
         </div>
         <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => { if (!hasUnboxEvidence && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return; doAction('buyer_received'); }}>🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์</button>

@@ -522,7 +522,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ result, expected: exp, amountMatch });
     }
 
-    if (action === 'mark_payout_sent' || action === 'mark_refund_sent') {
+    if (action === 'mark_payout_sent' || action === 'mark_refund_sent' || action === 'mark_middleman_fee_sent') {
       if (!id) return NextResponse.json({ error: 'missing id' }, { status: 400 });
       const { data: deal } = await db.from('deals').select('*').eq('id', id).single();
       if (!deal) return NextResponse.json({ error: 'ไม่พบดีล' }, { status: 404 });
@@ -531,6 +531,10 @@ export async function PATCH(req: NextRequest) {
       }
       if (action === 'mark_refund_sent' && deal.status !== 'cancelled') {
         return NextResponse.json({ error: 'ดีลนี้ไม่ได้ถูกยกเลิก' }, { status: 400 });
+      }
+      if (action === 'mark_middleman_fee_sent') {
+        if (deal.status !== 'completed') return NextResponse.json({ error: 'ดีลนี้ยังไม่ปิด — ยังจ่ายค่าบริการคนกลางไม่ได้' }, { status: 400 });
+        if (!deal.middleman_id) return NextResponse.json({ error: 'ดีลนี้ไม่มีคนกลาง' }, { status: 400 });
       }
 
       const now = new Date().toISOString();
@@ -543,13 +547,20 @@ export async function PATCH(req: NextRequest) {
         priceUpdates.payout_slip_file_id = String(fileId);
         priceUpdates.payout_note = payoutNote;
         msg = `ศูนย์กลางโอนเงินคืนผู้ขายแล้ว${payoutNote ? ': ' + payoutNote : ''}`;
-      } else {
+      } else if (action === 'mark_refund_sent') {
         if (!fileId) return NextResponse.json({ error: 'กรุณาแนบสลิปหลักฐานการคืนเงินให้ผู้ซื้อ' }, { status: 400 });
         const refundNote = String(note || '').slice(0, 300);
         priceUpdates.refund_sent_at = now;
         priceUpdates.refund_slip_file_id = String(fileId);
         priceUpdates.refund_note = refundNote;
         msg = `ศูนย์กลางโอนเงินคืนผู้ซื้อแล้ว${refundNote ? ': ' + refundNote : ''}`;
+      } else {
+        if (!fileId) return NextResponse.json({ error: 'กรุณาแนบสลิปหลักฐานการโอนค่าบริการให้คนกลาง' }, { status: 400 });
+        const feeNote = String(note || '').slice(0, 300);
+        priceUpdates.middleman_fee_sent_at = now;
+        priceUpdates.middleman_fee_slip_file_id = String(fileId);
+        priceUpdates.middleman_fee_note = feeNote;
+        msg = `ศูนย์กลางโอนค่าบริการให้คนกลางแล้ว${feeNote ? ': ' + feeNote : ''}`;
       }
       await db.from('deal_price_state').upsert({ deal_id: id, ...priceUpdates }, { onConflict: 'deal_id' });
 
