@@ -363,7 +363,7 @@ create table middleman_wallets (
 create table seller_applications (
   id                  uuid primary key default gen_random_uuid(),
   user_id             uuid not null references profiles(id),
-  seller_type         text not null check (seller_type in ('individual', 'corporate')),
+  seller_type         text not null check (seller_type in ('freelance', 'physical', 'distributor', 'corporate')),
   full_name_id        text not null,
   id_number           text not null,
   province            text,
