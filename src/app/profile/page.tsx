@@ -365,6 +365,15 @@ function ProfilePage() {
           )}
         </div>
 
+        {editing && (
+          <div style={{ display: 'flex', gap: 8, marginTop: -8 }}>
+            {!locked && <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={cancelEdit}>ยกเลิก</button>}
+            <button className="btn btn-primary" style={{ flex: 2, padding: '12px' }} onClick={handleSave} disabled={saving}>
+              {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+            </button>
+          </div>
+        )}
+
         {/* Application status */}
         {!locked && (sellerStatus || middlemanStatus) && (
           <div className="pf-card">

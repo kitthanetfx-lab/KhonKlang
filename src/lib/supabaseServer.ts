@@ -49,12 +49,31 @@ export async function verifyUser(req: Request): Promise<CurrentUser> {
   const { data: userRes, error: userErr } = await admin.auth.getUser(token);
   if (userErr || !userRes.user) throw new HttpError('Unauthorized', 401);
 
-  const { data: profile, error: profileErr } = await admin
+  const { data: existingProfile, error: profileErr } = await admin
     .from('profiles')
     .select('id, email, role')
     .eq('id', userRes.user.id)
-    .single();
-  if (profileErr || !profile) throw new HttpError('Unauthorized', 401);
+    .maybeSingle();
+  if (profileErr) throw new HttpError('Unauthorized', 401);
+
+  let profile = existingProfile;
+  if (!profile) {
+    // ปกติแล้วจะมี trigger สร้างแถว profiles ให้อัตโนมัติตอนสมัคร (migration 0004_profile_on_signup.sql)
+    // แต่เผื่อ migration นั้นยังไม่ได้รันบน DB จริง หรือเป็นผู้ใช้เก่าก่อนมี trigger — สร้างแถวให้ตรงนี้เลย
+    // กันไม่ให้ติด 401 Unauthorized ทั้งที่ login ผ่านแล้วจริง ๆ
+    await admin
+      .from('profiles')
+      .insert({ id: userRes.user.id, email: userRes.user.email || null })
+      .select('id')
+      .maybeSingle();
+    const { data: refetched, error: refetchErr } = await admin
+      .from('profiles')
+      .select('id, email, role')
+      .eq('id', userRes.user.id)
+      .maybeSingle();
+    if (refetchErr || !refetched) throw new HttpError('Unauthorized', 401);
+    profile = refetched;
+  }
 
   return { id: profile.id, email: profile.email, role: profile.role };
 }
