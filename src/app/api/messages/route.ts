@@ -47,11 +47,16 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await db.from('profiles').select('display_name').eq('id', me.id).maybeSingle();
 
+    // คอลัมน์ role ในตาราง messages เป็น enum รับได้แค่ 'user' หรือ 'system' เท่านั้น
+    // ฝั่ง client (deal/[id]/page.tsx) ส่ง myRole มาเป็น 'buyer'/'seller'/'middleman' ซึ่งไม่ตรงกับ enum
+    // ทำให้ insert ล้มด้วย Postgres enum error (500) ทุกครั้งที่พิมพ์แชท — บีบให้เหลือแค่ค่าที่ enum รับได้จริง
+    const safeRole = role === 'system' ? 'system' : 'user';
+
     const { data: msg, error } = await db.from('messages').insert({
       deal_id: dealId,
       sender_id: me.id,
       sender_name: profile?.display_name || '',
-      role: role || 'user',
+      role: safeRole,
       type: type || 'text',
       content: content || '',
       file_id: fileId || '',

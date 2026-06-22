@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
-import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2 } from 'lucide-react';
+import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2, Banknote } from 'lucide-react';
 import { dealCode } from '@/lib/dealNumber';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
@@ -73,6 +73,45 @@ export default function AdminDeals() {
         body: JSON.stringify({ id, action, note }),
       });
       if (r.ok) load(tab);
+    } finally { setActing(''); }
+  }
+
+  function pickSlipFile() {
+    return new Promise<File | null>(resolve => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*,.pdf';
+      input.onchange = () => resolve(input.files?.[0] || null);
+      input.click();
+    });
+  }
+
+  // โอนเงินให้ผู้ขาย (ดีลสำเร็จ) / คืนเงินให้ผู้ซื้อ (ดีลยกเลิก) — ต้องแนบสลิปจริงเสมอ
+  // ใช้ endpoint เดิมที่ /api/admin/finance (มีอยู่แล้ว) แค่เพิ่มปุ่ม+อัปโหลดให้ทำได้จากหน้าดีลนี้โดยตรง
+  async function markMoneySent(id: string, action: 'mark_payout_sent' | 'mark_refund_sent') {
+    const promptMsg = action === 'mark_payout_sent'
+      ? 'โอนเงินให้ผู้ขายแล้ว — ใส่บันทึกช่วยจำ (เช่น เลขอ้างอิงการโอน) ได้ถ้าต้องการ:'
+      : 'คืนเงินให้ผู้ซื้อแล้ว — ใส่บันทึกช่วยจำ (เช่น เลขอ้างอิงการโอน) ได้ถ้าต้องการ:';
+    const note = window.prompt(promptMsg, '');
+    if (note === null) return;
+    setActing(id);
+    try {
+      const file = await pickSlipFile();
+      if (!file) return;
+      const headers = await authHeaders();
+      const form = new FormData();
+      form.append('file', file);
+      const upRes = await fetch('/api/upload-deal', { method: 'POST', headers, body: form });
+      const upData = await upRes.json();
+      if (!upRes.ok) { alert(upData.error || 'อัปโหลดสลิปไม่สำเร็จ'); return; }
+      const r = await fetch('/api/admin/finance', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action, note, fileId: upData.fileId }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { alert(d.error || 'บันทึกไม่สำเร็จ'); return; }
+      load(tab);
     } finally { setActing(''); }
   }
 
@@ -186,6 +225,20 @@ export default function AdminDeals() {
                   <button onClick={() => act(d.id, 'mark_refunded', 'หมายเหตุการคืนเงิน (เช่น เลขอ้างอิงการโอน):')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
                     {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />} ยืนยันคืนเงินประกันแล้ว
+                  </button>
+                )}
+                {/* ดีลสำเร็จ (ไม่ใช่นัดรับ) แต่ยังไม่มีสลิปโอนเงินให้ผู้ขาย — ให้แอดมินอัปโหลดสลิปได้ตรงนี้เลย */}
+                {d.status === 'completed' && d.deal_type !== 'meetup' && !d.priceState?.payout_slip_file_id && (
+                  <button onClick={() => markMoneySent(d.id, 'mark_payout_sent')} disabled={!!acting}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
+                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนเงินให้ผู้ขายแล้ว — แนบสลิป
+                  </button>
+                )}
+                {/* ดีลถูกยกเลิก (ไม่ใช่นัดรับ) แต่ยังไม่มีสลิปคืนเงินผู้ซื้อ */}
+                {d.status === 'cancelled' && d.deal_type !== 'meetup' && d.payment_slip_file_id && !d.priceState?.refund_slip_file_id && (
+                  <button onClick={() => markMoneySent(d.id, 'mark_refund_sent')} disabled={!!acting}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
+                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} คืนเงินให้ผู้ซื้อแล้ว — แนบสลิป
                   </button>
                 )}
                 <button onClick={() => { if (window.confirm(`ลบดีล "${d.title}" ถาวร? (ใช้เฉพาะกรณีดีลทดสอบ/สแปม — กู้คืนไม่ได้)`)) act(d.id, 'delete_deal'); }} disabled={!!acting}

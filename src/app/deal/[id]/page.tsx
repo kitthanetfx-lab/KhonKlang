@@ -1314,6 +1314,350 @@ export default function DealRoom() {
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // Wizard ขั้นตอนดีล — เฉพาะ "ซื้อขายผ่านกลางแบบง่าย" (deal_type === 'simple')
+  // โฟกัสทีละขั้นตอน (การ์ดเดียว) แทนการแสดงทุกการ์ดพร้อมกันแบบเดิม — ลดความสับสน
+  // ═══════════════════════════════════════════════════════════════════════
+  const WIZARD_STEP_TITLES = [
+    'ยอมรับเงื่อนไข', 'คุย/ตกลงราคา', 'โอนเงิน', 'ตรวจสอบ',
+    'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
+  ];
+
+  /** คำนวณว่าตอนนี้อยู่ขั้นไหนของ wizard (1-8) จากสถานะที่มีอยู่จริง — ไม่เพิ่ม status ใหม่ในฐานข้อมูล */
+  function getSimpleStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
+    const s = deal!.status;
+    const pd: DealPriceState = priceState || {};
+    if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
+    const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
+    if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
+    if (s === 'payment_pending') {
+      const ready = !!pd.agreed && !!pd.evidence_done_buyer && !!pd.evidence_done_seller;
+      return { step: ready ? 3 : 2 };
+    }
+    if (s === 'payment_uploaded') return { step: 4 };
+    if (s === 'packing') return { step: 5 };
+    if (s === 'shipped_to_buyer') return { step: 6 };
+    if (s === 'completed') return { step: pd.payout_slip_file_id ? 8 : 7, outcome: 'success' };
+    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 8 : 7, outcome: 'cancelled' };
+    if (s === 'disputed') return { step: 7, outcome: 'disputed' };
+    return { step: 1 };
+  }
+
+  function renderWizardProgress(step: number) {
+    const clamped = Math.max(1, Math.min(8, step));
+    return (
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+          <b style={{ fontSize: 13, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>ขั้นที่ {clamped} จาก 8 · {WIZARD_STEP_TITLES[clamped - 1]}</b>
+          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{Math.round((clamped / 8) * 100)}%</span>
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {WIZARD_STEP_TITLES.map((t, i) => (
+            <div key={t} style={{ flex: 1, height: 6, borderRadius: 4, background: i + 1 < clamped ? 'var(--green-500)' : i + 1 === clamped ? 'var(--accent)' : 'var(--line)', transition: 'background .3s' }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /** การ์ดแสดงคู่ดีล (เพื่อนเป็นใคร) — ใช้ซ้ำได้ในหลายขั้น */
+  function renderWizardPartiesMini() {
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
+        <span>🛒 ผู้ขาย: <b style={{ color: 'var(--ink)' }}>{deal!.seller_name || '-'}</b></span>
+        <span>🛍️ ผู้ซื้อ: <b style={{ color: 'var(--ink)' }}>{deal!.buyer_name || '-'}</b></span>
+      </div>
+    );
+  }
+
+  // ─── ขั้น 0: รออีกฝ่ายเข้าร่วมดีล ────────────────────────────────────────
+  function renderWizardStep0() {
+    const waitingFor = !deal!.buyer_id ? 'ผู้ซื้อ' : 'ผู้ขาย';
+    return (
+      <div className="dr-card" style={{ textAlign: 'center', padding: '34px 20px' }}>
+        <div style={{ fontSize: 40, marginBottom: 10 }}>⏳</div>
+        <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอ{waitingFor}เข้าร่วมดีล</div>
+        <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 18 }}>ส่งลิงก์นี้ให้{waitingFor}เพื่อเข้าร่วม — wizard จะเริ่มขั้นที่ 1 ทันทีที่ทั้งสองฝ่ายอยู่ในดีลครบ</p>
+        <button onClick={copyLink} className="btn btn-primary btn-block">{copied ? '✅ คัดลอกลิงก์แล้ว' : '🔗 คัดลอกลิงก์แชร์'}</button>
+      </div>
+    );
+  }
+
+  // ─── ขั้น 1: ยอมรับเงื่อนไข ───────────────────────────────────────────────
+  function renderWizardStep1() {
+    const t = termsFor(deal!.deal_type);
+    const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
+    const meAccepted = (myRole === 'seller' && deal!.seller_accepted_terms) || (myRole === 'buyer' && deal!.buyer_accepted_terms);
+    return (
+      <div className="dr-card">
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 38, marginBottom: 6 }}>📋</div>
+          <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>อ่านและยอมรับเงื่อนไขก่อนเริ่มดีล</div>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>{t.name}</p>
+        </div>
+        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--green-600)', marginBottom: 6 }}>✅ บริการนี้ครอบคลุม</div>
+        <ul style={{ margin: '0 0 14px', paddingLeft: 18, fontSize: 13.5, lineHeight: 1.7, color: 'var(--ink)' }}>
+          {t.covers.map((c, i) => <li key={i}>{c}</li>)}
+        </ul>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#b22441', marginBottom: 6 }}>⚠️ ไม่ครอบคลุม</div>
+        <ul style={{ margin: '0 0 14px', paddingLeft: 18, fontSize: 13.5, lineHeight: 1.7, color: 'var(--muted)' }}>
+          {t.excludes.map((c, i) => <li key={i}>{c}</li>)}
+        </ul>
+        <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
+          <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>💸 ค่าบริการโดยประมาณ (มูลค่า ฿{deal!.price.toLocaleString()})</div>
+          {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}><span>รวมค่าบริการ</span><span>฿{fb.total.toLocaleString()}</span></div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
+          {[['ผู้ขาย', deal!.seller_accepted_terms], ['ผู้ซื้อ', deal!.buyer_accepted_terms]].map(([l, ok]) => (
+            <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ยอมรับแล้ว' : '⏳ รอ'}</span></div>
+          ))}
+        </div>
+        {!meAccepted
+          ? <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={() => doAction('accept_terms')}>✅ ยอมรับเงื่อนไข</button>
+          : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยอมรับเงื่อนไขแล้ว — รออีกฝ่าย</p>}
+      </div>
+    );
+  }
+
+  // ─── ขั้น 2: คุย/วิดีโอคอล/ตกลงราคา-ค่าบริการ-สินค้า (redesign รวมเป็นการ์ดเดียว) ──
+  function renderWizardStep2() {
+    const pd: DealPriceState = priceState || {};
+    const fpName = (fp?: string) => fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
+    const currentPrice = pd.proposed_price || deal!.price;
+    const currentFeePayer = pd.proposed_fee_payer || deal!.fee_payer || 'split';
+    const selectedFeePayer = feePayerInput || currentFeePayer;
+    const sellerReady = !!pd.seller_agreed && !!pd.evidence_done_seller;
+    const buyerReady = !!pd.buyer_agreed && !!pd.evidence_done_buyer;
+    const meReady = myRole === 'seller' ? sellerReady : buyerReady;
+    const chatMsgs = msgs.filter(m => m.role !== 'system').slice(-20);
+
+    async function confirmAllReady() {
+      await doAction('price_agree', { feePayer: selectedFeePayer });
+      await doAction('evidence_done');
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="dr-card">
+          <div className="dr-card-title">💬 ตกลงราคา ค่าบริการ และสินค้า</div>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>คุยรายละเอียดสินค้าและดูหลักฐานในแชต/วิดีโอคอลด้านล่างให้พอใจทั้งสองฝ่าย แล้วกดยืนยันครั้งเดียวด้านล่างสุด</p>
+
+          <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}><span>ราคาปัจจุบัน</span><span>฿{currentPrice.toLocaleString()}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', marginTop: 2 }}><span>ค่าบริการ</span><span>{fpName(currentFeePayer)}</span></div>
+          </div>
+
+          {!showPriceProposal ? (
+            <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => { setShowPriceProposal(true); setPriceInput(String(currentPrice)); setFeePayerInput(currentFeePayer); }}>✏️ เสนอราคาหรือค่าบริการใหม่</button>
+          ) : (
+            <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: 12, marginBottom: 4 }}>
+              <input type="number" className="dr-select" value={priceInput} onChange={e => setPriceInput(e.target.value)} placeholder="ราคา (บาท)" style={{ marginBottom: 8 }} />
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                {(['buyer', 'seller', 'split'] as const).map(fp => (
+                  <button key={fp} type="button" onClick={() => setFeePayerInput(fp)} className={`btn btn-sm ${selectedFeePayer === fp ? 'btn-primary' : 'btn-ghost'}`}>{fpName(fp)}</button>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                <button className="btn btn-primary btn-block btn-sm" disabled={acting} onClick={() => { const p = Math.round(Number(priceInput)); if (!(p >= 1)) { alert('กรอกราคาให้ถูกต้อง'); return; } doAction('price_propose', { price: p, feePayer: selectedFeePayer }); setShowPriceProposal(false); }}>ส่งข้อเสนอ</button>
+                <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => setShowPriceProposal(false)}>ยกเลิก</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '12px 0' }}>
+            {[['ผู้ขาย', sellerReady], ['ผู้ซื้อ', buyerReady]].map(([l, ok]) => (
+              <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ พร้อมแล้ว' : '⏳ รอ'}</span></div>
+            ))}
+          </div>
+
+          {!meReady
+            ? <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={confirmAllReady}>✅ ตกลงทุกอย่างแล้ว พร้อมโอนเงิน</button>
+            : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายกดยืนยัน</p>}
+        </div>
+
+        <div className="dr-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div className="dr-card-title" style={{ margin: 0 }}>💬 แชทคุยกัน</div>
+            <button type="button" className="btn btn-green btn-sm" onClick={toggleCall}>📹 เริ่มวิดีโอคอล</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto', marginBottom: 10, padding: '4px 2px' }}>
+            {chatMsgs.length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12.5, padding: '14px 0' }}>ยังไม่มีข้อความ — เริ่มคุยกับอีกฝ่ายได้เลย</p>}
+            {chatMsgs.map(m => {
+              const isMe = m.sender_id === myId;
+              return (
+                <div key={m.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
+                  {!isMe && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 2 }}>{m.sender_name}</div>}
+                  <div style={{ background: isMe ? 'var(--accent)' : 'var(--surface-2)', color: isMe ? '#fff' : 'var(--ink)', padding: '7px 11px', borderRadius: 10, fontSize: 13.5, wordBreak: 'break-word' }}>
+                    {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 180, borderRadius: 8 }} /></a>
+                      : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.file_name}</a>
+                      : m.content}
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={chatBottomRef} />
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending}>🖼️</button>
+            <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; if (f.size > 10 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 10MB'); return; } await uploadFile(f); }} />
+            <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="พิมพ์ข้อความ..." onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) sendMsg(chatInput); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, minWidth: 0 }} />
+            <button className="dr-chat-send" onClick={() => { if (chatInput.trim()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending}><Icon name="arrowRight" size={16} /></button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── ขั้น 4: ส่วนกลางตรวจสอบและอนุมัติ (รอ — ไม่มีปุ่มฝั่งผู้ใช้) ──────────
+  function renderWizardStep4() {
+    const pd: DealPriceState = priceState || {};
+    return (
+      <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
+        <div style={{ fontSize: 38, marginBottom: 10 }}>🔍</div>
+        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>ทีมงานกำลังตรวจสอบการโอนเงิน</div>
+        <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 16 }}>ศูนย์กลางกำลังตรวจสลิปที่อัปโหลดไว้ — เมื่อยืนยันรับเงินแล้ว ผู้ขายจะเริ่มแพ็คสินค้าได้ทันที</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {deal!.payment_slip_file_id && (
+            <a href={fileUrl(deal!.payment_slip_file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(deal!.payment_slip_file_id)} alt="สลิปผู้ซื้อ" style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+          )}
+          {pd.seller_fee_slip && (
+            <a href={fileUrl(pd.seller_fee_slip)} target="_blank" rel="noreferrer"><img src={fileUrl(pd.seller_fee_slip)} alt="สลิปผู้ขาย" style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── ขั้น 5: ผู้ขายแพ็ค + วิดีโอ + เลขพัสดุ ───────────────────────────────
+  function renderWizardStep5() {
+    if (myRole !== 'seller') {
+      return (
+        <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
+          <div style={{ fontSize: 38, marginBottom: 10 }}>📦</div>
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอผู้ขายแพ็คสินค้าและจัดส่ง</div>
+          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ขายกำลังถ่ายวิดีโอแพ็คของและจัดส่งตรงถึงคุณ — ระบบจะแจ้งเลขพัสดุให้ทันทีที่ส่งแล้ว</p>
+        </div>
+      );
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
+          <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6 }}>⚡ ถ่ายวิดีโอทุกขั้นตอน เก็บจุดสำคัญ เช่น Serial Number และเลขชิป หากมีผลเทสต้องถ่ายประกอบ และเลขซีเรียลบนตัวสินค้ากับกล่อง/เอกสารต้องตรงกัน</div>
+        </div>
+        <div className="dr-card">
+          <div className="dr-card-title">อัปโหลดวิดีโอแพ็คของ</div>
+          <button onClick={() => evidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> เลือกไฟล์ (รูป/วิดีโอ)</button>
+          <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'packing'); e.target.value = ''; }} />
+          {evidence.filter(e => e.type === 'packing').length > 0 && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 10 }}>✅ อัปโหลดแล้ว {evidence.filter(e => e.type === 'packing').length} ไฟล์</p>}
+        </div>
+        <div className="dr-card">
+          <div className="dr-card-title">เลขพัสดุ</div>
+          <input type="text" className="dr-select" value={trackingInput} onChange={e => setTrackingInput(e.target.value)} placeholder="กรอกเลขพัสดุ" style={{ marginBottom: 12 }} />
+          <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={() => { if (!trackingInput) { alert('กรอกเลขพัสดุ'); return; } doAction('seller_done_packing', { trackingNumber: trackingInput }); }}>📦 แพ็คเสร็จ — ส่งให้ผู้ซื้อโดยตรง</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── ขั้น 6: ผู้ซื้อแกะกล่อง + ถ่ายวิดีโอ + ยืนยันรับ/แจ้งปัญหา ───────────
+  function renderWizardStep6() {
+    if (myRole !== 'buyer') {
+      return (
+        <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
+          <div style={{ fontSize: 38, marginBottom: 10 }}>🚚</div>
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>ส่งสินค้าแล้ว — รอผู้ซื้อยืนยันรับ</div>
+          {deal!.tracking_to_buyer && <div className="dr-track-code" style={{ marginBottom: 8 }}>📦 {deal!.tracking_to_buyer}</div>}
+          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่อง แล้วกดยืนยันรับสินค้า ดีลจะเสร็จสมบูรณ์อัตโนมัติ</p>
+        </div>
+      );
+    }
+    const hasUnboxEvidence = evidence.some(e => e.type === 'receive');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {deal!.tracking_to_buyer && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ</div><div className="dr-track-code">{deal!.tracking_to_buyer}</div></div>}
+        <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
+          <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
+          <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
+          <button onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดวิดีโอก่อนแกะ</button>
+          <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
+          {hasUnboxEvidence && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 10 }}>✅ อัปโหลดวิดีโอแล้ว</p>}
+        </div>
+        <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => { if (!hasUnboxEvidence && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return; doAction('buyer_received'); }}>🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์</button>
+          <button className="btn btn-ghost btn-block" disabled={acting} onClick={() => { const r = prompt('อธิบายปัญหาที่พบ (เช่น สินค้าไม่ตรงปก/ชำรุด/ไม่ได้รับสินค้า):'); if (r === null || !r.trim()) return; doAction('dispute', { reason: r.trim() }); }} style={{ color: '#b22441' }}>⚠️ แจ้งปัญหากับสินค้า</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── ขั้น 7: ส่วนกลางโอน/คืน/อายัด (รอทีมงาน) ────────────────────────────
+  function renderWizardStep7(outcome?: 'success' | 'cancelled' | 'disputed') {
+    if (outcome === 'disputed') {
+      return (
+        <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px', borderColor: '#fbd5dd' }}>
+          <div style={{ fontSize: 38, marginBottom: 10 }}>⚠️</div>
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: '#b22441', marginBottom: 8 }}>มีข้อพิพาท — เงินถูกอายัดไว้</div>
+          {deal!.reject_reason && <p style={{ fontSize: 13.5, color: 'var(--ink)', background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12, textAlign: 'left' }}>{deal!.reject_reason}</p>}
+          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ทีมงานกำลังตรวจสอบข้อพิพาทนี้ — คุยรายละเอียดเพิ่มเติมกับอีกฝ่ายในแชตได้ ผลการตัดสินจะแจ้งให้ทราบเมื่อเสร็จสิ้น</p>
+        </div>
+      );
+    }
+    const isCancelled = outcome === 'cancelled';
+    return (
+      <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
+        <div style={{ fontSize: 38, marginBottom: 10 }}>💸</div>
+        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>
+          {isCancelled ? 'ดีลถูกยกเลิก — กำลังคืนเงินให้ผู้ซื้อ' : 'ยืนยันรับสินค้าแล้ว 🎉 — กำลังโอนเงินให้ผู้ขาย'}
+        </div>
+        {isCancelled && deal!.reject_reason && <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>เหตุผล: {deal!.reject_reason}</p>}
+        <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ทีมงานกำลังโอนเงินและจะอัปโหลดสลิปยืนยันให้เห็นที่นี่ภายในไม่นาน</p>
+      </div>
+    );
+  }
+
+  // ─── ขั้น 8: เสร็จสมบูรณ์ + รีวิว ─────────────────────────────────────────
+  function renderWizardStep8(outcome?: 'success' | 'cancelled' | 'disputed') {
+    const pd: DealPriceState = priceState || {};
+    const isCancelled = outcome === 'cancelled';
+    const slipId = isCancelled ? pd.refund_slip_file_id : pd.payout_slip_file_id;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="dr-card dr-done-card">
+          <div className="dr-done-emoji">{isCancelled ? '↩️' : '🎉'}</div>
+          <div className="dr-done-title">{isCancelled ? 'ดีลถูกยกเลิก — คืนเงินผู้ซื้อแล้ว' : 'ดีลเสร็จสมบูรณ์!'}</div>
+          <div className="dr-done-sub">{isCancelled ? 'ศูนย์กลางโอนเงินคืนผู้ซื้อเรียบร้อยแล้ว' : 'ศูนย์กลางโอนเงินให้ผู้ขายเรียบร้อยแล้ว (ดำเนินการโดยทีมงาน)'}</div>
+        </div>
+        {slipId && (
+          <div className="dr-card">
+            <div className="dr-card-title">📎 {isCancelled ? 'สลิปคืนเงินให้ผู้ซื้อ' : 'สลิปโอนเงินให้ผู้ขาย'}</div>
+            <a href={fileUrl(slipId)} target="_blank" rel="noreferrer"><img src={fileUrl(slipId)} alt="สลิป" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+          </div>
+        )}
+        {!isCancelled && <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />}
+      </div>
+    );
+  }
+
+  function renderSimpleWizard() {
+    const { step, outcome } = getSimpleStep();
+    return (
+      <div className="dr-inner">
+        {step > 0 && renderWizardProgress(step)}
+        {step > 0 && step < 7 && renderWizardPartiesMini()}
+        {step === 0 && renderWizardStep0()}
+        {step === 1 && renderWizardStep1()}
+        {step === 2 && renderWizardStep2()}
+        {step === 3 && renderPaymentSection()}
+        {step === 4 && renderWizardStep4()}
+        {step === 5 && renderWizardStep5()}
+        {step === 6 && renderWizardStep6()}
+        {step === 7 && renderWizardStep7(outcome)}
+        {step === 8 && renderWizardStep8(outcome)}
+      </div>
+    );
+  }
+
   // ─── Main render ─────────────────────────────────────────────────────────
   return (
     <div className="dr-root">
@@ -1384,13 +1728,15 @@ export default function DealRoom() {
               <button type="button" onClick={toggleCall}>เข้าร่วมเลย</button>
             </div>
           )}
+          {!isSimple && (
           <div className="dr-progress-wrap">
             <div className="dr-prog-meta"><span className="dr-prog-status">{statusText(deal)}</span><span className="dr-prog-pct">{pct}%</span></div>
             <div className="dr-prog-track"><div className="dr-prog-fill" style={{ width: `${pct}%`, background: deal.status === 'completed' ? 'var(--green-500)' : 'var(--accent)' }} /></div>
           </div>
+          )}
 
-          {/* แถบ "ถึงตาคุณ" — เด้งไปแท็บขั้นตอนเมื่อมีงานรอผู้ใช้คนนี้ทำ (กันหลงว่าไม่มีปุ่มให้ไปต่อ) */}
-          {(() => {
+          {/* แถบ "ถึงตาคุณ" — เด้งไปแท็บขั้นตอนเมื่อมีงานรอผู้ใช้คนนี้ทำ (กันหลงว่าไม่มีปุ่มให้ไปต่อ) — ซ่อนสำหรับ simple wizard เพราะมีปุ่มในแต่ละขั้นแล้ว */}
+          {!isSimple && (() => {
             const s = deal.status;
             let label: string | null = null;
             if (['buyer_joined', 'terms_pending'].includes(s)) {
@@ -1421,7 +1767,8 @@ export default function DealRoom() {
           </nav>
 
           <main className="dr-body">
-            {tab === 'steps' && (
+            {tab === 'steps' && isSimple && renderSimpleWizard()}
+            {tab === 'steps' && !isSimple && (
               <div className="dr-inner">
                 <div className="dr-card">
                   <div className="dr-card-title">ผู้เกี่ยวข้อง</div>
