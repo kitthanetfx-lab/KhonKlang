@@ -425,7 +425,7 @@ button.nav-link { background: none; border: none; }
 .blob-b { width: 420px; height: 420px; bottom: -180px; left: -140px; background: var(--green-100); }
 .hero-grid { position: absolute; inset: 0; background-image: linear-gradient(var(--line-2) 1px, transparent 1px), linear-gradient(90deg, var(--line-2) 1px, transparent 1px); background-size: 46px 46px; -webkit-mask-image: radial-gradient(120% 80% at 50% 0, #000, transparent 75%); mask-image: radial-gradient(120% 80% at 50% 0, #000, transparent 75%); opacity: .6; }
 
-.hero-inner { position: relative; z-index: 1; display: grid; gap: 38px; align-items: center; }
+.hero-inner { position: relative; z-index: 1; display: grid; gap: 38px; align-items: start; }
 @media (min-width: 900px){ .hero-inner { grid-template-columns: 1.04fr .96fr; gap: 54px; } }
 .hero-brand { margin: 0 0 16px; }
 .hero-brand-image { width: min(100%, 360px); height: auto; display: block; filter: drop-shadow(0 18px 38px rgba(20, 44, 94, 0.12)); }
@@ -435,6 +435,14 @@ button.nav-link { background: none; border: none; }
 .hero-trust { display: flex; align-items: center; gap: 14px; margin-top: 28px; }
 .hero-avatars { display: flex; }
 .hero-stage { max-width: 540px; width: 100%; margin: 0 auto; transition: transform .4s var(--ease-out); }
+
+/* ช่องวีดีโอ/ภาพขนาดเล็กใต้การ์ด escrow — ใช้พื้นที่ที่ว่างขึ้นจากการเลื่อนการ์ดขึ้นไปด้านบน */
+.hero-promo-mini { margin-top: 14px; }
+.hero-promo-mini .promo-video-wrap { padding-top: 40%; }
+.hero-promo-mini .promo-image { max-height: 170px; object-fit: cover; }
+.hero-promo-mini .promo-placeholder { aspect-ratio: auto; padding: 16px; gap: 6px; min-height: 0; }
+.hero-promo-mini .promo-placeholder svg { width: 20px; height: 20px; }
+.hero-promo-mini .promo-placeholder p { font-size: 12px; margin: 0; }
 @media (max-width: 899px){
   .hero-brand { margin-bottom: 12px; }
   .hero-brand-image { width: min(100%, 280px); margin: 0 auto; }

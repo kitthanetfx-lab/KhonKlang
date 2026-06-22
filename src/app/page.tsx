@@ -113,6 +113,21 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
         </div>
         <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
           <EscrowStage speed={1} />
+          <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '200ms' }}>
+            {PROMO_VIDEO_URL ? (
+              <div className="promo-video-wrap">
+                <iframe src={PROMO_VIDEO_URL} title="วีดีโอแนะนำการใช้งาน" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+              </div>
+            ) : PROMO_IMAGE ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={PROMO_IMAGE} alt="แนะนำการใช้งาน" className="promo-image" />
+            ) : (
+              <div className="promo-placeholder">
+                <Icon name="film" size={20} />
+                <p>เร็ว ๆ นี้ — วีดีโอ/ภาพแนะนำการใช้งาน</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>
@@ -144,27 +159,6 @@ export default function HomePage() {
               <div className="stat-l">{s.label}</div>
             </div>
           ))}
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <SectionHead kicker="แนะนำการใช้งาน" title="ดูวิธีซื้อขายผ่านคนกลางแบบเข้าใจง่าย" lead="คลิปสั้น ๆ หรือภาพประกอบ อธิบายขั้นตอนตั้งแต่เริ่มดีลจนเงินเข้าบัญชี" center />
-          <div className="promo-media reveal">
-            {PROMO_VIDEO_URL ? (
-              <div className="promo-video-wrap">
-                <iframe src={PROMO_VIDEO_URL} title="วีดีโอแนะนำการใช้งาน" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
-              </div>
-            ) : PROMO_IMAGE ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={PROMO_IMAGE} alt="แนะนำการใช้งาน" className="promo-image" />
-            ) : (
-              <div className="promo-placeholder">
-                <Icon name="film" size={32} />
-                <p>เร็ว ๆ นี้ — วีดีโอหรือภาพแนะนำการใช้งาน</p>
-              </div>
-            )}
-          </div>
         </div>
       </section>
 
