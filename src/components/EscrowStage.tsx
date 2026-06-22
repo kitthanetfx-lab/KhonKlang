@@ -124,14 +124,17 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
         <span className="ef-float ef-float-1"><Icon name="lock" size={13} /> เข้ารหัสปลอดภัย</span>
         <span className="ef-float ef-float-2"><Icon name="verified" size={13} /> ยืนยันตัวตน KYC</span>
       </div>
-      <ol className="ef-steps">
-        {EF_SEGMENTS.map((st, i) => (
-          <li key={st.key} className={`ef-step ${i === seg ? 'active' : ''} ${i < seg ? 'done' : ''}`}>
-            <span className="ef-step-no">{i < seg ? <Icon name="check" size={14} /> : i + 1}</span>
-            <span className="ef-step-tx"><b>{st.label}</b><span>{st.sub}</span></span>
-          </li>
-        ))}
-      </ol>
+      <div className="ef-steps-single">
+        <div key={s.key} className="ef-step-line">
+          <span className="ef-step-no">{activeSeg + 1}</span>
+          <span className="ef-step-tx"><b>{s.label}</b><span>{s.sub}</span></span>
+        </div>
+        <div className="ef-step-dots">
+          {EF_SEGMENTS.map((st, i) => (
+            <span key={st.key} className={`ef-dot ${i === activeSeg ? 'on' : i < activeSeg ? 'done' : ''}`} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

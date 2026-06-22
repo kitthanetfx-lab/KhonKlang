@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const db = getAdminClient();
 
-    const [dealsRes, middlemenRes, platformRes, listingsRes, meetupRes, scamRes, mmReviewRes] = await Promise.allSettled([
+    const [dealsRes, middlemenRes, platformRes, listingsRes, meetupRes, scamRes, mmReviewRes, sellersRes, membersRes] = await Promise.allSettled([
       db.from('deals').select('price', { count: 'exact' }).eq('status', 'completed').limit(1000),
       db.from('middleman_applications').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
       db.from('reviews').select('rating', { count: 'exact' }).eq('target_role', 'platform').limit(1000),
@@ -19,6 +19,10 @@ export async function GET() {
       db.from('scam_reports').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
       // รีวิวคนกลาง — ใช้คำนวณคะแนนเฉลี่ย
       db.from('reviews').select('rating', { count: 'exact' }).eq('target_role', 'middleman').limit(1000),
+      // ผู้ขายที่ผ่านการอนุมัติแล้วในระบบ
+      db.from('seller_applications').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
+      // สมาชิกทั้งหมดที่ลงทะเบียนในระบบ
+      db.from('profiles').select('id', { count: 'exact', head: true }),
     ]);
 
     const completedDeals = dealsRes.status === 'fulfilled' ? (dealsRes.value.count || 0) : 0;
@@ -26,6 +30,8 @@ export async function GET() {
       ? (dealsRes.value.data || []).reduce((s, d) => s + (Number(d.price) || 0), 0)
       : 0;
     const middlemen = middlemenRes.status === 'fulfilled' ? (middlemenRes.value.count || 0) : 0;
+    const sellers = sellersRes.status === 'fulfilled' ? (sellersRes.value.count || 0) : 0;
+    const totalMembers = membersRes.status === 'fulfilled' ? (membersRes.value.count || 0) : 0;
 
     let satisfaction = 0, reviewCount = 0;
     if (platformRes.status === 'fulfilled') {
@@ -58,6 +64,7 @@ export async function GET() {
     return NextResponse.json({
       completedDeals, protectedValue, middlemen, satisfaction, reviewCount,
       categories, listingTotal, meetupDeals, scamRecords, middlemanRating, middlemanReviews,
+      sellers, totalMembers,
     });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

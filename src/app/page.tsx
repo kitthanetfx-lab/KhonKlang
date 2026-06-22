@@ -12,6 +12,7 @@ interface SiteStats {
   completedDeals: number; protectedValue: number; middlemen: number; satisfaction: number; reviewCount: number;
   categories?: Record<string, number>; listingTotal?: number; meetupDeals?: number;
   scamRecords?: number; middlemanRating?: number; middlemanReviews?: number;
+  sellers?: number; totalMembers?: number;
 }
 
 /** สถิติจริงจากระบบ — ดึงจาก /api/stats (นับจากดีลที่เสร็จสมบูรณ์, คนกลางที่อนุมัติ, รีวิวจริง) */
@@ -32,8 +33,11 @@ function buildStatItems(s: SiteStats | null) {
   const value = s?.protectedValue ?? 0;
   const inMillions = value >= 1_000_000;
   return [
-    { v: s?.completedDeals ?? 0, suf: '', pre: '', label: 'ดีลสำเร็จปลอดภัย' },
+    // เรียงจากภาพรวมระบบไปสู่ผลลัพธ์จริง: สมาชิก → ผู้ขาย → คนกลาง → ดีลสำเร็จ → มูลค่าคุ้มครอง → ความพึงพอใจ
+    { v: s?.totalMembers ?? 0, suf: '', pre: '', label: 'สมาชิกทั้งหมด' },
+    { v: s?.sellers ?? 0, suf: '', pre: '', label: 'ผู้ขายในระบบ' },
     { v: s?.middlemen ?? 0, suf: '', pre: '', label: 'คนกลางผ่านการรับรอง' },
+    { v: s?.completedDeals ?? 0, suf: '', pre: '', label: 'ดีลสำเร็จปลอดภัย' },
     { v: inMillions ? Math.round(value / 100_000) / 10 : value, suf: inMillions ? 'ล้าน' : '', pre: '฿', label: 'มูลค่าที่คุ้มครอง' },
     s && s.reviewCount > 0
       ? { v: s.satisfaction, suf: '%', pre: '', label: 'ความพึงพอใจผู้ใช้' }
@@ -41,23 +45,9 @@ function buildStatItems(s: SiteStats | null) {
   ];
 }
 
-const TRUST = [
-  { icon: 'lock', tint: '', t: 'พักเงินไว้กับระบบ', d: 'เงินจะไม่ถึงมือผู้ขาย จนกว่าคุณจะกดยืนยันว่าได้รับของตรงปก' },
-  { icon: 'badgeCheck', tint: 'green', t: 'คนกลางผ่านการรับรอง', d: 'ยืนยันตัวตน KYC ทุกราย มีคะแนนรีวิวและประวัติการทำงานจริง' },
-  { icon: 'search', tint: 'amber', t: 'เช็คคนโกงก่อนโอน', d: 'ค้นชื่อ–บัญชี–เบอร์โทร จากฐานข้อมูลแบล็กลิสต์ได้ทันที' },
-  { icon: 'zap', tint: 'violet', t: 'ปล่อยเงินอัตโนมัติ', d: 'เมื่อตรวจรับครบเงื่อนไข ระบบโอนเงินให้ผู้ขายให้ทันที' },
-];
-
-// หมวดหมู่จริงที่ใช้ลงประกาศ — จำนวนประกาศดึงค่าจริงจาก /api/stats เท่านั้น
-const CATEGORIES = [
-  { icon: 'box', t: 'สินค้าทั่วไป' },
-  { icon: 'smartphone', t: 'อิเล็กทรอนิกส์' },
-  { icon: 'sparkles', t: 'เสื้อผ้า' },
-  { icon: 'car', t: 'ยานพาหนะ' },
-  { icon: 'building', t: 'อสังหาริมทรัพย์' },
-  { icon: 'handCoins', t: 'บริการ' },
-  { icon: 'package', t: 'อื่นๆ' },
-];
+// วางลิงก์วิดีโอ (YouTube embed URL) หรือรูปภาพโปรโมตที่นี่ — ถ้าว่างจะแสดง placeholder แทน
+const PROMO_VIDEO_URL = '';
+const PROMO_IMAGE = '';
 
 function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: string; lead?: string; center?: boolean }) {
   return (
@@ -159,15 +149,21 @@ export default function HomePage() {
 
       <section className="section">
         <div className="container">
-          <SectionHead kicker="ทำไมต้องคนกลาง" title="ความปลอดภัยที่จับต้องได้ ทุกขั้นตอน" lead="ระบบ Escrow ที่ออกแบบมาเพื่อตัดความเสี่ยงโดนโกงออกไปตั้งแต่ต้นจนจบดีล" center />
-          <div className="trust-grid">
-            {TRUST.map((f, i) => (
-              <div key={f.t} className="trust-card reveal" style={{ ['--d' as string]: i * 70 + 'ms' }}>
-                <span className={`icon-tile ${f.tint}`}><Icon name={f.icon} /></span>
-                <h3 className="trust-t">{f.t}</h3>
-                <p className="trust-d">{f.d}</p>
+          <SectionHead kicker="แนะนำการใช้งาน" title="ดูวิธีซื้อขายผ่านคนกลางแบบเข้าใจง่าย" lead="คลิปสั้น ๆ หรือภาพประกอบ อธิบายขั้นตอนตั้งแต่เริ่มดีลจนเงินเข้าบัญชี" center />
+          <div className="promo-media reveal">
+            {PROMO_VIDEO_URL ? (
+              <div className="promo-video-wrap">
+                <iframe src={PROMO_VIDEO_URL} title="วีดีโอแนะนำการใช้งาน" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
               </div>
-            ))}
+            ) : PROMO_IMAGE ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={PROMO_IMAGE} alt="แนะนำการใช้งาน" className="promo-image" />
+            ) : (
+              <div className="promo-placeholder">
+                <Icon name="film" size={32} />
+                <p>เร็ว ๆ นี้ — วีดีโอหรือภาพแนะนำการใช้งาน</p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -176,33 +172,6 @@ export default function HomePage() {
         <div className="container">
           <SectionHead kicker="บริการผ่านคนกลาง" title="ทุกปัญหาการซื้อขาย เรามีทางแก้ให้" lead="เลื่อนดูบริการที่ออกแบบมาแก้ปัญหาที่คนซื้อ–ขายเจอบ่อยที่สุด พร้อมข้อดีที่คุณจะได้รับ" center />
           <div className="reveal"><ServiceSlider stats={stats} /></div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <div className="cat-head reveal">
-            <div>
-              <div className="kicker" style={{ marginBottom: 12 }}>ตลาดคนกลาง</div>
-              <h2 className="section-title">ซื้อขายได้ทุกหมวด มั่นใจทุกมูลค่า</h2>
-            </div>
-            <Link className="btn btn-soft" href="/marketplace">ดูตลาดทั้งหมด <Icon name="arrowRight" size={16} /></Link>
-          </div>
-          <div className="cat-grid">
-            {CATEGORIES.map((c, i) => {
-              const cnt = stats?.categories?.[c.t] ?? 0;
-              return (
-                <Link key={c.t} href={`/marketplace?cat=${encodeURIComponent(c.t)}`} className="cat-card reveal" style={{ ['--d' as string]: i * 40 + 'ms' }}>
-                  <span className="icon-tile"><Icon name={c.icon} /></span>
-                  <div>
-                    <div className="cat-t">{c.t}</div>
-                    <div className="cat-n">{cnt > 0 ? `${cnt.toLocaleString()} ประกาศ` : 'ยังไม่มีประกาศ'}</div>
-                  </div>
-                  <Icon name="chevronRight" size={18} className="cat-arrow" />
-                </Link>
-              );
-            })}
-          </div>
         </div>
       </section>
 

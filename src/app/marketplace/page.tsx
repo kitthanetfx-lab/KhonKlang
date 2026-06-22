@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
@@ -99,10 +99,19 @@ export default function Marketplace() {
     })();
   }, []);
 
-  let filtered = listings
+  // ฐานรายการที่นับเป็น "ในตลาด" จริง (ก่อนกรองหมวด/จังหวัด/คำค้น) — ใช้คำนวณจำนวนต่อหมวดหมู่
+  const marketListings = listings
     .filter(d => d.status === 'posted')
-    // ตลาดแสดงเฉพาะ "ประกาศขาย" — ไม่รวมดีลส่วนตัว/ดีลจากหน้าบริการ
-    .filter(d => d.source === 'listing' || (!d.source && !!d.selling_mode && d.selling_mode !== 'normal'))
+    .filter(d => d.source === 'listing' || (!d.source && !!d.selling_mode && d.selling_mode !== 'normal'));
+
+  const catCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of marketListings) counts[d.category] = (counts[d.category] || 0) + 1;
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings]);
+
+  let filtered = marketListings
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)
     .filter(d => !province || d.location === province)
     .filter(d => !certified || isCertifiedMode(d.selling_mode))
@@ -112,6 +121,11 @@ export default function Marketplace() {
     );
   if (sort === 'ราคา: น้อย→มาก') filtered = [...filtered].sort((a, b) => a.price - b.price);
   else if (sort === 'ราคา: มาก→น้อย') filtered = [...filtered].sort((a, b) => b.price - a.price);
+
+  function goCat(c: string) {
+    setCat(c);
+    document.getElementById('mkt-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   function getFirstImage(listing: Listing): string {
     return listing.images && listing.images.length > 0 ? imgUrl(listing.images[0]) : '';
@@ -207,7 +221,33 @@ export default function Marketplace() {
         </div>
       </section>
 
-      <div className="container mkt-layout">
+      <section className="section" style={{ paddingTop: 36, paddingBottom: 8 }}>
+        <div className="container">
+          <div className="cat-head reveal">
+            <h2 className="section-title" style={{ fontSize: 'clamp(20px,2.4vw,26px)' }}>เลือกซื้อตามหมวดหมู่</h2>
+            <p className="section-lead" style={{ marginTop: 6, fontSize: 14 }}>แตะหมวดที่สนใจเพื่อกรองรายการด้านล่างทันที</p>
+          </div>
+          <div className="cat-grid reveal">
+            {CATS.filter(c => c !== 'ทั้งหมด').map((c, i) => (
+              <button
+                key={c}
+                className="cat-card"
+                onClick={() => goCat(c)}
+                style={{ ['--d' as string]: i * 40 + 'ms', textAlign: 'left', cursor: 'pointer', width: '100%', font: 'inherit', borderColor: cat === c ? 'var(--accent)' : undefined }}
+              >
+                <span className="icon-tile"><Icon name={CAT_ICON[c] || 'box'} /></span>
+                <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span className="cat-t">{c}</span>
+                  <span className="cat-n">{catCounts[c] || 0} รายการ</span>
+                </span>
+                <span className="cat-arrow"><Icon name="arrowRight" size={16} /></span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div id="mkt-results" className="container mkt-layout">
         <aside className="mkt-sidebar">
           <div className="mkt-filter-card">
             <h4>จังหวัด</h4>

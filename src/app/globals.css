@@ -398,16 +398,19 @@ button.nav-link { background: none; border: none; }
 .ef-float-2 { bottom: 16%; right: 1%; animation: efBob 4.6s ease-in-out infinite .6s; }
 @keyframes efBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 
-.ef-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.ef-step { display: flex; align-items: flex-start; gap: 13px; padding: 12px 14px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); box-shadow: var(--sh-xs); transition: border-color .3s, box-shadow .3s, background .3s, transform .3s; }
-.ef-step.active { border-color: color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: var(--sh-md); background: linear-gradient(90deg, var(--accent-soft), var(--surface) 60%); transform: translateX(2px); }
-.ef-step-no { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 600; font-size: 13px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); transition: all .3s; }
-.ef-step.active .ef-step-no { background: var(--accent); color: #fff; border-color: var(--accent); }
-.ef-step.done .ef-step-no { background: var(--green-500); color: #fff; border-color: var(--green-500); }
+/* แสดงทีละ step บรรทัดเดียว วนไปเรื่อย ๆ แทนการเรียง 5 บรรทัดสแต็กกัน — ประหยัดพื้นที่แนวตั้ง */
+.ef-steps-single { display: grid; gap: 10px; }
+.ef-step-line { display: flex; align-items: flex-start; gap: 13px; padding: 12px 14px; border-radius: var(--r-md); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: linear-gradient(90deg, var(--accent-soft), var(--surface) 60%); box-shadow: var(--sh-md); animation: efStepIn .35s var(--ease-out); }
+@keyframes efStepIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.ef-step-no { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 600; font-size: 13px; background: var(--accent); color: #fff; border: 1px solid var(--accent); }
 .ef-step-tx { flex: 1; min-width: 0; }
 .ef-step-tx b { display: block; font-family: var(--font-display); font-size: 14px; color: var(--ink); font-weight: 600; line-height: 1.5; }
 .ef-step-tx span { font-size: 12px; color: var(--muted); line-height: 1.5; display: block; margin-top: 1px; }
-@media (min-width: 560px){ .ef-steps { gap: 9px; } .ef-node-ic { width: 56px; height: 56px; } .ef-vault-ring { width: 94px; height: 94px; } }
+.ef-step-dots { display: flex; gap: 6px; justify-content: center; }
+.ef-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line); transition: all .3s; }
+.ef-dot.on { width: 18px; background: var(--accent); }
+.ef-dot.done { background: var(--green-500); }
+@media (min-width: 560px){ .ef-node-ic { width: 56px; height: 56px; } .ef-vault-ring { width: 94px; height: 94px; } }
 
 
 /* ==================== home.css ==================== */
@@ -440,7 +443,8 @@ button.nav-link { background: none; border: none; }
 /* ---- Stats ---- */
 .stats-band { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 30px 0; }
 .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px 12px; }
-@media (min-width: 720px){ .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 560px){ .stats-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px){ .stats-grid { grid-template-columns: repeat(6, 1fr); } }
 .stat { text-align: center; }
 .stat-v { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 4vw, 38px); color: var(--ink); line-height: 1; letter-spacing: -0.02em; }
 .stat-l { font-size: 13.5px; color: var(--muted); margin-top: 8px; }
@@ -453,6 +457,15 @@ button.nav-link { background: none; border: none; }
 .trust-card:hover { transform: translateY(-5px); box-shadow: var(--sh-md); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
 .trust-t { font-size: 17.5px; margin: 18px 0 9px; }
 .trust-d { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+/* ---- Promo media (วีดีโอ/ภาพแนะนำ) ---- */
+.promo-media { max-width: 880px; margin: 0 auto; }
+.promo-video-wrap { position: relative; width: 100%; padding-top: 56.25%; border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--sh-md); background: #000; }
+.promo-video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.promo-image { width: 100%; border-radius: var(--r-lg); box-shadow: var(--sh-md); display: block; object-fit: cover; }
+.promo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; aspect-ratio: 16/9; border-radius: var(--r-lg); border: 1.5px dashed var(--line); background: var(--surface-2); color: var(--muted); text-align: center; padding: 24px; }
+.promo-placeholder svg { color: var(--faint); }
+.promo-placeholder p { font-size: 14px; max-width: 36ch; }
 
 /* ---- Services ---- */
 .svc-grid { display: grid; gap: 18px; grid-template-columns: 1fr; }
