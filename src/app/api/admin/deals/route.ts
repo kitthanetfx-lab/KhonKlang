@@ -131,15 +131,17 @@ export async function PATCH(req: NextRequest) {
         break;
       }
       case 'delete_deal': {
-        // ลบดีลถาวร — ลบ child tables ก่อน
+        // ลบดีลถาวร — ลบ child tables ก่อน (ต้องลบ reviews + child FK ทั้งหมดก่อน deals)
         await Promise.all([
           db.from('messages').delete().eq('deal_id', id),
           db.from('deal_evidence').delete().eq('deal_id', id),
           db.from('deal_price_state').delete().eq('deal_id', id),
           db.from('deal_meetup').delete().eq('deal_id', id),
           db.from('deal_images').delete().eq('deal_id', id),
+          db.from('reviews').delete().eq('deal_id', id),
         ]);
-        await db.from('deals').delete().eq('id', id);
+        const { error: delErr } = await db.from('deals').delete().eq('id', id);
+        if (delErr) throw new Error(`ลบดีลไม่สำเร็จ: ${delErr.message}`);
         return NextResponse.json({ ok: true });
       }
       case 'mark_meetup_refund': {

@@ -94,7 +94,9 @@ export default function AdminDeals() {
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action, note }),
       });
+      const d = await r.json().catch(() => ({}));
       if (r.ok) load(tab);
+      else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
     } finally { setActing(''); }
   }
 
