@@ -54,4 +54,22 @@ export default function RegisterSelectPage() {
             <div className="rsel-card-feat">✅ คืนเงินประกันได้</div>
           </div>
           <div className="rsel-card-cta">
-            <span className="rsel-card-fee">เงิ�
+            <span className="rsel-card-fee">เงินประกัน ฿1,000–50,000</span>
+            {controls.isEnabled('middlemanRegistration')
+              ? <Link href="/register/middleman" className="rsel-card-cta-t" style={{ color: 'var(--green-600)' }}>สมัครเลย →</Link>
+              : <span className="rsel-card-cta-t" style={{ color: '#b7791f' }}>ปิดชั่วคราว</span>}
+          </div>
+          {!controls.isEnabled('middlemanRegistration') && (
+            <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700' }}>{controls.message('middlemanRegistration')}</div>
+          )}
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--muted)' }}>
+          มีบัญชีแล้ว? <Link href="/login" style={{ color: 'var(--accent)' }}>เข้าสู่ระบบ</Link>
+          &nbsp;·&nbsp;
+          <Link href="/" style={{ color: 'var(--accent)' }}>กลับหน้าหลัก</Link>
+        </div>
+      </div>
+    </div>
+  );
+}

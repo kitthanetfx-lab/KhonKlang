@@ -48,32 +48,4 @@ export default function ServiceTradePage() {
             <Link key={m.title} href={m.href} className="svc-mode">
               <div className="svc-mode-icon" style={{ background: m.bg }}>{m.icon}</div>
               <div className="svc-mode-title">{m.title}</div>
-              <div className="svc-mode-desc">{m.desc}</div>
-              <div className="svc-mode-feats">{m.feats.map(f => <div key={f} className="svc-mode-feat">{f}</div>)}</div>
-              <div className="svc-mode-cta">เริ่มต้น <span>→</span></div>
-            </Link>
-            ) : (
-            <div key={m.title} className="svc-mode" style={{ opacity: 0.7, cursor: 'not-allowed' }}>
-              <div className="svc-mode-icon" style={{ background: m.bg }}>{m.icon}</div>
-              <div className="svc-mode-title">{m.title}</div>
-              <div className="svc-mode-desc">{m.desc}</div>
-              <div className="svc-mode-feats">{m.feats.map(f => <div key={f} className="svc-mode-feat">{f}</div>)}</div>
-              <div className="svc-mode-cta" style={{ color: '#b7791f' }}>ปิดชั่วคราว</div>
-              <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700', lineHeight: 1.6 }}>{note}</div>
-            </div>
-            );
-          })}
-        </div>
-        <div className="svc-steps">
-          <div className="svc-steps-title">ขั้นตอน Escrow อัตโนมัติ</div>
-          {STEPS.map((s, i) => (
-            <div key={i} className="svc-step-row">
-              <div className="svc-step-num">{i + 1}</div>
-              <div><div className="svc-step-t">{s.t}</div><div className="svc-step-d">{s.d}</div></div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+              <div className="svc-mode-desc">
