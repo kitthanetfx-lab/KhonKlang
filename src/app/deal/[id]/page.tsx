@@ -1747,8 +1747,8 @@ export default function DealRoom() {
   // Wizard ขั้นตอน "ประกันการเดินทาง" (deal_type === 'meetup') — 7 ขั้น
   // ═══════════════════════════════════════════════════════════════════════
   const MEETUP_WZ_TITLES = [
-    'ยอมรับเงื่อนไข', 'ตกลงจุดนัด', 'แชทและสรุปราคา', 'วางเงินประกัน',
-    'รอยืนยันรับเงิน', 'เดินทาง+นัดพบ', 'รอคืนเงินประกัน', 'เสร็จสมบูรณ์',
+    'ยอมรับเงื่อนไข', 'ตกลงจุดนัด', 'แชทและ Video Call', 'ตรวจหลักฐาน',
+    'วางเงินประกัน', 'รอยืนยันรับเงิน', 'เดินทาง+นัดพบ', 'รอคืนเงินประกัน', 'เสร็จสมบูรณ์',
   ];
   const MWZ_TOTAL = MEETUP_WZ_TITLES.length;
 
@@ -1758,14 +1758,14 @@ export default function DealRoom() {
     if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
     const bothTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothTerms ? 2 : 1 };
-    if (s === 'payment_pending') return { step: md.deposit ? 4 : 2 };
-    if (s === 'payment_uploaded') return { step: 5 };
-    if (s === 'meetup_ready') return { step: 6 };
+    if (s === 'payment_pending') return { step: md.deposit ? 5 : 2 };
+    if (s === 'payment_uploaded') return { step: 6 };
+    if (s === 'meetup_ready') return { step: 7 };
     if (s === 'completed') {
-      if (md.refund_outcome) return { step: 8, outcome: 'completed' };
-      return { step: 7, outcome: 'completed' };
+      if (md.refund_outcome) return { step: 9, outcome: 'completed' };
+      return { step: 8, outcome: 'completed' };
     }
-    if (s === 'cancelled') return { step: 7, outcome: 'cancelled' };
+    if (s === 'cancelled') return { step: 8, outcome: 'cancelled' };
     return { step: 1 };
   }
 
@@ -2106,11 +2106,12 @@ export default function DealRoom() {
   function renderMeetupWizard() {
     const { step: actualStep, outcome } = getMeetupStep();
     const md: MeetupData = meetup || {};
-    // ถ้า actualStep=4 แต่ยังไม่มีสลิป → แสดง step 3 (แชท+สรุปราคา) ก่อน
-    const defaultStep = (actualStep === 4 && !md.buyer_slip && !md.seller_slip) ? 3 : actualStep;
+    // ถ้า actualStep=5 แต่ยังไม่มีสลิป → แสดง step 3 (แชท+Video) ก่อน
+    const defaultStep = (actualStep === 5 && !md.buyer_slip && !md.seller_slip) ? 3 : actualStep;
     const step = Math.min(wzViewStep ?? defaultStep, actualStep);
-    // step 3 เป็น mandatory pre-step ของ actualStep 4 — ไม่ใช่การย้อนดู
-    const isReviewing = step < actualStep && !(step === 3 && actualStep === 4 && !md.buyer_slip && !md.seller_slip);
+    // steps 3-4 เป็น pre-flow ของ actualStep 5 — ไม่ใช่การย้อนดู
+    const chatPreFlow = actualStep === 5 && !md.buyer_slip && !md.seller_slip;
+    const isReviewing = chatPreFlow ? step < 3 : step < actualStep;
     return (
       <div className="dr-inner">
         {step > 0 && renderMeetupWizardProgress(step)}
@@ -2129,12 +2130,13 @@ export default function DealRoom() {
           {step === 0 && renderWizardStep0()}
           {step === 1 && renderWizardStep1()}
           {step === 2 && renderMeetupWizardStepNegotiate()}
-          {step === 3 && renderMeetupWizardStepChat()}
-          {step === 4 && renderMeetupWizardStepDeposit()}
-          {step === 5 && renderMeetupWizardStepAdminCheck()}
-          {step === 6 && renderMeetupWizardStepMeet()}
-          {step === 7 && renderMeetupWizardStepWaitRefund(outcome)}
-          {step === 8 && renderMeetupWizardStepDone()}
+          {step === 3 && renderWizardStepChat()}
+          {step === 4 && renderWizardStepEvidenceReview()}
+          {step === 5 && renderMeetupWizardStepDeposit()}
+          {step === 6 && renderMeetupWizardStepAdminCheck()}
+          {step === 7 && renderMeetupWizardStepMeet()}
+          {step === 8 && renderMeetupWizardStepWaitRefund(outcome)}
+          {step === 9 && renderMeetupWizardStepDone()}
         </div>
         {step >= 1 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>
