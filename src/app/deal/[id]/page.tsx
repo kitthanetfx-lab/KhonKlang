@@ -1747,7 +1747,7 @@ export default function DealRoom() {
   // Wizard ขั้นตอน "ประกันการเดินทาง" (deal_type === 'meetup') — 7 ขั้น
   // ═══════════════════════════════════════════════════════════════════════
   const MEETUP_WZ_TITLES = [
-    'ยอมรับเงื่อนไข', 'ตกลงจุดนัด', 'วางเงินประกัน',
+    'ยอมรับเงื่อนไข', 'ตกลงจุดนัด', 'แชทและสรุปราคา', 'วางเงินประกัน',
     'รอยืนยันรับเงิน', 'เดินทาง+นัดพบ', 'รอคืนเงินประกัน', 'เสร็จสมบูรณ์',
   ];
   const MWZ_TOTAL = MEETUP_WZ_TITLES.length;
@@ -1758,14 +1758,14 @@ export default function DealRoom() {
     if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
     const bothTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothTerms ? 2 : 1 };
-    if (s === 'payment_pending') return { step: md.deposit ? 3 : 2 };
-    if (s === 'payment_uploaded') return { step: 4 };
-    if (s === 'meetup_ready') return { step: 5 };
+    if (s === 'payment_pending') return { step: md.deposit ? 4 : 2 };
+    if (s === 'payment_uploaded') return { step: 5 };
+    if (s === 'meetup_ready') return { step: 6 };
     if (s === 'completed') {
-      if (md.refund_outcome) return { step: 7, outcome: 'completed' };
-      return { step: 6, outcome: 'completed' };
+      if (md.refund_outcome) return { step: 8, outcome: 'completed' };
+      return { step: 7, outcome: 'completed' };
     }
-    if (s === 'cancelled') return { step: 6, outcome: 'cancelled' };
+    if (s === 'cancelled') return { step: 7, outcome: 'cancelled' };
     return { step: 1 };
   }
 
@@ -1887,22 +1887,103 @@ export default function DealRoom() {
     );
   }
 
+  function renderMeetupWizardStepChat() {
+    const md: MeetupData = meetup || {};
+    const isParty = myRole === 'buyer' || myRole === 'seller';
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* จุดนัดที่ตกลงแล้ว */}
+        <div className="dr-card" style={{ background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb,var(--accent) 25%,transparent)' }}>
+          <div className="dr-card-title">✅ ตกลงวิธีนัดพบแล้ว</div>
+          {md.meet_label && <p style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>📍 {md.meet_label}</p>}
+          <p style={{ fontSize: 13, color: 'var(--ink-2)' }}>เงินประกันที่จะวาง: <b>฿{Number(md.deposit || 0).toLocaleString()} / ฝ่าย</b></p>
+          {isParty && (
+            <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }}
+              onClick={() => { setMeetupPropLabel(md.meet_label || ''); setMeetupPropAmt(String(md.deposit || 500)); }}>
+              ✏️ เสนอเปลี่ยนยอดเงินประกัน
+            </button>
+          )}
+          {isParty && meetupPropLabel !== null && (
+            <div style={{ marginTop: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: 12 }}>
+              <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>ยอดใหม่ (บาท/ฝ่าย)</label>
+              <input type="number" className="input input-bordered" min={50} value={meetupPropAmt}
+                onChange={e => setMeetupPropAmt(e.target.value)} style={{ width: '100%', marginBottom: 8 }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="btn btn-primary flex-1" disabled={acting}
+                  onClick={() => { const a = Math.round(Number(meetupPropAmt)); if (!(a >= 50)) { alert('ขั้นต่ำ ฿50'); return; } doAction('meetup_propose', { amount: a, meetLabel: meetupPropLabel || md.meet_label }); setMeetupPropLabel(null); }}>
+                  ส่งข้อเสนอ
+                </button>
+                <button type="button" className="btn btn-ghost flex-1" onClick={() => setMeetupPropLabel(null)}>ยกเลิก</button>
+              </div>
+            </div>
+          )}
+        </div>
+        {/* สิ่งที่ต้องทำก่อนวางเงิน */}
+        <div className="dr-card">
+          <div className="dr-card-title">📋 ทำก่อนวางเงินประกัน</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { icon: '💬', label: 'แชทตกลงรายละเอียด', sub: 'ตกลงค่าเดินทาง ค่าบริการ และสิ่งที่แต่ละฝ่ายต้องรับผิดชอบ', tab: 'chat' },
+              { icon: '📹', label: 'Video Call (ถ้าจำเป็น)', sub: 'ยืนยันตัวตน ดูสินค้า หรือคุยรายละเอียดเพิ่มเติม', tab: 'call' },
+              { icon: '📷', label: 'เก็บหลักฐาน', sub: 'ถ่ายรูป/วิดีโอ รายละเอียดสินค้า ก่อนนัดพบ', tab: 'evidence' },
+            ].map(item => (
+              <button key={item.tab} type="button" className="btn btn-soft btn-block"
+                style={{ textAlign: 'left', height: 'auto', padding: '10px 14px', flexDirection: 'column', alignItems: 'flex-start' }}
+                onClick={() => setTab(item.tab as typeof tab)}>
+                <span style={{ fontWeight: 600, fontSize: 13.5 }}>{item.icon} {item.label}</span>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{item.sub}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <p style={{ fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>
+          เมื่อทุกอย่างตกลงกันเรียบร้อยแล้ว กด <b>ถัดไป →</b> เพื่อวางเงินประกัน
+        </p>
+      </div>
+    );
+  }
+
   function renderMeetupWizardStepDeposit() {
     const md: MeetupData = meetup || {};
     const depositEach = md.deposit || 0;
     const isParty = myRole === 'buyer' || myRole === 'seller';
+    const bank = middlemanBank;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* ยอดเงินที่ต้องโอน */}
         <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
-          <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6 }}>
-            💰 โอนเงินประกัน <b>฿{depositEach.toLocaleString()}</b> มาที่บัญชีศูนย์กลาง แล้วอัปโหลดสลิปด้านล่าง — เงินนี้จะถูกคืนให้ทั้งสองฝ่ายหลังนัดพบสำเร็จ
+          <div className="dr-card-title" style={{ color: '#8a5a00' }}>💰 ยอดเงินประกันที่ต้องวาง</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent-strong)', fontFamily: 'var(--font-display)', marginBottom: 6 }}>
+            ฿{depositEach.toLocaleString()} / ฝ่าย
           </div>
+          {md.meet_label && <p style={{ fontSize: 12.5, color: '#8a5a00' }}>📍 {md.meet_label}</p>}
+          <p style={{ fontSize: 12.5, color: '#8a5a00', marginTop: 4 }}>เงินนี้จะถูกคืนให้ทั้งสองฝ่ายหลังนัดพบสำเร็จ</p>
         </div>
+        {/* เลขบัญชี / QR */}
+        {bank ? (
+          <div className="dr-card">
+            <div className="dr-card-title">🏦 โอนมาที่บัญชีนี้</div>
+            <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 2 }}>ธนาคาร</div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>{bank.bankName}</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8, marginBottom: 2 }}>เลขบัญชี</div>
+              <div style={{ fontWeight: 700, fontSize: 18, letterSpacing: 1, fontFamily: 'var(--font-display)' }}>{bank.bankAcct}</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8, marginBottom: 2 }}>ชื่อบัญชี</div>
+              <div style={{ fontSize: 14 }}>{bank.bankOwner}</div>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--muted)' }}>⚠️ โอน <b>฿{depositEach.toLocaleString()}</b> พอดี — อย่าโอนรวมหรือแยกเงินอื่น เพื่อให้ตรวจสอบได้ง่าย</p>
+          </div>
+        ) : (
+          <div className="dr-card" style={{ textAlign: 'center', padding: '20px 14px' }}>
+            <p style={{ fontSize: 13.5, color: 'var(--muted)' }}>⏳ ระบบกำลังโหลดข้อมูลบัญชี — กรุณารอสักครู่</p>
+          </div>
+        )}
+        {/* สลิปของแต่ละฝ่าย */}
         {[{ side: 'buyer', label: '🛍️ ผู้ซื้อ', slip: md.buyer_slip }, { side: 'seller', label: '🛒 ผู้ขาย', slip: md.seller_slip }].map(r => (
           <div key={r.side} className="dr-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <b style={{ fontSize: 13.5 }}>{r.label}</b>
-              <span style={{ fontSize: 12.5, color: r.slip ? 'var(--green-600)' : 'var(--faint)' }}>{r.slip ? '✅ วางแล้ว' : '⏳ รอ'}</span>
+              <span style={{ fontSize: 12.5, color: r.slip ? 'var(--green-600)' : 'var(--faint)' }}>{r.slip ? '✅ ส่งสลิปแล้ว' : '⏳ รอ'}</span>
             </div>
             {r.slip
               ? <a href={fileUrl(r.slip)} target="_blank" rel="noreferrer"><img src={fileUrl(r.slip)} alt="สลิปเงินประกัน" style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
@@ -2026,7 +2107,10 @@ export default function DealRoom() {
 
   function renderMeetupWizard() {
     const { step: actualStep, outcome } = getMeetupStep();
-    const step = Math.min(wzViewStep ?? actualStep, actualStep);
+    const md: MeetupData = meetup || {};
+    // ถ้า actualStep=4 แต่ยังไม่มีสลิป → แสดง step 3 (แชท+สรุปราคา) ก่อน
+    const defaultStep = (actualStep === 4 && !md.buyer_slip && !md.seller_slip) ? 3 : actualStep;
+    const step = Math.min(wzViewStep ?? defaultStep, actualStep);
     const isReviewing = step < actualStep;
     return (
       <div className="dr-inner">
@@ -2046,11 +2130,12 @@ export default function DealRoom() {
           {step === 0 && renderWizardStep0()}
           {step === 1 && renderWizardStep1()}
           {step === 2 && renderMeetupWizardStepNegotiate()}
-          {step === 3 && renderMeetupWizardStepDeposit()}
-          {step === 4 && renderMeetupWizardStepAdminCheck()}
-          {step === 5 && renderMeetupWizardStepMeet()}
-          {step === 6 && renderMeetupWizardStepWaitRefund(outcome)}
-          {step === 7 && renderMeetupWizardStepDone()}
+          {step === 3 && renderMeetupWizardStepChat()}
+          {step === 4 && renderMeetupWizardStepDeposit()}
+          {step === 5 && renderMeetupWizardStepAdminCheck()}
+          {step === 6 && renderMeetupWizardStepMeet()}
+          {step === 7 && renderMeetupWizardStepWaitRefund(outcome)}
+          {step === 8 && renderMeetupWizardStepDone()}
         </div>
         {step >= 1 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>
