@@ -928,7 +928,7 @@ export default function DealRoom() {
                     <>
                       {' '}· 🛰️ ตำแหน่งล่าสุด {Math.max(0, Math.floor((nowTs - new Date(r.pos.at).getTime()) / 60000))} นาทีที่แล้ว —{' '}
                       <a href={`https://www.google.com/maps?q=${r.pos.lat},${r.pos.lng}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-strong)', textDecoration: 'underline' }}>
-                        เปิดดูแผนที่
+                        ตำแหน่งปัจจุบัน
                       </a>
                     </>
                   )}
@@ -2018,7 +2018,20 @@ export default function DealRoom() {
         {/* สรุปยอดแต่ละฝ่าย */}
         <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
           <div className="dr-card-title" style={{ color: '#8a5a00' }}>💰 สรุปยอดที่ต้องวางประกัน</div>
-          {md.meet_label && <p style={{ fontSize: 12.5, color: '#8a5a00', marginBottom: 10 }}>📍 {md.meet_label}</p>}
+          {md.meet_label && (() => {
+            const destLoc = md.meet_label.startsWith('ผู้ซื้อเดินทาง') ? md.seller_loc
+              : md.meet_label.startsWith('ผู้ขายเดินทาง') ? md.buyer_loc
+              : null;
+            const query = destLoc
+              ? `${destLoc.tambon} ${destLoc.amphoe} ${destLoc.province}`
+              : md.meet_label;
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <p style={{ fontSize: 12.5, color: '#8a5a00', margin: 0, flex: 1 }}>📍 {md.meet_label}</p>
+                <a href={`https://www.google.com/maps/search/${encodeURIComponent(query)}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--accent-strong)', textDecoration: 'underline', whiteSpace: 'nowrap' }}>🗺️ ดูแผนที่</a>
+              </div>
+            );
+          })()}
           <div style={{ display: 'grid', gap: 8 }}>
             {([['🛍️ ผู้ซื้อ', depositEach, buyerFee], ['🛒 ผู้ขาย', depositEach, sellerFee]] as [string, number, number][]).map(([label, dep, fee]) => (
               <div key={label} style={{ background: 'rgba(255,255,255,0.7)', borderRadius: 'var(--r-md)', padding: '10px 14px', border: '1px solid #ffe0b2' }}>
@@ -2096,7 +2109,19 @@ export default function DealRoom() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green-700)', marginBottom: 4 }}>📍 จุดนัดพบ: {md.meet_label || 'ตามที่ตกลง'}</div>
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>เงินประกัน ฿{(md.deposit || 0).toLocaleString()} / ฝ่าย ถูกล็อกไว้ที่ศูนย์กลางแล้ว</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>เงินประกัน ฿{(md.deposit || 0).toLocaleString()} / ฝ่าย ถูกล็อกไว้ที่ศูนย์กลางแล้ว</div>
+          {/* ลิงก์ไปยังจุดนัดพบ (ค้นหาชื่อที่อยู่ปลายทาง ไม่ใช่ GPS ผู้เดินทาง) */}
+          {(() => {
+            const destLoc = md.meet_label?.startsWith('ผู้ซื้อเดินทาง') ? md.seller_loc
+              : md.meet_label?.startsWith('ผู้ขายเดินทาง') ? md.buyer_loc
+              : null;
+            const query = destLoc
+              ? `${destLoc.tambon} ${destLoc.amphoe} ${destLoc.province}`
+              : md.meet_label || '';
+            return query ? (
+              <a href={`https://www.google.com/maps/search/${encodeURIComponent(query)}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">🗺️ ดูจุดนัดพบบนแผนที่</a>
+            ) : null;
+          })()}
         </div>
         {rows.map(r => (
           <div key={r.side} className="dr-card">
@@ -2107,7 +2132,7 @@ export default function DealRoom() {
               </span>
             </div>
             {r.pos && (
-              <a href={`https://maps.google.com/?q=${r.pos.lat},${r.pos.lng}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm btn-block">🗺️ ดูตำแหน่งบนแผนที่</a>
+              <a href={`https://maps.google.com/?q=${r.pos.lat},${r.pos.lng}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm btn-block">🛰️ ตำแหน่งปัจจุบัน (GPS สด)</a>
             )}
           </div>
         ))}
