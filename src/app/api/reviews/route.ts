@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
     };
 
     const created: string[] = [];
+    const insertErrors: string[] = [];
     for (const it of items) {
       const role = it.targetRole;
       const rating = Math.round(Number(it.rating));
@@ -84,18 +85,27 @@ export async function POST(req: NextRequest) {
         reviewer_id: me.id,
         reviewer_name: myProfile?.display_name || '',
         reviewer_role: myRole,
-        target_id: targetId,
+        target_id: targetId,   // null สำหรับ platform — ต้องมี ALTER TABLE reviews ALTER COLUMN target_id DROP NOT NULL
         target_role: role,
         rating,
         tags: (it.tags || []).slice(0, 6),
         comment: String(it.comment || '').slice(0, 1000),
       });
-      if (!error) created.push(role);
+      if (!error) {
+        created.push(role);
+      } else {
+        // surface DB error (เช่น NOT NULL constraint บน target_id) แทนการเงียบ
+        insertErrors.push(`${role}: ${error.message}`);
+        console.error('[reviews] insert error', role, error.message);
+      }
       // review_score / review_count on profiles is kept in sync by a DB trigger
     }
 
-    if (created.length === 0) return NextResponse.json({ error: 'ไม่มีรีวิวที่บันทึกได้' }, { status: 400 });
-    return NextResponse.json({ ok: true, created });
+    if (created.length === 0) {
+      const errMsg = insertErrors.length ? insertErrors.join('; ') : 'ไม่มีรีวิวที่บันทึกได้';
+      return NextResponse.json({ error: errMsg }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, created, warnings: insertErrors.length ? insertErrors : undefined });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;
     return NextResponse.json({ error: String(err) }, { status });
