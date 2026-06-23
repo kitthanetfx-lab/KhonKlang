@@ -377,6 +377,7 @@ export default function DealRoom() {
   const callFileInputRef = useRef<HTMLInputElement>(null);
   // wizard แบบง่าย: สถานะ local อย่างเดียว (ไม่บันทึกลง DB) ว่าฉันกด "คุยกันจบแล้ว" ไปดูหน้าหลักฐานหรือยัง
   const [chatReviewReady, setChatReviewReady] = useState(false);
+  const chatBundledRef = useRef(false); // กัน bundleChatTranscriptAsEvidence ถูกเรียกซ้ำ
   // wizard แบบง่าย: ขั้นที่กำลังดูอยู่ (ปุ่มย้อนกลับ/ถัดไป) — null แปลว่าให้ตามขั้นจริงปัจจุบันเสมอ
   const [wzViewStep, setWzViewStep] = useState<number | null>(null);
   const [meetupEvidReady, setMeetupEvidReady] = useState(false);
@@ -1607,7 +1608,7 @@ export default function DealRoom() {
             <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
           </div>
         </div>
-        <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={async () => { await bundleChatTranscriptAsEvidence(); setChatReviewReady(true); setWzViewStep(4); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</button>
+        <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={async () => { if (!chatBundledRef.current) { chatBundledRef.current = true; await bundleChatTranscriptAsEvidence(); } setChatReviewReady(true); setWzViewStep(4); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</button>
       </div>
     );
   }
