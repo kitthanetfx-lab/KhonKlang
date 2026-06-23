@@ -2105,34 +2105,43 @@ export default function DealRoom() {
       { side: 'buyer', label: '🛍️ ผู้ซื้อ', met: md.buyer_met, departedAt: md.buyer_departed_at, pos: md.buyer_pos },
       { side: 'seller', label: '🛒 ผู้ขาย', met: md.seller_met, departedAt: md.seller_departed_at, pos: md.seller_pos },
     ];
+    // คำนวณจุดหมายปลายทาง (สำหรับ navigation link)
+    const destLoc = md.meet_label?.startsWith('ผู้ซื้อเดินทาง') ? md.seller_loc
+      : md.meet_label?.startsWith('ผู้ขายเดินทาง') ? md.buyer_loc
+      : null;
+    const destQuery = destLoc
+      ? `${destLoc.tambon} ${destLoc.amphoe} ${destLoc.province}`
+      : md.meet_label || '';
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green-700)', marginBottom: 4 }}>📍 จุดนัดพบ: {md.meet_label || 'ตามที่ตกลง'}</div>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>เงินประกัน ฿{(md.deposit || 0).toLocaleString()} / ฝ่าย ถูกล็อกไว้ที่ศูนย์กลางแล้ว</div>
-          {/* ลิงก์ไปยังจุดนัดพบ (ค้นหาชื่อที่อยู่ปลายทาง ไม่ใช่ GPS ผู้เดินทาง) */}
-          {(() => {
-            const destLoc = md.meet_label?.startsWith('ผู้ซื้อเดินทาง') ? md.seller_loc
-              : md.meet_label?.startsWith('ผู้ขายเดินทาง') ? md.buyer_loc
-              : null;
-            const query = destLoc
-              ? `${destLoc.tambon} ${destLoc.amphoe} ${destLoc.province}`
-              : md.meet_label || '';
-            return query ? (
-              <a href={`https://www.google.com/maps/search/${encodeURIComponent(query)}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">🗺️ ดูจุดนัดพบบนแผนที่</a>
-            ) : null;
-          })()}
+          {destQuery && (
+            <a href={`https://www.google.com/maps/search/${encodeURIComponent(destQuery)}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">🗺️ ดูจุดนัดพบบนแผนที่</a>
+          )}
         </div>
         {rows.map(r => (
           <div key={r.side} className="dr-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <b style={{ fontSize: 13.5 }}>{r.label}</b>
               <span style={{ fontSize: 12, color: r.met ? 'var(--green-600)' : r.departedAt ? 'var(--accent)' : 'var(--faint)' }}>
                 {r.met ? '✅ เจอแล้ว' : r.departedAt ? '🚗 กำลังเดินทาง' : '⏳ ยังไม่ออกเดินทาง'}
               </span>
             </div>
-            {r.pos && (
-              <a href={`https://maps.google.com/?q=${r.pos.lat},${r.pos.lng}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm btn-block">🛰️ ตำแหน่งปัจจุบัน (GPS สด)</a>
+            {r.pos && !r.met && (
+              <div style={{ display: 'grid', gap: 6 }}>
+                {/* ตำแหน่งปัจจุบัน (GPS สด ของผู้เดินทาง) */}
+                <a href={`https://maps.google.com/?q=${r.pos.lat},${r.pos.lng}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm btn-block">
+                  🛰️ ตำแหน่งปัจจุบัน — {Math.max(0, Math.floor((nowTs - new Date(r.pos.at).getTime()) / 60000))} นาทีที่แล้ว
+                </a>
+                {/* นำทาง: จากตำแหน่งปัจจุบัน → จุดนัดพบ */}
+                {destQuery && (
+                  <a href={`https://www.google.com/maps/dir/${r.pos.lat},${r.pos.lng}/${encodeURIComponent(destQuery)}`} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm btn-block">
+                    🧭 นำทางจากตำแหน่งนี้ → จุดนัดพบ
+                  </a>
+                )}
+              </div>
             )}
           </div>
         ))}
