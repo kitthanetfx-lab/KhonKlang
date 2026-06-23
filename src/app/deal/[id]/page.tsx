@@ -380,6 +380,8 @@ export default function DealRoom() {
   // wizard แบบง่าย: ขั้นที่กำลังดูอยู่ (ปุ่มย้อนกลับ/ถัดไป) — null แปลว่าให้ตามขั้นจริงปัจจุบันเสมอ
   const [wzViewStep, setWzViewStep] = useState<number | null>(null);
   const [meetupEvidReady, setMeetupEvidReady] = useState(false);
+  const [meetupPropLabel, setMeetupPropLabel] = useState<string | null>(null); // null=hidden ''=custom label
+  const [meetupPropAmt, setMeetupPropAmt] = useState('');
   // รีเซ็ตกลับไปดูขั้นปัจจุบันทุกครั้งที่สถานะดีลเปลี่ยน (เช่น แอดมินอนุมัติ ขยับไปขั้นถัดไปจริง)
   useEffect(() => { setWzViewStep(null); }, [deal?.status]);
 
@@ -1796,15 +1798,16 @@ export default function DealRoom() {
       { label: `ผู้ขายเดินทางมาหาผู้ซื้อ (${addressLabel(md.buyer_loc)})`, sub: 'ผู้ซื้อไม่ต้องเดินทาง' },
       { label: `เจอกันครึ่งทาง (~จ.${midpointProvince(md.buyer_loc!.province, md.seller_loc!.province)})`, sub: 'แบ่งกันเดินทางคนละครึ่ง' },
     ] : [];
-    function proposeDeposit(meetLabel?: string, suggested?: number) {
-      const v = prompt(
-        (meetLabel ? `จุดนัด: ${meetLabel}\n` : '') + 'เสนอยอดเงินประกัน (บาท/ฝ่าย — เท่ากันทั้งคู่)',
-        String(suggested || md.deposit || 500),
-      );
-      if (v === null) return;
-      const amount = Math.round(Number(v));
+    function openPropose(meetLabel: string, suggested?: number) {
+      setMeetupPropLabel(meetLabel);
+      setMeetupPropAmt(String(suggested || md.deposit || 500));
+    }
+    function submitPropose() {
+      const amount = Math.round(Number(meetupPropAmt));
       if (!(amount >= 50)) { alert('กรอกตัวเลขขั้นต่ำ ฿50'); return; }
-      doAction('meetup_propose', meetLabel ? { amount, meetLabel } : { amount });
+      const lbl = meetupPropLabel || undefined;
+      doAction('meetup_propose', lbl ? { amount, meetLabel: lbl } : { amount });
+      setMeetupPropLabel(null);
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1838,7 +1841,7 @@ export default function DealRoom() {
                 <button type="button" className="btn btn-ghost btn-block btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>ยกเลิกข้อเสนอ</button>
               </div>
             )}
-            {isParty && <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => proposeDeposit()}>✏️ เสนอใหม่</button>}
+            {isParty && <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => openPropose('', md.deposit)}>✏️ เสนอใหม่</button>}
           </div>
         ) : (
           <div className="dr-card">
@@ -1846,14 +1849,32 @@ export default function DealRoom() {
             {isParty && meetOptions.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
                 {meetOptions.map(opt => (
-                  <button key={opt.label} type="button" className="btn btn-soft btn-block" style={{ textAlign: 'left', flexDirection: 'column', alignItems: 'flex-start', height: 'auto', padding: '10px 14px' }} onClick={() => proposeDeposit(opt.label, suggestAmount)}>
+                  <button key={opt.label} type="button" className="btn btn-soft btn-block" style={{ textAlign: 'left', flexDirection: 'column', alignItems: 'flex-start', height: 'auto', padding: '10px 14px' }} onClick={() => openPropose(opt.label, suggestAmount)}>
                     <span style={{ fontWeight: 600, fontSize: 13.5 }}>{opt.label}</span>
                     <span style={{ fontSize: 12, color: 'var(--muted)' }}>{opt.sub} — แนะนำ ฿{suggestAmount.toLocaleString()}</span>
                   </button>
                 ))}
               </div>
             )}
-            {isParty && <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => proposeDeposit()}>✏️ เสนอจุดนัดและเงินประกันด้วยตนเอง</button>}
+            {isParty && <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => openPropose('', suggestAmount)}>✏️ เสนอจุดนัดและเงินประกันด้วยตนเอง</button>}
+            {isParty && meetupPropLabel !== null && (
+              <div style={{ marginTop: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: 14 }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8 }}>📝 ยืนยันข้อเสนอ</div>
+                {!meetupPropLabel && (
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>จุดนัด</label>
+                    <input type="text" className="input input-bordered w-full" placeholder="เช่น ห้างฯ เซ็นทรัล ลาดพร้าว" value={meetupPropLabel ?? ''} onChange={e => setMeetupPropLabel(e.target.value)} style={{ width: '100%', marginBottom: 0 }} />
+                  </div>
+                )}
+                {meetupPropLabel && <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 8 }}>📍 {meetupPropLabel}</p>}
+                <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>เงินประกัน (บาท/ฝ่าย)</label>
+                <input type="number" className="input input-bordered w-full" placeholder="500" min={50} value={meetupPropAmt} onChange={e => setMeetupPropAmt(e.target.value)} style={{ width: '100%', marginBottom: 10 }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn btn-primary flex-1" disabled={acting} onClick={submitPropose}>✅ ส่งข้อเสนอ</button>
+                  <button type="button" className="btn btn-ghost flex-1" onClick={() => setMeetupPropLabel(null)}>ยกเลิก</button>
+                </div>
+              </div>
+            )}
             {!isParty && <p style={{ fontSize: 13.5, color: 'var(--muted)', textAlign: 'center', padding: '14px 0' }}>รอทั้งสองฝ่ายตกลงจุดนัดและเงินประกัน</p>}
           </div>
         )}
