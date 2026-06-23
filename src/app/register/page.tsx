@@ -11,7 +11,7 @@ export default function RegisterSelectPage() {
         <div className="rsel-header">
           <Image src="/logo.png" alt="คนกลาง" className="rsel-logo" width={160} height={160} priority />
           <h1 className="rsel-title">เลือกประเภทการสมัคร</h1>
-          <p className="rsel-sub">คุณต้องการเข้าร่วมแพลตฟอร์ม Khonklang ในฐานะอะไร?</p>
+          <p className="rsel-sub">คุณต้องการเข้าร่วมแพลตฟอร์ม KhonGlang ในฐานะอะไร?</p>
         </div>
 
         <div className="rsel-card" style={!controls.isEnabled('sellerRegistration') ? { opacity: 0.72 } : undefined}>
@@ -19,7 +19,7 @@ export default function RegisterSelectPage() {
             <div className="rsel-card-icon" style={{ background: '#eef4ff' }}>🛒</div>
             <div>
               <div className="rsel-card-title">สมัครเป็นผู้ขาย</div>
-              <div className="rsel-card-sub">ลงขายสินค้าในตลาด Khonklang และรับการคุ้มครองจากระบบ Escrow</div>
+              <div className="rsel-card-sub">ลงขายสินค้าในตลาด KhonGlang และรับการคุ้มครองจากระบบ Escrow</div>
             </div>
           </div>
           <div className="rsel-card-feats">
@@ -54,22 +54,4 @@ export default function RegisterSelectPage() {
             <div className="rsel-card-feat">✅ คืนเงินประกันได้</div>
           </div>
           <div className="rsel-card-cta">
-            <span className="rsel-card-fee">เงินประกัน ฿1,000–50,000</span>
-            {controls.isEnabled('middlemanRegistration')
-              ? <Link href="/register/middleman" className="rsel-card-cta-t" style={{ color: 'var(--green-600)' }}>สมัครเลย →</Link>
-              : <span className="rsel-card-cta-t" style={{ color: '#b7791f' }}>ปิดชั่วคราว</span>}
-          </div>
-          {!controls.isEnabled('middlemanRegistration') && (
-            <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700' }}>{controls.message('middlemanRegistration')}</div>
-          )}
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--muted)' }}>
-          มีบัญชีแล้ว? <Link href="/login" style={{ color: 'var(--accent)' }}>เข้าสู่ระบบ</Link>
-          &nbsp;·&nbsp;
-          <Link href="/" style={{ color: 'var(--accent)' }}>กลับหน้าหลัก</Link>
-        </div>
-      </div>
-    </div>
-  );
-}
+            <span className="rsel-card-fee">เงิ�

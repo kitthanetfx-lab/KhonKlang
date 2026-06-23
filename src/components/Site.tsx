@@ -95,7 +95,7 @@ export function Logo({ sub = true }: { sub?: boolean }) {
       <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}>
         <Image src="/logo.png" alt="คนกลาง" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
       </span>
-      <span className="logo-word">คนกลาง{sub && <small>KHONKLANG</small>}</span>
+      <span className="logo-word">คนกลาง{sub && <small>KHONGLANG</small>}</span>
     </Link>
   );
 }
@@ -298,7 +298,7 @@ export function Footer() {
               </span>
               <span className="logo-word" style={{ color: '#fff' }}>
                 คนกลาง
-                <small style={{ color: 'rgba(255,255,255,.45)' }}>KHONKLANG</small>
+                <small style={{ color: 'rgba(255,255,255,.45)' }}>KHONGLANG</small>
               </span>
             </div>
             <p style={{ color: '#9aa6c4', fontSize: 14, maxWidth: '34ch' }}>
@@ -346,7 +346,7 @@ export function Footer() {
             color: '#8694b5',
           }}
         >
-          <span>© {new Date().getFullYear() + 543} Khonklang - ซื้อขายมั่นใจผ่านคนกลาง</span>
+          <span>© {new Date().getFullYear() + 543} KhonGlang - ซื้อขายมั่นใจผ่านคนกลาง</span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
             <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
             <Link href="/terms">เงื่อนไขการใช้งาน</Link>

@@ -5,7 +5,7 @@ import { useServiceControls } from '@/lib/useServiceControls';
 
 const STEPS = [
   { icon: '📦', bg: '#eef4ff', t: 'ส่งสินค้าให้คนกลาง', d: 'นำสินค้าฝากไว้ที่คนกลาง พร้อมเอกสารประกอบ' },
-  { icon: '📸', bg: '#e9faf2', t: 'คนกลางถ่ายรูป+ลงขาย', d: 'คนกลางถ่ายภาพ เขียนรายละเอียด และลงขายในตลาด Khonklang' },
+  { icon: '📸', bg: '#e9faf2', t: 'คนกลางถ่ายรูป+ลงขาย', d: 'คนกลางถ่ายภาพ เขียนรายละเอียด และลงขายในตลาด KhonGlang' },
   { icon: '💳', bg: '#f1edff', t: 'ผู้ซื้อโอนเงิน', d: 'ผู้ซื้อชำระเงินให้คนกลางดูแล พักไว้ในระบบ Escrow' },
   { icon: '🚚', bg: '#fef5e3', t: 'คนกลางตรวจและจัดส่ง', d: 'คนกลางตรวจสภาพสินค้าอีกครั้ง แล้วจัดส่งให้ผู้ซื้อ' },
   { icon: '✅', bg: '#e9faf2', t: 'โอนเงินให้ผู้ขาย', d: 'ผู้ซื้อยืนยันรับสินค้า ระบบปล่อยเงินหักค่าบริการให้ผู้ขายทันที' },
@@ -40,14 +40,4 @@ export default function ConsignPage() {
           {STEPS.map((s, i) => (
             <div key={i} className="step-item">
               <div className="step-dot" style={{ background: s.bg }}>{s.icon}</div>
-              <div className="step-content"><div className="step-title">{s.t}</div><div className="step-desc">{s.d}</div></div>
-            </div>
-          ))}
-        </div>
-        {controls.isEnabled('consign')
-          ? <Link href="/marketplace" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>เริ่มฝากขาย →</Link>
-          : <button type="button" className="btn btn-primary btn-block" disabled>ปิดให้บริการชั่วคราว</button>}
-      </div>
-    </div>
-  );
-}
+              <div className=

@@ -17,7 +17,7 @@ export default function Privacy() {
           <h2 className="text-xl font-semibold mb-3">2. วัตถุประสงค์การใช้ข้อมูล</h2>
           <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
             ข้อมูลของคุณถูกใช้เพื่อยืนยันตัวตน ดำเนินการลงทะเบียนผู้ขาย และอำนวยความสะดวก
-            ในการทำธุรกรรมซื้อขายผ่านแพลตฟอร์ม Khonklang เท่านั้น
+            ในการทำธุรกรรมซื้อขายผ่านแพลตฟอร์ม KhonGlang เท่านั้น
           </p>
         </section>
 
@@ -58,6 +58,4 @@ export default function Privacy() {
           </p>
         </section>
       </div>
-    </main>
-  );
-}
+   
