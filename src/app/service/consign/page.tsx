@@ -40,4 +40,14 @@ export default function ConsignPage() {
           {STEPS.map((s, i) => (
             <div key={i} className="step-item">
               <div className="step-dot" style={{ background: s.bg }}>{s.icon}</div>
-              <div className=
+              <div className="step-content"><div className="step-title">{s.t}</div><div className="step-desc">{s.d}</div></div>
+            </div>
+          ))}
+        </div>
+        {controls.isEnabled('consign')
+          ? <Link href="/marketplace" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>เริ่มฝากขาย →</Link>
+          : <button type="button" className="btn btn-primary btn-block" disabled>ปิดให้บริการชั่วคราว</button>}
+      </div>
+    </div>
+  );
+}
