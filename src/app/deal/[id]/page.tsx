@@ -1923,16 +1923,14 @@ export default function DealRoom() {
           <div className="dr-card-title">📋 ทำก่อนวางเงินประกัน</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
-              { icon: '💬', label: 'แชทตกลงรายละเอียด', sub: 'ตกลงค่าเดินทาง ค่าบริการ และสิ่งที่แต่ละฝ่ายต้องรับผิดชอบ', tab: 'chat' },
-              { icon: '📹', label: 'Video Call (ถ้าจำเป็น)', sub: 'ยืนยันตัวตน ดูสินค้า หรือคุยรายละเอียดเพิ่มเติม', tab: 'call' },
-              { icon: '📷', label: 'เก็บหลักฐาน', sub: 'ถ่ายรูป/วิดีโอ รายละเอียดสินค้า ก่อนนัดพบ', tab: 'evidence' },
+              { icon: '💬', label: 'แชทตกลงรายละเอียด', sub: 'ตกลงค่าเดินทาง ค่าบริการ และสิ่งที่แต่ละฝ่ายต้องรับผิดชอบ' },
+              { icon: '📹', label: 'Video Call (ถ้าจำเป็น)', sub: 'ยืนยันตัวตน ดูสินค้า หรือคุยรายละเอียดเพิ่มเติม' },
+              { icon: '📷', label: 'เก็บหลักฐาน', sub: 'ถ่ายรูป/วิดีโอ รายละเอียดสินค้า ก่อนนัดพบ' },
             ].map(item => (
-              <button key={item.tab} type="button" className="btn btn-soft btn-block"
-                style={{ textAlign: 'left', height: 'auto', padding: '10px 14px', flexDirection: 'column', alignItems: 'flex-start' }}
-                onClick={() => setTab(item.tab as typeof tab)}>
-                <span style={{ fontWeight: 600, fontSize: 13.5 }}>{item.icon} {item.label}</span>
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{item.sub}</span>
-              </button>
+              <div key={item.label} style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 14px' }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 2 }}>{item.icon} {item.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>{item.sub}</div>
+              </div>
             ))}
           </div>
         </div>
@@ -2111,7 +2109,8 @@ export default function DealRoom() {
     // ถ้า actualStep=4 แต่ยังไม่มีสลิป → แสดง step 3 (แชท+สรุปราคา) ก่อน
     const defaultStep = (actualStep === 4 && !md.buyer_slip && !md.seller_slip) ? 3 : actualStep;
     const step = Math.min(wzViewStep ?? defaultStep, actualStep);
-    const isReviewing = step < actualStep;
+    // step 3 เป็น mandatory pre-step ของ actualStep 4 — ไม่ใช่การย้อนดู
+    const isReviewing = step < actualStep && !(step === 3 && actualStep === 4 && !md.buyer_slip && !md.seller_slip);
     return (
       <div className="dr-inner">
         {step > 0 && renderMeetupWizardProgress(step)}
