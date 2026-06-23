@@ -1607,7 +1607,7 @@ export default function DealRoom() {
             <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
           </div>
         </div>
-        <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={async () => { await bundleChatTranscriptAsEvidence(); setChatReviewReady(true); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</button>
+        <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={async () => { await bundleChatTranscriptAsEvidence(); setChatReviewReady(true); setWzViewStep(4); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</button>
       </div>
     );
   }
