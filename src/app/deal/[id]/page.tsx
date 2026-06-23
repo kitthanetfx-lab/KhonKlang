@@ -1634,7 +1634,9 @@ export default function DealRoom() {
           </div>
           {!meDone
             ? <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => doAction('evidence_done')}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</button>
-            : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
+            : sellerDone && buyerDone
+              ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(5)}>✅ ทุกฝ่ายยืนยันแล้ว — ดำเนินการต่อ →</button>
+              : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
           <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => setChatReviewReady(false)}>⬅ ย้อนกลับไปคุยต่อ</button>
         </div>
       </div>

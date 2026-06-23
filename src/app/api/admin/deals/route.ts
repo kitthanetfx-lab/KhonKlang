@@ -72,3 +72,118 @@ export async function GET(req: NextRequest) {
 }
 
 /** แอดมินดำเนินการกับดีล */
+export async function PATCH(req: NextRequest) {
+  try {
+    await verifyAdmin(req);
+    const db = getAdminClient();
+    const body = await req.json();
+    const { id, action, note, outcome, fileId, whichSlip } = body as {
+      id: string; action: string; note?: string;
+      outcome?: 'buyer_all' | 'seller_all' | 'both' | 'frozen';
+      fileId?: string; whichSlip?: 'buyer' | 'seller';
+    };
+
+    if (!id || !action) return NextResponse.json({ error: 'Missing id or action' }, { status: 400 });
+
+    // ดึงดีลปัจจุบัน
+    const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('id', id).maybeSingle();
+    if (dealErr || !deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+
+    switch (action) {
+      case 'resolve_dispute': {
+        // ปล่อยเงินให้ผู้ขาย — ดีลดำเนินต่อ
+        await db.from('deals').update({
+          status: 'packing',
+          reject_reason: note || null,
+        }).eq('id', id);
+        // system message
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ',
+          role: 'system', type: 'system',
+          content: `แอดมินตัดสินข้อพิพาท: ดำเนินการต่อ (ปล่อยเงินให้ผู้ขาย)${note ? ` — ${note}` : ''}`,
+        });
+        break;
+      }
+      case 'cancel_refund': {
+        // ยกเลิกดีล + คืนเงินผู้ซื้อ
+        await db.from('deals').update({
+          status: 'cancelled',
+          reject_reason: note || null,
+        }).eq('id', id);
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ',
+          role: 'system', type: 'system',
+          content: `แอดมินยกเลิกดีลและคืนเงินผู้ซื้อ${note ? ` — ${note}` : ''}`,
+        });
+        break;
+      }
+      case 'confirm_payment': {
+        // ยืนยันรับเงิน (admin แทน middleman)
+        await db.from('deals').update({
+          status: 'packing',
+          middleman_confirmed_payment: true,
+        }).eq('id', id);
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ',
+          role: 'system', type: 'system',
+          content: `แอดมินยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้าได้เลย${note ? ` (${note})` : ''}`,
+        });
+        break;
+      }
+      case 'delete_deal': {
+        // ลบดีลถาวร — ลบ child tables ก่อน
+        await Promise.all([
+          db.from('messages').delete().eq('deal_id', id),
+          db.from('deal_evidence').delete().eq('deal_id', id),
+          db.from('deal_price_state').delete().eq('deal_id', id),
+          db.from('deal_meetup').delete().eq('deal_id', id),
+          db.from('deal_images').delete().eq('deal_id', id),
+        ]);
+        await db.from('deals').delete().eq('id', id);
+        return NextResponse.json({ ok: true });
+      }
+      case 'mark_meetup_refund': {
+        if (!outcome) return NextResponse.json({ error: 'Missing outcome' }, { status: 400 });
+
+        const meetupUpdate: Record<string, unknown> = { refund_outcome: outcome };
+        if (outcome === 'frozen') {
+          meetupUpdate.refund_decision_note = note || null;
+        } else if (outcome === 'buyer_all') {
+          if (fileId) meetupUpdate.buyer_refund_slip = fileId;
+          meetupUpdate.refund_decision_note = note || null;
+          meetupUpdate.refunded_at = new Date().toISOString();
+        } else if (outcome === 'seller_all') {
+          if (fileId) meetupUpdate.seller_refund_slip = fileId;
+          meetupUpdate.refund_decision_note = note || null;
+          meetupUpdate.refunded_at = new Date().toISOString();
+        } else if (outcome === 'both') {
+          // upload แยกฝ่าย (whichSlip = 'buyer' | 'seller')
+          if (whichSlip === 'buyer' && fileId) meetupUpdate.buyer_refund_slip = fileId;
+          if (whichSlip === 'seller' && fileId) meetupUpdate.seller_refund_slip = fileId;
+          meetupUpdate.refund_decision_note = note || null;
+          // mark refunded_at เมื่อทั้งสองฝ่ายได้รับสลิปแล้ว
+          const { data: existing } = await db.from('deal_meetup').select('buyer_refund_slip,seller_refund_slip').eq('deal_id', id).maybeSingle();
+          const buyerDone = whichSlip === 'buyer' ? !!fileId : !!existing?.buyer_refund_slip;
+          const sellerDone = whichSlip === 'seller' ? !!fileId : !!existing?.seller_refund_slip;
+          if (buyerDone && sellerDone) meetupUpdate.refunded_at = new Date().toISOString();
+        }
+
+        await db.from('deal_meetup').upsert({ deal_id: id, ...meetupUpdate }, { onConflict: 'deal_id' });
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ',
+          role: 'system', type: 'system',
+          content: `แอดมินบันทึกการคืนเงินประกัน: ${outcome}${note ? ` — ${note}` : ''}`,
+        });
+        break;
+      }
+      default:
+        return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    }
+
+    const { data: updated } = await db.from('deals').select('*').eq('id', id).maybeSingle();
+    return NextResponse.json({ deal: updated });
+  } catch (err: unknown) {
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
+  }
+}
