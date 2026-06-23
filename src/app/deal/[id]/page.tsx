@@ -1814,7 +1814,7 @@ export default function DealRoom() {
             ? <p style={{ fontSize: 13.5, color: 'var(--green-600)', marginBottom: 8 }}>✅ {addressLabel(myLoc)}</p>
             : <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>ยังไม่ได้ระบุที่อยู่ — กรอกด้านล่างเพื่อให้ระบบแนะนำจุดนัด</p>}
           {isParty && !myLoc?.province && (
-            <AddressPicker value={EMPTY_ADDRESS} onChange={(a: ThaiAddress) => doAction('meetup_set_location', { loc: a })} placeholder="ค้นหาตำบล/อำเภอ/จังหวัด" />
+            <AddressPicker value={EMPTY_ADDRESS} onChange={(a: ThaiAddress) => doAction('meetup_set_location', { loc: a })} />
           )}
         </div>
         {md.deposit ? (
