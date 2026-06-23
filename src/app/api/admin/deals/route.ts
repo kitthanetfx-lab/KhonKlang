@@ -57,11 +57,12 @@ export async function GET(req: NextRequest) {
       middlemanBank: bankMap.get(d.middleman_id) || null,
     }));
 
-    // กรองเพิ่มฝั่ง JS เพราะต้องเช็คฟิลด์ที่อยู่ใน deal_price_state (join แล้วถึงรู้) ไม่ใช่ deals ตรงๆ
-    const jsFiltered = filter === 'pay_seller' || filter === 'refund_pending' || filter === 'middleman_fee';
+    // กรองเพิ่มฝั่ง JS เพราะต้องเช็คฟิลด์ที่อยู่ใน deal_price_state/deal_meetup (join แล้วถึงรู้)
+    const jsFiltered = filter === 'pay_seller' || filter === 'refund_pending' || filter === 'middleman_fee' || filter === 'meetup_refund';
     if (filter === 'pay_seller') documents = documents.filter(d => !d.priceState?.payout_slip_file_id);
     else if (filter === 'refund_pending') documents = documents.filter(d => !!d.payment_slip_file_id && !d.priceState?.refund_slip_file_id);
     else if (filter === 'middleman_fee') documents = documents.filter(d => !d.priceState?.middleman_fee_sent_at);
+    else if (filter === 'meetup_refund') documents = documents.filter(d => !d.meetup?.refund_outcome);
 
     return NextResponse.json({ documents, total: jsFiltered ? documents.length : (count || 0) });
   } catch (err: unknown) {
@@ -70,61 +71,4 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** แอดมินดำเนินการกับดีล: resolve_dispute (ตัดสินข้อพิพาท) / mark_refunded (คืนเงินประกัน meetup) */
-export async function PATCH(req: NextRequest) {
-  try {
-    await verifyAdmin(req);
-    const db = getAdminClient();
-    const { id, action, note } = await req.json();
-    if (!id || !action) return NextResponse.json({ error: 'missing params' }, { status: 400 });
-
-    const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('id', id).single();
-    if (dealErr || !deal) return NextResponse.json({ error: 'ไม่พบดีล' }, { status: 404 });
-
-    if (action === 'resolve_dispute') {
-      if (deal.status !== 'disputed') return NextResponse.json({ error: 'ดีลนี้ไม่ได้อยู่ในข้อพิพาท' }, { status: 400 });
-      const { data: updated } = await db.from('deals').update({
-        status: 'completed', reject_reason: `[แอดมินตัดสิน] ${String(note || '').slice(0, 400)}`,
-      }).eq('id', id).select().single();
-      return NextResponse.json({ deal: updated });
-    }
-
-    if (action === 'cancel_refund') {
-      const { data: updated } = await db.from('deals').update({
-        status: 'cancelled', reject_reason: `[แอดมินยกเลิก+คืนเงิน] ${String(note || '').slice(0, 400)}`,
-      }).eq('id', id).select().single();
-      return NextResponse.json({ deal: updated });
-    }
-
-    if (action === 'mark_refunded') {
-      // บันทึกว่าโอนเงินประกัน meetup คืนแล้ว
-      await db.from('deal_meetup').upsert({
-        deal_id: id, refunded_at: new Date().toISOString(), refund_note: String(note || '').slice(0, 200),
-      }, { onConflict: 'deal_id' });
-      const { data: updated } = await db.from('deals').select('*').eq('id', id).single();
-      return NextResponse.json({ deal: updated });
-    }
-
-    // ศูนย์กลางยืนยันรับเงิน — ครอบคลุมทุกบริการ (ปกติ/แบบง่าย) ไม่ใช่แค่แบบง่าย
-    if (action === 'confirm_payment' || action === 'confirm_simple_payment') {
-      if (deal.status !== 'payment_uploaded')
-        return NextResponse.json({ error: 'ดีลนี้ไม่อยู่ในสถานะรอยืนยันรับเงิน' }, { status: 400 });
-      const { data: updated } = await db.from('deals').update({
-        status: 'packing',
-        middleman_confirmed_payment: true,
-        reject_reason: note ? `[ศูนย์กลางยืนยันรับเงิน] ${String(note).slice(0, 200)}` : deal.reject_reason || '',
-      }).eq('id', id).select().single();
-      return NextResponse.json({ deal: updated });
-    }
-
-    if (action === 'delete_deal') {
-      await db.from('deals').delete().eq('id', id);
-      return NextResponse.json({ ok: true, deleted: true });
-    }
-
-    return NextResponse.json({ error: 'unknown action' }, { status: 400 });
-  } catch (err: unknown) {
-    const status = err instanceof HttpError ? err.status : 500;
-    return NextResponse.json({ error: String(err) }, { status });
-  }
-}
+/** แอดมินดำเนินการกับดีล */
