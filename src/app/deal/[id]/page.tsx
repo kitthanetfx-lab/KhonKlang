@@ -380,6 +380,7 @@ export default function DealRoom() {
   // wizard แบบง่าย: ขั้นที่กำลังดูอยู่ (ปุ่มย้อนกลับ/ถัดไป) — null แปลว่าให้ตามขั้นจริงปัจจุบันเสมอ
   const [wzViewStep, setWzViewStep] = useState<number | null>(null);
   const [meetupEvidReady, setMeetupEvidReady] = useState(false);
+  const [savedEvidIds, setSavedEvidIds] = useState<Set<string>>(new Set());
   const [meetupPropLabel, setMeetupPropLabel] = useState<string | null>(null); // null=hidden ''=custom label
   const [meetupPropAmt, setMeetupPropAmt] = useState('');
   // รีเซ็ตกลับไปดูขั้นปัจจุบันทุกครั้งที่สถานะดีลเปลี่ยน (เช่น แอดมินอนุมัติ ขยับไปขั้นถัดไปจริง)
@@ -438,7 +439,9 @@ export default function DealRoom() {
   }, [deal?.status, dealId, fetchDeal]);
 
   useEffect(() => {
-    if (tab !== 'chat' && !showJitsi) return;
+    // poll chat เสมอสำหรับดีล meetup (แชทฝังใน wizard) หรือเมื่ออยู่ tab chat / jitsi
+    const isMeetupDeal = deal?.deal_type === 'meetup';
+    if (tab !== 'chat' && !showJitsi && !isMeetupDeal) return;
     let stopped = false;
     const poll = async () => {
       try {
@@ -447,12 +450,12 @@ export default function DealRoom() {
       } catch { /* เงียบ */ }
     };
     void poll();
-    const timer = window.setInterval(() => { void poll(); }, showJitsi ? 4000 : 8000);
+    const timer = window.setInterval(() => { void poll(); }, showJitsi ? 4000 : 5000);
     return () => {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [fetchMsgs, showJitsi, tab]);
+  }, [fetchMsgs, showJitsi, tab, deal?.deal_type]);
 
   // แจ้งผู้ร่วมดีลว่ามีคนเข้ามาดูห้องนี้ — ครั้งเดียวต่อ session ต่อดีล กันสแปม
   const visitSent = useRef(false);
@@ -571,6 +574,7 @@ export default function DealRoom() {
     } else {
       await doAction('add_evidence', { evidenceType: 'chat_text', content: `${m.sender_name || ''}: ${m.content}` });
     }
+    setSavedEvidIds(prev => new Set([...prev, m.id]));
   }
 
   // เก็บวิดีโอคอลที่บันทึกไว้เป็นหลักฐาน (อัปโหลดตรงเข้า Storage ผ่าน uploadFile)
@@ -1496,6 +1500,61 @@ export default function DealRoom() {
     );
   }
 
+  function bubbleClass(m: Msg, isMe: boolean): string {
+    if (isMe) return 'dr-bubble dr-bubble-mine';
+    if (m.role === 'seller') return 'dr-bubble dr-bubble-seller';
+    if (m.role === 'middleman') return 'dr-bubble dr-bubble-middleman';
+    if (m.role === 'admin') return 'dr-bubble dr-bubble-admin';
+    return 'dr-bubble'; // buyer หรือ unknown
+  }
+
+  function bubbleAvColor(m: Msg): string {
+    if (m.role === 'seller') return '#16a34a';
+    if (m.role === 'middleman') return '#7c3aed';
+    if (m.role === 'admin') return '#dc2626';
+    return '#2f6bf0'; // buyer
+  }
+
+  function pinBtn(m: Msg, small = false): React.ReactNode {
+    const saved = savedEvidIds.has(m.id);
+    if (!(m.content || m.file_id)) return null;
+    return (
+      <button type="button" onClick={() => !saved && saveMsgEvidence(m)} disabled={acting || saved}
+        style={{ fontSize: small ? 10 : 10.5, color: saved ? 'var(--green-600)' : 'var(--accent)', background: 'none', border: 'none', cursor: saved ? 'default' : 'pointer', padding: '2px 0 0', display: 'block', opacity: saved ? 1 : undefined }}>
+        {saved ? '✅ เก็บหลักฐานแล้ว' : '📌 เก็บเป็นหลักฐาน'}
+      </button>
+    );
+  }
+
+  function renderChatPresenceBar() {
+    if (!deal) return null;
+    const d = deal;
+    const isMM = !!d.middleman_id;
+    const isDispute = ['disputed'].includes(d.status);
+    const parties: { label: string; id: string | null; color: string }[] = [
+      { label: '🛍️ ผู้ซื้อ', id: d.buyer_id || null, color: '#2f6bf0' },
+      { label: '🛒 ผู้ขาย', id: d.seller_id || null, color: '#16a34a' },
+      ...(isMM ? [{ label: '🤝 คนกลาง', id: d.middleman_id!, color: '#7c3aed' }] : []),
+      ...(isDispute ? [{ label: '🛡️ แอดมิน', id: 'admin', color: '#dc2626' }] : []),
+    ];
+    return (
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '8px 16px', background: 'var(--surface-2)', borderBottom: '1px solid var(--line)' }}>
+        {parties.map(p => (
+          <div key={p.label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: p.id ? p.color : 'var(--faint)', fontWeight: p.id ? 600 : 400 }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.id ? p.color : 'var(--faint)' }} />
+            {p.label}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function chatIsOpen(): boolean {
+    if (!deal) return false;
+    // ต้องมีทั้ง buyer และ seller join ถึงจะแชทได้
+    return !!(deal.buyer_id && deal.seller_id);
+  }
+
   /** รวมประวัติแชท (ข้อความล้วน ไม่รวมรูป/ไฟล์ที่ดูได้จากแท็บแชทอยู่แล้ว) เป็นหลักฐาน "ชิ้นเดียว" — ไม่เก็บทีละข้อความ */
   async function bundleChatTranscriptAsEvidence() {
     const lines = msgs.filter(m => m.role !== 'system' && m.type === 'text' && m.content?.trim());
@@ -1524,27 +1583,28 @@ export default function DealRoom() {
               const isMe = m.sender_id === myId;
               const isMedia = m.type === 'image' || m.type === 'file';
               return (
-                <div key={m.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
-                  {!isMe && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 2 }}>{m.sender_name}</div>}
-                  <div style={{ background: isMe ? 'var(--accent)' : 'var(--surface-2)', color: isMe ? '#fff' : 'var(--ink)', padding: '7px 11px', borderRadius: 10, fontSize: 13.5, wordBreak: 'break-word' }}>
-                    {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 180, borderRadius: 8 }} /></a>
-                      : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.file_name}</a>
-                      : m.content}
+                <div key={m.id} className={`dr-bubble-row${isMe ? ' mine' : ''}`}>
+                  {!isMe && <div className="dr-bubble-av" style={{ background: bubbleAvColor(m) }}>{(m.sender_name || '?').slice(0, 1)}</div>}
+                  <div className="dr-bubble-col">
+                    {!isMe && <span className="dr-bubble-sender">{m.sender_name}</span>}
+                    <div className={bubbleClass(m, isMe)}>
+                      {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 180, borderRadius: 8 }} /></a>
+                        : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.file_name}</a>
+                        : m.content}
+                    </div>
+                    {isMedia && <span style={{ marginLeft: isMe ? 'auto' : 0 }}>{pinBtn(m, true)}</span>}
                   </div>
-                  {/* รูป/ไฟล์เก็บเป็นหลักฐานได้ทีละชิ้นตามต้องการ — ส่วนข้อความพิมพ์คุยกันถูกรวมเป็นหลักฐานชิ้นเดียวอัตโนมัติตอนกด "คุยกันจบแล้ว" ด้านล่าง ไม่ต้องเก็บทีละคำ */}
-                  {isMedia && (
-                    <button type="button" onClick={() => saveMsgEvidence(m)} disabled={acting} style={{ fontSize: 10.5, color: isMe ? 'rgba(255,255,255,.85)' : 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0', display: 'block', marginLeft: isMe ? 'auto' : 0 }}>📌 เก็บเป็นหลักฐาน</button>
-                  )}
                 </div>
               );
             })}
             <div ref={chatBottomRef} />
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending}>🖼️</button>
+          {renderChatPresenceBar()}
+          <div style={{ display: 'flex', gap: 6, padding: '0 2px' }}>
+            <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending || !chatIsOpen()}>🖼️</button>
             <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; if (f.size > 10 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 10MB'); return; } await uploadFile(f); }} />
-            <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="พิมพ์ข้อความ..." onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) sendMsg(chatInput); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, minWidth: 0 }} />
-            <button className="dr-chat-send" onClick={() => { if (chatInput.trim()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending}><Icon name="arrowRight" size={16} /></button>
+            <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={chatIsOpen() ? 'พิมพ์ข้อความ...' : 'รอบุคคลที่เกี่ยวข้องเข้าร่วมก่อน...'} disabled={!chatIsOpen()} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, minWidth: 0 }} />
+            <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
           </div>
         </div>
         <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={async () => { await bundleChatTranscriptAsEvidence(); setChatReviewReady(true); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</button>
@@ -2391,21 +2451,17 @@ export default function DealRoom() {
                     const isMe = m.sender_id === myId;
                     return (
                       <div key={m.id} className={`dr-bubble-row${isMe ? ' mine' : ''}`}>
-                        {!isMe && <div className="dr-bubble-av" style={{ background: '#6841d9' }}>{(m.sender_name || '?').slice(0, 1)}</div>}
+                        {!isMe && <div className="dr-bubble-av" style={{ background: bubbleAvColor(m) }}>{(m.sender_name || '?').slice(0, 1)}</div>}
                         <div className="dr-bubble-col">
                           {!isMe && <span className="dr-bubble-sender">{m.sender_name}</span>}
-                          <div className={`dr-bubble${isMe ? ' dr-bubble-mine' : ''}`}>
+                          <div className={bubbleClass(m, isMe)}>
                             {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 200, borderRadius: 10 }} /></a>
                               : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', fontSize: 14 }}>📎 {m.file_name}</a>
                                 : m.content}
                           </div>
                           <span className="dr-bubble-t">
                             {new Date(m.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                            {(m.content || m.file_id) && (
-                              <button type="button" onClick={() => saveMsgEvidence(m)} disabled={acting}
-                                style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                                title="เก็บข้อความ/ไฟล์นี้เป็นหลักฐาน">📌 เก็บเป็นหลักฐาน</button>
-                            )}
+                            <span style={{ marginLeft: 8 }}>{pinBtn(m)}</span>
                           </span>
                         </div>
                       </div>
@@ -2413,11 +2469,17 @@ export default function DealRoom() {
                   })}
                   <div ref={chatBottomRef} />
                 </div>
+                {renderChatPresenceBar()}
+                {!chatIsOpen() && (
+                  <div style={{ padding: '10px 16px', background: '#fff8ef', borderBottom: '1px solid #ffe0b2', fontSize: 12.5, color: '#8a5a00', textAlign: 'center' }}>
+                    ⏳ รอบุคคลที่เกี่ยวข้องเข้าร่วมดีลก่อนจึงจะแชทได้
+                  </div>
+                )}
                 <div className="dr-chat-bar">
-                  <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending}>🖼️</button>
+                  <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending || !chatIsOpen()}>🖼️</button>
                   <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; if (f.size > 10 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 10MB'); return; } await uploadFile(f); }} />
-                  <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="พิมพ์ข้อความ..." onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) sendMsg(chatInput); } }} />
-                  <button className="dr-chat-send" onClick={() => { if (chatInput.trim()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending}><Icon name="arrowRight" size={16} /></button>
+                  <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={chatIsOpen() ? 'พิมพ์ข้อความ...' : 'รอบุคคลที่เกี่ยวข้องเข้าร่วมก่อน...'} disabled={!chatIsOpen()} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); } }} />
+                  <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
                 </div>
               </div>
             )}
