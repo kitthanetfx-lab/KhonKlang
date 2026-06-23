@@ -2203,7 +2203,8 @@ export default function DealRoom() {
             {step > 1
               ? <button type="button" className="btn btn-ghost" onClick={() => setWzViewStep(Math.max(1, step - 1))}>← ย้อนกลับ</button>
               : <span />}
-            {step < actualStep && (
+            {/* ซ่อนปุ่มถัดไปใน chatPreFlow (step 3-4) — ต้องกดปุ่มหลักในแต่ละขั้นเท่านั้น */}
+            {step < actualStep && !(chatPreFlow && step >= 3) && (
               <button type="button" className="btn btn-primary" onClick={() => setWzViewStep(Math.min(actualStep, step + 1))}>ถัดไป →</button>
             )}
           </div>
