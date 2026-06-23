@@ -416,6 +416,10 @@ export default function DealRoom() {
     if (!headers.Authorization) return;
     const r = await fetch(`/api/messages?dealId=${dealId}`, { headers }).catch(() => null);
     if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); }
+    else if (r?.status === 401) {
+      // token หมดอายุ — ล้าง cache ให้ poll รอบถัดไปขอ token ใหม่จาก Supabase
+      headersRef.current = {};
+    }
   }, [dealId, setMsgs]);
 
   useEffect(() => {
@@ -511,14 +515,21 @@ export default function DealRoom() {
   async function doAction(action: string, extra: Record<string, unknown> = {}) {
     setActing(true);
     try {
-      const headers = await getAuthHeaders();
+      // ดึง token ใหม่ก่อนทุก action — ป้องกัน cached token หมดอายุ
+      const headers = await getAuthHeaders(true);
+      if (!headers.Authorization) { alert('กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง'); return; }
       const r = await fetch(`/api/deals/${dealId}`, { method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...extra }) });
       const d = await r.json();
       if (r.ok) {
         // re-fetch ทั้งดีล+meetup+priceState+evidence ให้ตรงกัน (PATCH คืนแค่ deal row)
         await fetchDeal(headers);
         if (tab === 'chat' || showJitsi) await fetchMsgs(headers);
-      } else alert(d.error || 'เกิดข้อผิดพลาด');
+      } else if (r.status === 401) {
+        headersRef.current = {}; // ล้าง cache
+        alert('เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่');
+      } else {
+        alert(d.error || 'เกิดข้อผิดพลาด');
+      }
     } finally { setActing(false); }
   }
 
