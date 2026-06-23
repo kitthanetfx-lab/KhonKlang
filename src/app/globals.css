@@ -2005,4 +2005,4 @@ html, body { overflow-x: hidden; max-width: 100%; }
 .sw-roundbtn:hover { transform: translateY(-1px); }
 .sw-roundbtn:focus-visible { outline: none; box-shadow: var(--ring); }
 .sw-roundbtn.accept { background: var(--green-500); color: #fff; }
-.sw-roundbtn.decline 
+.sw-roundbtn.decline { background: var(--red-500); color: #fff; }
