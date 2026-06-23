@@ -1798,10 +1798,10 @@ export default function DealRoom() {
       { label: `ผู้ขายเดินทางมาหาผู้ซื้อ (${addressLabel(md.buyer_loc)})`, sub: 'ผู้ซื้อไม่ต้องเดินทาง' },
       { label: `เจอกันครึ่งทาง (~จ.${midpointProvince(md.buyer_loc!.province, md.seller_loc!.province)})`, sub: 'แบ่งกันเดินทางคนละครึ่ง' },
     ] : [];
-    function openPropose(meetLabel: string, suggested?: number) {
-      setMeetupPropLabel(meetLabel);
-      setMeetupPropAmt(String(suggested || md.deposit || 500));
-    }
+    // pending = มีข้อเสนอรอตอบ; iProposed = ฉันเป็นคนเสนอ
+    const hasPending = !!(md.pending_deposit && md.pending_by);
+    const iProposed = hasPending && md.pending_by === myRole;
+    const proposerLabel = md.pending_by === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
     function submitPropose() {
       const amount = Math.round(Number(meetupPropAmt));
       if (!(amount >= 50)) { alert('กรอกตัวเลขขั้นต่ำ ฿50'); return; }
@@ -1811,71 +1811,76 @@ export default function DealRoom() {
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* --- ส่วน 1: ที่อยู่ของฉัน --- */}
         <div className="dr-card">
-          <div className="dr-card-title">📍 บอกที่อยู่ของคุณ</div>
+          <div className="dr-card-title">📍 ที่อยู่ของคุณ</div>
           {myLoc?.province
-            ? <p style={{ fontSize: 13.5, color: 'var(--green-600)', marginBottom: 8 }}>✅ {addressLabel(myLoc)}</p>
+            ? <p style={{ fontSize: 13.5, color: 'var(--green-600)', marginBottom: 4 }}>✅ {addressLabel(myLoc)}</p>
             : <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>ยังไม่ได้ระบุที่อยู่ — กรอกด้านล่างเพื่อให้ระบบแนะนำจุดนัด</p>}
           {isParty && !myLoc?.province && (
             <AddressPicker value={meetAddr} onChange={(a: ThaiAddress) => { setMeetAddr(a); if (a.tambon) doAction('meetup_set_location', { loc: a }); }} />
           )}
         </div>
-        {md.deposit ? (
-          <div className="dr-card">
-            <div className="dr-card-title">💰 ข้อเสนอเงินประกัน</div>
-            <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb,var(--accent) 25%,transparent)', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 10 }}>
-              <span style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>📍 <b>{md.meet_label || 'จุดนัดตามตกลง'}</b> · เงินประกัน</span>
-              <b style={{ fontSize: 17, color: 'var(--accent-strong)', fontFamily: 'var(--font-display)', marginLeft: 6 }}>฿{md.deposit.toLocaleString()} / ฝ่าย</b>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-              {[{ side: 'seller', label: 'ผู้ขาย', acc: md.seller_agreed_at }, { side: 'buyer', label: 'ผู้ซื้อ', acc: md.buyer_agreed_at }].map(r => (
-                <div key={r.side} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
-                  <span style={{ color: 'var(--muted)' }}>{r.label}</span>
-                  <span style={{ color: r.acc ? 'var(--green-600)' : 'var(--faint)' }}>{r.acc ? '✅ ยอมรับแล้ว' : '⏳ รอ'}</span>
-                </div>
-              ))}
-            </div>
-            {isParty && !(myRole === 'seller' ? md.seller_agreed_at : md.buyer_agreed_at) && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-green btn-block" disabled={acting} onClick={() => doAction('meetup_respond', { accept: true })}>✅ ยอมรับข้อเสนอ</button>
-                <button type="button" className="btn btn-ghost btn-block btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>ยกเลิกข้อเสนอ</button>
+        {/* --- ส่วน 2: ข้อเสนอ / เลือกวิธีนัด --- */}
+        {hasPending ? (
+          iProposed ? (
+            /* ฉันเป็นคนเสนอ — รออีกฝ่าย */
+            <div className="dr-card">
+              <div className="dr-card-title">⏳ รออีกฝ่ายตอบรับ</div>
+              <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
+                {md.pending_meet_label && <p style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>📍 {md.pending_meet_label}</p>}
+                <p style={{ fontSize: 13, color: 'var(--muted)' }}>เงินประกันที่เสนอ: ฿{Number(md.pending_deposit).toLocaleString()}/ฝ่าย</p>
               </div>
-            )}
-            {isParty && <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => openPropose('', md.deposit)}>✏️ เสนอใหม่</button>}
-          </div>
+              <button type="button" className="btn btn-ghost btn-block btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>↩️ ยกเลิกข้อเสนอของฉัน</button>
+            </div>
+          ) : (
+            /* อีกฝ่ายเสนอมา — ฉันต้องตอบ */
+            <div className="dr-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)' }}>
+              <div className="dr-card-title">📋 ข้อเสนอจาก{proposerLabel}</div>
+              {md.pending_meet_label && <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>📍 {md.pending_meet_label}</p>}
+              <p style={{ fontSize: 13.5, color: 'var(--ink-2)', marginBottom: 14 }}>เงินประกัน: <b style={{ color: 'var(--accent-strong)' }}>฿{Number(md.pending_deposit).toLocaleString()}/ฝ่าย</b></p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="btn btn-green flex-1" disabled={acting} onClick={() => doAction('meetup_respond', { accept: true })}>✅ ยอมรับ</button>
+                <button type="button" className="btn btn-ghost flex-1 btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>❌ ปฏิเสธ</button>
+              </div>
+            </div>
+          )
         ) : (
+          /* ยังไม่มีข้อเสนอ — เลือกวิธีนัด */
           <div className="dr-card">
-            <div className="dr-card-title">💰 ตกลงเงินประกัน + จุดนัด</div>
-            {isParty && meetOptions.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-                {meetOptions.map(opt => (
-                  <button key={opt.label} type="button" className="btn btn-soft btn-block" style={{ textAlign: 'left', flexDirection: 'column', alignItems: 'flex-start', height: 'auto', padding: '10px 14px' }} onClick={() => openPropose(opt.label, suggestAmount)}>
-                    <span style={{ fontWeight: 600, fontSize: 13.5 }}>{opt.label}</span>
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>{opt.sub} — แนะนำ ฿{suggestAmount.toLocaleString()}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {isParty && <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => openPropose('', suggestAmount)}>✏️ เสนอจุดนัดและเงินประกันด้วยตนเอง</button>}
-            {isParty && meetupPropLabel !== null && (
-              <div style={{ marginTop: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: 14 }}>
-                <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8 }}>📝 ยืนยันข้อเสนอ</div>
-                {!meetupPropLabel && (
-                  <div style={{ marginBottom: 8 }}>
+            <div className="dr-card-title">🗺️ เลือกวิธีนัดพบ</div>
+            {isParty && meetOptions.length > 0 ? (
+              <>
+                <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>กดตัวเลือกด้านล่างเพื่อเสนอวิธีนัด — อีกฝ่ายจะกด "ยอมรับ" หรือ "ปฏิเสธ" ได้</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                  {meetOptions.map(opt => (
+                    <button key={opt.label} type="button" className="btn btn-soft btn-block" style={{ textAlign: 'left', flexDirection: 'column', alignItems: 'flex-start', height: 'auto', padding: '10px 14px' }}
+                      disabled={acting}
+                      onClick={() => doAction('meetup_propose', { amount: suggestAmount, meetLabel: opt.label })}>
+                      <span style={{ fontWeight: 600, fontSize: 13.5 }}>{opt.label}</span>
+                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{opt.sub}</span>
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => { setMeetupPropLabel(''); setMeetupPropAmt(String(suggestAmount)); }}>✏️ กำหนดจุดนัดและเงินประกันเอง</button>
+                {meetupPropLabel !== null && (
+                  <div style={{ marginTop: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: 14 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8 }}>📝 เสนอเอง</div>
                     <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>จุดนัด</label>
-                    <input type="text" className="input input-bordered w-full" placeholder="เช่น ห้างฯ เซ็นทรัล ลาดพร้าว" value={meetupPropLabel ?? ''} onChange={e => setMeetupPropLabel(e.target.value)} style={{ width: '100%', marginBottom: 0 }} />
+                    <input type="text" className="input input-bordered" placeholder="เช่น ห้างฯ เซ็นทรัล ลาดพร้าว" value={meetupPropLabel} onChange={e => setMeetupPropLabel(e.target.value)} style={{ width: '100%', marginBottom: 8 }} />
+                    <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>เงินประกัน (บาท/ฝ่าย)</label>
+                    <input type="number" className="input input-bordered" placeholder="500" min={50} value={meetupPropAmt} onChange={e => setMeetupPropAmt(e.target.value)} style={{ width: '100%', marginBottom: 10 }} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" className="btn btn-primary flex-1" disabled={acting} onClick={submitPropose}>✅ ส่งข้อเสนอ</button>
+                      <button type="button" className="btn btn-ghost flex-1" onClick={() => setMeetupPropLabel(null)}>ยกเลิก</button>
+                    </div>
                   </div>
                 )}
-                {meetupPropLabel && <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 8 }}>📍 {meetupPropLabel}</p>}
-                <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>เงินประกัน (บาท/ฝ่าย)</label>
-                <input type="number" className="input input-bordered w-full" placeholder="500" min={50} value={meetupPropAmt} onChange={e => setMeetupPropAmt(e.target.value)} style={{ width: '100%', marginBottom: 10 }} />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" className="btn btn-primary flex-1" disabled={acting} onClick={submitPropose}>✅ ส่งข้อเสนอ</button>
-                  <button type="button" className="btn btn-ghost flex-1" onClick={() => setMeetupPropLabel(null)}>ยกเลิก</button>
-                </div>
-              </div>
-            )}
-            {!isParty && <p style={{ fontSize: 13.5, color: 'var(--muted)', textAlign: 'center', padding: '14px 0' }}>รอทั้งสองฝ่ายตกลงจุดนัดและเงินประกัน</p>}
+              </>
+            ) : isParty && !bothLocs ? (
+              <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '10px 0' }}>รอทั้งสองฝ่ายระบุที่อยู่ก่อน — ระบบจะแนะนำจุดนัดให้อัตโนมัติ</p>
+            ) : null}
+            {!isParty && <p style={{ fontSize: 13.5, color: 'var(--muted)', textAlign: 'center', padding: '14px 0' }}>รอทั้งสองฝ่ายตกลงวิธีนัดพบ</p>}
           </div>
         )}
       </div>
