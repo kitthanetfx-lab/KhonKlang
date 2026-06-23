@@ -139,6 +139,7 @@ export async function PATCH(req: NextRequest) {
           db.from('deal_meetup').delete().eq('deal_id', id),
           db.from('deal_images').delete().eq('deal_id', id),
           db.from('reviews').delete().eq('deal_id', id),
+          db.from('finance_ledger').delete().eq('deal_id', id),
         ]);
         const { error: delErr } = await db.from('deals').delete().eq('id', id);
         if (delErr) throw new Error(`ลบดีลไม่สำเร็จ: ${delErr.message}`);

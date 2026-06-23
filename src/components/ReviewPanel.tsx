@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { Icon } from './Icon';
+import { authHeaders } from '@/lib/supabase';
 
 type Role = 'buyer' | 'seller' | 'middleman' | 'platform';
 
@@ -77,6 +78,9 @@ export function ReviewPanel({ deal, myRole, headers }: { deal: DealParties; myRo
     if (!allRated || sending) return;
     setSending(true); setError('');
     try {
+      // ดึง token ใหม่เสมอตอน submit — ป้องกัน cached token หมดอายุ
+      const freshHdrs = await authHeaders();
+      const submitHdrs = Object.keys(freshHdrs).length ? freshHdrs : headers;
       const items = targets.map(t => ({
         targetRole: t.role,
         rating: get(t.role).rating,
@@ -85,7 +89,7 @@ export function ReviewPanel({ deal, myRole, headers }: { deal: DealParties; myRo
       }));
       const r = await fetch('/api/reviews', {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { ...submitHdrs, 'Content-Type': 'application/json' },
         body: JSON.stringify({ dealId: deal.id, items }),
       });
       const d = await r.json();

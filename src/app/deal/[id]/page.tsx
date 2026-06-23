@@ -441,7 +441,8 @@ export default function DealRoom() {
 
   useEffect(() => {
     // poll chat เสมอสำหรับดีล meetup (แชทฝังใน wizard) หรือเมื่ออยู่ tab chat / jitsi
-    const isMeetupDeal = deal?.deal_type === 'meetup';
+    // หยุด poll เมื่อ meetup เสร็จแล้ว (step 9) — ไม่จำเป็นต้องโหลดแชทใน done screen
+    const isMeetupDeal = deal?.deal_type === 'meetup' && deal?.status !== 'completed';
     if (tab !== 'chat' && !showJitsi && !isMeetupDeal) return;
     let stopped = false;
     const poll = async () => {
