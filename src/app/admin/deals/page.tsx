@@ -13,6 +13,9 @@ const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 interface DealMeetup {
   deposit: number; refunded_at?: string; buyer_met: boolean; seller_met: boolean;
   buyer_slip?: string; seller_slip?: string;
+  refund_outcome?: 'buyer_all' | 'seller_all' | 'both' | 'frozen';
+  buyer_refund_slip?: string; seller_refund_slip?: string;
+  refund_decision_note?: string;
 }
 interface DealPriceState {
   seller_fee_slip?: string; payout_slip_file_id?: string; refund_slip_file_id?: string;
@@ -59,7 +62,6 @@ export default function AdminDeals() {
 
   useEffect(() => { fetch('/api/fees').then(r => r.json()).then(d => { if (d.fees) setFees(d.fees); }).catch(() => {}); }, []);
 
-  // ค่าบริการสุทธิที่ต้องโอนให้คนกลาง (หลังหักส่วนแอป) — ใช้สูตรเดียวกับ ledger ฝั่งเซิร์ฟเวอร์
   function middlemanNetFee(d: Deal) {
     const fb = computeDealFees(fees, d.price, d.deal_type);
     const parts = splitDealFeeComponents(fees, fb.lines);
@@ -102,18 +104,12 @@ export default function AdminDeals() {
       input.type = 'file';
       input.accept = 'image/*,.pdf';
       input.onchange = () => resolve(input.files?.[0] || null);
-      // ถ้าผู้ใช้กดยกเลิกหน้าต่างเลือกไฟล์ — ต้องเคลียร์สถานะ "กำลังทำงาน" ด้วย ไม่งั้นปุ่มจะหมุนค้าง
       input.oncancel = () => resolve(null);
       input.click();
     });
   }
 
-  // โอนเงินให้ผู้ขาย (ดีลสำเร็จ) / คืนเงินให้ผู้ซื้อ (ดีลยกเลิก) — ต้องแนบสลิปจริงเสมอ
-  // ใช้ endpoint เดิมที่ /api/admin/finance (มีอยู่แล้ว) แค่เพิ่มปุ่ม+อัปโหลดให้ทำได้จากหน้าดีลนี้โดยตรง
   async function markMoneySent(id: string, action: 'mark_payout_sent' | 'mark_refund_sent' | 'mark_middleman_fee_sent') {
-    // ต้องเปิดตัวเลือกไฟล์เป็นอย่างแรกเสมอ (synchronous กับการคลิกปุ่ม) — ถ้ามี window.prompt
-    // หรือ await อื่นแทรกก่อนหน้านี้ เบราว์เซอร์จะถือว่า user activation หมดอายุแล้ว
-    // ทำให้ input.click() ไม่เปิดหน้าต่างเลือกไฟล์ (เงียบ ไม่มี error) และปุ่มหมุนค้างตลอดไป
     setActing(id);
     try {
       const file = await pickSlipFile();
@@ -142,9 +138,48 @@ export default function AdminDeals() {
     } finally { setActing(''); }
   }
 
-  // ดีลยังไม่ "เสร็จสมบูรณ์" จริงจนกว่าเงินจะถูกโอนให้ผู้ขายแล้ว (มีสลิป) — กันป้ายเขียวขึ้นทั้งที่ยังไม่จบกระบวนการ
-  // เช่นเดียวกับดีลที่ "ยกเลิก" แต่ยังไม่คืนเงินให้ผู้ซื้อ ก็ยังไม่ควรถือว่าจบ
+  async function markMeetupRefund(id: string, outcome: 'buyer_all' | 'seller_all' | 'both' | 'frozen', whichSlip?: 'buyer' | 'seller') {
+    setActing(id);
+    try {
+      let fileId = '';
+      let note = '';
+      if (outcome === 'frozen') {
+        const v = window.prompt('เหตุผลที่อยัดเงินประกัน (เช่น กรณีพิพาท):');
+        if (v === null) return;
+        note = v;
+      } else {
+        const file = await pickSlipFile();
+        if (!file) return;
+        const slipTarget = outcome === 'buyer_all' ? 'ผู้ซื้อ (ทั้งหมด)'
+          : outcome === 'seller_all' ? 'ผู้ขาย (ทั้งหมด)'
+          : whichSlip === 'buyer' ? 'ผู้ซื้อ (แยกฝ่าย)'
+          : 'ผู้ขาย (แยกฝ่าย)';
+        const v = window.prompt(`สลิปโอนเงินให้${slipTarget} — ใส่บันทึก (เช่น เลขอ้างอิง) ได้ถ้าต้องการ:`, '');
+        if (v === null) return;
+        note = v;
+        const headers = await authHeaders();
+        const form = new FormData(); form.append('file', file);
+        const upRes = await fetch('/api/upload-deal', { method: 'POST', headers, body: form });
+        const upData = await upRes.json();
+        if (!upRes.ok) { alert(upData.error || 'อัปโหลดสลิปไม่สำเร็จ'); return; }
+        fileId = upData.fileId;
+      }
+      const headers = await authHeaders();
+      const r = await fetch('/api/admin/deals', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'mark_meetup_refund', outcome, fileId: fileId || undefined, whichSlip, note }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { alert(data.error || 'บันทึกไม่สำเร็จ'); return; }
+      load(tab);
+    } finally { setActing(''); }
+  }
+
   function statusBadge(d: Deal) {
+    if (d.status === 'completed' && d.deal_type === 'meetup' && !d.meetup?.refund_outcome) {
+      return { label: '⏳ รอตัดสินคืนเงินประกัน', cls: 'bg-amber-100 text-amber-700' };
+    }
     if (d.status === 'completed' && d.deal_type !== 'meetup' && !d.priceState?.payout_slip_file_id) {
       return { label: '⏳ รอโอนเงินให้ผู้ขาย', cls: 'bg-amber-100 text-amber-700' };
     }
@@ -157,10 +192,21 @@ export default function AdminDeals() {
   function refundInfo(d: Deal) {
     if (d.deal_type !== 'meetup' || !d.meetup) return null;
     const md = d.meetup;
-    return { deposit: md.deposit || 0, refundedAt: md.refunded_at, bothMet: md.buyer_met && md.seller_met };
+    const OUTCOME_LABEL: Record<string, string> = {
+      buyer_all: 'โอนให้ผู้ซื้อทั้งหมด', seller_all: 'โอนให้ผู้ขายทั้งหมด',
+      both: 'คืนให้ทั้งสองฝ่าย', frozen: 'อายัดไว้',
+    };
+    return {
+      deposit: md.deposit || 0,
+      refundedAt: md.refunded_at,
+      bothMet: md.buyer_met && md.seller_met,
+      outcome: md.refund_outcome,
+      outcomeLabel: md.refund_outcome ? OUTCOME_LABEL[md.refund_outcome] : undefined,
+      buyerSlipDone: !!md.buyer_refund_slip,
+      sellerSlipDone: !!md.seller_refund_slip,
+    };
   }
 
-  // รวมสลิปทุกใบของดีล — ทุกฝ่าย (ผู้ซื้อ/ผู้ขาย/คนกลาง/แอดมิน) ต้องเห็นได้ที่นี่เช่นกัน
   function slipsOf(d: Deal): { label: string; fileId: string }[] {
     const slips: { label: string; fileId: string }[] = [];
     if (d.payment_slip_file_id) slips.push({ label: 'สลิปผู้ซื้อ (ค่าสินค้า)', fileId: d.payment_slip_file_id });
@@ -172,6 +218,8 @@ export default function AdminDeals() {
     if (d.deal_type === 'meetup' && d.meetup) {
       if (d.meetup.buyer_slip) slips.push({ label: 'สลิปผู้ซื้อ (เงินประกัน)', fileId: d.meetup.buyer_slip });
       if (d.meetup.seller_slip) slips.push({ label: 'สลิปผู้ขาย (เงินประกัน)', fileId: d.meetup.seller_slip });
+      if (d.meetup.buyer_refund_slip) slips.push({ label: 'สลิปคืนเงินประกันให้ผู้ซื้อ', fileId: d.meetup.buyer_refund_slip });
+      if (d.meetup.seller_refund_slip) slips.push({ label: 'สลิปคืนเงินประกันให้ผู้ขาย', fileId: d.meetup.seller_refund_slip });
     }
     return slips;
   }
@@ -179,7 +227,7 @@ export default function AdminDeals() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center gap-2 mb-1">
-        <Handshake size={22} className="text-blue-500" />
+        <Handshake size={22} className="text-blue-600" />
         <h1 className="text-xl font-bold">ดีล & ข้อพิพาท</h1>
       </div>
       <p className="text-sm text-gray-500 mb-5">จัดการดีลที่มีปัญหา ตัดสินข้อพิพาท และยืนยันการคืนเงินประกันนัดรับ</p>
@@ -225,7 +273,23 @@ export default function AdminDeals() {
                       {refund.refundedAt ? <span className="text-green-600"> ✅ คืนเงินแล้ว</span> : <span className="text-amber-600"> ⏳ ยังไม่คืนเงิน</span>}
                     </p>
                   )}
-                  {/* บัญชีที่ต้องโอนเงินเข้า — แสดงให้แอดมินเห็นตรงนี้เลย ไม่ต้องเปิดดีลแยกไปหา */}
+                  {/* เลขบัญชี + ยอดโอนสำหรับ meetup refund */}
+                  {refund && !refund.refundedAt && refund.outcome !== 'frozen' && (
+                    <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs space-y-1">
+                      <p className="font-semibold text-amber-800">
+                        💰 ยอดโอนคืน: ฝ่ายละ ฿{refund.deposit.toLocaleString()}
+                        {!refund.outcome && <span className="ml-1 text-amber-600">(รวม ฿{(refund.deposit * 2).toLocaleString()})</span>}
+                      </p>
+                      {d.buyerBank?.bankAcct
+                        ? <p className="text-blue-700">🛍️ ผู้ซื้อ ({d.buyer_name || '-'}): <span className="font-mono font-semibold">{d.buyerBank.bankName} {d.buyerBank.bankAcct}</span> เจ้าของ: {d.buyerBank.bankOwner || '-'}</p>
+                        : <p className="text-red-600">⚠️ ผู้ซื้อ ({d.buyer_name || '-'}): ยังไม่ผูกบัญชีธนาคาร — ติดต่อก่อนโอน</p>
+                      }
+                      {d.sellerBank?.bankAcct
+                        ? <p className="text-blue-700">🛒 ผู้ขาย ({d.seller_name || '-'}): <span className="font-mono font-semibold">{d.sellerBank.bankName} {d.sellerBank.bankAcct}</span> เจ้าของ: {d.sellerBank.bankOwner || '-'}</p>
+                        : <p className="text-red-600">⚠️ ผู้ขาย ({d.seller_name || '-'}): ยังไม่ผูกบัญชีธนาคาร — ติดต่อก่อนโอน</p>
+                      }
+                    </div>
+                  )}
                   {d.deal_type !== 'meetup' && (d.status === 'completed' || d.status === 'disputed') && !d.priceState?.payout_slip_file_id && (
                     d.sellerBank?.bankAcct
                       ? <p className="text-xs mt-1 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 โอนให้ผู้ขาย: {d.sellerBank.bankName} {d.sellerBank.bankAcct} ({d.sellerBank.bankOwner || '-'})</p>
@@ -236,7 +300,6 @@ export default function AdminDeals() {
                       ? <p className="text-xs mt-1 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 คืนให้ผู้ซื้อ: {d.buyerBank.bankName} {d.buyerBank.bankAcct} ({d.buyerBank.bankOwner || '-'})</p>
                       : <p className="text-xs mt-1 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ ผู้ซื้อยังไม่ผูกบัญชีธนาคาร — ติดต่อผู้ซื้อก่อนคืนเงิน</p>
                   )}
-                  {/* ค่าบริการคนกลาง — เฉพาะดีลที่มีคนกลางจริงและจบแบบสำเร็จ */}
                   {d.status === 'completed' && d.middleman_id && !d.priceState?.middleman_fee_sent_at && middlemanNetFee(d) > 0 && (
                     d.middlemanBank?.bankAcct
                       ? <p className="text-xs mt-1 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 โอนค่าบริการให้คนกลาง ฿{middlemanNetFee(d).toLocaleString()}: {d.middlemanBank.bankName} {d.middlemanBank.bankAcct} ({d.middlemanBank.bankOwner || '-'})</p>
@@ -275,30 +338,67 @@ export default function AdminDeals() {
                 {d.status === 'payment_uploaded' && (
                   <button onClick={() => act(d.id, 'confirm_payment', 'หมายเหตุ (เช่น เลขอ้างอิงสลิป) — เว้นว่างได้:')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
-                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ยืนยันรับเงิน — เริ่มแพ็ค
+                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    {d.deal_type === 'meetup' ? 'ยืนยันรับเงิน — เริ่มนัดเจอ' : 'ยืนยันรับเงิน — เริ่มแพ็ค'}
                   </button>
                 )}
-                {refund && !refund.refundedAt && (
-                  <button onClick={() => act(d.id, 'mark_refunded', 'หมายเหตุการคืนเงิน (เช่น เลขอ้างอิงการโอน):')} disabled={!!acting}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
-                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />} ยืนยันคืนเงินประกันแล้ว
-                  </button>
+                {refund && !refund.outcome && (
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => markMeetupRefund(d.id, 'buyer_all')} disabled={!!acting}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
+                      {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนให้ผู้ซื้อทั้งหมด
+                    </button>
+                    <button onClick={() => markMeetupRefund(d.id, 'seller_all')} disabled={!!acting}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
+                      {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนให้ผู้ขายทั้งหมด
+                    </button>
+                    <button onClick={() => markMeetupRefund(d.id, 'both', 'buyer')} disabled={!!acting}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 flex items-center gap-1 disabled:opacity-50">
+                      {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนให้ทั้งคู่ (สลิปผู้ซื้อ)
+                    </button>
+                    <button onClick={() => markMeetupRefund(d.id, 'both', 'seller')} disabled={!!acting}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 flex items-center gap-1 disabled:opacity-50">
+                      {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนให้ทั้งคู่ (สลิปผู้ขาย)
+                    </button>
+                    <button onClick={() => markMeetupRefund(d.id, 'frozen')} disabled={!!acting}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-600 text-white hover:bg-gray-700 flex items-center gap-1 disabled:opacity-50">
+                      {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />} อายัดไว้ก่อน
+                    </button>
+                  </div>
                 )}
-                {/* ดีลสำเร็จ (ไม่ใช่นัดรับ) แต่ยังไม่มีสลิปโอนเงินให้ผู้ขาย — ให้แอดมินอัปโหลดสลิปได้ตรงนี้เลย */}
+                {refund && refund.outcome === 'both' && !refund.refundedAt && (
+                  <div className="flex flex-wrap gap-2">
+                    {!refund.buyerSlipDone && (
+                      <button onClick={() => markMeetupRefund(d.id, 'both', 'buyer')} disabled={!!acting}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 flex items-center gap-1 disabled:opacity-50">
+                        {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} แนบสลิปผู้ซื้อ
+                      </button>
+                    )}
+                    {!refund.sellerSlipDone && (
+                      <button onClick={() => markMeetupRefund(d.id, 'both', 'seller')} disabled={!!acting}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 flex items-center gap-1 disabled:opacity-50">
+                        {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} แนบสลิปผู้ขาย
+                      </button>
+                    )}
+                  </div>
+                )}
+                {refund && refund.outcome && (refund.refundedAt || refund.outcome === 'frozen') && (
+                  <span className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">
+                    ✅ {refund.outcomeLabel}{refund.refundedAt ? '' : ' (อายัด — ยังไม่คืน)'}
+                  </span>
+                )}
                 {d.status === 'completed' && d.deal_type !== 'meetup' && !d.priceState?.payout_slip_file_id && (
                   <button onClick={() => markMoneySent(d.id, 'mark_payout_sent')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
                     {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนเงินให้ผู้ขายแล้ว — แนบสลิป
                   </button>
                 )}
-                {/* ดีลถูกยกเลิก (ไม่ใช่นัดรับ) แต่ยังไม่มีสลิปคืนเงินผู้ซื้อ */}
                 {d.status === 'cancelled' && d.deal_type !== 'meetup' && d.payment_slip_file_id && !d.priceState?.refund_slip_file_id && (
                   <button onClick={() => markMoneySent(d.id, 'mark_refund_sent')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
                     {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} คืนเงินให้ผู้ซื้อแล้ว — แนบสลิป
                   </button>
                 )}
-                {/* ดีลสำเร็จที่มีคนกลางจริง — ยังไม่ได้โอนค่าบริการสุทธิให้คนกลาง (เครดิตประกันที่คนกลางวางไว้จะปล่อยอัตโนมัติ ไม่ต้องกดเอง) */}
                 {d.status === 'completed' && d.middleman_id && !d.priceState?.middleman_fee_sent_at && middlemanNetFee(d) > 0 && (
                   <button onClick={() => markMoneySent(d.id, 'mark_middleman_fee_sent')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-1 disabled:opacity-50">
