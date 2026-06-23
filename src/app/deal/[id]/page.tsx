@@ -2008,38 +2008,53 @@ export default function DealRoom() {
     const md: MeetupData = meetup || {};
     const depositEach = md.deposit || 0;
     const isParty = myRole === 'buyer' || myRole === 'seller';
-    const bank = middlemanBank;
+    const buyerFee = md.buyer_fee || 0;
+    const sellerFee = md.seller_fee || 0;
+    const myFee = myRole === 'buyer' ? buyerFee : sellerFee;
+    const myTotal = depositEach + myFee;
+    const mySlip = myRole === 'buyer' ? md.buyer_slip : md.seller_slip;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* ยอดเงินที่ต้องโอน */}
+        {/* สรุปยอดแต่ละฝ่าย */}
         <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
-          <div className="dr-card-title" style={{ color: '#8a5a00' }}>💰 ยอดเงินประกันที่ต้องวาง</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent-strong)', fontFamily: 'var(--font-display)', marginBottom: 6 }}>
-            ฿{depositEach.toLocaleString()} / ฝ่าย
+          <div className="dr-card-title" style={{ color: '#8a5a00' }}>💰 สรุปยอดที่ต้องวางประกัน</div>
+          {md.meet_label && <p style={{ fontSize: 12.5, color: '#8a5a00', marginBottom: 10 }}>📍 {md.meet_label}</p>}
+          <div style={{ display: 'grid', gap: 8 }}>
+            {([['🛍️ ผู้ซื้อ', depositEach, buyerFee], ['🛒 ผู้ขาย', depositEach, sellerFee]] as [string, number, number][]).map(([label, dep, fee]) => (
+              <div key={label} style={{ background: 'rgba(255,255,255,0.7)', borderRadius: 'var(--r-md)', padding: '10px 14px', border: '1px solid #ffe0b2' }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 6, fontFamily: 'var(--font-display)' }}>{label}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-2)' }}>
+                  <span>เงินประกัน <span style={{ fontSize: 11, color: 'var(--muted)' }}>(ได้คืนหลังนัดพบ)</span></span>
+                  <span>฿{dep.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>
+                  <span>ค่าบริการ</span>
+                  <span>{fee > 0 ? `฿${fee.toLocaleString()}` : <span style={{ color: 'var(--green-600)' }}>ฟรี</span>}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, marginTop: 8, paddingTop: 8, borderTop: '1px solid #ffe0b2', color: 'var(--accent-strong)' }}>
+                  <span>รวมโอน</span>
+                  <span>฿{(dep + fee).toLocaleString()}</span>
+                </div>
+              </div>
+            ))}
           </div>
-          {md.meet_label && <p style={{ fontSize: 12.5, color: '#8a5a00' }}>📍 {md.meet_label}</p>}
-          <p style={{ fontSize: 12.5, color: '#8a5a00', marginTop: 4 }}>เงินนี้จะถูกคืนให้ทั้งสองฝ่ายหลังนัดพบสำเร็จ</p>
+          <p style={{ fontSize: 11.5, color: '#9a6209', marginTop: 8 }}>⚠️ เงินประกันจะถูกคืนให้ทั้งสองฝ่ายเต็มจำนวนหลังนัดพบสำเร็จ — ระบบเก็บเฉพาะค่าบริการ</p>
         </div>
-        {/* เลขบัญชี / QR */}
-        {bank ? (
+        {/* ช่องทางชำระ — แสดงเฉพาะฝ่ายที่ยังไม่ได้วาง */}
+        {isParty && !mySlip && (
           <div className="dr-card">
-            <div className="dr-card-title">🏦 โอนมาที่บัญชีนี้</div>
-            <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 10 }}>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 2 }}>ธนาคาร</div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>{bank.bankName}</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8, marginBottom: 2 }}>เลขบัญชี</div>
-              <div style={{ fontWeight: 700, fontSize: 18, letterSpacing: 1, fontFamily: 'var(--font-display)' }}>{bank.bankAcct}</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8, marginBottom: 2 }}>ชื่อบัญชี</div>
-              <div style={{ fontSize: 14 }}>{bank.bankOwner}</div>
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--muted)' }}>⚠️ โอน <b>฿{depositEach.toLocaleString()}</b> พอดี — อย่าโอนรวมหรือแยกเงินอื่น เพื่อให้ตรวจสอบได้ง่าย</p>
-          </div>
-        ) : (
-          <div className="dr-card" style={{ textAlign: 'center', padding: '20px 14px' }}>
-            <p style={{ fontSize: 13.5, color: 'var(--muted)' }}>⏳ ระบบกำลังโหลดข้อมูลบัญชี — กรุณารอสักครู่</p>
+            <div className="dr-card-title">🏦 ช่องทางชำระเงิน</div>
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
+              โอนยอด <b style={{ color: 'var(--accent-strong)', fontSize: 15 }}>฿{myTotal.toLocaleString()}</b> เข้าบัญชีศูนย์กลาง
+              {myFee > 0 && <span style={{ fontSize: 11.5 }}> (ประกัน ฿{depositEach.toLocaleString()} + บริการ ฿{myFee.toLocaleString()})</span>}
+            </p>
+            <PaymentMethods
+              amount={myTotal}
+              note={`เงินประกัน ฿${depositEach.toLocaleString()} + ค่าบริการ ฿${myFee.toLocaleString()} — มาตามนัดได้เงินประกันคืน ฿${depositEach.toLocaleString()} เต็มจำนวน`}
+            />
           </div>
         )}
-        {/* สลิปของแต่ละฝ่าย */}
+        {/* สถานะสลิปของแต่ละฝ่าย */}
         {[{ side: 'buyer', label: '🛍️ ผู้ซื้อ', slip: md.buyer_slip }, { side: 'seller', label: '🛒 ผู้ขาย', slip: md.seller_slip }].map(r => (
           <div key={r.side} className="dr-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -2049,7 +2064,7 @@ export default function DealRoom() {
             {r.slip
               ? <a href={fileUrl(r.slip)} target="_blank" rel="noreferrer"><img src={fileUrl(r.slip)} alt="สลิปเงินประกัน" style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
               : isParty && r.side === myRole && (
-                <button onClick={() => meetupSlipInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดสลิปเงินประกัน</button>
+                <button onClick={() => meetupSlipInputRef.current?.click()} className="btn btn-green btn-block"><Icon name="upload" size={16} /> อัปโหลดสลิปเงินประกัน</button>
               )}
           </div>
         ))}
