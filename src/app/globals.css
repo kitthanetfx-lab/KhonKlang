@@ -479,10 +479,11 @@ button.nav-link { background: none; border: none; }
 
 .hero-inner { position: relative; z-index: 1; display: grid; gap: 38px; align-items: start; }
 @media (min-width: 900px){ .hero-inner { grid-template-columns: 1.04fr .96fr; gap: 54px; } }
-.hero-brand { margin: 0 0 16px; }
-.hero-brand-image { width: min(100%, 360px); height: auto; display: block; filter: drop-shadow(0 18px 38px rgba(20, 44, 94, 0.12)); }
+.hero-copy { text-align: center; }
+.hero-brand { margin: 0 auto 16px; }
+.hero-brand-image { width: min(100%, 520px); height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 18px 38px rgba(20, 44, 94, 0.12)); }
 .hero-title { font-size: clamp(33px, 6.2vw, 58px); line-height: 1.06; letter-spacing: -0.02em; }
-.hero-lead { color: var(--ink-2); font-size: clamp(15.5px, 1.9vw, 19px); margin-top: 20px; max-width: 50ch; }
+.hero-lead { color: var(--ink-2); font-size: clamp(15.5px, 1.9vw, 19px); margin-top: 20px; max-width: 50ch; margin-left: auto; margin-right: auto; }
 .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 .hero-trust { display: flex; align-items: center; gap: 14px; margin-top: 28px; }
 .hero-avatars { display: flex; }
@@ -497,7 +498,7 @@ button.nav-link { background: none; border: none; }
 .hero-promo-mini .promo-placeholder p { font-size: 12px; margin: 0; }
 @media (max-width: 899px){
   .hero-brand { margin-bottom: 12px; }
-  .hero-brand-image { width: min(100%, 280px); margin: 0 auto; }
+  .hero-brand-image { width: min(100%, 400px); margin: 0 auto; }
 }
 
 /* ---- Stats ---- */

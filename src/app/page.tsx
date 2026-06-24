@@ -88,8 +88,7 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
           </p>
         </div>
         <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
-          <EscrowStage speed={1} />
-          <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '200ms' }}>
+          <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '140ms' }}>
             {stats?.promoVideoUrl ? (
               <div className="promo-video-wrap">
                 <iframe src={stats.promoVideoUrl} title="วีดีโอแนะนำการใช้งาน" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
@@ -104,6 +103,7 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
               </div>
             )}
           </div>
+          <EscrowStage speed={1} />
         </div>
       </div>
     </header>
