@@ -80,14 +80,6 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
               className="hero-brand-image"
             />
           </div>
-          <div className="eyebrow reveal"><Icon name="shieldCheck" size={15} /> ซื้อขายปลอดภัยผ่านคนกลางรับรอง</div>
-          <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
-            จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span>
-          </h1>
-          <p className="hero-lead reveal" style={{ ['--d' as string]: '120ms' }}>
-          </p>
-        </div>
-        <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
           <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '140ms' }}>
             {stats?.promoVideoUrl ? (
               <div className="promo-video-wrap">
@@ -103,6 +95,12 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
               </div>
             )}
           </div>
+        </div>
+        <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
+          <div className="eyebrow reveal"><Icon name="shieldCheck" size={15} /> ซื้อขายปลอดภัยผ่านคนกลางรับรอง</div>
+          <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
+            จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span>
+          </h1>
           <EscrowStage speed={1} />
         </div>
       </div>
