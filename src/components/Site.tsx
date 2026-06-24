@@ -203,12 +203,13 @@ export function Nav({ active }: { active?: string }) {
         <button className="nav-burger" onClick={() => setDrawer(true)} aria-label="เปิดเมนู" aria-expanded={drawer}><Icon name="menu" size={22} /></button>
       </div>
 
-      {/* Mobile service tabs — แสดงเฉพาะมือถือ (< 980px) */}
+      {/* Mobile bottom nav — fixed ไม่หายตามสกรอล */}
       <div className="mobile-service-tabs">
         {NAV_SERVICES.map(s => (
           <Link key={s.href} href={s.href}
             className={`mst-item ${isAct(s.href) ? 'active' : ''}`}>
-            {s.t}
+            <Icon name={s.icon} size={20} />
+            <span className="mst-label">{s.t}</span>
           </Link>
         ))}
       </div>

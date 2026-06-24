@@ -87,16 +87,6 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
           <p className="hero-lead reveal" style={{ ['--d' as string]: '120ms' }}>
             คนกลางพักเงินของคุณไว้กับระบบจนกว่าจะได้รับสินค้าจริง — ครอบคลุมตั้งแต่มือถือ แบรนด์เนม รถมือสอง ไอดีเกม ของสะสม ไปจนถึงเหมาสวนและสั่งผลิตโรงงาน
           </p>
-          <div className="hero-cta reveal" style={{ ['--d' as string]: '180ms' }}>
-            {controls.isEnabled('tradeOnline') || controls.isEnabled('tradeSimple') ? (
-              <Link className="btn btn-primary btn-lg" href="/service/trade">เริ่มสร้างดีล <Icon name="arrowRight" size={18} /></Link>
-            ) : (
-              <button className="btn btn-primary btn-lg" type="button" disabled title={controls.message('tradeOnline')}>
-                บริการซื้อขายปิดชั่วคราว
-              </button>
-            )}
-            <Link className="btn btn-ghost btn-lg" href="/marketplace"><Icon name="store" size={18} /> ดูตลาด</Link>
-          </div>
         </div>
         <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
           <EscrowStage speed={1} />
