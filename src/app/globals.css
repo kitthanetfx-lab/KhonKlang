@@ -402,7 +402,7 @@ button.nav-link { background: none; border: none; }
 /* ============================================================
    Escrow automation stage
    ============================================================ */
-.ef-wrap { display: grid; gap: 18px; }
+.ef-wrap { display: grid; gap: 18px; width: 100%; }
 .ef-stage {
   position: relative; width: 100%; aspect-ratio: 1 / 0.86;
   background:
