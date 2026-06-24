@@ -74,8 +74,8 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
             <Image
               src="/logo.png"
               alt="โลโก้คนกลาง"
-              width={420}
-              height={420}
+              width={520}
+              height={520}
               priority
               className="hero-brand-image"
             />
@@ -85,7 +85,6 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
             จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span>
           </h1>
           <p className="hero-lead reveal" style={{ ['--d' as string]: '120ms' }}>
-            คนกลางพักเงินของคุณไว้กับระบบจนกว่าจะได้รับสินค้าจริง — ครอบคลุมตั้งแต่มือถือ แบรนด์เนม รถมือสอง ไอดีเกม ของสะสม ไปจนถึงเหมาสวนและสั่งผลิตโรงงาน
           </p>
         </div>
         <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
