@@ -108,7 +108,12 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
           </div>
         ))}
         <div className={`ef-vault ${active.hub ? 'on' : ''}`} style={pos('hub')}>
-          <div className="ef-vault-ring" style={{ background: `conic-gradient(var(--green-400) ${pct * 3.6}deg, var(--line) 0)` }}>
+          <div className="ef-vault-ring">
+            <svg className="ef-ring-svg" viewBox="0 0 100 100" aria-hidden="true">
+              <circle className="ef-ring-bg" cx="50" cy="50" r="45" />
+              <circle className="ef-ring-fg" cx="50" cy="50" r="45"
+                style={{ strokeDashoffset: 283 * (1 - pct / 100) }} />
+            </svg>
             <div className="ef-vault-core"><Icon name="shieldCheck" size={26} /></div>
           </div>
           <div className="ef-vault-meta"><b>ศูนย์กลาง</b><span>พักเงิน + ค้ำประกัน</span></div>
