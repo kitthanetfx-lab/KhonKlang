@@ -110,7 +110,7 @@ export const NAV_SERVICES: NavItem[] = [
   { icon: 'shieldCheck', tint: '', t: 'ซื้อขายผ่านกลาง', d: 'พักเงินไว้กับระบบ ปลอดภัยทั้งสองฝ่าย', href: '/service/trade' },
   { icon: 'mapPin', tint: 'green', t: 'นัดรับผ่านกลาง', d: 'นัดเจอในจุดปลอดภัย มีคนกลางดูแล', href: '/service/meetup' },
   { icon: 'store', tint: 'violet', t: 'ฝากขายผ่านกลาง', d: 'ฝากของให้คนกลางช่วยขายให้', href: '/service/consign' },
-  { icon: 'mapPin', tint: 'amber', t: 'บริการนัดออนไซต์', d: 'ช่างผู้เชี่ยวชาญตรวจสอบถึงที่', href: '/service/onsite' },
+  { icon: 'car', tint: 'amber', t: 'บริการนัดออนไซต์', d: 'ช่างผู้เชี่ยวชาญตรวจสอบถึงที่', href: '/service/onsite' },
 ];
 
 function DropItem({ it }: { it: NavItem }) {
