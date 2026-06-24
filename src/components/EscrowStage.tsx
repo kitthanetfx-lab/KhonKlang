@@ -32,15 +32,19 @@ export function EscrowStage({ speed = 1 }: { speed?: number }) {
 
   useEffect(() => {
     if (reduce) return;
+    const FRAME = 1000 / 24; // throttle ~24fps: ลดจำนวน repaint ลงราว 60% เพื่อตัดเฟรมขยะ/อาการกระพริบ
     const loop = (now: number) => {
       if (!last.current) last.current = now;
-      const dt = now - last.current; last.current = now;
-      setT(prev => {
-        const s = EF_SEGMENTS[seg];
-        const nt = prev + (dt / s.dur) * speed;
-        if (nt >= 1) { setSeg(p => (p + 1) % EF_SEGMENTS.length); return 0; }
-        return nt;
-      });
+      const dt = now - last.current;
+      if (dt >= FRAME) {
+        last.current = now;
+        setT(prev => {
+          const s = EF_SEGMENTS[seg];
+          const nt = prev + (dt / s.dur) * speed;
+          if (nt >= 1) { setSeg(p => (p + 1) % EF_SEGMENTS.length); return 0; }
+          return nt;
+        });
+      }
       raf.current = requestAnimationFrame(loop);
     };
     raf.current = requestAnimationFrame(loop);
