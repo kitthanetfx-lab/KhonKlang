@@ -313,6 +313,7 @@ button.nav-link { background: none; border: none; }
   .mobile-service-tabs { display: flex; }
   .nav { top: 56px; }              /* nav sticks just below the fixed tabs */
   .mobile-tab-spacer { display: block; height: 56px; } /* pushes nav down initially */
+  .nav-inner .logo { transform: translateY(5px); } /* ขยับโลโก้ลงเล็กน้อย กันขอบบนโดนแถบแท็บบัง */
 }
 .mobile-tab-spacer { display: none; }
 /* สีเฉพาะแต่ละปุ่ม */
