@@ -156,6 +156,7 @@ export function Nav({ active }: { active?: string }) {
   ];
 
   return (
+    <>
     <nav className={`nav ${scrolled ? 'scrolled' : ''}`}>
       <InAppBanner />
       <div className="container nav-inner">
@@ -203,17 +204,6 @@ export function Nav({ active }: { active?: string }) {
         <button className="nav-burger" onClick={() => setDrawer(true)} aria-label="เปิดเมนู" aria-expanded={drawer}><Icon name="menu" size={22} /></button>
       </div>
 
-      {/* Mobile bottom nav — fixed ไม่หายตามสกรอล */}
-      <div className="mobile-service-tabs">
-        {NAV_SERVICES.map(s => (
-          <Link key={s.href} href={s.href}
-            className={`mst-item ${isAct(s.href) ? 'active' : ''}`}>
-            <Icon name={s.icon} size={20} />
-            <span className="mst-label">{s.t}</span>
-          </Link>
-        ))}
-      </div>
-
         <div className={`drawer-backdrop ${drawer ? 'open' : ''}`} onClick={() => setDrawer(false)} />
       <aside className={`drawer ${drawer ? 'open' : ''}`} role="dialog" aria-modal="true" aria-label="เมนูหลัก" aria-hidden={!drawer}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -257,6 +247,18 @@ export function Nav({ active }: { active?: string }) {
         ))}
       </aside>
     </nav>
+    {/* Mobile service tabs — อยู่นอก nav เพื่อให้ position:fixed ยึด viewport ได้ (backdrop-filter ใน nav จะ trap fixed) */}
+    <div className="mobile-service-tabs">
+      {NAV_SERVICES.map(s => (
+        <Link key={s.href} href={s.href}
+          className={`mst-item ${isAct(s.href) ? 'active' : ''}`}>
+          <Icon name={s.icon} size={20} />
+          <span className="mst-label">{s.t}</span>
+        </Link>
+      ))}
+    </div>
+    <div className="mobile-tab-spacer" />
+    </>
   );
 }
 
