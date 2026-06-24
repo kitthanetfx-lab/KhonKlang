@@ -402,7 +402,7 @@ button.nav-link { background: none; border: none; }
 /* ============================================================
    Escrow automation stage
    ============================================================ */
-.ef-wrap { display: grid; gap: 18px; width: 100%; }
+.ef-wrap { display: grid; gap: 18px; width: 100%; overflow: hidden; isolation: isolate; }
 .ef-stage {
   position: relative; width: 100%; aspect-ratio: 1 / 0.86;
   background:
@@ -455,7 +455,7 @@ button.nav-link { background: none; border: none; }
 /* แสดงทีละ step บรรทัดเดียว วนไปเรื่อย ๆ แทนการเรียง 5 บรรทัดสแต็กกัน — ประหยัดพื้นที่แนวตั้ง */
 .ef-steps-single { display: grid; gap: 10px; }
 .ef-step-line { display: flex; align-items: flex-start; gap: 13px; padding: 12px 14px; border-radius: var(--r-md); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: linear-gradient(90deg, var(--accent-soft), var(--surface) 60%); box-shadow: var(--sh-md); animation: efStepIn .35s var(--ease-out); }
-@keyframes efStepIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes efStepIn { from { opacity: 0; } to { opacity: 1; } }
 .ef-step-no { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 600; font-size: 13px; background: var(--accent); color: #fff; border: 1px solid var(--accent); }
 .ef-step-tx { flex: 1; min-width: 0; }
 .ef-step-tx b { display: block; font-family: var(--font-display); font-size: 14px; color: var(--ink); font-weight: 600; line-height: 1.5; }
