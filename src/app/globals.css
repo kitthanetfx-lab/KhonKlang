@@ -161,6 +161,8 @@ button.nav-link { background: none; border: none; }
   padding: 7px 15px; border-radius: var(--r-pill); line-height: 1;
 }
 .eyebrow svg { flex: 0 0 auto; }
+.hero-stage .eyebrow { margin-bottom: 20px; }
+.hero-stage .hero-title { margin-top: 0; }
 .section-title { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; letter-spacing: -0.03em; }
 .section-lead {
   color: var(--ink-2);
@@ -479,7 +481,7 @@ button.nav-link { background: none; border: none; }
 
 .hero-inner { position: relative; z-index: 1; display: grid; gap: 38px; align-items: center; }
 @media (min-width: 900px){ .hero-inner { grid-template-columns: 1.04fr .96fr; gap: 54px; } }
-.hero-stage { padding-top: 24px; }
+.hero-stage { padding-top: 24px; text-align: center; display: flex; flex-direction: column; align-items: center; }
 .hero-copy { text-align: center; }
 .hero-brand { margin: 0 auto 16px; }
 .hero-brand-image { width: min(100%, 520px); height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 18px 38px rgba(20, 44, 94, 0.12)); }
