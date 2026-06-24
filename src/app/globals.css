@@ -163,6 +163,8 @@ button.nav-link { background: none; border: none; }
 .eyebrow svg { flex: 0 0 auto; }
 .hero-stage .eyebrow { margin-bottom: 20px; }
 .hero-stage .hero-title { margin-top: 0; }
+/* ตรึงตัวหนังสือใต้การ์ดไว้บน layer ของมันเอง กันการ re-rasterize ตาม animation (โดยเฉพาะ gradient-text ที่ไวต่อการกระพริบ) */
+.hero-stage .eyebrow, .hero-stage .hero-title { transform: translateZ(0); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .section-title { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; letter-spacing: -0.03em; }
 .section-lead {
   color: var(--ink-2);
@@ -402,7 +404,7 @@ button.nav-link { background: none; border: none; }
 /* ============================================================
    Escrow automation stage
    ============================================================ */
-.ef-wrap { display: grid; gap: 18px; width: 100%; }
+.ef-wrap { display: grid; gap: 18px; width: 100%; transform: translateZ(0); /* แยกขึ้น GPU layer ของตัวเอง: repaint ของ animation ไม่ไปแตะตัวหนังสือพี่น้อง */ }
 .ef-stage {
   position: relative; width: 100%; aspect-ratio: 1 / 0.86;
   background:
