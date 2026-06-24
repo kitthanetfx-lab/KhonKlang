@@ -293,6 +293,35 @@ button.nav-link { background: none; border: none; }
 .dropdown-item .t { font-family: var(--font-display); font-weight:700; font-size:15px; color: var(--ink); line-height: 1.35; }
 .dropdown-item .d { font-size:13.5px; color: var(--muted); line-height:1.55; }
 
+/* mobile service tabs — ซ่อนบน desktop, แสดงบน mobile */
+.mobile-service-tabs {
+  display: none;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.mobile-service-tabs::-webkit-scrollbar { display: none; }
+@media (max-width: 979px) {
+  .mobile-service-tabs { display: flex; }
+}
+.mst-item {
+  flex: 1 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+  border-bottom: 2.5px solid transparent;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.mst-item:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.mst-item.active { color: var(--accent-strong); border-bottom-color: var(--accent); }
+
 /* mobile drawer */
 .drawer-backdrop { position: fixed; inset:0; background: rgba(13,27,62,.4); backdrop-filter: blur(2px); z-index: 90; opacity:0; pointer-events:none; transition: opacity .25s; }
 .drawer-backdrop.open { opacity:1; pointer-events:auto; }

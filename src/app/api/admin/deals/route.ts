@@ -14,12 +14,39 @@ async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string |
   return { bankName, bankAcct, bankOwner };
 }
 
-/** รายการดีลสำหรับแอดมิน: ?filter=disputed | active | completed | meetup_refund | all */
+/** นับจำนวนดีลทุก tab พร้อมกัน: ?filter=counts */
+async function getCounts(db: ReturnType<typeof getAdminClient>) {
+  const [active, confirmPay, paySeller, refundPending, meetupRefund, disputed, middlemanFee] = await Promise.all([
+    db.from('deals').select('id', { count: 'exact', head: true }).neq('status', 'completed').neq('status', 'cancelled'),
+    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'payment_uploaded'),
+    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'completed').neq('deal_type', 'meetup'),
+    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'cancelled').neq('deal_type', 'meetup'),
+    db.from('deal_meetup').select('id', { count: 'exact', head: true }).is('refund_outcome', null),
+    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'disputed'),
+    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'completed').not('middleman_id', 'is', null),
+  ]);
+  return {
+    active: active.count || 0,
+    confirm_pay: confirmPay.count || 0,
+    pay_seller: paySeller.count || 0,
+    refund_pending: refundPending.count || 0,
+    meetup_refund: meetupRefund.count || 0,
+    disputed: disputed.count || 0,
+    middleman_fee: middlemanFee.count || 0,
+  };
+}
+
+/** รายการดีลสำหรับแอดมิน: ?filter=disputed | active | completed | meetup_refund | counts */
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
     const db = getAdminClient();
     const filter = req.nextUrl.searchParams.get('filter') || 'disputed';
+
+    if (filter === 'counts') {
+      const counts = await getCounts(db);
+      return NextResponse.json({ counts });
+    }
     let query = db.from('deals').select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(200);
     if (filter === 'disputed') query = query.eq('status', 'disputed');
     else if (filter === 'completed') query = query.eq('status', 'completed');

@@ -97,19 +97,6 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
             )}
             <Link className="btn btn-ghost btn-lg" href="/marketplace"><Icon name="store" size={18} /> ดูตลาด</Link>
           </div>
-          <div className="hero-trust reveal" style={{ ['--d' as string]: '240ms' }}>
-            <div className="hero-avatars">
-              {[0, 1, 2, 3].map(i => <span key={i} className="avatar" style={{ width: 34, height: 34, fontSize: 12, marginLeft: i ? -10 : 0, border: '2px solid #fff', background: ['#2f6bf0', '#10a566', '#6841d9', '#e89211'][i] }}>{['ก', 'ข', 'ค', 'ง'][i]}</span>)}
-            </div>
-            <div>
-              <div style={{ display: 'flex', gap: 2, color: 'var(--amber-500)' }}>{[0, 1, 2, 3, 4].map(i => <Icon key={i} name="star" size={15} style={{ fill: 'currentColor' }} />)}</div>
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-                {stats && stats.completedDeals > 0
-                  ? <><b style={{ color: 'var(--ink)' }}>{stats.completedDeals.toLocaleString()}</b> ดีลสำเร็จ{hasReviews ? ` • รีวิว ${avgStars}/5` : ''}</>
-                  : <>พักเงินกับระบบ • ปลอดภัยทุกดีล</>}
-              </span>
-            </div>
-          </div>
         </div>
         <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
           <EscrowStage speed={1} />

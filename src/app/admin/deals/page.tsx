@@ -59,6 +59,22 @@ export default function AdminDeals() {
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [acting, setActing] = useState('');
   const [fees, setFees] = useState<FeeConfig>(FEE_DEFAULTS);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+
+  const loadCounts = useCallback(async () => {
+    try {
+      const headers = await authHeaders();
+      const r = await fetch('/api/admin/deals?filter=counts', { headers });
+      const d = await r.json();
+      if (d.counts) setCounts(d.counts);
+    } catch { /* ไม่ต้อง alert */ }
+  }, []);
+
+  useEffect(() => {
+    void loadCounts();
+    const t = window.setInterval(() => void loadCounts(), 30000);
+    return () => window.clearInterval(t);
+  }, [loadCounts]);
 
   useEffect(() => { fetch('/api/fees').then(r => r.json()).then(d => { if (d.fees) setFees(d.fees); }).catch(() => {}); }, []);
 
@@ -235,12 +251,21 @@ export default function AdminDeals() {
       <p className="text-sm text-gray-500 mb-5">จัดการดีลที่มีปัญหา ตัดสินข้อพิพาท และยืนยันการคืนเงินประกันนัดรับ</p>
 
       <div className="flex gap-2 mb-5 flex-wrap">
-        {TABS.map(t => (
-          <button key={t.k} onClick={() => setTab(t.k)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab === t.k ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800'}`}>
-            {t.label}
-          </button>
-        ))}
+        {TABS.map(t => {
+          const cnt = counts[t.k] ?? 0;
+          const isActive = tab === t.k;
+          return (
+            <button key={t.k} onClick={() => setTab(t.k)}
+              className={`relative px-4 py-2 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800'}`}>
+              {t.label}
+              {cnt > 0 && (
+                <span className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold leading-none ${isActive ? 'bg-white text-blue-600' : 'bg-red-500 text-white'}`}>
+                  {cnt}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {deals === null && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
@@ -404,18 +429,14 @@ export default function AdminDeals() {
                 {d.status === 'completed' && d.middleman_id && !d.priceState?.middleman_fee_sent_at && middlemanNetFee(d) > 0 && (
                   <button onClick={() => markMoneySent(d.id, 'mark_middleman_fee_sent')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-1 disabled:opacity-50">
-                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนค่าบริการให้คนกลางแล้ว — แนบสลิป
+                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนค่าคนกลางแล้ว — แนบสลิป
                   </button>
                 )}
-                <button onClick={() => { if (window.confirm(`ลบดีล "${d.title}" ถาวร? (ใช้เฉพาะกรณีดีลทดสอบ/สแปม — กู้คืนไม่ได้)`)) act(d.id, 'delete_deal'); }} disabled={!!acting}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 disabled:opacity-50 ml-auto">
-                  <Trash2 size={14} /> ลบดีล
-                </button>
               </div>
             </div>
           );
         })}
+        </div>
       </div>
-    </div>
   );
 }
