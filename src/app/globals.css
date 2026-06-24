@@ -2077,8 +2077,21 @@ html, body { overflow-x: hidden; max-width: 100%; }
   .home-fab { left: 12px; bottom: 12px; width: 56px; height: 56px; }
 }
 
+/* ---- ข้อ5: Pop-up รับทราบการออกเดินทาง ---- */
+.meetup-ack-pop { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 24px; background: rgba(13,27,62,.45); animation: ack-fade .2s ease; }
+.meetup-ack-card { width: min(92vw, 360px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--sh-lg); padding: 26px 22px; text-align: center; animation: ack-pop .28s cubic-bezier(.2,.8,.2,1); }
+@keyframes ack-fade { from { opacity: 0; } }
+@keyframes ack-pop { from { opacity: 0; transform: translateY(14px) scale(.96); } }
+
+/* ---- AsyncButton: สปินเนอร์ในปุ่มไปขั้นตอนต่อไป (ข้อ1) ---- */
+.async-spin { display: inline-block; width: 1em; height: 1em; margin-right: .5em; vertical-align: -0.15em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: async-spin .6s linear infinite; }
+@keyframes async-spin { to { transform: rotate(360deg); } }
+button.is-loading { cursor: progress; }
+
 /* ---- Support widget (ปุ่มลอยติดต่อทีมงาน) ---- */
 .sw-wrap { position: fixed; right: 18px; bottom: 18px; z-index: 150; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+/* ข้อ3: ซ่อนปุ่มลอยทั้งสอง ("กลับหน้าหลัก" + "บริการลูกค้า") ระหว่างวิดีโอคอล */
+body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .sw-fab { position: relative; width: 58px; height: 58px; border-radius: 50%; border: none; background: var(--accent); color: #fff; display: grid; place-items: center; cursor: pointer; box-shadow: var(--sh-lg); transition: transform .2s, background .2s; }
 .sw-fab:hover { background: var(--accent-strong); transform: translateY(-2px); }
 .sw-fab:focus-visible { outline: none; box-shadow: var(--ring), var(--sh-lg); }

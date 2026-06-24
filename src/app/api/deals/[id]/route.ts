@@ -346,6 +346,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
         break;
       }
+      case 'meetup_ack_departure': {
+        // ข้อ5: รับทราบว่าอีกฝ่ายออกเดินทางแล้ว (mutual acknowledge)
+        if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (isBuyer) {
+          if (!md.seller_departed_at) return NextResponse.json({ error: 'อีกฝ่ายยังไม่ได้ออกเดินทาง' }, { status: 400 });
+          meetupUpdates.seller_departed_ack_at = new Date().toISOString();
+        } else {
+          if (!md.buyer_departed_at) return NextResponse.json({ error: 'อีกฝ่ายยังไม่ได้ออกเดินทาง' }, { status: 400 });
+          meetupUpdates.buyer_departed_ack_at = new Date().toISOString();
+        }
+        systemMsg = `🤝 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}รับทราบว่าอีกฝ่ายออกเดินทางแล้ว`;
+        break;
+      }
+      case 'progress_ping': {
+        // ข้อ4: แจ้งเตือนอีกฝ่ายเมื่อเรากดไปขั้นต่อไป (ไม่เปลี่ยนสถานะดีล แจ้งเตือนอย่างเดียว)
+        if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const whoLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
+        if (body.stage === 'to_evidence') systemMsg = `📋 ${whoLabel}คุยรายละเอียดเสร็จแล้ว — กำลังไปขั้นตรวจหลักฐาน`;
+        else return NextResponse.json({ error: 'Unknown stage' }, { status: 400 });
+        writeChatMsg = false; // แจ้งเตือนอย่างเดียว ไม่ลงข้อความในแชท
+        break;
+      }
       case 'visit': {
         const roleLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : isMiddleman ? 'คนกลาง' : 'ผู้สนใจจากลิงก์แชร์';
         systemMsg = `👀 ${myName || 'ผู้ใช้'} (${roleLabel}) เข้ามาดูห้องดีล`;

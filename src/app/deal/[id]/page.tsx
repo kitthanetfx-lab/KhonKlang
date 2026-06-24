@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { ReviewPanel } from '@/components/ReviewPanel';
 import { NotifyBell } from '@/components/NotifyBell';
+import { AsyncButton } from '@/components/AsyncButton';
 import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
 import { PaymentMethods } from '@/components/PaymentMethods';
 import { InAppBanner } from '@/components/InAppBanner';
@@ -160,6 +161,7 @@ interface MeetupData {
   meet_label?: string; pending_meet_label?: string;
   deposit?: number;
   buyer_departed_at?: string; seller_departed_at?: string;
+  buyer_departed_ack_at?: string; seller_departed_ack_at?: string; // ข้อ5: อีกฝ่ายรับทราบการออกเดินทาง (buyer_*=ผู้ขายรับทราบของผู้ซื้อ)
   buyer_pos?: { lat: number; lng: number; at: string }; seller_pos?: { lat: number; lng: number; at: string };
   pending_deposit?: number; pending_by?: 'buyer' | 'seller';
   buyer_fee?: number; seller_fee?: number;
@@ -303,6 +305,12 @@ export default function DealRoom() {
   const [acting, setActing] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
   const [showJitsi, setShowJitsi] = useState(requestedCall);
+  // ข้อ3: ระหว่างวิดีโอคอล ซ่อนปุ่มลอย "กลับหน้าหลัก" + "บริการลูกค้า" (ผ่าน body.in-call)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.classList.toggle('in-call', showJitsi);
+    return () => { document.body.classList.remove('in-call'); };
+  }, [showJitsi]);
   const [tab, setTab] = useState<DealTab>(readDealTab(requestedTab));
   const [evidenceType, setEvidenceType] = useState('packing');
   const [copied, setCopied] = useState(false);
@@ -688,8 +696,8 @@ export default function DealRoom() {
           </div>
           {notLoggedIn && <div style={{ background: '#fef5e3', border: '1px solid #fbe6bf', borderRadius: 'var(--r-md)', padding: '12px 16px', fontSize: 13, color: '#9a6209', textAlign: 'center' }}>⚠️ กรุณาเข้าสู่ระบบก่อนเข้าร่วมดีล</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {canBeBuyer && <button onClick={() => handleJoin('buyer')} disabled={acting} className="btn btn-primary btn-block btn-lg">{acting ? '...' : notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ซื้อ' : '🛍️ เข้าร่วมเป็นผู้ซื้อ'}</button>}
-            {canBeSeller && <button onClick={() => handleJoin('seller')} disabled={acting} className="btn btn-block btn-lg" style={{ background: '#6841d9', color: '#fff' }}>{acting ? '...' : notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ขาย' : '🛒 เข้าร่วมเป็นผู้ขาย'}</button>}
+            {canBeBuyer && <AsyncButton onClick={() => handleJoin('buyer')} className="btn btn-primary btn-block btn-lg">{notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ซื้อ' : '🛍️ เข้าร่วมเป็นผู้ซื้อ'}</AsyncButton>}
+            {canBeSeller && <AsyncButton onClick={() => handleJoin('seller')} className="btn btn-block btn-lg" style={{ background: '#6841d9', color: '#fff' }}>{notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ขาย' : '🛒 เข้าร่วมเป็นผู้ขาย'}</AsyncButton>}
             {!canBeBuyer && !canBeSeller && <p style={{ textAlign: 'center', color: 'var(--muted)' }}>ดีลนี้มีผู้ซื้อและผู้ขายครบแล้ว</p>}
           </div>
           <button onClick={copyLink} className="btn btn-ghost btn-block">{copied ? '✅ คัดลอกลิงก์แล้ว' : '🔗 คัดลอกลิงก์แชร์'}</button>
@@ -1016,9 +1024,9 @@ export default function DealRoom() {
               ))}
             </div>
             {!meAgreed && (
-              <button className="btn btn-green btn-block" disabled={acting} onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>
+              <AsyncButton className="btn btn-green btn-block" onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>
                 {myRole === 'middleman' ? '✅ อนุมัติดีล + วางเครดิตประกัน' : '✅ ตกลงราคานี้'}
-              </button>
+              </AsyncButton>
             )}
             {meAgreed && <p style={{ fontSize: 13, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณตกลงแล้ว — รอฝ่ายอื่น</p>}
           </div>
@@ -1038,9 +1046,9 @@ export default function DealRoom() {
               ))}
             </div>
             {!meAgreed ? (
-              <button className="btn btn-green btn-block" disabled={acting} onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>
+              <AsyncButton className="btn btn-green btn-block" onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>
                 {myRole === 'middleman' ? '✅ รับรู้ราคาเดิมและอนุมัติดีล' : '✅ ใช้ราคาเดิมนี้'}
-              </button>
+              </AsyncButton>
             ) : (
               <p style={{ fontSize: 13, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันราคาเดิมแล้ว — รอฝ่ายอื่น</p>
             )}
@@ -1100,7 +1108,7 @@ export default function DealRoom() {
           ))}
         </div>
         {!meDone
-          ? <button className="btn btn-primary btn-block" disabled={acting} onClick={() => doAction('evidence_done')}>✅ เก็บหลักฐานเสร็จสิ้น</button>
+          ? <AsyncButton className="btn btn-primary btn-block" onClick={() => doAction('evidence_done')}>✅ เก็บหลักฐานเสร็จสิ้น</AsyncButton>
           : <p style={{ fontSize: 13, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันแล้ว — รอฝ่ายอื่น</p>}
       </div>
     );
@@ -1260,23 +1268,22 @@ export default function DealRoom() {
 
   // ─── Action panel ────────────────────────────────────────────────────────
   function renderActionPanel() {
-    if (acting) return <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0', fontSize: 13 }}>กำลังดำเนินการ...</div>;
     const s = deal!.status;
-    const btns: { label: string; cls: string; fn: () => void }[] = [];
+    const btns: { label: string; cls: string; fn: () => void | Promise<unknown> }[] = [];
     if (['buyer_joined', 'terms_pending'].includes(s)) {
       const accepted = (myRole === 'seller' && deal!.seller_accepted_terms) || (myRole === 'middleman' && deal!.middleman_accepted_terms) || (myRole === 'buyer' && deal!.buyer_accepted_terms);
       if (!accepted) btns.push({ label: '✅ ยอมรับเงื่อนไขข้อตกลง', cls: 'btn-primary', fn: () => setShowTerms(true) });
       else return <p style={{ color: 'var(--green-600)', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>✅ คุณยอมรับเงื่อนไขแล้ว — รอฝ่ายอื่น</p>;
     }
     if (s === 'payment_uploaded' && myRole === 'middleman') btns.push({ label: '✅ ยืนยันรับเงิน — เริ่มขั้นตอนแพ็คของ', cls: 'btn-green', fn: () => doAction('confirm_payment') });
-    if (s === 'packing' && myRole === 'seller') btns.push({ label: isSimple ? '📦 แพ็คเสร็จ — จัดส่งให้ผู้ซื้อโดยตรง' : '📦 แพ็คของเสร็จ — จัดส่งให้คนกลาง', cls: 'btn-primary', fn: () => { if (trackingInput) doAction('seller_done_packing', { trackingNumber: trackingInput }); else alert('กรอกเลขพัสดุ'); } });
+    if (s === 'packing' && myRole === 'seller') btns.push({ label: isSimple ? '📦 แพ็คเสร็จ — จัดส่งให้ผู้ซื้อโดยตรง' : '📦 แพ็คของเสร็จ — จัดส่งให้คนกลาง', cls: 'btn-primary', fn: () => { if (trackingInput) return doAction('seller_done_packing', { trackingNumber: trackingInput }); alert('กรอกเลขพัสดุ'); } });
     if (s === 'shipped_to_middleman' && myRole === 'middleman') btns.push({ label: '📬 รับสินค้าแล้ว', cls: 'btn-primary', fn: () => doAction('middleman_received') });
     if (s === 'middleman_checking' && myRole === 'buyer' && !deal!.buyer_confirmed_check) btns.push({ label: '✅ ยืนยันสินค้าไม่มีปัญหา', cls: 'btn-green', fn: () => doAction('buyer_confirm_check') });
-    if (s === 'middleman_checking' && myRole === 'middleman' && deal!.buyer_confirmed_check) btns.push({ label: '🚚 จัดส่งให้ผู้ซื้อแล้ว', cls: 'btn-primary', fn: () => { if (trackingInput) doAction('middleman_ship_to_buyer', { trackingNumber: trackingInput }); else alert('กรอกเลขพัสดุ'); } });
+    if (s === 'middleman_checking' && myRole === 'middleman' && deal!.buyer_confirmed_check) btns.push({ label: '🚚 จัดส่งให้ผู้ซื้อแล้ว', cls: 'btn-primary', fn: () => { if (trackingInput) return doAction('middleman_ship_to_buyer', { trackingNumber: trackingInput }); alert('กรอกเลขพัสดุ'); } });
     if (s === 'shipped_to_buyer' && myRole === 'buyer') btns.push({ label: '🎉 ได้รับสินค้าแล้ว — ดีลเสร็จสมบูรณ์', cls: 'btn-green', fn: () => doAction('buyer_received') });
     if (myRole === 'buyer' && s === 'buyer_joined' && !deal!.middleman_id && !isMeetup && !isSimple) btns.push({ label: showSelectMM ? 'ซ่อนการเลือกคนกลาง' : '🔎 เลือกคนกลาง', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
     if (myRole === 'buyer' && !isSimple && deal!.middleman_id && ['terms_pending', 'payment_pending'].includes(s)) btns.push({ label: showSelectMM ? 'ซ่อนรายการคนกลาง' : '🔄 เลือกคนกลางใหม่', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
-    if (!isFinished && myRole !== 'guest') btns.push({ label: '❌ ยกเลิก', cls: 'btn-danger', fn: () => { const r = prompt('เหตุผล'); doAction('cancel', { reason: r || '' }); } });
+    if (!isFinished && myRole !== 'guest') btns.push({ label: '❌ ยกเลิก', cls: 'btn-danger', fn: () => { const r = prompt('เหตุผล'); return doAction('cancel', { reason: r || '' }); } });
 
     if (btns.length === 0) return <p style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>ไม่มีการกระทำในขั้นตอนนี้</p>;
     return (
@@ -1284,7 +1291,7 @@ export default function DealRoom() {
         {(['packing', 'middleman_checking'].includes(s) && (myRole === 'seller' || (myRole === 'middleman' && deal!.buyer_confirmed_check))) && (
           <input type="text" className="dr-select" value={trackingInput} onChange={e => setTrackingInput(e.target.value)} placeholder="เลขพัสดุ / Tracking number" />
         )}
-        {btns.map(b => <button key={b.label} onClick={b.fn} className={`btn ${b.cls} btn-block`}>{b.label}</button>)}
+        {btns.map(b => <AsyncButton key={b.label} onClick={b.fn} disabled={acting} className={`btn ${b.cls} btn-block`}>{b.label}</AsyncButton>)}
       </div>
     );
   }
@@ -1456,7 +1463,7 @@ export default function DealRoom() {
           ))}
         </div>
         {!meAccepted
-          ? <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={() => doAction('accept_terms')}>✅ ยอมรับเงื่อนไข</button>
+          ? <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => doAction('accept_terms')}>✅ ยอมรับเงื่อนไข</AsyncButton>
           : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยอมรับเงื่อนไขแล้ว — รออีกฝ่าย</p>}
       </div>
     );
@@ -1507,7 +1514,7 @@ export default function DealRoom() {
         </div>
 
         {!meReady
-          ? <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>✅ ตกลงราคานี้ — ไปคุยรายละเอียดสินค้า</button>
+          ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>✅ ตกลงราคานี้ — ไปคุยรายละเอียดสินค้า</AsyncButton>
           : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณตกลงแล้ว — รออีกฝ่ายยืนยัน</p>}
       </div>
     );
@@ -1620,7 +1627,7 @@ export default function DealRoom() {
             <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
           </div>
         </div>
-        <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={async () => { if (!chatBundledRef.current) { chatBundledRef.current = true; await bundleChatTranscriptAsEvidence(); } setChatReviewReady(true); setWzViewStep(4); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</button>
+        <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={async () => { if (!chatBundledRef.current) { chatBundledRef.current = true; await bundleChatTranscriptAsEvidence(); } await doAction('progress_ping', { stage: 'to_evidence' }); setChatReviewReady(true); setWzViewStep(4); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</AsyncButton>
       </div>
     );
   }
@@ -1645,7 +1652,7 @@ export default function DealRoom() {
             ))}
           </div>
           {!meDone
-            ? <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => doAction('evidence_done')}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</button>
+            ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('evidence_done')}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</AsyncButton>
             : sellerDone && buyerDone
               ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(5)}>✅ ทุกฝ่ายยืนยันแล้ว — ดำเนินการต่อ →</button>
               : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
@@ -1727,7 +1734,7 @@ export default function DealRoom() {
         <div className="dr-card">
           <div className="dr-card-title">เลขพัสดุ</div>
           <input type="text" className="dr-select" value={trackingInput} onChange={e => setTrackingInput(e.target.value)} placeholder="กรอกเลขพัสดุ" style={{ marginBottom: 12 }} />
-          <button className="btn btn-primary btn-block btn-lg" disabled={acting} onClick={() => { if (!trackingInput) { alert('กรอกเลขพัสดุ'); return; } doAction('seller_done_packing', { trackingNumber: trackingInput }); }}>📦 แพ็คเสร็จ — ส่งให้ผู้ซื้อโดยตรง</button>
+          <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => { if (!trackingInput) { alert('กรอกเลขพัสดุ'); return; } return doAction('seller_done_packing', { trackingNumber: trackingInput }); }}>📦 แพ็คเสร็จ — ส่งให้ผู้ซื้อโดยตรง</AsyncButton>
         </div>
       </div>
     );
@@ -1762,8 +1769,8 @@ export default function DealRoom() {
           {renderWizardEvidenceThumbs(unboxEvidence)}
         </div>
         <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => { if (!hasUnboxEvidence && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return; doAction('buyer_received'); }}>🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์</button>
-          <button className="btn btn-ghost btn-block" disabled={acting} onClick={() => { const r = prompt('อธิบายปัญหาที่พบ (เช่น สินค้าไม่ตรงปก/ชำรุด/ไม่ได้รับสินค้า):'); if (r === null || !r.trim()) return; doAction('dispute', { reason: r.trim() }); }} style={{ color: '#b22441' }}>⚠️ แจ้งปัญหากับสินค้า</button>
+          <AsyncButton className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => { if (!hasUnboxEvidence && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return; return doAction('buyer_received'); }}>🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์</AsyncButton>
+          <AsyncButton className="btn btn-ghost btn-block" disabled={acting} onClick={() => { const r = prompt('อธิบายปัญหาที่พบ (เช่น สินค้าไม่ตรงปก/ชำรุด/ไม่ได้รับสินค้า):'); if (r === null || !r.trim()) return; return doAction('dispute', { reason: r.trim() }); }} style={{ color: '#b22441' }}>⚠️ แจ้งปัญหากับสินค้า</AsyncButton>
         </div>
       </div>
     );
@@ -1915,8 +1922,8 @@ export default function DealRoom() {
               {md.pending_meet_label && <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>📍 {md.pending_meet_label}</p>}
               <p style={{ fontSize: 13.5, color: 'var(--ink-2)', marginBottom: 14 }}>เงินประกัน: <b style={{ color: 'var(--accent-strong)' }}>฿{Number(md.pending_deposit).toLocaleString()}/ฝ่าย</b></p>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className="btn btn-green flex-1" disabled={acting} onClick={() => doAction('meetup_respond', { accept: true })}>✅ ยอมรับ</button>
-                <button type="button" className="btn btn-ghost flex-1 btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>❌ ปฏิเสธ</button>
+                <AsyncButton type="button" className="btn btn-green flex-1" disabled={acting} onClick={() => doAction('meetup_respond', { accept: true })}>✅ ยอมรับ</AsyncButton>
+                <AsyncButton type="button" className="btn btn-ghost flex-1 btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>❌ ปฏิเสธ</AsyncButton>
               </div>
             </div>
           )
@@ -1984,10 +1991,10 @@ export default function DealRoom() {
               <input type="number" className="input input-bordered" min={50} value={meetupPropAmt}
                 onChange={e => setMeetupPropAmt(e.target.value)} style={{ width: '100%', marginBottom: 8 }} />
               <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className="btn btn-primary flex-1" disabled={acting}
-                  onClick={() => { const a = Math.round(Number(meetupPropAmt)); if (!(a >= 50)) { alert('ขั้นต่ำ ฿50'); return; } doAction('meetup_propose', { amount: a, meetLabel: meetupPropLabel || md.meet_label }); setMeetupPropLabel(null); }}>
+                <AsyncButton type="button" className="btn btn-primary flex-1"
+                  onClick={async () => { const a = Math.round(Number(meetupPropAmt)); if (!(a >= 50)) { alert('ขั้นต่ำ ฿50'); return; } await doAction('meetup_propose', { amount: a, meetLabel: meetupPropLabel || md.meet_label }); setMeetupPropLabel(null); }}>
                   ส่งข้อเสนอ
-                </button>
+                </AsyncButton>
                 <button type="button" className="btn btn-ghost flex-1" onClick={() => setMeetupPropLabel(null)}>ยกเลิก</button>
               </div>
             </div>
@@ -2113,6 +2120,11 @@ export default function DealRoom() {
     const isParty = myRole === 'buyer' || myRole === 'seller';
     const myDepartedAt = myRole === 'buyer' ? md.buyer_departed_at : md.seller_departed_at;
     const myMet = myRole === 'buyer' ? md.buyer_met : md.seller_met;
+    // ข้อ5: สถานะรับทราบการออกเดินทาง (buyer_departed_ack_at = ผู้ขายรับทราบของผู้ซื้อ)
+    const otherDepartedAt = myRole === 'buyer' ? md.seller_departed_at : md.buyer_departed_at;
+    const iAckedOther = !!(myRole === 'buyer' ? md.seller_departed_ack_at : md.buyer_departed_ack_at);
+    const myDepartAcked = !!(myRole === 'buyer' ? md.buyer_departed_ack_at : md.seller_departed_ack_at);
+    const showAckPopup = isParty && !!otherDepartedAt && !iAckedOther && !myMet;
     const rows = [
       { side: 'buyer', label: '🛍️ ผู้ซื้อ', met: md.buyer_met, departedAt: md.buyer_departed_at, pos: md.buyer_pos },
       { side: 'seller', label: '🛒 ผู้ขาย', met: md.seller_met, departedAt: md.seller_departed_at, pos: md.seller_pos },
@@ -2133,6 +2145,25 @@ export default function DealRoom() {
             <a href={`https://www.google.com/maps/search/${encodeURIComponent(destQuery)}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">🗺️ ดูจุดนัดพบบนแผนที่</a>
           )}
         </div>
+        {/* ข้อ5: Pop-up รับทราบ — เด้งเมื่ออีกฝ่ายออกเดินทางแล้วและเรายังไม่ได้กดรับทราบ */}
+        {showAckPopup && (
+          <div className="meetup-ack-pop" role="alertdialog" aria-label="อีกฝ่ายออกเดินทางแล้ว">
+            <div className="meetup-ack-card">
+              <div style={{ fontSize: 34, marginBottom: 6 }}>🚗</div>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 4 }}>อีกฝ่ายออกเดินทางแล้ว!</div>
+              <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 14 }}>
+                {myRole === 'buyer' ? 'ผู้ขาย' : 'ผู้ซื้อ'}เริ่มออกเดินทางมุ่งหน้าสู่จุดนัดพบแล้ว — กดรับทราบเพื่อให้อีกฝ่ายรู้ว่าคุณรับทราบ
+              </p>
+              <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('meetup_ack_departure')}>✅ รับทราบ</AsyncButton>
+            </div>
+          </div>
+        )}
+        {/* สถานะการรับทราบของการเดินทางของฉัน */}
+        {isParty && myDepartedAt && !myMet && (
+          <div className="dr-card" style={{ background: myDepartAcked ? '#f0fdf4' : 'var(--surface-2)', borderColor: myDepartAcked ? '#bbf7d0' : 'var(--line)', fontSize: 13, color: myDepartAcked ? 'var(--green-700)' : 'var(--muted)', textAlign: 'center' }}>
+            {myDepartAcked ? '🤝 อีกฝ่ายรับทราบว่าคุณออกเดินทางแล้ว' : '⏳ รออีกฝ่ายกดรับทราบว่าคุณออกเดินทาง'}
+          </div>
+        )}
         {rows.map(r => (
           <div key={r.side} className="dr-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -2160,10 +2191,10 @@ export default function DealRoom() {
         {isParty && !myMet && (
           <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {!myDepartedAt && (
-              <button className="btn btn-primary btn-block" disabled={acting} onClick={() => { startShareLoc(); doAction('meetup_depart'); }}>🚗 ออกเดินทางแล้ว — แชร์ตำแหน่ง</button>
+              <AsyncButton className="btn btn-primary btn-block" onClick={() => { startShareLoc(); return doAction('meetup_depart'); }}>🚗 ออกเดินทางแล้ว — แชร์ตำแหน่ง</AsyncButton>
             )}
             {myDepartedAt && (
-              <button className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => { if (confirm('ยืนยันว่านัดเจอกันสำเร็จแล้ว?')) { stopShareLoc(); doAction('meetup_met'); } }}>✅ เจอกันแล้ว — ยืนยัน</button>
+              <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => { if (!confirm('ยืนยันว่านัดเจอกันสำเร็จแล้ว?')) return; stopShareLoc(); return doAction('meetup_met'); }}>✅ เจอกันแล้ว — ยืนยัน</AsyncButton>
             )}
           </div>
         )}

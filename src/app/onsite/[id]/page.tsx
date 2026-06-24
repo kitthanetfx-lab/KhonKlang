@@ -4,6 +4,7 @@ import { useEffect, useState, use, useCallback } from 'react';
 import { supabase, authHeaders } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { AsyncButton } from '@/components/AsyncButton';
 
 interface OnsiteJob {
   id: string;
@@ -222,13 +223,14 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
                 className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition text-sm resize-none"
               />
             </div>
-            <button
+            <AsyncButton
               onClick={() => doAction('submit_quote', { travelFee, serviceFee, estimatedArrival, conditions })}
-              disabled={acting || !travelFee || !serviceFee || !estimatedArrival}
+              disabled={!travelFee || !serviceFee || !estimatedArrival}
+              loadingChildren="กำลังส่ง..."
               className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-semibold transition"
             >
-              {acting ? 'กำลังส่ง...' : '📩 ส่งใบเสนอราคา'}
-            </button>
+              📩 ส่งใบเสนอราคา
+            </AsyncButton>
           </div>
         )}
 
@@ -293,16 +295,17 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => doAction('reject_quote')} disabled={acting}
+              <AsyncButton onClick={() => doAction('reject_quote')} disabled={acting}
                 className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white font-medium transition"
               >
                 ❌ ปฏิเสธ
-              </button>
-              <button onClick={() => doAction('accept_quote')} disabled={acting}
+              </AsyncButton>
+              <AsyncButton onClick={() => doAction('accept_quote')} disabled={acting}
+                loadingChildren="กำลังยืนยัน..."
                 className="flex-2 flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold transition"
               >
-                {acting ? 'กำลังยืนยัน...' : '✅ ยอมรับและว่าจ้าง'}
-              </button>
+                ✅ ยอมรับและว่าจ้าง
+              </AsyncButton>
             </div>
           </div>
         )}
@@ -315,11 +318,11 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
               ติดต่อผู้ขายที่เบอร์ <strong className="text-white">{job.seller_contact || '—'}</strong> และเดินทางไปยัง{' '}
               <strong className="text-white">{job.seller_location}</strong>
             </p>
-            <button onClick={() => doAction('start_work')} disabled={acting}
+            <AsyncButton onClick={() => doAction('start_work')}
               className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold transition"
             >
-              {acting ? '...' : '🚗 เริ่มออกเดินทาง'}
-            </button>
+              🚗 เริ่มออกเดินทาง
+            </AsyncButton>
           </div>
         )}
 
@@ -334,11 +337,11 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
                 className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition resize-none text-sm"
               />
             </div>
-            <button onClick={() => doAction('complete', { reportNotes })} disabled={acting || !reportNotes}
+            <AsyncButton onClick={() => doAction('complete', { reportNotes })} disabled={!reportNotes}
               className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold transition"
             >
-              {acting ? '...' : '🎉 รายงานเสร็จสิ้น'}
-            </button>
+              🎉 รายงานเสร็จสิ้น
+            </AsyncButton>
           </div>
         )}
 

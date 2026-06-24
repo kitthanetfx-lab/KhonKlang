@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Anuphan, IBM_Plex_Mono, IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -31,6 +31,13 @@ const monoFont = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "คนกลาง — ซื้อขายปลอดภัยผ่านคนกลาง",
   description: "แพลตฟอร์มซื้อขายปลอดภัยผ่านคนกลางที่ผ่านการรับรอง พักเงินไว้กับระบบจนกว่าจะได้รับของจริง",
+};
+
+// interactive-widget=overlays-content: บนมือถือ คีย์บอร์ดจะ "ทับ" จอแทนที่จะดันเนื้อหาขึ้น (ทุกบริการ)
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "overlays-content",
 };
 
 export default function RootLayout({
