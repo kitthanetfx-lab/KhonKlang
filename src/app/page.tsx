@@ -97,7 +97,7 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
           </div>
         </div>
         <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
-          <div className="eyebrow reveal"><Icon name="shieldCheck" size={15} /> ซื้อขายปลอดภัยผ่านคนกลางรับรอง</div>
+          <div className="eyebrow reveal"><Icon name="shieldCheck" size={19} /> ซื้อขายปลอดภัยผ่านคนกลางรับรอง</div>
           <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
             จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span>
           </h1>
