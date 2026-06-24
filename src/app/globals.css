@@ -293,22 +293,14 @@ button.nav-link { background: none; border: none; }
 .dropdown-item .t { font-family: var(--font-display); font-weight:700; font-size:15px; color: var(--ink); line-height: 1.35; }
 .dropdown-item .d { font-size:13.5px; color: var(--muted); line-height:1.55; }
 
-/* mobile bottom nav — fixed ไม่หายตามสกรอล, เฉพาะมือถือ */
+/* mobile service tabs — ติดไปกับ sticky nav, เฉพาะมือถือ */
 .mobile-service-tabs {
   display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 55;
   background: var(--surface);
   border-top: 1px solid var(--line);
-  box-shadow: 0 -2px 12px rgba(0,0,0,.08);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 @media (max-width: 979px) {
   .mobile-service-tabs { display: flex; }
-  body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 }
 .mst-item {
   flex: 1;
