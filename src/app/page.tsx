@@ -145,33 +145,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="section" style={{ paddingTop: 0 }}>
-        <div className="container">
-          <div className="join-grid">
-            <div className="join-card reveal">
-              <span className="icon-tile"><Icon name="users" /></span>
-              <h3>เปิดร้านในฐานะผู้ขาย</h3>
-              <p>เพิ่มความน่าเชื่อถือด้วยตราการันตี ปิดการขายได้ง่ายขึ้น และเบิกเงินไว</p>
-              {controls.isEnabled('sellerRegistration') ? (
-                <Link className="btn btn-dark" href="/register/seller">สมัครเป็นผู้ขาย <Icon name="arrowRight" size={16} /></Link>
-              ) : (
-                <button className="btn btn-dark" type="button" disabled title={controls.message('sellerRegistration')}>สมัครเป็นผู้ขายปิดชั่วคราว</button>
-              )}
-            </div>
-            <div className="join-card green reveal" style={{ ['--d' as string]: '90ms' }}>
-              <span className="icon-tile green"><Icon name="handCoins" /></span>
-              <h3>สร้างรายได้เป็นคนกลาง</h3>
-              <p>ใช้ความน่าเชื่อถือของคุณรับงานคนกลาง รับค่าธรรมเนียมจากทุกดีลที่สำเร็จ</p>
-              {controls.isEnabled('middlemanRegistration') ? (
-                <Link className="btn btn-dark" href="/register/middleman">สมัครเป็นคนกลาง <Icon name="arrowRight" size={16} /></Link>
-              ) : (
-                <button className="btn btn-dark" type="button" disabled title={controls.message('middlemanRegistration')}>สมัครเป็นคนกลางปิดชั่วคราว</button>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className="scam-band">
         <div className="container scam-inner reveal">
           <div className="scam-ic"><Icon name="search" size={30} /></div>
