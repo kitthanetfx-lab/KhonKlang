@@ -297,7 +297,7 @@ button.nav-link { background: none; border: none; }
 .mobile-service-tabs {
   display: none;
   position: fixed;
-  top: 70px;
+  top: 0;
   left: 0;
   right: 0;
   z-index: 55;
@@ -307,11 +307,10 @@ button.nav-link { background: none; border: none; }
 }
 @media (max-width: 979px) {
   .mobile-service-tabs { display: flex; }
+  .nav { top: 56px; }              /* nav sticks just below the fixed tabs */
+  .mobile-tab-spacer { display: block; height: 56px; } /* pushes nav down initially */
 }
 .mobile-tab-spacer { display: none; }
-@media (max-width: 979px) {
-  .mobile-tab-spacer { display: block; height: 56px; }
-}
 /* สีเฉพาะแต่ละปุ่ม */
 .mst-item:nth-child(1) { --mst-c: #3b82f6; }
 .mst-item:nth-child(2) { --mst-c: #22c55e; }

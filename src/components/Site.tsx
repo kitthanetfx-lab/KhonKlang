@@ -157,6 +157,7 @@ export function Nav({ active }: { active?: string }) {
 
   return (
     <>
+    <div className="mobile-tab-spacer" />
     <nav className={`nav ${scrolled ? 'scrolled' : ''}`}>
       <InAppBanner />
       <div className="container nav-inner">
@@ -257,7 +258,6 @@ export function Nav({ active }: { active?: string }) {
         </Link>
       ))}
     </div>
-    <div className="mobile-tab-spacer" />
     </>
   );
 }
