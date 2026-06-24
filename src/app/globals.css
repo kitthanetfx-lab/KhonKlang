@@ -494,7 +494,7 @@ button.nav-link { background: none; border: none; }
 
 /* ช่องวีดีโอ/ภาพขนาดเล็กใต้การ์ด escrow — ใช้พื้นที่ที่ว่างขึ้นจากการเลื่อนการ์ดขึ้นไปด้านบน */
 .hero-promo-mini { margin-top: 14px; }
-.hero-promo-mini .promo-video-wrap { padding-top: 62.4%; }
+.hero-promo-mini .promo-video-wrap { padding-top: 49.9%; }
 .hero-promo-mini .promo-image { max-height: 220px; object-fit: cover; }
 .hero-promo-mini .promo-placeholder { aspect-ratio: auto; padding: 16px; gap: 6px; min-height: 0; }
 .hero-promo-mini .promo-placeholder svg { width: 20px; height: 20px; }
