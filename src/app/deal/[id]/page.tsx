@@ -282,6 +282,11 @@ function isFinishedStatus(status?: string) {
   return status === 'completed' || status === 'cancelled' || status === 'disputed';
 }
 
+function isDealParty(deal: Deal | null, userId: string) {
+  if (!deal || !userId) return false;
+  return [deal.seller_id, deal.middleman_id, deal.buyer_id].includes(userId);
+}
+
 export default function DealRoom() {
   const router = useRouter();
   const params = useParams();
@@ -306,7 +311,7 @@ export default function DealRoom() {
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
-  const [showJitsi, setShowJitsi] = useState(requestedCall);
+  const [showJitsi, setShowJitsi] = useState(false);
   // ข้อ3: ระหว่างวิดีโอคอล ซ่อนปุ่มลอย "กลับหน้าหลัก" + "บริการลูกค้า" (ผ่าน body.in-call)
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -409,43 +414,48 @@ export default function DealRoom() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setTab(readDealTab(requestedTab));
-      if (requestedCall) setShowJitsi(true);
+      if (requestedCall && isDealParty(deal, myId)) setShowJitsi(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [requestedCall, requestedTab]);
+  }, [deal, myId, requestedCall, requestedTab]);
 
   const fetchDeal = useCallback(async (headers: Record<string, string> = {}) => {
     try {
       const r = await fetch(`/api/deals/${dealId}`, { headers });
       const d = await r.json();
       if (r.ok) {
-        setDeal(d.deal); setDealError('');
+        const nextDeal = d.deal as Deal;
+        setDeal(nextDeal); setDealError('');
         setMeetup(d.meetup || null); setPriceState(d.priceState || null); setEvidence(d.evidence || []);
         setBuyerBank(d.buyerBank || null); setSellerBank(d.sellerBank || null); setMiddlemanBank(d.middlemanBank || null);
+        return nextDeal;
       } else setDealError(d.error || `Error ${r.status}`);
     } catch (e: any) { setDealError(e?.message || 'Network error'); }
+    return null;
   }, [dealId, setDeal, setDealError]);
 
-  const fetchMsgs = useCallback(async (headers: Record<string, string>) => {
-    if (!headers.Authorization) return;
+  const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
+    if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
     const r = await fetch(`/api/messages?dealId=${dealId}`, { headers }).catch(() => null);
     if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); }
     else if (r?.status === 401) {
       // token หมดอายุ — ล้าง cache ให้ poll รอบถัดไปขอ token ใหม่จาก Supabase
       headersRef.current = {};
     }
-  }, [dealId, setMsgs]);
+  }, [deal, dealId, myId, setMsgs]);
 
   useEffect(() => {
     (async () => {
-      await fetchDeal();
+      const loadedDeal = await fetchDeal();
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('guest');
         const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
         setMyId(user.id); setMyName(profile?.display_name || '');
         const headers = await getAuthHeaders();
-        if (readDealTab(requestedTab) === 'chat' || requestedCall) await fetchMsgs(headers);
+        if ((readDealTab(requestedTab) === 'chat' || requestedCall) && isDealParty(loadedDeal, user.id)) {
+          await fetchMsgs(headers, loadedDeal, user.id);
+        }
       } catch { /* guest */ }
       finally { setLoading(false); }
     })();
@@ -461,12 +471,13 @@ export default function DealRoom() {
     // poll chat เสมอสำหรับดีล meetup (แชทฝังใน wizard) หรือเมื่ออยู่ tab chat / jitsi
     // หยุด poll เมื่อ meetup เสร็จแล้ว (step 9) — ไม่จำเป็นต้องโหลดแชทใน done screen
     const isMeetupDeal = deal?.deal_type === 'meetup' && deal?.status !== 'completed';
+    if (!isDealParty(deal, myId)) return;
     if (tab !== 'chat' && !showJitsi && !isMeetupDeal) return;
     let stopped = false;
     const poll = async () => {
       try {
         const headers = await getAuthHeaders();
-        if (!stopped) await fetchMsgs(headers);
+        if (!stopped) await fetchMsgs(headers, deal, myId);
       } catch { /* เงียบ */ }
     };
     void poll();
@@ -475,7 +486,7 @@ export default function DealRoom() {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [fetchMsgs, showJitsi, tab, deal?.deal_type]);
+  }, [deal, fetchMsgs, getAuthHeaders, myId, showJitsi, tab]);
 
   // แจ้งผู้ร่วมดีลว่ามีคนเข้ามาดูห้องนี้ — ครั้งเดียวต่อ session ต่อดีล กันสแปม
   const visitSent = useRef(false);
@@ -536,8 +547,8 @@ export default function DealRoom() {
       const d = await r.json();
       if (r.ok) {
         // re-fetch ทั้งดีล+meetup+priceState+evidence ให้ตรงกัน (PATCH คืนแค่ deal row)
-        await fetchDeal(headers);
-        if (tab === 'chat' || showJitsi) await fetchMsgs(headers);
+        const nextDeal = await fetchDeal(headers);
+        if ((tab === 'chat' || showJitsi) && isDealParty(nextDeal ?? deal, myId)) await fetchMsgs(headers, nextDeal ?? deal, myId);
       } else if (r.status === 401) {
         headersRef.current = {}; // ล้าง cache
         alert('เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่');
@@ -549,11 +560,12 @@ export default function DealRoom() {
 
   async function sendMsg(text: string, type = 'text', fileId = '', fileName = '') {
     if (!text && !fileId) return;
+    if (!isDealParty(deal, myId) || !chatIsOpen()) return;
     setSending(true);
     try {
       const headers = await getAuthHeaders();
       await fetch('/api/messages', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId, content: text, type, fileId, fileName, role: myRole }) });
-      setChatInput(''); await fetchMsgs(headers);
+      setChatInput(''); await fetchMsgs(headers, deal, myId);
     } finally { setSending(false); }
   }
 
@@ -616,6 +628,7 @@ export default function DealRoom() {
 
   /** เปิด/ปิดวิดีโอคอล — ตอนเปิดจะแจ้งเตือนทุกฝ่ายในดีล (กันสแปม: แจ้งซ้ำได้ทุก 2 นาที) */
   function toggleCall() {
+    if (!isDealParty(deal, myId)) return;
     const opening = !showJitsi;
     setShowJitsi(opening);
     // แจ้งเตือนทุกครั้งที่มีคนล็อกอินเปิดคอล — รวมถึงผู้สนใจที่มาจากลิงก์แชร์ (guest ที่ล็อกอินแล้ว)
@@ -629,7 +642,7 @@ export default function DealRoom() {
             headers: { ...headers, 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'start_call' }),
           });
-          fetchMsgs(headers);
+          fetchMsgs(headers, deal, myId);
         } catch { /* แจ้งเตือนไม่สำเร็จ ไม่กระทบการเข้าคอล */ }
       })();
     }
