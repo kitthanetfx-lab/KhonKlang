@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -12,7 +12,9 @@ import { supabase } from '@/lib/supabase';
  */
 function OAuthCompleteInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [status, setStatus] = useState('กำลังเข้าสู่ระบบ...');
+  const returnTo = searchParams.get('returnTo') || '/register';
 
   useEffect(() => {
     async function finish() {
@@ -23,16 +25,16 @@ function OAuthCompleteInner() {
         if (error || !data.session) throw new Error(error?.message || 'no_session');
 
         setStatus('เข้าสู่ระบบสำเร็จ...');
-        // บังคับเข้าหน้าโปรไฟล์ทันทีหลังล็อกอินเสมอ ไม่ว่าจะมีข้อมูลโปรไฟล์แล้วหรือไม่
-        router.replace('/profile');
+        const safeReturn = returnTo.startsWith('/') ? returnTo : '/register';
+        router.replace(safeReturn);
       } catch (err: unknown) {
         console.error('OAuth complete error:', err);
         const message = err instanceof Error ? err.message : 'session_invalid';
-        router.replace(`/login?error=oauth_failed&msg=${encodeURIComponent(message)}`);
+        router.replace(`/login?error=oauth_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
       }
     }
     finish();
-  }, [router]);
+  }, [returnTo, router]);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: '#0a0f1e', color: '#fff' }}>

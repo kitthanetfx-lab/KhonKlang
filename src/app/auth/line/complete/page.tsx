@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 function LineCompleteInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [status, setStatus] = useState('กำลังเข้าสู่ระบบด้วย LINE...');
+  const returnTo = searchParams.get('returnTo') || '/register';
 
   useEffect(() => {
     async function finish() {
@@ -25,7 +27,7 @@ function LineCompleteInner() {
           if (!data.session) throw new Error('no_session');
           await routeAfterLogin();
         } catch {
-          router.replace('/login?error=line_failed&msg=no_session');
+          router.replace(`/login?error=line_failed&msg=no_session&returnTo=${encodeURIComponent(returnTo)}`);
         }
         return;
       }
@@ -41,18 +43,18 @@ function LineCompleteInner() {
       } catch (err: unknown) {
         console.error('LINE complete error:', err);
         const message = err instanceof Error ? err.message : 'session_invalid';
-        router.replace(`/login?error=line_failed&msg=${encodeURIComponent(message)}`);
+        router.replace(`/login?error=line_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
       }
     }
 
     async function routeAfterLogin() {
       setStatus('เข้าสู่ระบบสำเร็จ...');
-      // บังคับเข้าหน้าโปรไฟล์ทันทีหลังล็อกอินเสมอ ไม่ว่าจะมีข้อมูลโปรไฟล์แล้วหรือไม่
-      router.replace('/profile');
+      const safeReturn = returnTo.startsWith('/') ? returnTo : '/register';
+      router.replace(safeReturn);
     }
 
     finish();
-  }, [router]);
+  }, [returnTo, router]);
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center gap-4 text-white">
