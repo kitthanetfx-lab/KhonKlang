@@ -4,6 +4,7 @@ import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../../_lib/notify';
 import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
 import { getTierCreditLimit } from '@/lib/financeLedger';
+import { computeDealFees } from '@/lib/fees';
 
 // หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
 async function getAdminIds(db: SupabaseClient): Promise<string[]> {
@@ -274,7 +275,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         meetupUpdates.pending_deposit = amount;
         meetupUpdates.pending_by = isBuyer ? 'buyer' : 'seller';
         if (body.meetLabel) meetupUpdates.pending_meet_label = String(body.meetLabel).slice(0, 200);
-        systemMsg = `💰 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เสนอ${body.meetLabel ? `จุดนัด "${String(body.meetLabel).slice(0, 200)}" + ` : 'เปลี่ยน'}เงินประกัน ฿${amount.toLocaleString()}/ฝ่าย — รออีกฝ่ายกดยอมรับ`;
+        // แนบการปรับราคา/ค่าบริการมากับข้อเสนอจุดนัด (popup รวมทุกอย่าง)
+        let extra = '';
+        if (body.price !== undefined && body.price !== null && String(body.price) !== '') {
+          const p = Math.round(Number(body.price));
+          if (p >= 1 && p <= 999999999) { meetupUpdates.pending_price = p; extra += ` · ราคาใหม่ ฿${p.toLocaleString()}`; }
+        } else { meetupUpdates.pending_price = null; }
+        if (['buyer', 'seller', 'split'].includes(body.feePayer)) {
+          meetupUpdates.pending_fee_payer = body.feePayer;
+          extra += ` · ค่าบริการ ${body.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : body.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง'}`;
+        } else { meetupUpdates.pending_fee_payer = null; }
+        systemMsg = `💰 ${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เสนอ${body.meetLabel ? `จุดนัด "${String(body.meetLabel).slice(0, 200)}" + ` : 'เปลี่ยน'}เงินประกัน ฿${amount.toLocaleString()}/ฝ่าย${extra} — รออีกฝ่ายกดยอมรับ`;
         break;
       }
       case 'meetup_respond': {
@@ -286,7 +297,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           if (md.pending_by === meSide) return NextResponse.json({ error: 'ผู้เสนอกดยอมรับเองไม่ได้ — ต้องให้อีกฝ่ายยอมรับ' }, { status: 400 });
           meetupUpdates.deposit = md.pending_deposit;
           if (md.pending_meet_label) meetupUpdates.meet_label = md.pending_meet_label;
-          systemMsg = `✅ ตกลงกันแล้ว${md.pending_meet_label ? `: ${md.pending_meet_label}` : ''} — เงินประกัน ฿${Number(md.pending_deposit).toLocaleString()}/ฝ่าย วางเงินได้เลย`;
+          // apply การปรับราคา/ค่าบริการที่แนบมากับข้อเสนอ + คำนวณค่าบริการรายฝ่ายใหม่
+          let extra = '';
+          if (md.pending_price) { updates.price = md.pending_price; extra += ` · ราคา ฿${Number(md.pending_price).toLocaleString()}`; }
+          if (md.pending_fee_payer) { updates.fee_payer = md.pending_fee_payer; extra += ` · ค่าบริการ ${md.pending_fee_payer === 'buyer' ? 'ผู้ซื้อจ่าย' : md.pending_fee_payer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง'}`; }
+          if (md.pending_price || md.pending_fee_payer) {
+            const newPrice = Number(md.pending_price || deal.price) || 0;
+            const newFeePayer = (md.pending_fee_payer || deal.fee_payer || 'split') as 'buyer' | 'seller' | 'split';
+            const cfg = await readFeesConfig(db);
+            const totalFee = computeDealFees(cfg, newPrice, 'meetup').total;
+            meetupUpdates.buyer_fee = newFeePayer === 'buyer' ? totalFee : newFeePayer === 'split' ? Math.ceil(totalFee / 2) : 0;
+            meetupUpdates.seller_fee = newFeePayer === 'seller' ? totalFee : newFeePayer === 'split' ? Math.floor(totalFee / 2) : 0;
+          }
+          systemMsg = `✅ ตกลงกันแล้ว${md.pending_meet_label ? `: ${md.pending_meet_label}` : ''} — เงินประกัน ฿${Number(md.pending_deposit).toLocaleString()}/ฝ่าย${extra} วางเงินได้เลย`;
         } else {
           systemMsg = md.pending_by === meSide
             ? `↩️ ${meSide === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ยกเลิกข้อเสนอ`
@@ -295,6 +318,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         meetupUpdates.pending_deposit = null;
         meetupUpdates.pending_by = null;
         meetupUpdates.pending_meet_label = null;
+        meetupUpdates.pending_price = null;
+        meetupUpdates.pending_fee_payer = null;
         break;
       }
       case 'meetup_deposit': {

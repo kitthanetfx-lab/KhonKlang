@@ -159,6 +159,7 @@ interface MeetupData {
   deal_id?: string;
   buyer_loc?: ThaiAddress; seller_loc?: ThaiAddress;
   meet_label?: string; pending_meet_label?: string;
+  pending_price?: number; pending_fee_payer?: 'buyer' | 'seller' | 'split'; // ข้อเสนอจุดนัดที่แนบการปรับราคา/ค่าบริการ
   deposit?: number;
   buyer_departed_at?: string; seller_departed_at?: string;
   buyer_departed_ack_at?: string; seller_departed_ack_at?: string; // ข้อ5: อีกฝ่ายรับทราบการออกเดินทาง (buyer_*=ผู้ขายรับทราบของผู้ซื้อ)
@@ -393,8 +394,12 @@ export default function DealRoom() {
   const [savedEvidIds, setSavedEvidIds] = useState<Set<string>>(new Set());
   const [meetupPropLabel, setMeetupPropLabel] = useState<string | null>(null); // null=hidden ''=custom label
   const [meetupPropAmt, setMeetupPropAmt] = useState('');
-  // รีเซ็ตกลับไปดูขั้นปัจจุบันทุกครั้งที่สถานะดีลเปลี่ยน (เช่น แอดมินอนุมัติ ขยับไปขั้นถัดไปจริง)
-  useEffect(() => { setWzViewStep(null); }, [deal?.status]);
+  // Pop-Up ตกลงจุดนัด (รวมสถานที่+เงินประกัน+ปรับราคา+ค่าบริการ)
+  const [meetupPopOpen, setMeetupPopOpen] = useState(false);
+  const [meetupPropPrice, setMeetupPropPrice] = useState('');           // ราคาสินค้าใหม่ ('' = ไม่เปลี่ยน)
+  const [meetupPropFeePayer, setMeetupPropFeePayer] = useState<'buyer' | 'seller' | 'split' | ''>(''); // '' = ไม่เปลี่ยน
+  // รีเซ็ตกลับไปดูขั้นปัจจุบันเมื่อสถานะดีลเปลี่ยน หรือ meetup ตกลงยอดประกันแล้ว (ขยับไปขั้นวางเงินอัตโนมัติ)
+  useEffect(() => { setWzViewStep(null); }, [deal?.status, meetup?.deposit]);
 
   useEffect(() => {
     const r = document.documentElement;
@@ -1586,7 +1591,7 @@ export default function DealRoom() {
   }
 
   // ─── ขั้น 3: คุย/วิดีโอคอลรายละเอียดสินค้า ────────────────────────────────
-  function renderWizardStepChat() {
+  function renderWizardStepChat(nextStep = 4) {
     const chatMsgs = msgs.filter(m => m.role !== 'system').slice(-30);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1628,13 +1633,13 @@ export default function DealRoom() {
             <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
           </div>
         </div>
-        <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={async () => { if (!chatBundledRef.current) { chatBundledRef.current = true; await bundleChatTranscriptAsEvidence(); } await doAction('progress_ping', { stage: 'to_evidence' }); setChatReviewReady(true); setWzViewStep(4); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</AsyncButton>
+        <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={async () => { if (!chatBundledRef.current) { chatBundledRef.current = true; await bundleChatTranscriptAsEvidence(); } await doAction('progress_ping', { stage: 'to_evidence' }); setChatReviewReady(true); setWzViewStep(nextStep); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</AsyncButton>
       </div>
     );
   }
 
   // ─── ขั้น 4: ตรวจหลักฐาน + ยืนยัน ─────────────────────────────────────────
-  function renderWizardStepEvidenceReview() {
+  function renderWizardStepEvidenceReview(nextStep = 5) {
     const pd: DealPriceState = priceState || {};
     const meDone = myRole === 'seller' ? !!pd.evidence_done_seller : !!pd.evidence_done_buyer;
     const sellerDone = !!pd.evidence_done_seller;
@@ -1655,7 +1660,7 @@ export default function DealRoom() {
           {!meDone
             ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('evidence_done')}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</AsyncButton>
             : sellerDone && buyerDone
-              ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(5)}>✅ ทุกฝ่ายยืนยันแล้ว — ดำเนินการต่อ →</button>
+              ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ดำเนินการต่อ →</button>
               : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
           <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => setChatReviewReady(false)}>⬅ ย้อนกลับไปคุยต่อ</button>
         </div>
@@ -1830,7 +1835,7 @@ export default function DealRoom() {
   // Wizard ขั้นตอน "ประกันการเดินทาง" (deal_type === 'meetup') — 7 ขั้น
   // ═══════════════════════════════════════════════════════════════════════
   const MEETUP_WZ_TITLES = [
-    'ยอมรับเงื่อนไข', 'ตกลงจุดนัด', 'แชทและ Video Call', 'ตรวจหลักฐาน',
+    'ยอมรับเงื่อนไข', 'แชทและ Video Call', 'ตรวจหลักฐาน', 'ตกลงจุดนัด',
     'วางเงินประกัน', 'รอยืนยันรับเงิน', 'เดินทาง+นัดพบ', 'รอคืนเงินประกัน', 'เสร็จสมบูรณ์',
   ];
   const MWZ_TOTAL = MEETUP_WZ_TITLES.length;
@@ -1841,7 +1846,7 @@ export default function DealRoom() {
     if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
     const bothTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothTerms ? 2 : 1 };
-    if (s === 'payment_pending') return { step: md.deposit ? 5 : 2 };
+    if (s === 'payment_pending') return { step: md.deposit ? 5 : 4 };
     if (s === 'payment_uploaded') return { step: 6 };
     if (s === 'meetup_ready') return { step: 7 };
     if (s === 'completed') {
@@ -1885,12 +1890,23 @@ export default function DealRoom() {
     const hasPending = !!(md.pending_deposit && md.pending_by);
     const iProposed = hasPending && md.pending_by === myRole;
     const proposerLabel = md.pending_by === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
-    function submitPropose() {
+    const feeLabel = (fp: 'buyer' | 'seller' | 'split') => fp === 'buyer' ? 'ผู้ซื้อจ่าย' : fp === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
+    function openPop(label: string) {
+      setMeetupPropLabel(label);
+      setMeetupPropAmt(String(suggestAmount));
+      setMeetupPropPrice(''); setMeetupPropFeePayer('');
+      setMeetupPopOpen(true);
+    }
+    async function submitPropose() {
       const amount = Math.round(Number(meetupPropAmt));
-      if (!(amount >= 50)) { alert('กรอกตัวเลขขั้นต่ำ ฿50'); return; }
-      const lbl = meetupPropLabel || undefined;
-      doAction('meetup_propose', lbl ? { amount, meetLabel: lbl } : { amount });
-      setMeetupPropLabel(null);
+      if (!(amount >= 50)) { alert('เงินประกันขั้นต่ำ ฿50'); return; }
+      const label = (meetupPropLabel || '').trim();
+      if (!label) { alert('กรอกจุดนัด/รายละเอียดสถานที่'); return; }
+      const payload: Record<string, unknown> = { amount, meetLabel: label };
+      if (meetupPropPrice.trim()) { const p = Math.round(Number(meetupPropPrice)); if (p >= 1) payload.price = p; }
+      if (meetupPropFeePayer) payload.feePayer = meetupPropFeePayer;
+      await doAction('meetup_propose', payload);
+      setMeetupPopOpen(false);
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1904,24 +1920,36 @@ export default function DealRoom() {
             <AddressPicker value={meetAddr} onChange={(a: ThaiAddress) => { setMeetAddr(a); if (a.tambon) doAction('meetup_set_location', { loc: a }); }} />
           )}
         </div>
-        {/* --- ส่วน 2: ข้อเสนอ / เลือกวิธีนัด --- */}
-        {hasPending ? (
+        {/* --- ส่วน 2: สถานะ ตกลงแล้ว / รอตอบ / เลือกวิธีนัด --- */}
+        {md.deposit && !hasPending ? (
+          <div className="dr-card" style={{ background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb,var(--accent) 25%,transparent)' }}>
+            <div className="dr-card-title">✅ ตกลงจุดนัด + เงินประกันแล้ว</div>
+            {md.meet_label && <p style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>📍 {md.meet_label}</p>}
+            <p style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 10 }}>เงินประกัน: <b>฿{Number(md.deposit).toLocaleString()} / ฝ่าย</b></p>
+            <button type="button" className="btn btn-primary btn-block" onClick={() => setWzViewStep(5)}>ไปวางเงินประกัน →</button>
+            {isParty && <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => openPop(md.meet_label || '')}>✏️ เสนอแก้จุดนัด/ยอด</button>}
+          </div>
+        ) : hasPending ? (
           iProposed ? (
-            /* ฉันเป็นคนเสนอ — รออีกฝ่าย */
             <div className="dr-card">
-              <div className="dr-card-title">⏳ รออีกฝ่ายตอบรับ</div>
-              <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
-                {md.pending_meet_label && <p style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>📍 {md.pending_meet_label}</p>}
-                <p style={{ fontSize: 13, color: 'var(--muted)' }}>เงินประกันที่เสนอ: ฿{Number(md.pending_deposit).toLocaleString()}/ฝ่าย</p>
+              <div className="dr-card-title">⏳ รออีกฝ่ายตอบรับข้อเสนอ</div>
+              <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12, display: 'grid', gap: 4, fontSize: 13 }}>
+                {md.pending_meet_label && <div style={{ fontWeight: 600 }}>📍 {md.pending_meet_label}</div>}
+                <div>เงินประกัน: ฿{Number(md.pending_deposit).toLocaleString()}/ฝ่าย</div>
+                {md.pending_price ? <div>ราคาสินค้าใหม่: ฿{Number(md.pending_price).toLocaleString()}</div> : null}
+                {md.pending_fee_payer ? <div>ค่าบริการ: {feeLabel(md.pending_fee_payer)}</div> : null}
               </div>
               <button type="button" className="btn btn-ghost btn-block btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>↩️ ยกเลิกข้อเสนอของฉัน</button>
             </div>
           ) : (
-            /* อีกฝ่ายเสนอมา — ฉันต้องตอบ */
             <div className="dr-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)' }}>
               <div className="dr-card-title">📋 ข้อเสนอจาก{proposerLabel}</div>
-              {md.pending_meet_label && <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>📍 {md.pending_meet_label}</p>}
-              <p style={{ fontSize: 13.5, color: 'var(--ink-2)', marginBottom: 14 }}>เงินประกัน: <b style={{ color: 'var(--accent-strong)' }}>฿{Number(md.pending_deposit).toLocaleString()}/ฝ่าย</b></p>
+              <div style={{ display: 'grid', gap: 4, fontSize: 13.5, marginBottom: 14 }}>
+                {md.pending_meet_label && <div style={{ fontWeight: 700 }}>📍 {md.pending_meet_label}</div>}
+                <div>เงินประกัน: <b style={{ color: 'var(--accent-strong)' }}>฿{Number(md.pending_deposit).toLocaleString()}/ฝ่าย</b></div>
+                {md.pending_price ? <div>ราคาสินค้าใหม่: <b>฿{Number(md.pending_price).toLocaleString()}</b></div> : null}
+                {md.pending_fee_payer ? <div>ค่าบริการ: <b>{feeLabel(md.pending_fee_payer)}</b></div> : null}
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <AsyncButton type="button" className="btn btn-green flex-1" disabled={acting} onClick={() => doAction('meetup_respond', { accept: true })}>✅ ยอมรับ</AsyncButton>
                 <AsyncButton type="button" className="btn btn-ghost flex-1 btn-sm" disabled={acting} onClick={() => doAction('meetup_respond', { accept: false })}>❌ ปฏิเสธ</AsyncButton>
@@ -1929,41 +1957,54 @@ export default function DealRoom() {
             </div>
           )
         ) : (
-          /* ยังไม่มีข้อเสนอ — เลือกวิธีนัด */
           <div className="dr-card">
             <div className="dr-card-title">🗺️ เลือกวิธีนัดพบ</div>
             {isParty && meetOptions.length > 0 ? (
               <>
-                <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>กดตัวเลือกด้านล่างเพื่อเสนอวิธีนัด — อีกฝ่ายจะกด "ยอมรับ" หรือ "ปฏิเสธ" ได้</p>
+                <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>กดเลือกวิธีนัด แล้วกรอกรายละเอียดในหน้าต่างที่เด้งขึ้นมา — อีกฝ่ายจะกดยอมรับ/ปฏิเสธได้</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
                   {meetOptions.map(opt => (
                     <button key={opt.label} type="button" className="btn btn-soft btn-block" style={{ textAlign: 'left', flexDirection: 'column', alignItems: 'flex-start', height: 'auto', padding: '10px 14px' }}
-                      disabled={acting}
-                      onClick={() => doAction('meetup_propose', { amount: suggestAmount, meetLabel: opt.label })}>
+                      disabled={acting} onClick={() => openPop(opt.label)}>
                       <span style={{ fontWeight: 600, fontSize: 13.5 }}>{opt.label}</span>
                       <span style={{ fontSize: 12, color: 'var(--muted)' }}>{opt.sub}</span>
                     </button>
                   ))}
                 </div>
-                <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => { setMeetupPropLabel(''); setMeetupPropAmt(String(suggestAmount)); }}>✏️ กำหนดจุดนัดและเงินประกันเอง</button>
-                {meetupPropLabel !== null && (
-                  <div style={{ marginTop: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: 14 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8 }}>📝 เสนอเอง</div>
-                    <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>จุดนัด</label>
-                    <input type="text" className="input input-bordered" placeholder="เช่น ห้างฯ เซ็นทรัล ลาดพร้าว" value={meetupPropLabel} onChange={e => setMeetupPropLabel(e.target.value)} style={{ width: '100%', marginBottom: 8 }} />
-                    <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>เงินประกัน (บาท/ฝ่าย)</label>
-                    <input type="number" className="input input-bordered" placeholder="500" min={50} value={meetupPropAmt} onChange={e => setMeetupPropAmt(e.target.value)} style={{ width: '100%', marginBottom: 10 }} />
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" className="btn btn-primary flex-1" disabled={acting} onClick={submitPropose}>✅ ส่งข้อเสนอ</button>
-                      <button type="button" className="btn btn-ghost flex-1" onClick={() => setMeetupPropLabel(null)}>ยกเลิก</button>
-                    </div>
-                  </div>
-                )}
+                <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => openPop('')}>✏️ กำหนดจุดนัดเอง</button>
               </>
             ) : isParty && !bothLocs ? (
               <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '10px 0' }}>รอทั้งสองฝ่ายระบุที่อยู่ก่อน — ระบบจะแนะนำจุดนัดให้อัตโนมัติ</p>
             ) : null}
             {!isParty && <p style={{ fontSize: 13.5, color: 'var(--muted)', textAlign: 'center', padding: '14px 0' }}>รอทั้งสองฝ่ายตกลงวิธีนัดพบ</p>}
+          </div>
+        )}
+
+        {/* POP-UP กรอกรายละเอียดข้อเสนอจุดนัด (สถานที่ + เงินประกัน + ปรับราคา + ค่าบริการ) */}
+        {meetupPopOpen && (
+          <div className="meetup-ack-pop" role="dialog" aria-label="ตกลงรายละเอียดจุดนัด" onClick={() => setMeetupPopOpen(false)}>
+            <div className="meetup-ack-card" style={{ textAlign: 'left', width: 'min(94vw, 400px)' }} onClick={e => e.stopPropagation()}>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 12, textAlign: 'center' }}>📍 ตกลงรายละเอียดจุดนัด</div>
+              <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>จุดนัด / รายละเอียดสถานที่</label>
+              <input type="text" value={meetupPropLabel || ''} onChange={e => setMeetupPropLabel(e.target.value)} placeholder="เช่น โลตัส สาขาลพบุรี ชั้น 1 หน้าร้านกาแฟ"
+                style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, marginBottom: 10 }} />
+              <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>เงินประกัน (บาท/ฝ่าย)</label>
+              <input type="number" min={50} value={meetupPropAmt} onChange={e => setMeetupPropAmt(e.target.value)} placeholder="500"
+                style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, marginBottom: 10 }} />
+              <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>ปรับราคาสินค้า? (เว้นว่าง = ใช้ราคาเดิม ฿{Number(deal!.price || 0).toLocaleString()})</label>
+              <input type="number" min={1} value={meetupPropPrice} onChange={e => setMeetupPropPrice(e.target.value)} placeholder={`฿${Number(deal!.price || 0).toLocaleString()}`}
+                style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, marginBottom: 10 }} />
+              <label style={{ fontSize: 12.5, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>ค่าบริการ</label>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+                {([['', 'ไม่เปลี่ยน'], ['buyer', 'ผู้ซื้อ'], ['seller', 'ผู้ขาย'], ['split', 'หารครึ่ง']] as const).map(([v, l]) => (
+                  <button key={v || 'none'} type="button" className={`btn btn-sm ${meetupPropFeePayer === v ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMeetupPropFeePayer(v)}>{l}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <AsyncButton type="button" className="btn btn-primary flex-1" onClick={submitPropose}>✅ ส่งข้อเสนอ</AsyncButton>
+                <button type="button" className="btn btn-ghost flex-1" onClick={() => setMeetupPopOpen(false)}>ยกเลิก</button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -2152,10 +2193,12 @@ export default function DealRoom() {
     const iAckedOther = !!(myRole === 'buyer' ? md.seller_departed_ack_at : md.buyer_departed_ack_at);
     const myDepartAcked = !!(myRole === 'buyer' ? md.buyer_departed_ack_at : md.seller_departed_ack_at);
     const showAckPopup = isParty && !!otherDepartedAt && !iAckedOther && !myMet;
-    const rows = [
+    const allRows = [
       { side: 'buyer', label: '🛍️ ผู้ซื้อ', met: md.buyer_met, departedAt: md.buyer_departed_at, pos: md.buyer_pos },
       { side: 'seller', label: '🛒 ผู้ขาย', met: md.seller_met, departedAt: md.seller_departed_at, pos: md.seller_pos },
     ];
+    // ผู้ซื้อ/ผู้ขายเห็นแค่ตำแหน่ง "ฝ่ายตรงข้าม" พอ (คนกลาง/แอดมินเห็นทั้งคู่)
+    const rows = isParty ? allRows.filter(r => r.side !== myRole) : allRows;
     // คำนวณจุดหมายปลายทาง (สำหรับ navigation link)
     const destLoc = md.meet_label?.startsWith('ผู้ซื้อเดินทาง') ? md.seller_loc
       : md.meet_label?.startsWith('ผู้ขายเดินทาง') ? md.buyer_loc
@@ -2288,12 +2331,12 @@ export default function DealRoom() {
   function renderMeetupWizard() {
     const { step: actualStep, outcome } = getMeetupStep();
     const md: MeetupData = meetup || {};
-    // ถ้า actualStep=5 แต่ยังไม่มีสลิป → แสดง step 3 (แชท+Video) ก่อน
-    const defaultStep = (actualStep === 5 && !md.buyer_slip && !md.seller_slip) ? 3 : actualStep;
+    // ก่อนตกลงจุดนัด (ยังไม่มี deposit) actualStep=4 — เดิน แชท(2)→ตรวจหลักฐาน(3)→ตกลงจุดนัด(4) เป็น pre-flow
+    const negotiatePreFlow = actualStep === 4 && !md.deposit;
+    const defaultStep = negotiatePreFlow ? 2 : actualStep;
     const step = Math.min(wzViewStep ?? defaultStep, actualStep);
-    // steps 3-4 เป็น pre-flow ของ actualStep 5 — ไม่ใช่การย้อนดู
-    const chatPreFlow = actualStep === 5 && !md.buyer_slip && !md.seller_slip;
-    const isReviewing = chatPreFlow ? step < 3 : step < actualStep;
+    const chatPreFlow = negotiatePreFlow; // ใช้ชื่อเดิมในส่วนปุ่มถัดไปด้านล่าง
+    const isReviewing = negotiatePreFlow ? step < 2 : step < actualStep;
     return (
       <div className="dr-inner">
         {step > 0 && renderMeetupWizardProgress(step)}
@@ -2311,9 +2354,9 @@ export default function DealRoom() {
         <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
           {step === 0 && renderWizardStep0()}
           {step === 1 && renderWizardStep1()}
-          {step === 2 && renderMeetupWizardStepNegotiate()}
-          {step === 3 && renderWizardStepChat()}
-          {step === 4 && renderWizardStepEvidenceReview()}
+          {step === 2 && renderWizardStepChat(3)}
+          {step === 3 && renderWizardStepEvidenceReview(4)}
+          {step === 4 && renderMeetupWizardStepNegotiate()}
           {step === 5 && renderMeetupWizardStepDeposit()}
           {step === 6 && renderMeetupWizardStepAdminCheck()}
           {step === 7 && renderMeetupWizardStepMeet()}
@@ -2325,8 +2368,8 @@ export default function DealRoom() {
             {step > 1
               ? <button type="button" className="btn btn-ghost" onClick={() => setWzViewStep(Math.max(1, step - 1))}>← ย้อนกลับ</button>
               : <span />}
-            {/* ซ่อนปุ่มถัดไปใน chatPreFlow (step 3-4) — ต้องกดปุ่มหลักในแต่ละขั้นเท่านั้น */}
-            {step < actualStep && !(chatPreFlow && step >= 3) && (
+            {/* ซ่อนปุ่มถัดไปใน pre-flow (แชท/ตรวจหลักฐาน/ตกลงจุดนัด) — ต้องกดปุ่มหลักในแต่ละขั้น */}
+            {step < actualStep && !(chatPreFlow && step >= 2) && (
               <button type="button" className="btn btn-primary" onClick={() => setWzViewStep(Math.min(actualStep, step + 1))}>ถัดไป →</button>
             )}
           </div>
