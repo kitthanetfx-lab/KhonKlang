@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 
+function isAuthError(err: unknown) {
+  return err instanceof HttpError && (err.status === 401 || err.status === 403);
+}
+
 /** อ่าน/โพสต์แชทได้เฉพาะผู้ร่วมดีล — กันคนสุ่ม dealId มาอ่าน/ยิงข้อความดีลคนอื่น */
 async function assertDealParty(db: SupabaseClient, dealId: string, userId: string): Promise<NextResponse | null> {
   const { data: deal, error } = await db.from('deals').select('buyer_id, seller_id, middleman_id').eq('id', dealId).maybeSingle();
@@ -14,20 +18,32 @@ async function assertDealParty(db: SupabaseClient, dealId: string, userId: strin
 // GET /api/messages?dealId=xxx&after=isoDate
 export async function GET(req: NextRequest) {
   try {
-    const me = await verifyUser(req);
     const dealId = req.nextUrl.searchParams.get('dealId');
     const after  = req.nextUrl.searchParams.get('after');
     if (!dealId) return NextResponse.json({ error: 'Missing dealId' }, { status: 400 });
 
     const db = getAdminClient();
+    let me;
+    try {
+      me = await verifyUser(req);
+    } catch (err: unknown) {
+      // หน้า deal มีการ poll route นี้เป็นระยะ แม้บางช่วง session จะยังไม่พร้อม
+      // หรือผู้ใช้ยังไม่ได้เข้าร่วมดีลจริง ๆ จึงคืนรายการว่างแทน 401 เพื่อไม่ให้ console โดน spam
+      if (isAuthError(err)) return NextResponse.json({ messages: [] });
+      throw err;
+    }
     const denied = await assertDealParty(db, dealId, me.id);
-    if (denied) return denied;
+    if (denied) {
+      if (denied.status === 403) return NextResponse.json({ messages: [] });
+      return denied;
+    }
 
     let query = db.from('messages').select('*').eq('deal_id', dealId).order('created_at', { ascending: true }).limit(200);
     if (after) query = query.gt('created_at', after);
     const { data } = await query;
     return NextResponse.json({ messages: data || [] });
   } catch (err: unknown) {
+    if (isAuthError(err)) return NextResponse.json({ messages: [] });
     const status = err instanceof HttpError ? err.status : 500;
     return NextResponse.json({ error: String(err) }, { status });
   }

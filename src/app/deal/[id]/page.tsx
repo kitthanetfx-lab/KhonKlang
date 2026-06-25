@@ -287,20 +287,6 @@ function isDealParty(deal: Deal | null, userId: string) {
   return [deal.seller_id, deal.middleman_id, deal.buyer_id].includes(userId);
 }
 
-function reportClientDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
-  fetch('http://127.0.0.1:7777/event', {
-    method: 'POST',
-    body: JSON.stringify({ sessionId: 'deal-chat-auth-mismatch', runId: 'pre-fix', hypothesisId, location, msg: `[DEBUG] ${msg}`, data, ts: Date.now() }),
-  }).catch(() => {});
-}
-
-function reportCreateCrashDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
-  fetch('http://127.0.0.1:7777/event', {
-    method: 'POST',
-    body: JSON.stringify({ sessionId: 'deal-create-runtime-crash', runId: 'pre-fix', hypothesisId, location, msg: `[DEBUG] ${msg}`, data, ts: Date.now() }),
-  }).catch(() => {});
-}
-
 export default function DealRoom() {
   const router = useRouter();
   const params = useParams();
@@ -422,20 +408,6 @@ export default function DealRoom() {
   useEffect(() => { setWzViewStep(null); }, [deal?.status, meetup?.deposit]);
 
   useEffect(() => {
-    // #region debug-point A:pre-guard-render-snapshot
-    reportCreateCrashDebug('A', 'deal/[id]:pre-guard-snapshot', 'render snapshot before early returns', {
-      dealId,
-      loading,
-      hasDeal: !!deal,
-      dealType: deal?.deal_type || null,
-      dealStatus: deal?.status || null,
-      myId: myId || null,
-      wzViewStep,
-    });
-    // #endregion
-  }, [deal, dealId, loading, myId, wzViewStep]);
-
-  useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
   }, []);
@@ -464,29 +436,8 @@ export default function DealRoom() {
   }, [dealId, setDeal, setDealError]);
 
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
-    // #region debug-point A:fetch-msgs-entry
-    reportClientDebug('A', 'deal/[id]:fetchMsgs:entry', 'fetchMsgs called', {
-      dealId,
-      currentUserId: currentUserId || null,
-      hasAuthHeader: !!headers.Authorization,
-      buyerId: currentDeal?.buyer_id || null,
-      sellerId: currentDeal?.seller_id || null,
-      middlemanId: currentDeal?.middleman_id || null,
-      isDealParty: isDealParty(currentDeal, currentUserId),
-      tab,
-      showJitsi,
-    });
-    // #endregion
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
     const r = await fetch(`/api/messages?dealId=${dealId}`, { headers }).catch(() => null);
-    // #region debug-point D:fetch-msgs-response
-    reportClientDebug('D', 'deal/[id]:fetchMsgs:response', 'fetchMsgs received response', {
-      dealId,
-      currentUserId: currentUserId || null,
-      status: r?.status || 'network-null',
-      ok: !!r?.ok,
-    });
-    // #endregion
     if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); }
     else if (r?.status === 401) {
       // token หมดอายุ — ล้าง cache ให้ poll รอบถัดไปขอ token ใหม่จาก Supabase
@@ -512,15 +463,6 @@ export default function DealRoom() {
   }, [dealId, fetchDeal, fetchMsgs, getAuthHeaders, requestedCall, requestedTab]);
 
   useEffect(() => {
-    // #region debug-point B:late-simple-effect-entered
-    reportCreateCrashDebug('B', 'deal/[id]:late-simple-effect', 'late simple effect registered', {
-      dealId,
-      hasDeal: !!deal,
-      dealType: deal?.deal_type || null,
-      loading,
-      wzViewStep,
-    });
-    // #endregion
     if (deal?.deal_type !== 'simple') {
       simpleActualStepRef.current = null;
       return;

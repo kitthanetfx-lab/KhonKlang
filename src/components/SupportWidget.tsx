@@ -124,47 +124,12 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
 
-  const reportDebug = useCallback((hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) => {
-    const send = (headers: Record<string, string>) => fetch('/api/support/debug', {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'support-call-fail',
-        runId: 'pre-fix',
-        hypothesisId,
-        location,
-        msg,
-        data,
-        ts: Date.now(),
-        callId: threadRef.current?.call_id || '',
-      }),
-    }).catch(() => null);
-    const headers = headersRef.current;
-    if (headers) {
-      void send(headers);
-      return;
-    }
-    void getAuthHeaders().then(send).catch(() => null);
-  }, [getAuthHeaders]);
-
   const getIceServers = useCallback(async () => {
     const headers = headersRef.current || await getAuthHeaders();
     const r = await fetch('/api/support/ice', { headers, cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
-    reportDebug('A', 'src/components/SupportWidget.tsx:getIceServers', '[DEBUG] customer getIceServers', {
-      ok: r.ok,
-      status: r.status,
-      count: Array.isArray(d.iceServers) ? d.iceServers.length : -1,
-      servers: Array.isArray(d.iceServers)
-        ? d.iceServers.map((s: RTCIceServer) => ({
-          urls: s.urls,
-          hasUsername: !!s.username,
-          hasCredential: !!s.credential,
-        }))
-        : [],
-    });
     return Array.isArray(d.iceServers) ? d.iceServers : [];
-  }, [getAuthHeaders, reportDebug]);
+  }, [getAuthHeaders]);
 
   const callAction = useCallback(async (action: string) => {
     try {
@@ -174,19 +139,11 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
         body: JSON.stringify({ action }),
       });
       const d = await r.json().catch(() => ({}));
-      reportDebug('B', 'src/components/SupportWidget.tsx:callAction', '[DEBUG] customer callAction', {
-        action,
-        ok: r.ok,
-        status: r.status,
-        response: d,
-        threadStatus: threadRef.current?.call_status || '',
-        threadCallId: threadRef.current?.call_id || '',
-      });
       void loadThread(open);
       return d as { callId?: string };
     } catch { /* แสดงผลรอบโพลถัดไป */ }
     return {};
-  }, [getAuthHeaders, loadThread, open, reportDebug]);
+  }, [getAuthHeaders, loadThread, open]);
 
   useEffect(() => {
     if (!callStartedAt) {
@@ -209,14 +166,6 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
       setCallStartedAt(null);
       setMuted(false);
       return;
-    }
-    if (status || callId) {
-      reportDebug('B', 'src/components/SupportWidget.tsx:useEffect', '[DEBUG] customer thread state', {
-        status,
-        callId,
-        handledCallId: handledCallIdRef.current,
-        callState: callStateRef.current,
-      });
     }
     if (status === 'connecting' && callId && handledCallIdRef.current !== callId) {
       handledCallIdRef.current = callId;
@@ -249,7 +198,7 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
       setCallStartedAt(null);
       setMuted(false);
     }
-  }, [thread?.call_status, thread?.call_id, getAuthHeaders, getIceServers, callAction, reportDebug, callFeatureLocked]);
+  }, [thread?.call_status, thread?.call_id, getAuthHeaders, getIceServers, callAction, callFeatureLocked]);
 
   useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 

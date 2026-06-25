@@ -116,50 +116,12 @@ export default function AdminSupportPage() {
   const callStatus = thread?.call_status;
   const callFeatureLocked = !SUPPORT_CALLS_ENABLED;
 
-  const reportDebug = useCallback((hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) => {
-    const customerId = selectedRef.current || '';
-    if (!customerId) return;
-    const send = (headers: Record<string, string>) => fetch('/api/admin/support/debug', {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'support-call-fail',
-        runId: 'pre-fix',
-        hypothesisId,
-        location,
-        msg,
-        data,
-        ts: Date.now(),
-        customerId,
-        callId: threadRef.current?.call_id || '',
-      }),
-    }).catch(() => null);
-    const headers = headersRef.current;
-    if (headers) {
-      void send(headers);
-      return;
-    }
-    void getAuthHeaders().then(send).catch(() => null);
-  }, [getAuthHeaders]);
-
   const getIceServers = useCallback(async () => {
     const headers = headersRef.current || await getAuthHeaders();
     const r = await fetch('/api/admin/support/ice', { headers, cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
-    reportDebug('A', 'src/app/admin/support/page.tsx:getIceServers', '[DEBUG] admin getIceServers', {
-      ok: r.ok,
-      status: r.status,
-      count: Array.isArray(d.iceServers) ? d.iceServers.length : -1,
-      servers: Array.isArray(d.iceServers)
-        ? d.iceServers.map((s: RTCIceServer) => ({
-          urls: s.urls,
-          hasUsername: !!s.username,
-          hasCredential: !!s.credential,
-        }))
-        : [],
-    });
     return Array.isArray(d.iceServers) ? d.iceServers : [];
-  }, [getAuthHeaders, reportDebug]);
+  }, [getAuthHeaders]);
 
   const callAction = useCallback(async (action: string) => {
     if (!selected) return;
@@ -170,20 +132,11 @@ export default function AdminSupportPage() {
         body: JSON.stringify({ customerId: selected, action }),
       });
       const d = await r.json().catch(() => ({}));
-      reportDebug('B', 'src/app/admin/support/page.tsx:callAction', '[DEBUG] admin callAction', {
-        action,
-        selected,
-        ok: r.ok,
-        status: r.status,
-        response: d,
-        threadStatus: threadRef.current?.call_status || '',
-        threadCallId: threadRef.current?.call_id || '',
-      });
       void loadThread(selected);
       return d as { callId?: string };
     } catch { /* แสดงผลรอบโพลถัดไป */ }
     return {};
-  }, [getAuthHeaders, loadThread, selected, reportDebug]);
+  }, [getAuthHeaders, loadThread, selected]);
 
   useEffect(() => {
     if (!callStartedAt) {
@@ -207,15 +160,6 @@ export default function AdminSupportPage() {
       setCallStartedAt(null);
       setMuted(false);
       return;
-    }
-    if (status || callId || customerId) {
-      reportDebug('B', 'src/app/admin/support/page.tsx:useEffect', '[DEBUG] admin thread state', {
-        status,
-        callId,
-        customerId,
-        handledCallId: handledCallIdRef.current,
-        callState: callStateRef.current,
-      });
     }
     if (status === 'connecting' && callId && customerId && handledCallIdRef.current !== callId) {
       handledCallIdRef.current = callId;
@@ -249,7 +193,7 @@ export default function AdminSupportPage() {
       setCallStartedAt(null);
       setMuted(false);
     }
-  }, [thread?.call_status, thread?.call_id, selected, getAuthHeaders, getIceServers, callAction, reportDebug, callFeatureLocked]);
+  }, [thread?.call_status, thread?.call_id, selected, getAuthHeaders, getIceServers, callAction, callFeatureLocked]);
 
   useEffect(() => () => { sessionRef.current?.stop(false); }, []);
 

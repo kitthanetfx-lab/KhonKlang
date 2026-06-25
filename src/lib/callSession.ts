@@ -43,38 +43,8 @@ export class CallSession {
 
   constructor(opts: CallSessionOpts) { this.opts = opts; }
 
-  private reportDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
-    const url = this.opts.role === 'staff' ? '/api/admin/support/debug' : '/api/support/debug';
-    const body = {
-      sessionId: 'support-call-fail',
-      runId: 'pre-fix',
-      hypothesisId,
-      location,
-      msg,
-      data,
-      ts: Date.now(),
-      customerId: this.opts.customerId || '',
-      callId: this.opts.callId,
-      role: this.opts.role,
-    };
-    this.opts.getAuthHeaders()
-      .then((headers) => fetch(url, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }))
-      .catch(() => null);
-  }
-
   private async sendSignal(type: string, data: string) {
     try {
-      this.reportDebug('C', 'src/lib/callSession.ts:sendSignal', '[DEBUG] sendSignal', {
-        role: this.opts.role,
-        callId: this.opts.callId,
-        type,
-        customerId: this.opts.customerId || '',
-        size: data.length,
-      });
       const headers = await this.opts.getAuthHeaders();
       await fetch(this.opts.signalUrl, {
         method: 'POST',
@@ -93,13 +63,6 @@ export class CallSession {
       if (r.ok) {
         const d = await r.json();
         const signals = (d.signals || []) as SignalMsg[];
-        this.reportDebug('C', 'src/lib/callSession.ts:pollSignals', '[DEBUG] pollSignals', {
-          role: this.opts.role,
-          callId: this.opts.callId,
-          since: this.since,
-          count: signals.length,
-          types: signals.map(s => s.type),
-        });
         for (const s of signals) {
           this.since = s.created_at;
           await this.handleSignal(s);
@@ -111,13 +74,6 @@ export class CallSession {
   private async handleSignal(s: SignalMsg) {
     if (!this.pc || this.ended) return;
     try {
-      this.reportDebug('C', 'src/lib/callSession.ts:handleSignal', '[DEBUG] handleSignal', {
-        role: this.opts.role,
-        callId: this.opts.callId,
-        type: s.type,
-        fromRole: s.from_role,
-        createdAt: s.created_at,
-      });
       if (s.type === 'offer') {
         await this.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(s.data)));
         const answer = await this.pc.createAnswer();
@@ -138,76 +94,23 @@ export class CallSession {
   async start() {
     this.ended = false;
     try {
-      this.reportDebug('D', 'src/lib/callSession.ts:start', '[DEBUG] getUserMedia:start', {
-        role: this.opts.role,
-        callId: this.opts.callId,
-        isOfferer: this.opts.isOfferer,
-        customerId: this.opts.customerId || '',
-      });
       this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      this.reportDebug('D', 'src/lib/callSession.ts:start', '[DEBUG] getUserMedia:ok', {
-        role: this.opts.role,
-        callId: this.opts.callId,
-        tracks: this.localStream.getAudioTracks().map(t => ({
-          enabled: t.enabled,
-          readyState: t.readyState,
-          label: t.label,
-        })),
-      });
     } catch {
-      this.reportDebug('D', 'src/lib/callSession.ts:start', '[DEBUG] getUserMedia:fail', {
-        role: this.opts.role,
-        callId: this.opts.callId,
-      });
       this.opts.onState?.('failed');
       return;
     }
     const iceServers = await this.opts.getIceServers?.().catch(() => DEFAULT_ICE_SERVERS) || DEFAULT_ICE_SERVERS;
-    this.reportDebug('A', 'src/lib/callSession.ts:start', '[DEBUG] iceServers', {
-      role: this.opts.role,
-      callId: this.opts.callId,
-      count: iceServers.length,
-      servers: iceServers.map(s => ({
-        urls: s.urls,
-        hasUsername: !!s.username,
-        hasCredential: !!s.credential,
-      })),
-    });
     const pc = new RTCPeerConnection({ iceServers });
     this.pc = pc;
     this.localStream.getTracks().forEach(t => pc.addTrack(t, this.localStream!));
 
     pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        this.reportDebug('A', 'src/lib/callSession.ts:onicecandidate', '[DEBUG] onicecandidate', {
-          role: this.opts.role,
-          callId: this.opts.callId,
-          type: e.candidate.type,
-          protocol: e.candidate.protocol,
-          address: e.candidate.address || '',
-          candidate: e.candidate.candidate.slice(0, 160),
-        });
-      }
       if (e.candidate) void this.sendSignal('candidate', JSON.stringify(e.candidate.toJSON()));
     };
     pc.ontrack = (e) => { this.opts.onRemoteStream?.(e.streams[0] || null); };
     pc.oniceconnectionstatechange = () => {
-      this.reportDebug('D', 'src/lib/callSession.ts:oniceconnectionstatechange', '[DEBUG] iceConnectionState', {
-        role: this.opts.role,
-        callId: this.opts.callId,
-        iceConnectionState: pc.iceConnectionState,
-        iceGatheringState: pc.iceGatheringState,
-        signalingState: pc.signalingState,
-      });
     };
     pc.onconnectionstatechange = () => {
-      this.reportDebug('D', 'src/lib/callSession.ts:onconnectionstatechange', '[DEBUG] connectionState', {
-        role: this.opts.role,
-        callId: this.opts.callId,
-        connectionState: pc.connectionState,
-        iceConnectionState: pc.iceConnectionState,
-        signalingState: pc.signalingState,
-      });
       if (pc.connectionState === 'connected') this.opts.onState?.('active');
       if (pc.connectionState === 'failed') this.opts.onState?.('failed');
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed') this.opts.onState?.('ended');
@@ -218,12 +121,6 @@ export class CallSession {
     if (this.opts.isOfferer) {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      this.reportDebug('B', 'src/lib/callSession.ts:start', '[DEBUG] createOffer', {
-        role: this.opts.role,
-        callId: this.opts.callId,
-        type: offer.type,
-        sdpLen: (offer.sdp || '').length,
-      });
       await this.sendSignal('offer', JSON.stringify(offer));
     }
   }
