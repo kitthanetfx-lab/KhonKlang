@@ -287,6 +287,13 @@ function isDealParty(deal: Deal | null, userId: string) {
   return [deal.seller_id, deal.middleman_id, deal.buyer_id].includes(userId);
 }
 
+function reportClientDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
+  fetch('http://127.0.0.1:7777/event', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId: 'deal-chat-auth-mismatch', runId: 'pre-fix', hypothesisId, location, msg: `[DEBUG] ${msg}`, data, ts: Date.now() }),
+  }).catch(() => {});
+}
+
 export default function DealRoom() {
   const router = useRouter();
   const params = useParams();
@@ -395,6 +402,7 @@ export default function DealRoom() {
   const chatBundledRef = useRef(false); // กัน bundleChatTranscriptAsEvidence ถูกเรียกซ้ำ
   // wizard แบบง่าย: ขั้นที่กำลังดูอยู่ (ปุ่มย้อนกลับ/ถัดไป) — null แปลว่าให้ตามขั้นจริงปัจจุบันเสมอ
   const [wzViewStep, setWzViewStep] = useState<number | null>(null);
+  const simpleActualStepRef = useRef<number | null>(null);
   const [meetupEvidReady, setMeetupEvidReady] = useState(false);
   const [savedEvidIds, setSavedEvidIds] = useState<Set<string>>(new Set());
   const [meetupPropLabel, setMeetupPropLabel] = useState<string | null>(null); // null=hidden ''=custom label
@@ -435,8 +443,29 @@ export default function DealRoom() {
   }, [dealId, setDeal, setDealError]);
 
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
+    // #region debug-point A:fetch-msgs-entry
+    reportClientDebug('A', 'deal/[id]:fetchMsgs:entry', 'fetchMsgs called', {
+      dealId,
+      currentUserId: currentUserId || null,
+      hasAuthHeader: !!headers.Authorization,
+      buyerId: currentDeal?.buyer_id || null,
+      sellerId: currentDeal?.seller_id || null,
+      middlemanId: currentDeal?.middleman_id || null,
+      isDealParty: isDealParty(currentDeal, currentUserId),
+      tab,
+      showJitsi,
+    });
+    // #endregion
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
     const r = await fetch(`/api/messages?dealId=${dealId}`, { headers }).catch(() => null);
+    // #region debug-point D:fetch-msgs-response
+    reportClientDebug('D', 'deal/[id]:fetchMsgs:response', 'fetchMsgs received response', {
+      dealId,
+      currentUserId: currentUserId || null,
+      status: r?.status || 'network-null',
+      ok: !!r?.ok,
+    });
+    // #endregion
     if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); }
     else if (r?.status === 401) {
       // token หมดอายุ — ล้าง cache ให้ poll รอบถัดไปขอ token ใหม่จาก Supabase
@@ -1410,6 +1439,34 @@ export default function DealRoom() {
     if (s === 'disputed') return { step: 9, outcome: 'disputed' };
     return { step: 1 };
   }
+
+  useEffect(() => {
+    if (!isSimple) {
+      simpleActualStepRef.current = null;
+      return;
+    }
+    const nextStep = getSimpleStep().step;
+    // ถ้าสถานะจริงของดีลเดินหน้าแล้ว ให้ยกเลิกโหมด "ดูขั้นเก่า" อัตโนมัติ
+    // เพื่อไม่ให้ค้างที่หน้าขั้นเดิมหลังยืนยันหลักฐาน/ขยับสเต็ปสำเร็จ
+    if (simpleActualStepRef.current !== null && nextStep > simpleActualStepRef.current) {
+      setWzViewStep(null);
+    }
+    simpleActualStepRef.current = nextStep;
+  }, [
+    isSimple,
+    deal?.status,
+    deal?.price,
+    deal?.fee_payer,
+    priceState?.agreed,
+    priceState?.evidence_done_buyer,
+    priceState?.evidence_done_seller,
+    priceState?.evidence_done_middleman,
+    priceState?.seller_fee_slip,
+    priceState?.payout_slip_file_id,
+    priceState?.refund_slip_file_id,
+    chatReviewReady,
+    feeConfig,
+  ]);
 
   function renderWizardProgress(step: number) {
     const clamped = Math.max(1, Math.min(WZ_TOTAL, step));
