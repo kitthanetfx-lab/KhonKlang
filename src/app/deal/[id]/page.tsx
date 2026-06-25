@@ -294,6 +294,13 @@ function reportClientDebug(hypothesisId: string, location: string, msg: string, 
   }).catch(() => {});
 }
 
+function reportCreateCrashDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
+  fetch('http://127.0.0.1:7777/event', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId: 'deal-create-runtime-crash', runId: 'pre-fix', hypothesisId, location, msg: `[DEBUG] ${msg}`, data, ts: Date.now() }),
+  }).catch(() => {});
+}
+
 export default function DealRoom() {
   const router = useRouter();
   const params = useParams();
@@ -415,6 +422,20 @@ export default function DealRoom() {
   useEffect(() => { setWzViewStep(null); }, [deal?.status, meetup?.deposit]);
 
   useEffect(() => {
+    // #region debug-point A:pre-guard-render-snapshot
+    reportCreateCrashDebug('A', 'deal/[id]:pre-guard-snapshot', 'render snapshot before early returns', {
+      dealId,
+      loading,
+      hasDeal: !!deal,
+      dealType: deal?.deal_type || null,
+      dealStatus: deal?.status || null,
+      myId: myId || null,
+      wzViewStep,
+    });
+    // #endregion
+  }, [deal, dealId, loading, myId, wzViewStep]);
+
+  useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
   }, []);
@@ -489,6 +510,46 @@ export default function DealRoom() {
       finally { setLoading(false); }
     })();
   }, [dealId, fetchDeal, fetchMsgs, getAuthHeaders, requestedCall, requestedTab]);
+
+  useEffect(() => {
+    // #region debug-point B:late-simple-effect-entered
+    reportCreateCrashDebug('B', 'deal/[id]:late-simple-effect', 'late simple effect registered', {
+      dealId,
+      hasDeal: !!deal,
+      dealType: deal?.deal_type || null,
+      loading,
+      wzViewStep,
+    });
+    // #endregion
+    if (deal?.deal_type !== 'simple') {
+      simpleActualStepRef.current = null;
+      return;
+    }
+    const nextStep = getSimpleStep().step;
+    // ถ้าสถานะจริงของดีลเดินหน้าแล้ว ให้ยกเลิกโหมด "ดูขั้นเก่า" อัตโนมัติ
+    // เพื่อไม่ให้ค้างที่หน้าขั้นเดิมหลังยืนยันหลักฐาน/ขยับสเต็ปสำเร็จ
+    if (simpleActualStepRef.current !== null && nextStep > simpleActualStepRef.current) {
+      setWzViewStep(null);
+    }
+    simpleActualStepRef.current = nextStep;
+  }, [
+    deal,
+    dealId,
+    loading,
+    wzViewStep,
+    deal?.status,
+    deal?.price,
+    deal?.fee_payer,
+    priceState?.agreed,
+    priceState?.evidence_done_buyer,
+    priceState?.evidence_done_seller,
+    priceState?.evidence_done_middleman,
+    priceState?.seller_fee_slip,
+    priceState?.payout_slip_file_id,
+    priceState?.refund_slip_file_id,
+    chatReviewReady,
+    feeConfig,
+  ]);
 
   useEffect(() => {
     if (!dealId) return;
@@ -1439,34 +1500,6 @@ export default function DealRoom() {
     if (s === 'disputed') return { step: 9, outcome: 'disputed' };
     return { step: 1 };
   }
-
-  useEffect(() => {
-    if (!isSimple) {
-      simpleActualStepRef.current = null;
-      return;
-    }
-    const nextStep = getSimpleStep().step;
-    // ถ้าสถานะจริงของดีลเดินหน้าแล้ว ให้ยกเลิกโหมด "ดูขั้นเก่า" อัตโนมัติ
-    // เพื่อไม่ให้ค้างที่หน้าขั้นเดิมหลังยืนยันหลักฐาน/ขยับสเต็ปสำเร็จ
-    if (simpleActualStepRef.current !== null && nextStep > simpleActualStepRef.current) {
-      setWzViewStep(null);
-    }
-    simpleActualStepRef.current = nextStep;
-  }, [
-    isSimple,
-    deal?.status,
-    deal?.price,
-    deal?.fee_payer,
-    priceState?.agreed,
-    priceState?.evidence_done_buyer,
-    priceState?.evidence_done_seller,
-    priceState?.evidence_done_middleman,
-    priceState?.seller_fee_slip,
-    priceState?.payout_slip_file_id,
-    priceState?.refund_slip_file_id,
-    chatReviewReady,
-    feeConfig,
-  ]);
 
   function renderWizardProgress(step: number) {
     const clamped = Math.max(1, Math.min(WZ_TOTAL, step));
