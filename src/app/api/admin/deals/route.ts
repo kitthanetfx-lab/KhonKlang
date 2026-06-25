@@ -151,6 +151,11 @@ export async function PATCH(req: NextRequest) {
           status: isMeetup ? 'meetup_ready' : 'packing',
           middleman_confirmed_payment: true,
         }).eq('id', id);
+        // meetup: ยืนยันรับเงิน = ตรวจสลิปครบทั้งสองฝ่าย (กันสถานะ "นัดเจอ" แต่สลิปยัง "รอตรวจ")
+        if (isMeetup) {
+          const now = new Date().toISOString();
+          await db.from('deal_meetup').upsert({ deal_id: id, buyer_slip_verified_at: now, seller_slip_verified_at: now }, { onConflict: 'deal_id' });
+        }
         await db.from('messages').insert({
           deal_id: id, sender_id: null, sender_name: 'ระบบ',
           role: 'system', type: 'system',

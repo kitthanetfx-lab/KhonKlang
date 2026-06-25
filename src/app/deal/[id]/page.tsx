@@ -2108,9 +2108,11 @@ export default function DealRoom() {
 
   function renderMeetupWizardStepAdminCheck() {
     const md: MeetupData = meetup || {};
+    // ถ้าดีลเลยขั้นตรวจไปแล้ว (นัดเจอ/เสร็จ) ถือว่าผ่านการตรวจแล้ว — กันสภาพ "ขั้น 7 แต่สลิปยังรอตรวจ"
+    const passedCheck = deal!.status === 'meetup_ready' || deal!.status === 'completed';
     const slipRows = [
-      { side: 'buyer', label: '🛍️ สลิปผู้ซื้อ', slip: md.buyer_slip, verified: !!md.buyer_slip_verified_at },
-      { side: 'seller', label: '🛒 สลิปผู้ขาย', slip: md.seller_slip, verified: !!md.seller_slip_verified_at },
+      { side: 'buyer', label: '🛍️ สลิปผู้ซื้อ', slip: md.buyer_slip, verified: !!md.buyer_slip_verified_at || passedCheck },
+      { side: 'seller', label: '🛒 สลิปผู้ขาย', slip: md.seller_slip, verified: !!md.seller_slip_verified_at || passedCheck },
     ];
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

@@ -312,6 +312,13 @@ export default function AdminDeals() {
           const st = statusBadge(d);
           const refund = refundInfo(d);
           const slips = slipsOf(d);
+          // refund (คืนเงินประกัน) ทำได้เฉพาะตอนดีลจบแล้ว (เจอกันเสร็จ = completed) เท่านั้น
+          const refundStage = d.deal_type === 'meetup' && d.status === 'completed';
+          // ตรวจสลิปเงินประกัน: meetup ที่ยังไม่จบ มีสลิปอย่างน้อย 1 ฝ่าย และยังตรวจไม่ครบ
+          const needsSlipVerify = d.deal_type === 'meetup'
+            && !['completed', 'cancelled'].includes(d.status)
+            && (!!d.meetup?.buyer_slip || !!d.meetup?.seller_slip)
+            && !(d.meetup?.buyer_slip_verified_at && d.meetup?.seller_slip_verified_at);
           return (
             <div key={d.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -334,8 +341,8 @@ export default function AdminDeals() {
                       {refund.refundedAt ? <span className="text-green-600"> ✅ คืนเงินแล้ว</span> : <span className="text-amber-600"> ⏳ ยังไม่คืนเงิน</span>}
                     </p>
                   )}
-                  {/* เลขบัญชี + ยอดโอนสำหรับ meetup refund */}
-                  {refund && !refund.refundedAt && refund.outcome !== 'frozen' && (
+                  {/* เลขบัญชี + ยอดโอนสำหรับ meetup refund — เฉพาะตอนถึงขั้นคืนเงิน (completed) */}
+                  {refund && refundStage && !refund.refundedAt && refund.outcome !== 'frozen' && (
                     <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs space-y-1">
                       <p className="font-semibold text-amber-800">
                         💰 ยอดโอนคืน: ฝ่ายละ ฿{refund.deposit.toLocaleString()}
@@ -404,7 +411,7 @@ export default function AdminDeals() {
                   </button>
                 )}
                 {/* ข้อ5: meetup รอตรวจสลิป — ปุ่มตรวจถูกต้อง/ไม่ถูกต้อง รายฝ่าย */}
-                {d.status === 'payment_uploaded' && d.deal_type === 'meetup' && (
+                {needsSlipVerify && (
                   <div className="flex flex-wrap gap-2 items-center">
                     {(['buyer', 'seller'] as const).map(side => {
                       const slip = side === 'buyer' ? d.meetup?.buyer_slip : d.meetup?.seller_slip;
@@ -427,7 +434,7 @@ export default function AdminDeals() {
                     })}
                   </div>
                 )}
-                {refund && !refund.outcome && (
+                {refund && refundStage && !refund.outcome && (
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => markMeetupRefund(d.id, 'buyer_all')} disabled={!!acting}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
