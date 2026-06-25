@@ -13,6 +13,7 @@ const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 interface DealMeetup {
   deposit: number; refunded_at?: string; buyer_met: boolean; seller_met: boolean;
   buyer_slip?: string; seller_slip?: string;
+  buyer_slip_verified_at?: string; seller_slip_verified_at?: string;
   refund_outcome?: 'buyer_all' | 'seller_all' | 'both' | 'frozen';
   buyer_refund_slip?: string; seller_refund_slip?: string;
   refund_decision_note?: string;
@@ -113,6 +114,39 @@ export default function AdminDeals() {
       const d = await r.json().catch(() => ({}));
       if (r.ok) load(tab);
       else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
+    } finally { setActing(''); }
+  }
+
+  // ข้อ3: ลบดีลถาวร (พร้อมไฟล์สลิป + ข้อมูลทุกตาราง)
+  async function del(id: string) {
+    if (!window.confirm('ลบดีลนี้ถาวร?\nจะลบข้อมูลและรูปสลิปทั้งหมดที่เกี่ยวข้อง — กู้คืนไม่ได้')) return;
+    setActing(id);
+    try {
+      const headers = await authHeaders();
+      const r = await fetch('/api/admin/deals', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'delete_deal' }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { load(tab); loadCounts(); } else alert(d.error || `ลบไม่สำเร็จ (${r.status})`);
+    } finally { setActing(''); }
+  }
+
+  // ข้อ5: ศูนย์กลางตรวจสลิปเงินประกันรายฝ่าย
+  async function verifySlip(id: string, side: 'buyer' | 'seller', ok: boolean) {
+    let note = '';
+    if (!ok) { const v = window.prompt(`เหตุผลที่สลิป${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ไม่ถูกต้อง (ระบบจะถอยให้อีกฝ่ายวางใหม่):`); if (v === null) return; note = v; }
+    setActing(id);
+    try {
+      const headers = await authHeaders();
+      const r = await fetch('/api/admin/deals', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'verify_meetup_slip', whichSlip: side, ok, note }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { load(tab); loadCounts(); } else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
     } finally { setActing(''); }
   }
 
@@ -362,12 +396,36 @@ export default function AdminDeals() {
                     </button>
                   </>
                 )}
-                {d.status === 'payment_uploaded' && (
+                {d.status === 'payment_uploaded' && d.deal_type !== 'meetup' && (
                   <button onClick={() => act(d.id, 'confirm_payment', 'หมายเหตุ (เช่น เลขอ้างอิงสลิป) — เว้นว่างได้:')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
                     {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    {d.deal_type === 'meetup' ? 'ยืนยันรับเงิน — เริ่มนัดเจอ' : 'ยืนยันรับเงิน — เริ่มแพ็ค'}
+                    ยืนยันรับเงิน — เริ่มแพ็ค
                   </button>
+                )}
+                {/* ข้อ5: meetup รอตรวจสลิป — ปุ่มตรวจถูกต้อง/ไม่ถูกต้อง รายฝ่าย */}
+                {d.status === 'payment_uploaded' && d.deal_type === 'meetup' && (
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {(['buyer', 'seller'] as const).map(side => {
+                      const slip = side === 'buyer' ? d.meetup?.buyer_slip : d.meetup?.seller_slip;
+                      const verified = side === 'buyer' ? d.meetup?.buyer_slip_verified_at : d.meetup?.seller_slip_verified_at;
+                      const lbl = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
+                      if (verified) return <span key={side} className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">✅ สลิป{lbl} ถูกต้อง</span>;
+                      if (!slip) return <span key={side} className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-500 border border-gray-200">⏳ {lbl} ยังไม่อัปสลิป</span>;
+                      return (
+                        <span key={side} className="inline-flex gap-1">
+                          <button onClick={() => verifySlip(d.id, side, true)} disabled={!!acting}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
+                            <CheckCircle2 size={14} /> สลิป{lbl} ถูกต้อง
+                          </button>
+                          <button onClick={() => verifySlip(d.id, side, false)} disabled={!!acting}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 flex items-center gap-1 disabled:opacity-50">
+                            ❌ ไม่ถูกต้อง
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
                 )}
                 {refund && !refund.outcome && (
                   <div className="flex flex-wrap gap-2">
@@ -432,6 +490,11 @@ export default function AdminDeals() {
                     {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนค่าคนกลางแล้ว — แนบสลิป
                   </button>
                 )}
+                {/* ข้อ3: ลบดีลถาวร — ทุกดีล (ชิดขวา) */}
+                <button onClick={() => del(d.id)} disabled={!!acting} title="ลบดีลถาวร (รวมรูปสลิป)"
+                  className="ml-auto px-3 py-1.5 rounded-lg text-sm font-medium bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 flex items-center gap-1 disabled:opacity-50">
+                  {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} ลบดีล
+                </button>
               </div>
             </div>
           );

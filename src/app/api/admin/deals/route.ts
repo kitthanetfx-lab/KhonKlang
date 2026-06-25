@@ -104,10 +104,10 @@ export async function PATCH(req: NextRequest) {
     await verifyAdmin(req);
     const db = getAdminClient();
     const body = await req.json();
-    const { id, action, note, outcome, fileId, whichSlip } = body as {
+    const { id, action, note, outcome, fileId, whichSlip, ok } = body as {
       id: string; action: string; note?: string;
       outcome?: 'buyer_all' | 'seller_all' | 'both' | 'frozen';
-      fileId?: string; whichSlip?: 'buyer' | 'seller';
+      fileId?: string; whichSlip?: 'buyer' | 'seller'; ok?: boolean;
     };
 
     if (!id || !action) return NextResponse.json({ error: 'Missing id or action' }, { status: 400 });
@@ -145,19 +145,68 @@ export async function PATCH(req: NextRequest) {
         break;
       }
       case 'confirm_payment': {
-        // ยืนยันรับเงิน (admin แทน middleman)
+        // ยืนยันรับเงิน (admin แทน middleman) — meetup ไป meetup_ready, ดีลปกติไป packing
+        const isMeetup = deal.deal_type === 'meetup';
         await db.from('deals').update({
-          status: 'packing',
+          status: isMeetup ? 'meetup_ready' : 'packing',
           middleman_confirmed_payment: true,
         }).eq('id', id);
         await db.from('messages').insert({
           deal_id: id, sender_id: null, sender_name: 'ระบบ',
           role: 'system', type: 'system',
-          content: `แอดมินยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้าได้เลย${note ? ` (${note})` : ''}`,
+          content: isMeetup
+            ? `แอดมินยืนยันสลิปเงินประกันแล้ว — เริ่มขั้นตอนนัดพบได้เลย${note ? ` (${note})` : ''}`
+            : `แอดมินยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้าได้เลย${note ? ` (${note})` : ''}`,
+        });
+        break;
+      }
+      case 'verify_meetup_slip': {
+        // ข้อ5: ศูนย์กลางตรวจสลิปเงินประกันรายฝ่าย (whichSlip = buyer|seller, ok = true/false)
+        if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
+        if (whichSlip !== 'buyer' && whichSlip !== 'seller') return NextResponse.json({ error: 'whichSlip ไม่ถูกต้อง' }, { status: 400 });
+        const { data: md } = await db.from('deal_meetup').select('*').eq('deal_id', id).maybeSingle();
+        if (!md) return NextResponse.json({ error: 'ไม่พบข้อมูลเงินประกัน' }, { status: 404 });
+        const sideLabel = whichSlip === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
+        let msg = '';
+        if (ok) {
+          await db.from('deal_meetup').upsert({ deal_id: id, [`${whichSlip}_slip_verified_at`]: new Date().toISOString() }, { onConflict: 'deal_id' });
+          const buyerV = whichSlip === 'buyer' ? true : !!md.buyer_slip_verified_at;
+          const sellerV = whichSlip === 'seller' ? true : !!md.seller_slip_verified_at;
+          if (buyerV && sellerV) {
+            await db.from('deals').update({ status: 'meetup_ready' }).eq('id', id);
+            msg = '✅ ศูนย์กลางตรวจสลิปเงินประกันครบทั้งสองฝ่ายแล้ว — เริ่มขั้นตอนนัดพบได้เลย';
+          } else {
+            msg = `✅ ศูนย์กลางตรวจสลิป${sideLabel}แล้ว (ถูกต้อง) — รออีกฝ่าย`;
+          }
+        } else {
+          // ตีกลับ: ล้างสลิป+ผลตรวจของฝ่ายนั้น แล้วถอยสถานะกลับไปวางเงินใหม่
+          await db.from('deal_meetup').upsert({ deal_id: id, [`${whichSlip}_slip`]: null, [`${whichSlip}_slip_verified_at`]: null }, { onConflict: 'deal_id' });
+          await db.from('deals').update({ status: 'payment_pending' }).eq('id', id);
+          msg = `❌ สลิป${sideLabel}ไม่ถูกต้อง — กรุณาวางเงินประกันและอัปสลิปใหม่อีกครั้ง${note ? ` (${note})` : ''}`;
+        }
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ', role: 'system', type: 'system', content: msg,
         });
         break;
       }
       case 'delete_deal': {
+        // ลบไฟล์ใน storage ('deal-files') ที่ผูกกับดีลก่อน — เก็บ path จากทุกตารางที่เกี่ยวข้อง
+        const [mu, ps, ev, im] = await Promise.all([
+          db.from('deal_meetup').select('buyer_slip,seller_slip,buyer_refund_slip,seller_refund_slip').eq('deal_id', id).maybeSingle(),
+          db.from('deal_price_state').select('seller_fee_slip,payout_slip_file_id,refund_slip_file_id,middleman_fee_slip_file_id').eq('deal_id', id).maybeSingle(),
+          db.from('deal_evidence').select('file_id').eq('deal_id', id),
+          db.from('deal_images').select('file_id').eq('deal_id', id),
+        ]);
+        const filePaths = [
+          deal.payment_slip_file_id,
+          mu.data?.buyer_slip, mu.data?.seller_slip, mu.data?.buyer_refund_slip, mu.data?.seller_refund_slip,
+          ps.data?.seller_fee_slip, ps.data?.payout_slip_file_id, ps.data?.refund_slip_file_id, ps.data?.middleman_fee_slip_file_id,
+          ...((ev.data || []).map(e => e.file_id)),
+          ...((im.data || []).map(i => i.file_id)),
+        ].filter((p): p is string => typeof p === 'string' && p.length > 0);
+        if (filePaths.length) {
+          await db.storage.from('deal-files').remove(filePaths);
+        }
         // ลบดีลถาวร — ลบ child tables ก่อน (ต้องลบ reviews + child FK ทั้งหมดก่อน deals)
         await Promise.all([
           db.from('messages').delete().eq('deal_id', id),

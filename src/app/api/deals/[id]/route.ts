@@ -302,11 +302,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!isBuyer && !isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
         if (!md.deposit) return NextResponse.json({ error: 'ต้องตกลงจุดนัดพบและยอดประกันกับอีกฝ่ายก่อนวางเงิน' }, { status: 400 });
-        if (isBuyer) meetupUpdates.buyer_slip = body.fileId; else meetupUpdates.seller_slip = body.fileId;
+        // อัปสลิป + รีเซ็ตผลตรวจของฝ่ายตัวเอง (กรณีอัปใหม่หลังถูกตีกลับ)
+        if (isBuyer) { meetupUpdates.buyer_slip = body.fileId; meetupUpdates.buyer_slip_verified_at = null; }
+        else { meetupUpdates.seller_slip = body.fileId; meetupUpdates.seller_slip_verified_at = null; }
         const bothSlipped = isBuyer ? (!!md.seller_slip) : (!!md.buyer_slip);
         if (bothSlipped) {
-          updates.status = 'meetup_ready';
-          systemMsg = '✅ ทั้งสองฝ่ายวางเงินประกันแล้ว — นัดเจอกันได้เลย เมื่อเจอกันสำเร็จกดยืนยันทั้งคู่เพื่อรับเงินประกันคืน';
+          // ข้อ4/5: วางครบ 2 ฝ่าย → ส่งให้ศูนย์กลางตรวจสลิป (ไม่ข้ามไปนัดเจอทันที)
+          updates.status = 'payment_uploaded';
+          systemMsg = '✅ ทั้งสองฝ่ายวางเงินประกันแล้ว — รอศูนย์กลางตรวจสลิป เมื่อตรวจครบจะเริ่มขั้นตอนนัดพบทันที';
         } else {
           systemMsg = `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}วางเงินประกันเดินทางแล้ว — รออีกฝ่าย`;
         }

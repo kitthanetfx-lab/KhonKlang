@@ -166,6 +166,7 @@ interface MeetupData {
   pending_deposit?: number; pending_by?: 'buyer' | 'seller';
   buyer_fee?: number; seller_fee?: number;
   buyer_slip?: string; seller_slip?: string; buyer_met?: boolean; seller_met?: boolean;
+  buyer_slip_verified_at?: string; seller_slip_verified_at?: string; // ข้อ4/5: ศูนย์กลางตรวจสลิปเงินประกันรายฝ่าย
   refunded_at?: string; refund_note?: string;
   refund_outcome?: 'buyer_all' | 'seller_all' | 'both' | 'frozen';
   buyer_refund_slip?: string; seller_refund_slip?: string;
@@ -2106,11 +2107,35 @@ export default function DealRoom() {
   }
 
   function renderMeetupWizardStepAdminCheck() {
+    const md: MeetupData = meetup || {};
+    const slipRows = [
+      { side: 'buyer', label: '🛍️ สลิปผู้ซื้อ', slip: md.buyer_slip, verified: !!md.buyer_slip_verified_at },
+      { side: 'seller', label: '🛒 สลิปผู้ขาย', slip: md.seller_slip, verified: !!md.seller_slip_verified_at },
+    ];
     return (
-      <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
-        <div style={{ fontSize: 38, marginBottom: 10 }}>🔍</div>
-        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>ศูนย์กลางกำลังตรวจสอบสลิปเงินประกัน</div>
-        <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>เมื่อยืนยันรับเงินแล้ว ระบบจะแจ้งและเริ่มขั้นตอนนัดพบได้ทันที</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="dr-card" style={{ textAlign: 'center', padding: '24px 20px' }}>
+          <div style={{ fontSize: 38, marginBottom: 10 }}>🔍</div>
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>ศูนย์กลางกำลังตรวจสอบสลิปเงินประกัน</div>
+          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>เมื่อตรวจสลิปครบทั้งสองฝ่ายแล้ว ระบบจะแจ้งและเริ่มขั้นตอนนัดพบทันที</p>
+        </div>
+        {/* ข้อ2: โชว์สลิปจริง + ผลตรวจรายฝ่าย */}
+        <div className="dr-card">
+          <div className="dr-card-title">🧾 สลิปเงินประกัน + ผลตรวจ</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {slipRows.map(r => (
+              <div key={r.side} style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{r.label}</div>
+                {r.slip
+                  ? <a href={fileUrl(r.slip)} target="_blank" rel="noreferrer"><img src={fileUrl(r.slip)} alt={r.label} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 'var(--r-sm)', border: '1px solid var(--line)' }} /></a>
+                  : <div style={{ height: 120, display: 'grid', placeItems: 'center', fontSize: 12, color: 'var(--faint)', border: '1px dashed var(--line)', borderRadius: 'var(--r-sm)' }}>ยังไม่อัปสลิป</div>}
+                <div style={{ fontSize: 12, marginTop: 6, fontWeight: 600, color: r.verified ? 'var(--green-600)' : 'var(--muted)' }}>
+                  {r.verified ? '✅ ตรวจแล้ว — ถูกต้อง' : r.slip ? '⏳ รอศูนย์กลางตรวจ' : '⏳ รอวางเงินประกัน'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

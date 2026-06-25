@@ -258,6 +258,9 @@ button.nav-link { background: none; border: none; }
   transition: border-color .3s, box-shadow .3s, background .3s;
 }
 .nav.scrolled { border-color: var(--line); box-shadow: var(--sh-sm); background: color-mix(in srgb, var(--surface) 90%, transparent); }
+/* ข้อ1: ตอนเปิด dropdown (เช่น เมนูโปรไฟล์มุมขวาบน) ยก stacking context ของ nav ทั้งก้อนให้ลอยเหนือ FAB/แถบแท็บ
+   ไม่งั้น backdrop-filter ของ nav จะกักเมนูไว้ในชั้น z ของ nav แล้วถูกองค์ประกอบ fixed อื่นบัง (มือถือ/แท็บเล็ต) */
+.nav:has(.dropdown.open), .nav:has(.dropdown:hover), .nav:has(.dropdown:focus-within) { z-index: 160; }
 .nav-inner { display:flex; align-items:center; justify-content:space-between; height: 70px; gap: 16px; }
 .nav-links { display:none; align-items:center; gap: 2px; }
 @media (min-width: 980px){ .nav-links { display:flex; } }
@@ -282,7 +285,7 @@ button.nav-link { background: none; border: none; }
   position:absolute; top:calc(100% + 8px); left:0; min-width: 248px;
   background: var(--surface); border:1px solid var(--line); border-radius: var(--r-md);
   box-shadow: var(--sh-lg); padding: 8px; opacity:0; transform: translateY(6px) scale(.98);
-  visibility:hidden; transform-origin: top left; z-index: 70;
+  visibility:hidden; transform-origin: top left; z-index: 200;
   /* close grace period: stays visible & clickable .3s after mouse leaves */
   transition: opacity .18s .3s, transform .18s var(--ease-out) .3s, visibility 0s linear .48s;
 }
