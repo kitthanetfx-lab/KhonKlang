@@ -2283,10 +2283,14 @@ export default function DealRoom() {
       );
     }
     return (
-      <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
-        <div style={{ fontSize: 38, marginBottom: 10 }}>⏳</div>
-        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>นัดพบสำเร็จ! 🎉 — ศูนย์กลางกำลังคืนเงินประกัน</div>
-        <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ทีมงานกำลังตัดสินและโอนเงินประกันคืน — จะแจ้งให้ทราบเมื่อโอนแล้ว</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
+          <div style={{ fontSize: 38, marginBottom: 10 }}>⏳</div>
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>นัดพบสำเร็จ! 🎉 — ศูนย์กลางกำลังคืนเงินประกัน</div>
+          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ทีมงานกำลังตัดสินและโอนเงินประกันคืน — จะแจ้งให้ทราบเมื่อโอนแล้ว</p>
+        </div>
+        {/* ให้รีวิว+ดาว ตรงนี้เลย — ส่วนใหญ่ผู้ใช้ไม่กลับเข้าดีลอีกหลังได้เงินคืน */}
+        <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />
       </div>
     );
   }
