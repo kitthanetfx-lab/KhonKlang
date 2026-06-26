@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 const ENV_PP = process.env.NEXT_PUBLIC_PROMPTPAY_ID || '';
 const ENV_BANK = process.env.NEXT_PUBLIC_COMPANY_BANK || '';
 const ENV_ACCT = process.env.NEXT_PUBLIC_COMPANY_BANK_ACCT || '';
-const ENV_HOLDER = process.env.NEXT_PUBLIC_COMPANY_BANK_HOLDER || 'บริษัท คนกลาง จำกัด';
+const ENV_HOLDER = process.env.NEXT_PUBLIC_COMPANY_BANK_HOLDER || 'บริษัท กลางฮับ จำกัด';
 import { fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -52,7 +52,7 @@ export function PaymentMethods({ amount, note }: { amount: number; note?: string
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `khonklang-qr-${amount}.png`;
+      a.href = url; a.download = `glanghub-qr-${amount}.png`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch {
@@ -71,7 +71,7 @@ export function PaymentMethods({ amount, note }: { amount: number; note?: string
 
   return (
     <div className="pm-box">
-      <div className="pm-head">💳 ช่องทางชำระเงิน — {cfg.bankHolder || 'บริษัท คนกลาง จำกัด'}</div>
+      <div className="pm-head">💳 ช่องทางชำระเงิน — {cfg.bankHolder || 'บริษัท กลางฮับ จำกัด'}</div>
       <div className="pm-amount">ยอดที่ต้องโอน <b>฿{amount.toLocaleString()}</b></div>
 
       {qrSrc && (

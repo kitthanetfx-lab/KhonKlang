@@ -368,7 +368,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const bothMet = isBuyer ? (!!md.seller_met) : (!!md.buyer_met);
         if (bothMet) {
           updates.status = 'completed';
-          systemMsg = '🎉 นัดเจอสำเร็จทั้งสองฝ่าย! บริษัท คนกลาง จำกัด จะโอนเงินประกันคืนให้ทั้งคู่เต็มจำนวน (หักเฉพาะค่าบริการ)';
+          systemMsg = '🎉 นัดเจอสำเร็จทั้งสองฝ่าย! บริษัท กลางฮับ จำกัด จะโอนเงินประกันคืนให้ทั้งคู่เต็มจำนวน (หักเฉพาะค่าบริการ)';
         } else {
           systemMsg = `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}ยืนยันว่านัดเจอสำเร็จ — รออีกฝ่ายยืนยัน`;
         }

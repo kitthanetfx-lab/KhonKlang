@@ -268,7 +268,7 @@ export default function SellerDashboard() {
                 </button>
                 <button type="button" className={`mode-opt${listingMode.certified ? ' sel' : ''}`} onClick={() => setListingMode(prev => ({ ...prev, certified: !prev.certified, escrow: true }))}>
                   <div className="mode-opt-icon">⭐</div>
-                  <div><div className="mode-opt-t">Khonklang Certified</div><div className="mode-opt-d">เพิ่มป้าย Certified และบังคับเปิดการซื้อผ่านคนกลาง</div></div>
+                  <div><div className="mode-opt-t">Glanghub Certified</div><div className="mode-opt-d">เพิ่มป้าย Certified และบังคับเปิดการซื้อผ่านคนกลาง</div></div>
                 </button>
               </div>
             </div>

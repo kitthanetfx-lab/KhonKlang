@@ -196,7 +196,7 @@ export default function SettingsPage() {
                 <input value={fees.companyBankAcct} onChange={e => setStr('companyBankAcct', e.target.value)} placeholder="123-4-56789-0"
                   className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
               <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">ชื่อบัญชี</span>
-                <input value={fees.companyBankHolder} onChange={e => setStr('companyBankHolder', e.target.value)} placeholder="บริษัท คนกลาง จำกัด"
+                <input value={fees.companyBankHolder} onChange={e => setStr('companyBankHolder', e.target.value)} placeholder="บริษัท กลางฮับ จำกัด"
                   className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
             </div>
             <div className="mt-4">
