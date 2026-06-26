@@ -317,6 +317,7 @@ button.nav-link { background: none; border: none; }
   .nav { top: 56px; }              /* nav sticks just below the fixed tabs */
   .mobile-tab-spacer { display: block; height: 56px; } /* pushes nav down initially */
   .nav-inner .logo { transform: translateY(5px); } /* ขยับโลโก้ลงเล็กน้อย กันขอบบนโดนแถบแท็บบัง */
+  body.drawer-open .mobile-service-tabs { opacity: 0; pointer-events: none; }
 }
 .mobile-tab-spacer { display: none; }
 /* สีเฉพาะแต่ละปุ่ม */
@@ -357,12 +358,18 @@ button.nav-link { background: none; border: none; }
 .drawer-backdrop { position: fixed; inset:0; background: rgba(13,27,62,.4); backdrop-filter: blur(2px); z-index: 90; opacity:0; pointer-events:none; transition: opacity .25s; }
 .drawer-backdrop.open { opacity:1; pointer-events:auto; }
 .drawer {
-  position: fixed; top:0; right:0; height:100%; width: min(86vw, 360px);
+  position: fixed; top: 0; right: 0; height: 100dvh; width: min(86vw, 360px);
   background: var(--surface); z-index: 95; box-shadow: var(--sh-lg);
   transform: translateX(100%); transition: transform .32s var(--ease-out);
-  display:flex; flex-direction:column; padding: 18px; overflow-y:auto;
+  display:flex; flex-direction:column; padding: calc(18px + env(safe-area-inset-top, 0px)) 18px calc(18px + env(safe-area-inset-bottom, 0px)); overflow-y:auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .drawer.open { transform: none; }
+
+@supports not (height: 100dvh) {
+  .drawer { height: 100vh; }
+}
 .drawer-link { display:flex; align-items:center; gap:12px; padding: 13px 12px; border-radius: var(--r-sm); font-weight:600; font-size: 15px; color: var(--ink-2); }
 .drawer-link:hover { background: var(--accent-soft); color: var(--accent-strong); }
 .drawer-link.active { background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }

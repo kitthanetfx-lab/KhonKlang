@@ -91,11 +91,11 @@ export function CountUp({ to, suffix = '', prefix = '', dur = 1600, delay = 350,
 /* ---------- Logo ---------- */
 export function Logo({ sub = true }: { sub?: boolean }) {
   return (
-    <Link href="/" className="logo" aria-label="คนกลาง หน้าแรก">
+    <Link href="/" className="logo" aria-label="กลางฮับ หน้าแรก">
       <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}>
-        <Image src="/logo.png" alt="คนกลาง" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <Image src="/logo.png" alt="กลางฮับ" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
       </span>
-      <span className="logo-word">คนกลาง{sub && <small>KHONGLANG</small>}</span>
+      <span className="logo-word">กลางฮับ{sub && <small>GLANGHUB</small>}</span>
     </Link>
   );
 }
@@ -142,9 +142,14 @@ export function Nav({ active }: { active?: string }) {
   const { user, loading, logout } = useUser();
   useEffect(() => {
     document.body.style.overflow = drawer ? 'hidden' : '';
+    document.body.classList.toggle('drawer-open', drawer);
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawer(false); setProfileOpen(false); } };
     window.addEventListener('keydown', onKey);
-    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); };
+    return () => {
+      document.body.style.overflow = '';
+      document.body.classList.remove('drawer-open');
+      window.removeEventListener('keydown', onKey);
+    };
   }, [drawer]);
   const displayName = user?.prefs?.displayName || user?.name || 'บัญชีของฉัน';
   const shortName = displayName.length > 18 ? `${displayName.slice(0, 18)}...` : displayName;
@@ -307,15 +312,15 @@ export function Footer() {
           <div>
             <div className="logo" style={{ marginBottom: 14 }}>
               <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}>
-                <Image src="/logo.png" alt="คนกลาง" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                <Image src="/logo.png" alt="กลางฮับ" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </span>
               <span className="logo-word" style={{ color: '#fff' }}>
-                คนกลาง
-                <small style={{ color: 'rgba(255,255,255,.45)' }}>KHONGLANG</small>
+                กลางฮับ
+                <small style={{ color: 'rgba(255,255,255,.45)' }}>GLANGHUB</small>
               </span>
             </div>
             <p style={{ color: '#9aa6c4', fontSize: 14, maxWidth: '34ch' }}>
-              แพลตฟอร์มซื้อขายปลอดภัยผ่านคนกลาง ช่วยลดความเสี่ยงในการโอนเงิน ตรวจรับสินค้า
+              แพลตฟอร์มซื้อขายปลอดภัยด้วยระบบตัวกลาง ช่วยลดความเสี่ยงในการโอนเงิน ตรวจรับสินค้า
               และติดตามดีลได้ในที่เดียว
             </p>
             <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
@@ -359,7 +364,7 @@ export function Footer() {
             color: '#8694b5',
           }}
         >
-          <span>© {new Date().getFullYear() + 543} KhonGlang - ซื้อขายมั่นใจผ่านคนกลาง</span>
+          <span>© {new Date().getFullYear() + 543} GLANGHUB - ซื้อขายมั่นใจด้วยระบบตัวกลาง</span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
             <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
             <Link href="/terms">เงื่อนไขการใช้งาน</Link>
