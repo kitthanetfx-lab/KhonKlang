@@ -499,9 +499,23 @@ export default function DealRoom() {
 
   useEffect(() => {
     if (!dealId) return;
-    const timer = window.setInterval(() => { void fetchDeal(headersRef.current); }, isFinishedStatus(deal?.status) ? 45000 : 15000);
+    const simpleStep = deal?.deal_type === 'simple' ? getSimpleStep().step : null;
+    const waitSyncFast = deal?.deal_type === 'simple' && (simpleStep === 3 || simpleStep === 4);
+    const intervalMs = isFinishedStatus(deal?.status) ? 45000 : waitSyncFast ? 4000 : 15000;
+    const timer = window.setInterval(() => { void fetchDeal(headersRef.current); }, intervalMs);
     return () => window.clearInterval(timer);
-  }, [deal?.status, dealId, fetchDeal]);
+  }, [
+    deal,
+    deal?.deal_type,
+    deal?.status,
+    dealId,
+    fetchDeal,
+    priceState?.agreed,
+    priceState?.evidence_done_buyer,
+    priceState?.evidence_done_seller,
+    priceState?.evidence_done_middleman,
+    chatReviewReady,
+  ]);
 
   useEffect(() => {
     // poll chat เสมอสำหรับดีล meetup (แชทฝังใน wizard) หรือเมื่ออยู่ tab chat / jitsi
@@ -585,6 +599,7 @@ export default function DealRoom() {
         // re-fetch ทั้งดีล+meetup+priceState+evidence ให้ตรงกัน (PATCH คืนแค่ deal row)
         const nextDeal = await fetchDeal(headers);
         if ((tab === 'chat' || showJitsi) && isDealParty(nextDeal ?? deal, myId)) await fetchMsgs(headers, nextDeal ?? deal, myId);
+        return nextDeal;
       } else if (r.status === 401) {
         headersRef.current = {}; // ล้าง cache
         alert('เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่');
@@ -1738,7 +1753,26 @@ export default function DealRoom() {
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerDone, doneText: '✅ ยืนยันถูกต้องแล้ว' },
           ])}
           {!meDone
-            ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('evidence_done')}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</AsyncButton>
+            ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={async () => {
+              setPriceState(prev => ({
+                ...(prev || {}),
+                evidence_done_seller: myRole === 'seller' ? true : !!prev?.evidence_done_seller,
+                evidence_done_buyer: myRole === 'buyer' ? true : !!prev?.evidence_done_buyer,
+              }));
+              await doAction('evidence_done');
+              const { data } = await supabase.auth.getSession();
+              const headers = data.session?.access_token
+                ? { Authorization: `Bearer ${data.session.access_token}` }
+                : await getAuthHeaders(true);
+              const freshDeal = await fetchDeal(headers);
+              const fresh = await fetch(`/api/deals/${dealId}`, { headers }).then(r => r.ok ? r.json() : null).catch(() => null);
+              const freshPd: DealPriceState = fresh?.priceState || {};
+              const nextSellerDone = !!freshPd.evidence_done_seller;
+              const nextBuyerDone = !!freshPd.evidence_done_buyer;
+              if ((freshDeal?.deal_type === 'simple' && (freshPd.evidence_done_buyer && freshPd.evidence_done_seller)) || (nextSellerDone && nextBuyerDone)) {
+                setWzViewStep(nextStep);
+              }
+            }}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</AsyncButton>
             : sellerDone && buyerDone
               ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ดำเนินการต่อ →</button>
               : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
