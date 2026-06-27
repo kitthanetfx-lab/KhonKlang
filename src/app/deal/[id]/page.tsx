@@ -1219,6 +1219,7 @@ export default function DealRoom() {
           const priceAgreed = !!pd.agreed;
           const hasMm = !!deal!.middleman_id;
           const evidenceDone = !!(pd.evidence_done_buyer && pd.evidence_done_seller && (!hasMm || pd.evidence_done_middleman));
+          const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
           const fpName = fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
           const payTitle = myRole === 'buyer'
             ? '💳 ยอดที่คุณต้องโอน'
@@ -1243,6 +1244,10 @@ export default function DealRoom() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: sellerShare > 0 ? '#8a5a00' : 'var(--muted)', marginTop: 4 }}><span>ผู้ขายชำระค่าบริการแยก</span><span>{sellerShare > 0 ? `฿${sellerShare.toLocaleString()}` : '฿0'}</span></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginTop: 4 }}><span>ยอดสุทธิที่ผู้ขายได้รับเมื่อดีลสำเร็จ</span><span>฿{sellerNet.toLocaleString()}</span></div>
               </div>
+              {renderParticipantStatusRows([
+                { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPaymentDone, doneText: sellerShare > 0 ? '✅ ส่งสลิปแล้ว' : '✅ ไม่ต้องชำระเพิ่ม', waitText: sellerShare > 0 ? '⏳ รอส่งสลิป' : '⏳ รอเงื่อนไขถัดไป' },
+                { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.payment_slip_file_id, doneText: '✅ ส่งสลิปแล้ว', waitText: '⏳ รอส่งสลิป' },
+              ], { marginBottom: 12 })}
 
               {deal!.status === 'payment_pending' && myRole === 'buyer' && (
                 !priceAgreed ? <p style={{ fontSize: 13, color: '#b22441' }}>⚠️ ต้องตกลงราคาในขั้นตอน &quot;ตกลงราคา&quot; ให้ครบทุกฝ่ายก่อน จึงจะโอนเงินได้</p>
@@ -1527,11 +1532,19 @@ export default function DealRoom() {
   // ─── ขั้น 0: รออีกฝ่ายเข้าร่วมดีล ────────────────────────────────────────
   function renderWizardStep0() {
     const waitingFor = !deal!.buyer_id ? 'ผู้ซื้อ' : 'ผู้ขาย';
+    const sellerJoined = !!deal!.seller_id;
+    const buyerJoined = !!deal!.buyer_id;
     return (
       <div className="dr-card" style={{ textAlign: 'center', padding: '34px 20px' }}>
         <div style={{ fontSize: 40, marginBottom: 10 }}>⏳</div>
         <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอ{waitingFor}เข้าร่วมดีล</div>
         <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 18 }}>ส่งลิงก์นี้ให้{waitingFor}เพื่อเข้าร่วม — wizard จะเริ่มขั้นที่ 1 ทันทีที่ทั้งสองฝ่ายอยู่ในดีลครบ</p>
+        <div style={{ textAlign: 'left', marginBottom: 18 }}>
+          {renderParticipantStatusRows([
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerJoined, doneText: '✅ เข้าร่วมแล้ว', waitText: '⏳ รอเข้าร่วม' },
+            { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerJoined, doneText: '✅ เข้าร่วมแล้ว', waitText: '⏳ รอเข้าร่วม' },
+          ], { marginBottom: 0 })}
+        </div>
         <button onClick={copyLink} className="btn btn-primary btn-block">{copied ? '✅ คัดลอกลิงก์แล้ว' : '🔗 คัดลอกลิงก์แชร์'}</button>
       </div>
     );
@@ -1802,6 +1815,10 @@ export default function DealRoom() {
   // ─── ขั้น 4: ส่วนกลางตรวจสอบและอนุมัติ (รอ — ไม่มีปุ่มฝั่งผู้ใช้) ──────────
   function renderWizardStep4() {
     const pd: DealPriceState = priceState || {};
+    const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
+    const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
+    const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+    const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
     return (
       <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
         <div style={{ fontSize: 38, marginBottom: 10 }}>🔍</div>
@@ -1814,6 +1831,12 @@ export default function DealRoom() {
           {pd.seller_fee_slip && (
             <a href={fileUrl(pd.seller_fee_slip)} target="_blank" rel="noreferrer"><img src={fileUrl(pd.seller_fee_slip)} alt="สลิปผู้ขาย" style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
           )}
+        </div>
+        <div style={{ textAlign: 'left', marginTop: 16 }}>
+          {renderParticipantStatusRows([
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPaymentDone, doneText: sellerShare > 0 ? '✅ ส่งสลิปแล้ว' : '✅ ไม่ต้องชำระเพิ่ม', waitText: sellerShare > 0 ? '⏳ รอส่งสลิป' : '⏳ รอศูนย์กลางตรวจสอบ' },
+            { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.payment_slip_file_id, doneText: '✅ ส่งสลิปแล้ว', waitText: '⏳ รอส่งสลิป' },
+          ], { marginBottom: 0 })}
         </div>
       </div>
     );
@@ -1844,12 +1867,19 @@ export default function DealRoom() {
   // ─── ขั้น 7: ผู้ขายแพ็ค + วิดีโอ + เลขพัสดุ ───────────────────────────────
   function renderWizardStep5() {
     const packingEvidence = evidence.filter(e => e.type === 'packing');
+    const sellerPacked = !!deal!.tracking_to_buyer || ['shipped_to_buyer', 'completed', 'cancelled', 'disputed'].includes(deal!.status);
     if (myRole !== 'seller') {
       return (
         <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
           <div style={{ fontSize: 38, marginBottom: 10 }}>📦</div>
           <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอผู้ขายแพ็คสินค้าและจัดส่ง</div>
           <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ขายกำลังถ่ายวิดีโอแพ็คของและจัดส่งตรงถึงคุณ — ระบบจะแจ้งเลขพัสดุให้ทันทีที่ส่งแล้ว</p>
+          <div style={{ textAlign: 'left', marginTop: 16 }}>
+            {renderParticipantStatusRows([
+              { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPacked, doneText: '✅ แพ็คและส่งแล้ว', waitText: '⏳ กำลังแพ็ค' },
+              { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
+            ], { marginBottom: 0 })}
+          </div>
           {packingEvidence.length > 0
             ? renderWizardEvidenceThumbs(packingEvidence)
             : <p style={{ fontSize: 12.5, color: 'var(--faint)', marginTop: 10 }}>ยังไม่มีรูป/วิดีโอแพ็คของ</p>}
@@ -1871,6 +1901,10 @@ export default function DealRoom() {
         <div className="dr-card">
           <div className="dr-card-title">เลขพัสดุ</div>
           <input type="text" className="dr-select" value={trackingInput} onChange={e => setTrackingInput(e.target.value)} placeholder="กรอกเลขพัสดุ" style={{ marginBottom: 12 }} />
+          {renderParticipantStatusRows([
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPacked, doneText: '✅ แพ็คและส่งแล้ว', waitText: '⏳ กำลังแพ็ค' },
+            { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
+          ], { marginBottom: 12 })}
           <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => { if (!trackingInput) { alert('กรอกเลขพัสดุ'); return; } return doAction('seller_done_packing', { trackingNumber: trackingInput }); }}>📦 แพ็คเสร็จ — ส่งให้ผู้ซื้อโดยตรง</AsyncButton>
         </div>
       </div>
@@ -1880,6 +1914,7 @@ export default function DealRoom() {
   // ─── ขั้น 8: ผู้ซื้อแกะกล่อง + ถ่ายวิดีโอ + ยืนยันรับ/แจ้งปัญหา ───────────
   function renderWizardStep6() {
     const unboxEvidence = evidence.filter(e => e.type === 'receive');
+    const buyerReceived = deal!.status === 'completed';
     if (myRole !== 'buyer') {
       return (
         <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
@@ -1887,6 +1922,12 @@ export default function DealRoom() {
           <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>ส่งสินค้าแล้ว — รอผู้ซื้อยืนยันรับ</div>
           {deal!.tracking_to_buyer && <div className="dr-track-code" style={{ marginBottom: 8 }}>📦 {deal!.tracking_to_buyer}</div>}
           <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่อง แล้วกดยืนยันรับสินค้า ดีลจะเสร็จสมบูรณ์อัตโนมัติ</p>
+          <div style={{ textAlign: 'left', marginTop: 16 }}>
+            {renderParticipantStatusRows([
+              { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ส่งสินค้าแล้ว', waitText: '⏳ รอจัดส่ง' },
+              { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerReceived, doneText: '✅ ยืนยันรับแล้ว', waitText: '⏳ รอยืนยันรับ' },
+            ], { marginBottom: 0 })}
+          </div>
           {unboxEvidence.length > 0
             ? renderWizardEvidenceThumbs(unboxEvidence)
             : <p style={{ fontSize: 12.5, color: 'var(--faint)', marginTop: 10 }}>ยังไม่มีรูป/วิดีโอแกะกล่องจากผู้ซื้อ</p>}
@@ -1906,6 +1947,10 @@ export default function DealRoom() {
           {renderWizardEvidenceThumbs(unboxEvidence)}
         </div>
         <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {renderParticipantStatusRows([
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ส่งสินค้าแล้ว', waitText: '⏳ รอจัดส่ง' },
+            { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerReceived, doneText: '✅ ยืนยันรับแล้ว', waitText: '⏳ รอยืนยันรับ' },
+          ], { marginBottom: 4 })}
           <AsyncButton className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => { if (!hasUnboxEvidence && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return; return doAction('buyer_received'); }}>🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์</AsyncButton>
           <AsyncButton className="btn btn-ghost btn-block" disabled={acting} onClick={() => { const r = prompt('อธิบายปัญหาที่พบ (เช่น สินค้าไม่ตรงปก/ชำรุด/ไม่ได้รับสินค้า):'); if (r === null || !r.trim()) return; return doAction('dispute', { reason: r.trim() }); }} style={{ color: '#b22441' }}>⚠️ แจ้งปัญหากับสินค้า</AsyncButton>
         </div>
@@ -1922,10 +1967,22 @@ export default function DealRoom() {
           <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: '#b22441', marginBottom: 8 }}>มีข้อพิพาท — เงินถูกอายัดไว้</div>
           {deal!.reject_reason && <p style={{ fontSize: 13.5, color: 'var(--ink)', background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12, textAlign: 'left' }}>{deal!.reject_reason}</p>}
           <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ทีมงานกำลังตรวจสอบข้อพิพาทนี้ — คุยรายละเอียดเพิ่มเติมกับอีกฝ่ายในแชตได้ ผลการตัดสินจะแจ้งให้ทราบเมื่อเสร็จสิ้น</p>
+          <div style={{ textAlign: 'left', marginTop: 16 }}>
+            {renderParticipantStatusRows([
+              { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: false, doneText: '✅ ส่งข้อมูลครบแล้ว', waitText: '⚠️ รอทีมงานตรวจสอบ' },
+              { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: false, doneText: '✅ ส่งข้อมูลครบแล้ว', waitText: '⚠️ รอทีมงานตรวจสอบ' },
+            ], { marginBottom: 0 })}
+          </div>
         </div>
       );
     }
     const isCancelled = outcome === 'cancelled';
+    const sellerRow = isCancelled
+      ? { ok: false, doneText: '✅ ดีลยกเลิกแล้ว', waitText: '⏳ ดีลถูกยกเลิก' }
+      : { ok: false, doneText: '✅ รับเงินแล้ว', waitText: '⏳ รอทีมงานโอนเงิน' };
+    const buyerRow = isCancelled
+      ? { ok: false, doneText: '✅ ได้รับเงินคืนแล้ว', waitText: '⏳ รอทีมงานคืนเงิน' }
+      : { ok: true, doneText: '✅ ยืนยันรับสินค้าแล้ว', waitText: '⏳ รอทีมงานโอนเงิน' };
     return (
       <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
         <div style={{ fontSize: 38, marginBottom: 10 }}>💸</div>
@@ -1934,6 +1991,12 @@ export default function DealRoom() {
         </div>
         {isCancelled && deal!.reject_reason && <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>เหตุผล: {deal!.reject_reason}</p>}
         <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ทีมงานกำลังโอนเงินและจะอัปโหลดสลิปยืนยันให้เห็นที่นี่ภายในไม่นาน</p>
+        <div style={{ textAlign: 'left', marginTop: 16 }}>
+          {renderParticipantStatusRows([
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ...sellerRow },
+            { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ...buyerRow },
+          ], { marginBottom: 0 })}
+        </div>
       </div>
     );
   }
@@ -1956,6 +2019,12 @@ export default function DealRoom() {
             <a href={fileUrl(slipId)} target="_blank" rel="noreferrer"><img src={fileUrl(slipId)} alt="สลิป" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
           </div>
         )}
+        <div className="dr-card">
+          {renderParticipantStatusRows([
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: true, doneText: isCancelled ? '✅ ดีลยกเลิกแล้ว' : '✅ รับเงินแล้ว' },
+            { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: true, doneText: isCancelled ? '✅ ได้รับเงินคืนแล้ว' : '✅ ดีลเสร็จสมบูรณ์' },
+          ], { marginBottom: 0 })}
+        </div>
         {!isCancelled && <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />}
       </div>
     );
