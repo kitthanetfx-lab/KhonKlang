@@ -438,7 +438,7 @@ export default function DealRoom() {
 
   const fetchDeal = useCallback(async (headers: Record<string, string> = {}) => {
     try {
-      const r = await fetch(`/api/deals/${dealId}`, { headers });
+      const r = await fetch(`/api/deals/${dealId}`, { headers, cache: 'no-store' });
       const d = await r.json();
       if (r.ok) {
         const nextDeal = d.deal as Deal;
@@ -453,7 +453,7 @@ export default function DealRoom() {
 
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
-    const r = await fetch(`/api/messages?dealId=${dealId}`, { headers }).catch(() => null);
+    const r = await fetch(`/api/messages?dealId=${dealId}`, { headers, cache: 'no-store' }).catch(() => null);
     if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); }
     else if (r?.status === 401) {
       // token หมดอายุ — ล้าง cache ให้ poll รอบถัดไปขอ token ใหม่จาก Supabase
@@ -1812,7 +1812,7 @@ export default function DealRoom() {
                 ? { Authorization: `Bearer ${data.session.access_token}` }
                 : await getAuthHeaders(true);
               const freshDeal = await fetchDeal(headers);
-              const fresh = await fetch(`/api/deals/${dealId}`, { headers }).then(r => r.ok ? r.json() : null).catch(() => null);
+              const fresh = await fetch(`/api/deals/${dealId}`, { headers, cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
               const freshPd: DealPriceState = fresh?.priceState || {};
               const nextSellerDone = !!freshPd.evidence_done_seller;
               const nextBuyerDone = !!freshPd.evidence_done_buyer;
