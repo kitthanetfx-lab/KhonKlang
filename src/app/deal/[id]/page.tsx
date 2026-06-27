@@ -412,6 +412,17 @@ export default function DealRoom() {
   // รีเซ็ตกลับไปดูขั้นปัจจุบันเมื่อสถานะดีลเปลี่ยน หรือ meetup ตกลงยอดประกันแล้ว (ขยับไปขั้นวางเงินอัตโนมัติ)
   useEffect(() => { setWzViewStep(null); }, [deal?.status, meetup?.deposit]);
 
+  // รีเซ็ต state ที่เก็บไว้เฉพาะฝั่ง client เมื่อเปลี่ยนดีลหรือเปลี่ยนบัญชี
+  // เพื่อกันสถานะ "ฉันกดยืนยันแล้ว" จากผู้ใช้ก่อนหน้าติดมาหลอกอีกบัญชี
+  useEffect(() => {
+    setChatReviewReady(false);
+    chatBundledRef.current = false;
+    setWzViewStep(null);
+    setShowStep3Warning(false);
+    step3PendingRef.current = null;
+    simpleActualStepRef.current = null;
+  }, [dealId, myId]);
+
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
