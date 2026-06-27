@@ -96,6 +96,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let priceUpdates: Record<string, unknown> = {};
     let meetupUpdates: Record<string, unknown> = {};
     let evidenceInsert: Record<string, unknown> | null = null;
+    let replaceChatTranscript = false;
     let systemMsg = '';
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
 
@@ -180,6 +181,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const { evidenceType, fileId, fileName, content } = body;
         // chat_text เก็บประวัติการสนทนาทั้งหมดเป็นหลักฐานชิ้นเดียว (ไม่ใช่ทีละข้อความ) จึงต้องยาวกว่าแคปทั่วไป 200 ตัวอักษร
         const contentCap = evidenceType === 'chat_text' ? 4000 : 200;
+        replaceChatTranscript = evidenceType === 'chat_text';
         evidenceInsert = {
           deal_id: id,
           type: evidenceType,
@@ -510,7 +512,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await db.from('deal_meetup').upsert({ deal_id: id, ...meetupUpdates }, { onConflict: 'deal_id' });
     }
     if (evidenceInsert) {
-      await db.from('deal_evidence').insert(evidenceInsert);
+      if (replaceChatTranscript) {
+        const { data: existingChatEvidence } = await db
+          .from('deal_evidence')
+          .select('id')
+          .eq('deal_id', id)
+          .eq('type', 'chat_text')
+          .order('created_at', { ascending: true });
+
+        const keepId = existingChatEvidence?.[0]?.id;
+        if (keepId) {
+          await db.from('deal_evidence').update(evidenceInsert).eq('id', keepId);
+          const duplicateIds = (existingChatEvidence || []).slice(1).map(row => row.id).filter(Boolean);
+          if (duplicateIds.length) {
+            await db.from('deal_evidence').delete().in('id', duplicateIds);
+          }
+        } else {
+          await db.from('deal_evidence').insert(evidenceInsert);
+        }
+      } else {
+        await db.from('deal_evidence').insert(evidenceInsert);
+      }
     }
 
     // กัน race ตอนยอมรับเงื่อนไข: ถ้าหลังอัปเดตแล้วทุกฝ่ายยอมรับครบแต่สถานะยังค้าง → ดันไปขั้นโอนเงินทันที
