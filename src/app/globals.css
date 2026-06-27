@@ -872,12 +872,10 @@ button.nav-link { background: none; border: none; }
 /* form sections */
 .deal-form { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 32px 28px; box-shadow: var(--sh-sm); }
 @media (min-width: 560px){ .deal-form { padding: 40px 36px; } }
-.deal-form-title { font-size: 22px; margin-bottom: 6px; }
-.deal-form-sub { color: var(--muted); font-size: 14.5px; margin-bottom: 28px; }
 .create-deal-brand-wrap {
   display: flex;
   justify-content: center;
-  margin: 0 auto 12px;
+  margin: -12px auto 18px;
 }
 .create-deal-brand {
   display: inline-flex;
@@ -914,7 +912,7 @@ button.nav-link { background: none; border: none; }
   flex-direction: column;
   justify-content: flex-start;
   gap: 0;
-  padding: 10px;
+  padding: 8px;
   overflow: hidden;
 }
 .svc-pick-role-media {
@@ -922,7 +920,7 @@ button.nav-link { background: none; border: none; }
   display: block;
   flex: 0 0 auto;
   width: 100%;
-  height: 152px;
+  aspect-ratio: 1 / 1;
   border-radius: 16px;
   overflow: hidden;
   background: linear-gradient(180deg, rgba(247, 250, 255, .98), rgba(239, 244, 252, .98));
@@ -935,9 +933,10 @@ button.nav-link { background: none; border: none; }
 .svc-pick-role-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   display: block;
+  background: rgba(255,255,255,.72);
 }
 .svc-pick-role-desc {
   display: block;
@@ -958,7 +957,6 @@ button.nav-link { background: none; border: none; }
     padding: 8px;
   }
   .svc-pick-role-media {
-    height: 152px;
     border-radius: 14px;
   }
 }
