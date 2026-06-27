@@ -872,10 +872,14 @@ button.nav-link { background: none; border: none; }
 /* form sections */
 .deal-form { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 32px 28px; box-shadow: var(--sh-sm); }
 @media (min-width: 560px){ .deal-form { padding: 40px 36px; } }
+.create-deal-form {
+  padding-top: 0;
+  overflow: hidden;
+}
 .create-deal-brand-wrap {
   display: flex;
   justify-content: center;
-  margin: -12px auto 18px;
+  margin: -1px auto 14px;
 }
 .create-deal-brand {
   display: inline-flex;
@@ -946,6 +950,9 @@ button.nav-link { background: none; border: none; }
   line-height: 1.55;
 }
 @media (max-width: 559px) {
+  .create-deal-form {
+    padding-top: 0;
+  }
   .create-deal-brand {
     min-height: 70px;
     border-radius: 0 0 20px 20px;

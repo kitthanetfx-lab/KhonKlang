@@ -98,7 +98,7 @@ function CreateDealForm() {
       </header>
 
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px 80px' }}>
-        <div className="deal-form">
+        <div className="deal-form create-deal-form">
           <div className="create-deal-brand-wrap">
             <div className="create-deal-brand">
               <Image src="/logo.png" alt="กลางฮับ" width={420} height={132} priority className="create-deal-brand-image" />
