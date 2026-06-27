@@ -874,6 +874,27 @@ button.nav-link { background: none; border: none; }
 @media (min-width: 560px){ .deal-form { padding: 40px 36px; } }
 .deal-form-title { font-size: 22px; margin-bottom: 6px; }
 .deal-form-sub { color: var(--muted); font-size: 14.5px; margin-bottom: 28px; }
+.create-deal-brand-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 12px;
+}
+.create-deal-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 92px;
+  padding: 8px 26px 10px;
+  border-radius: 0 0 26px 26px;
+  background: linear-gradient(180deg, rgba(243, 248, 255, .98), rgba(221, 233, 250, .98));
+  border: 1px solid rgba(175, 199, 232, .95);
+  box-shadow: 0 18px 36px -30px rgba(53, 95, 172, .52);
+}
+.create-deal-brand-image {
+  width: min(180px, 32vw);
+  height: auto;
+  display: block;
+}
 
 /* service picker */
 .svc-pick-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
@@ -892,8 +913,8 @@ button.nav-link { background: none; border: none; }
 .svc-pick-card-role {
   flex-direction: column;
   justify-content: flex-start;
-  gap: 10px;
-  padding: 14px;
+  gap: 0;
+  padding: 10px;
   overflow: hidden;
 }
 .svc-pick-role-media {
@@ -901,7 +922,7 @@ button.nav-link { background: none; border: none; }
   display: block;
   flex: 0 0 auto;
   width: 100%;
-  height: 132px;
+  height: 152px;
   border-radius: 16px;
   overflow: hidden;
   background: linear-gradient(180deg, rgba(247, 250, 255, .98), rgba(239, 244, 252, .98));
@@ -914,7 +935,8 @@ button.nav-link { background: none; border: none; }
 .svc-pick-role-image {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
   display: block;
 }
 .svc-pick-role-desc {
@@ -924,11 +946,19 @@ button.nav-link { background: none; border: none; }
   line-height: 1.55;
 }
 @media (max-width: 559px) {
+  .create-deal-brand {
+    min-height: 70px;
+    padding: 6px 14px 8px;
+    border-radius: 0 0 20px 20px;
+  }
+  .create-deal-brand-image {
+    width: min(132px, 42vw);
+  }
   .svc-pick-card-role {
-    padding: 12px;
+    padding: 8px;
   }
   .svc-pick-role-media {
-    height: 124px;
+    height: 152px;
     border-radius: 14px;
   }
 }

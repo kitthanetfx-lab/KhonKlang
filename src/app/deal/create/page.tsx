@@ -98,6 +98,11 @@ function CreateDealForm() {
       </header>
 
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px 80px' }}>
+        <div className="create-deal-brand-wrap">
+          <div className="create-deal-brand">
+            <Image src="/logo.png" alt="กลางฮับ" width={420} height={132} priority className="create-deal-brand-image" />
+          </div>
+        </div>
         <div className="deal-form">
           <h2 className="deal-form-title">รายละเอียดดีล</h2>
           <p className="deal-form-sub">{isSimple ? 'ซื้อขายผ่านกลางแบบง่าย — พักเงินกับศูนย์กลาง ผู้ขายส่งตรงถึงผู้ซื้อ ไม่ต้องใช้คนกลางบุคคล' : isSafeZone ? 'สร้างดีลนัดรับ Safe Zone แล้วชวนอีกฝ่ายเข้าร่วมต่อจากลิงก์นี้' : 'สร้างดีล Escrow แล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม'}</p>
@@ -128,7 +133,6 @@ function CreateDealForm() {
                       sizes="(max-width: 559px) 100vw, 240px"
                     />
                   </span>
-                  <span className="spc-d svc-pick-role-desc">{option.desc}</span>
                 </button>
               ))}
             </div>
