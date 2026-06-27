@@ -882,11 +882,12 @@ button.nav-link { background: none; border: none; }
   align-items: center;
   justify-content: center;
   min-height: 92px;
-  padding: 8px 26px 10px;
+  padding: 0;
   border-radius: 0 0 26px 26px;
   background: linear-gradient(180deg, rgba(243, 248, 255, .98), rgba(221, 233, 250, .98));
   border: 1px solid rgba(175, 199, 232, .95);
   box-shadow: 0 18px 36px -30px rgba(53, 95, 172, .52);
+  overflow: hidden;
 }
 .create-deal-brand-image {
   width: min(180px, 32vw);
@@ -912,7 +913,7 @@ button.nav-link { background: none; border: none; }
   flex-direction: column;
   justify-content: flex-start;
   gap: 0;
-  padding: 8px;
+  padding: 0;
   overflow: hidden;
 }
 .svc-pick-role-media {
@@ -947,14 +948,10 @@ button.nav-link { background: none; border: none; }
 @media (max-width: 559px) {
   .create-deal-brand {
     min-height: 70px;
-    padding: 6px 14px 8px;
     border-radius: 0 0 20px 20px;
   }
   .create-deal-brand-image {
     width: min(132px, 42vw);
-  }
-  .svc-pick-card-role {
-    padding: 8px;
   }
   .svc-pick-role-media {
     border-radius: 14px;
