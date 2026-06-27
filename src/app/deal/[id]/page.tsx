@@ -452,7 +452,8 @@ export default function DealRoom() {
     (async () => {
       const loadedDeal = await fetchDeal();
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user ?? null;
         if (!user) throw new Error('guest');
         const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
         setMyId(user.id); setMyName(profile?.display_name || '');
@@ -1486,6 +1487,11 @@ export default function DealRoom() {
     );
   }
 
+  function hasProgressPing(role: 'seller' | 'buyer' | 'middleman') {
+    const roleLabel = role === 'seller' ? 'ผู้ขาย' : role === 'buyer' ? 'ผู้ซื้อ' : 'คนกลาง';
+    return msgs.some(m => m.role === 'system' && typeof m.content === 'string' && m.content.includes(`${roleLabel}คุยรายละเอียดเสร็จแล้ว`));
+  }
+
   // ─── ขั้น 0: รออีกฝ่ายเข้าร่วมดีล ────────────────────────────────────────
   function renderWizardStep0() {
     const waitingFor = !deal!.buyer_id ? 'ผู้ซื้อ' : 'ผู้ขาย';
@@ -1652,6 +1658,10 @@ export default function DealRoom() {
   // ─── ขั้น 3: คุย/วิดีโอคอลรายละเอียดสินค้า ────────────────────────────────
   function renderWizardStepChat(nextStep = 4) {
     const chatMsgs = msgs.filter(m => m.role !== 'system').slice(-30);
+    const sellerChatReady = hasProgressPing('seller') || (myRole === 'seller' && chatReviewReady);
+    const buyerChatReady = hasProgressPing('buyer') || (myRole === 'buyer' && chatReviewReady);
+    const meChatReady = myRole === 'seller' ? sellerChatReady : myRole === 'buyer' ? buyerChatReady : false;
+    const allChatReady = sellerChatReady && buyerChatReady;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
@@ -1692,7 +1702,19 @@ export default function DealRoom() {
             <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
           </div>
         </div>
-        <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={async () => { if (!chatBundledRef.current) { chatBundledRef.current = true; await bundleChatTranscriptAsEvidence(); } await doAction('progress_ping', { stage: 'to_evidence' }); setChatReviewReady(true); setWzViewStep(nextStep); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</AsyncButton>
+        <div className="dr-card">
+          {renderParticipantStatusRows([
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerChatReady, doneText: '✅ ยืนยันแล้ว' },
+            { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerChatReady, doneText: '✅ ยืนยันแล้ว' },
+          ], { marginBottom: 12 })}
+          {!meChatReady ? (
+            <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={async () => { if (!chatBundledRef.current) { chatBundledRef.current = true; await bundleChatTranscriptAsEvidence(); } await doAction('progress_ping', { stage: 'to_evidence' }); setChatReviewReady(true); setWzViewStep(nextStep); }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</AsyncButton>
+          ) : allChatReady ? (
+            <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ไปขั้นถัดไป</button>
+          ) : (
+            <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>
+          )}
+        </div>
       </div>
     );
   }
