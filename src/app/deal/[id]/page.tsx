@@ -1066,11 +1066,11 @@ export default function DealRoom() {
         ) : isRepriceFlow ? (
           <div>
             <div style={{ fontSize: 14, marginBottom: 8 }}>{proposerLabel}เสนอราคาใหม่: <b>฿{Number(pd.proposed_price).toLocaleString()}</b> · ค่าบริการ: {fpName(pd.proposed_fee_payer)}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-              {[['ผู้ขาย', pd.seller_agreed], ['ผู้ซื้อ', pd.buyer_agreed], ...(hasMm ? [['คนกลาง', pd.middleman_agreed] as [string, boolean]] : [])].map(([l, ok]) => (
-                <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ตกลงแล้ว' : '⏳ รอ'}</span></div>
-              ))}
-            </div>
+            {renderParticipantStatusRows([
+              { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!pd.seller_agreed, doneText: '✅ ตกลงแล้ว' },
+              { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!pd.buyer_agreed, doneText: '✅ ตกลงแล้ว' },
+              ...(hasMm ? [{ roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: !!pd.middleman_agreed, doneText: '✅ ตกลงแล้ว' }] : []),
+            ], { marginBottom: 10, gap: 5, fontSize: 13 })}
             <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
               {(['buyer', 'seller', 'split'] as const).map(fp => (
                 <button key={fp} type="button" onClick={() => setFeePayerInput(fp)} className={`btn btn-sm ${selectedFeePayer === fp ? 'btn-primary' : 'btn-ghost'}`}>{fpName(fp)}</button>
@@ -1093,11 +1093,11 @@ export default function DealRoom() {
                 <button key={fp} type="button" onClick={() => setFeePayerInput(fp)} className={`btn btn-sm ${selectedFeePayer === fp ? 'btn-primary' : 'btn-ghost'}`}>{fpName(fp)}</button>
               ))}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {[['ผู้ขาย', pd.seller_agreed], ['ผู้ซื้อ', pd.buyer_agreed], ...(hasMm ? [['คนกลาง', pd.middleman_agreed] as [string, boolean]] : [])].map(([l, ok]) => (
-                <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ รับรู้/ยืนยันแล้ว' : '⏳ รอ'}</span></div>
-              ))}
-            </div>
+            {renderParticipantStatusRows([
+              { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!pd.seller_agreed, doneText: '✅ รับรู้/ยืนยันแล้ว' },
+              { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!pd.buyer_agreed, doneText: '✅ รับรู้/ยืนยันแล้ว' },
+              ...(hasMm ? [{ roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: !!pd.middleman_agreed, doneText: '✅ รับรู้/ยืนยันแล้ว' }] : []),
+            ], { gap: 5, fontSize: 13 })}
             {!meAgreed ? (
               <AsyncButton className="btn btn-green btn-block" onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>
                 {myRole === 'middleman' ? '✅ รับรู้ราคาเดิมและอนุมัติดีล' : '✅ ใช้ราคาเดิมนี้'}
@@ -1155,11 +1155,11 @@ export default function DealRoom() {
       <div className="dr-card">
         <div className="dr-card-title">📁 เก็บหลักฐานก่อนโอนเงิน</div>
         <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>คุยรายละเอียด ดูสินค้า เก็บหลักฐานในแชต/วิดีโอคอลให้เรียบร้อย แล้วกดยืนยัน — ทุกฝ่ายต้องยืนยันก่อนเข้าขั้นโอนเงิน</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-          {[['ผู้ขาย', pd.evidence_done_seller], ['ผู้ซื้อ', pd.evidence_done_buyer], ...(hasMm ? [['คนกลาง', pd.evidence_done_middleman] as [string, boolean]] : [])].map(([l, ok]) => (
-            <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ เก็บหลักฐานแล้ว' : '⏳ รอ'}</span></div>
-          ))}
-        </div>
+        {renderParticipantStatusRows([
+          { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!pd.evidence_done_seller, doneText: '✅ เก็บหลักฐานแล้ว' },
+          { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!pd.evidence_done_buyer, doneText: '✅ เก็บหลักฐานแล้ว' },
+          ...(hasMm ? [{ roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: !!pd.evidence_done_middleman, doneText: '✅ เก็บหลักฐานแล้ว' }] : []),
+        ], { marginBottom: 10, gap: 5, fontSize: 13 })}
         {!meDone
           ? <AsyncButton className="btn btn-primary btn-block" onClick={() => doAction('evidence_done')}>✅ เก็บหลักฐานเสร็จสิ้น</AsyncButton>
           : <p style={{ fontSize: 13, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันแล้ว — รอฝ่ายอื่น</p>}
@@ -1462,6 +1462,28 @@ export default function DealRoom() {
     );
   }
 
+  function renderParticipantStatusRows(
+    items: Array<{ roleLabel: string; name: string; ok: boolean; doneText: string; waitText?: string }>,
+    opts?: { marginBottom?: number; gap?: number; fontSize?: number }
+  ) {
+    const marginBottom = opts?.marginBottom ?? 12;
+    const gap = opts?.gap ?? 6;
+    const fontSize = opts?.fontSize ?? 13.5;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap, marginBottom }}>
+        {items.map(({ roleLabel, name, ok, doneText, waitText = '⏳ รอ' }) => (
+          <div key={roleLabel} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: 'var(--muted)', fontSize: 12 }}>{roleLabel}</div>
+              <div style={{ color: 'var(--ink)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name || '-'}</div>
+            </div>
+            <span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)', flexShrink: 0 }}>{ok ? doneText : waitText}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   // ─── ขั้น 0: รออีกฝ่ายเข้าร่วมดีล ────────────────────────────────────────
   function renderWizardStep0() {
     const waitingFor = !deal!.buyer_id ? 'ผู้ซื้อ' : 'ผู้ขาย';
@@ -1500,20 +1522,10 @@ export default function DealRoom() {
           {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}><span>รวมค่าบริการ</span><span>฿{fb.total.toLocaleString()}</span></div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-          {[
-            ['ผู้ขาย', deal!.seller_name || '-', deal!.seller_accepted_terms],
-            ['ผู้ซื้อ', deal!.buyer_name || '-', deal!.buyer_accepted_terms],
-          ].map(([roleLabel, name, ok]) => (
-            <div key={roleLabel as string} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 13.5 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ color: 'var(--muted)', fontSize: 12 }}>{roleLabel}</div>
-                <div style={{ color: 'var(--ink)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name as string}</div>
-              </div>
-              <span style={{ color: (ok as boolean) ? 'var(--green-600)' : 'var(--faint)', flexShrink: 0 }}>{(ok as boolean) ? '✅ ยอมรับแล้ว' : '⏳ รอ'}</span>
-            </div>
-          ))}
-        </div>
+        {renderParticipantStatusRows([
+          { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: deal!.seller_accepted_terms, doneText: '✅ ยอมรับแล้ว' },
+          { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: deal!.buyer_accepted_terms, doneText: '✅ ยอมรับแล้ว' },
+        ], { marginBottom: 16 })}
         {!meAccepted
           ? <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => doAction('accept_terms')}>✅ ยอมรับเงื่อนไข</AsyncButton>
           : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยอมรับเงื่อนไขแล้ว — รออีกฝ่าย</p>}
@@ -1559,11 +1571,10 @@ export default function DealRoom() {
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '12px 0' }}>
-          {[['ผู้ขาย', sellerReady], ['ผู้ซื้อ', buyerReady]].map(([l, ok]) => (
-            <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ตกลงแล้ว' : '⏳ รอ'}</span></div>
-          ))}
-        </div>
+        {renderParticipantStatusRows([
+          { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerReady, doneText: '✅ ตกลงแล้ว' },
+          { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerReady, doneText: '✅ ตกลงแล้ว' },
+        ], { marginBottom: 12 })}
 
         {!meReady
           ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>✅ ตกลงราคานี้ — ไปคุยรายละเอียดสินค้า</AsyncButton>
@@ -1698,11 +1709,10 @@ export default function DealRoom() {
         </div>
         {renderEvidencePanel()}
         <div className="dr-card">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-            {[['ผู้ขาย', sellerDone], ['ผู้ซื้อ', buyerDone]].map(([l, ok]) => (
-              <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ยืนยันถูกต้องแล้ว' : '⏳ รอ'}</span></div>
-            ))}
-          </div>
+          {renderParticipantStatusRows([
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerDone, doneText: '✅ ยืนยันถูกต้องแล้ว' },
+            { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerDone, doneText: '✅ ยืนยันถูกต้องแล้ว' },
+          ])}
           {!meDone
             ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('evidence_done')}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</AsyncButton>
             : sellerDone && buyerDone
@@ -2607,9 +2617,11 @@ export default function DealRoom() {
                 {(deal.seller_accepted_terms || deal.buyer_accepted_terms || deal.middleman_accepted_terms) && (
                   <div className="dr-card">
                     <div className="dr-card-title">ยอมรับเงื่อนไข</div>
-                    {[['ผู้ขาย', deal.seller_accepted_terms], ...(deal.middleman_id ? [['คนกลาง', deal.middleman_accepted_terms] as [string, boolean]] : []), ['ผู้ซื้อ', deal.buyer_accepted_terms]].map(([l, ok]) => (
-                      <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--line-2)', fontSize: 14 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ยอมรับแล้ว' : '⏳ รอ'}</span></div>
-                    ))}
+                    {renderParticipantStatusRows([
+                      { roleLabel: 'ผู้ขาย', name: deal.seller_name || '-', ok: deal.seller_accepted_terms, doneText: '✅ ยอมรับแล้ว' },
+                      ...(deal.middleman_id ? [{ roleLabel: 'คนกลาง', name: deal.middleman_name || '-', ok: deal.middleman_accepted_terms, doneText: '✅ ยอมรับแล้ว' }] : []),
+                      { roleLabel: 'ผู้ซื้อ', name: deal.buyer_name || '-', ok: deal.buyer_accepted_terms, doneText: '✅ ยอมรับแล้ว' },
+                    ], { marginBottom: 0, gap: 9, fontSize: 14 })}
                   </div>
                 )}
 
