@@ -1,6 +1,4 @@
 'use client';
-import buyerImage from '../../../../public/Buyer.webp';
-import sellerImage from '../../../../public/Seller.webp';
 import Image from 'next/image';
 import { useState, useEffect, Suspense } from 'react';
 import { authHeaders } from '@/lib/supabase';
@@ -14,12 +12,12 @@ import { useServiceControls } from '@/lib/useServiceControls';
 const CATS = ['สินค้าทั่วไป', 'อิเล็กทรอนิกส์', 'เสื้อผ้า', 'ยานพาหนะ', 'อสังหาริมทรัพย์', 'บริการ', 'อื่นๆ'];
 const ROLE_OPTIONS = {
   simple: [
-    { key: 'seller', image: sellerImage, imageAlt: 'Seller', desc: 'สร้างดีลแล้วส่งลิงก์ให้ผู้ซื้อเข้าร่วม' },
-    { key: 'buyer', image: buyerImage, imageAlt: 'Buyer', desc: 'สร้างดีลแล้วส่งลิงก์ให้ผู้ขายเข้าร่วม' },
+    { key: 'seller', image: '/Seller.webp', imageAlt: 'Seller', desc: 'สร้างดีลแล้วส่งลิงก์ให้ผู้ซื้อเข้าร่วม' },
+    { key: 'buyer', image: '/Buyer.webp', imageAlt: 'Buyer', desc: 'สร้างดีลแล้วส่งลิงก์ให้ผู้ขายเข้าร่วม' },
   ],
   regular: [
-    { key: 'seller', image: sellerImage, imageAlt: 'Seller', desc: 'สร้างดีลแล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม' },
-    { key: 'buyer', image: buyerImage, imageAlt: 'Buyer', desc: 'สร้างดีลแล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม' },
+    { key: 'seller', image: '/Seller.webp', imageAlt: 'Seller', desc: 'สร้างดีลแล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม' },
+    { key: 'buyer', image: '/Buyer.webp', imageAlt: 'Buyer', desc: 'สร้างดีลแล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม' },
   ],
 } as const;
 
@@ -125,6 +123,7 @@ function CreateDealForm() {
                     <Image
                       src={option.image}
                       alt={option.imageAlt}
+                      fill
                       className="svc-pick-role-image"
                       sizes="(max-width: 559px) 100vw, 240px"
                     />
