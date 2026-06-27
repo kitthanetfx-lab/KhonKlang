@@ -5,6 +5,7 @@ import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase'
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
+import { DealFlowBrand } from '@/components/DealFlowBrand';
 import { ReviewPanel } from '@/components/ReviewPanel';
 import { NotifyBell } from '@/components/NotifyBell';
 import { AsyncButton } from '@/components/AsyncButton';
@@ -736,6 +737,7 @@ export default function DealRoom() {
           <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div></div>
         </header>
         <div style={{ maxWidth: 440, margin: '0 auto', padding: '40px 16px', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <DealFlowBrand className="dr-brand-slot" />
           <div className="dr-card">
             <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--ink)' }}>{deal.title}</div>
             {deal.description && <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>{deal.description}</p>}
@@ -2388,6 +2390,7 @@ export default function DealRoom() {
     const isReviewing = negotiatePreFlow ? step < 2 : step < actualStep;
     return (
       <div className="dr-inner">
+        <DealFlowBrand className="dr-brand-slot" />
         {step > 0 && renderMeetupWizardProgress(step)}
         {step > 0 && step < 7 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
@@ -2433,6 +2436,7 @@ export default function DealRoom() {
     const isReviewing = step < actualStep; // กำลังย้อนดูขั้นที่ผ่านมาแล้ว — ปิดปฏิสัมพันธ์ กันกดซ้ำย้อนสถานะดีล
     return (
       <div className="dr-inner">
+        <DealFlowBrand className="dr-brand-slot" />
         {step > 0 && renderWizardProgress(step)}
         {step > 0 && step < 9 && renderWizardPartiesMini()}
         {isReviewing && (
@@ -2584,6 +2588,7 @@ export default function DealRoom() {
             {tab === 'steps' && isMeetup && renderMeetupWizard()}
             {tab === 'steps' && !isSimple && !isMeetup && (
               <div className="dr-inner">
+                <DealFlowBrand className="dr-brand-slot" />
                 <div className="dr-card">
                   <div className="dr-card-title">ผู้เกี่ยวข้อง</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>

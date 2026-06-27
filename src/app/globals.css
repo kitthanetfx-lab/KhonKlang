@@ -876,12 +876,14 @@ button.nav-link { background: none; border: none; }
   padding-top: 0;
   overflow: hidden;
 }
-.create-deal-brand-wrap {
+.deal-flow-brand-wrap {
   display: flex;
   justify-content: center;
+}
+.deal-flow-brand-wrap.is-docked {
   margin: -1px auto 14px;
 }
-.create-deal-brand {
+.deal-flow-brand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -893,10 +895,13 @@ button.nav-link { background: none; border: none; }
   box-shadow: 0 18px 36px -30px rgba(53, 95, 172, .52);
   overflow: hidden;
 }
-.create-deal-brand-image {
+.deal-flow-brand-image {
   width: min(180px, 32vw);
   height: auto;
   display: block;
+}
+.dr-brand-slot {
+  margin: 2px auto 4px;
 }
 
 /* service picker */
@@ -953,12 +958,16 @@ button.nav-link { background: none; border: none; }
   .create-deal-form {
     padding-top: 0;
   }
-  .create-deal-brand {
+  .deal-flow-brand {
     min-height: 70px;
     border-radius: 0 0 20px 20px;
   }
-  .create-deal-brand-image {
+  .deal-flow-brand-image {
     width: min(132px, 42vw);
+  }
+  .dr-brand-slot {
+    margin-top: 0;
+    margin-bottom: 2px;
   }
   .svc-pick-role-media {
     border-radius: 14px;

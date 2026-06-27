@@ -1,10 +1,10 @@
 'use client';
-import Image from 'next/image';
 import { useState, useEffect, Suspense } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
+import { DealFlowBrand } from '@/components/DealFlowBrand';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { useServiceControls } from '@/lib/useServiceControls';
@@ -99,11 +99,7 @@ function CreateDealForm() {
 
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px 80px' }}>
         <div className="deal-form create-deal-form">
-          <div className="create-deal-brand-wrap">
-            <div className="create-deal-brand">
-              <Image src="/logo.png" alt="กลางฮับ" width={420} height={132} priority className="create-deal-brand-image" />
-            </div>
-          </div>
+          <DealFlowBrand docked />
 
           {/* Role */}
           <div className="deal-field">
