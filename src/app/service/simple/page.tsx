@@ -1,36 +1,29 @@
 'use client';
+import slide1 from '../../../../public/1.webp';
+import slide2 from '../../../../public/2.webp';
+import slide3 from '../../../../public/3.webp';
+import slide4 from '../../../../public/4.webp';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 
-const STEPS = [
-  {
-    icon: 'banknote',
-    tone: 'blue',
-    no: '1',
-    t: 'ผู้ซื้อโอนเงินกับคนกลาง',
-    d: 'เงินพักไว้ก่อน จนกว่าผู้ซื้อจะยืนยันรับของ',
-  },
-  {
-    icon: 'truck',
-    tone: 'mint',
-    no: '2',
-    t: 'ผู้ขายส่งตรงถึงผู้ซื้อ',
-    d: 'ถ่ายวิดีโอ เก็บ Serial และหลักฐานสำคัญให้ครบ',
-  },
-  {
-    icon: 'shieldCheck',
-    tone: 'sand',
-    no: '3',
-    t: 'ผู้ซื้อถ่ายก่อนแกะกล่อง',
-    d: 'ยืนยันรับของถูกต้องแล้ว คนกลางจึงโอนเงินให้ผู้ขาย',
-  },
+const SLIDES = [
+  { src: slide1, alt: 'ขั้นตอนที่ 1 ซื้อขายผ่านกลางแบบง่าย' },
+  { src: slide2, alt: 'ขั้นตอนที่ 2 ซื้อขายผ่านกลางแบบง่าย' },
+  { src: slide3, alt: 'ขั้นตอนที่ 3 ซื้อขายผ่านกลางแบบง่าย' },
+  { src: slide4, alt: 'ขั้นตอนที่ 4 ซื้อขายผ่านกลางแบบง่าย' },
 ];
 
 export default function ServiceSimplePage() {
   const controls = useServiceControls();
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  const goPrev = () => setActiveSlide((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
+  const goNext = () => setActiveSlide((prev) => (prev + 1) % SLIDES.length);
+
   if (!controls.loading && !controls.isEnabled('tradeSimple')) {
     return <ServiceDisabledNotice title="ซื้อขายผ่านกลางแบบง่าย" message={controls.message('tradeSimple')} backHref="/service/trade" backLabel="กลับไปหน้าบริการ" />;
   }
@@ -51,27 +44,50 @@ export default function ServiceSimplePage() {
 
           <div className="svc-simple-hero">
             <h1 className="svc-simple-title">ซื้อขายผ่านกลางแบบง่าย</h1>
-            <p className="svc-simple-sub">ซื้อขายง่าย ปลอดภัยขึ้น70% คลอบคลุมกรณีไม่ได้สินค้า</p>
-            <p className="svc-simple-sub">ของไม่ตรงปก และความเสียหายที่เห็นได้ชัด </p>
+            <p className="svc-simple-sub">ซื้อขายง่าย ปลอดภัยขึ้น70% </p>
+            <p className="svc-simple-sub">คลอบคลุมกรณีไม่ได้รับสินค้า ไม่ตรงปก</p>
+            <p className="svc-simple-sub"> ความเสียหายที่เห็นได้ชัด </p>
           </div>
 
           <div className="svc-simple-kicker svc-simple-fade">ขั้นตอนการดำเนินงาน</div>
-          <div className="svc-simple-steps svc-simple-fade">
-            {STEPS.map((s) => (
-              <div key={s.no} className={`svc-simple-step-card is-${s.tone}`}>
-                <div className="svc-simple-step-no">{s.no}</div>
-                <div className={`svc-simple-step-icon is-${s.tone}`}>
-                  <Icon name={s.icon} size={34} strokeWidth={1.9} />
-                </div>
-                <div className="svc-simple-step-title">{s.t}</div>
-                <div className="svc-simple-step-text">{s.d}</div>
+          <div className="svc-simple-slider svc-simple-fade">
+            <button type="button" className="svc-simple-slider-nav is-prev" onClick={goPrev} aria-label="รูปก่อนหน้า">
+              <Icon name="chevronRight" size={20} className="svc-simple-slider-nav-icon is-prev" />
+            </button>
+
+            <div className="svc-simple-slide-shell">
+              <div className="svc-simple-slide-frame">
+                <Image
+                  key={activeSlide}
+                  src={SLIDES[activeSlide].src}
+                  alt={SLIDES[activeSlide].alt}
+                  className="svc-simple-slide-image"
+                  priority
+                />
               </div>
-            ))}
+
+              <div className="svc-simple-slider-dots" aria-label="ตัวเลือกรูปขั้นตอน">
+                {SLIDES.map((slide, index) => (
+                  <button
+                    key={slide.alt}
+                    type="button"
+                    className={`svc-simple-slider-dot${index === activeSlide ? ' is-active' : ''}`}
+                    onClick={() => setActiveSlide(index)}
+                    aria-label={`ดูรูปขั้นตอน ${index + 1}`}
+                    aria-pressed={index === activeSlide}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <button type="button" className="svc-simple-slider-nav is-next" onClick={goNext} aria-label="รูปถัดไป">
+              <Icon name="chevronRight" size={20} className="svc-simple-slider-nav-icon" />
+            </button>
           </div>
 
           <div className="svc-simple-alert svc-simple-fade">
-            <span className="svc-simple-alert-icon"><Icon name="info" size={18} strokeWidth={2.1} /></span>
-            <span className="svc-simple-alert-text"><strong>สำคัญ:</strong> ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่องทุกครั้ง มิฉะนั้นจะไม่สามารถใช้เรียกร้องกับผู้ขายได้</span>
+            <span className="svc-simple-alert-icon"><Icon name="info" size={20} strokeWidth={2.1} /></span>
+            <span className="svc-simple-alert-text"><strong>สำคัญ:</strong> ผู้ซื้อต้องถ่ายวิดีโอหลักฐานทุกครั้ง มิฉะนั้นจะไม่สามารถใช้เรียกร้องกับผู้ขายได้</span>
           </div>
 
           <div className="svc-simple-cta-wrap svc-simple-fade">
