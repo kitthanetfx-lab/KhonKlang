@@ -1476,6 +1476,9 @@ export default function DealRoom() {
   function getSimpleStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
     const s = deal!.status;
     const pd: DealPriceState = priceState || {};
+    const sellerReviewStarted = hasProgressPing('seller') || !!pd.evidence_done_seller;
+    const buyerReviewStarted = hasProgressPing('buyer') || !!pd.evidence_done_buyer;
+    const reviewStarted = sellerReviewStarted || buyerReviewStarted || chatReviewReady;
     if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
     const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
@@ -1483,7 +1486,7 @@ export default function DealRoom() {
       if (!pd.agreed) return { step: 2 }; // ยังไม่ตกลงราคา/ค่าบริการ
       const evReady = !!pd.evidence_done_buyer && !!pd.evidence_done_seller;
       if (evReady) return { step: 5 }; // ทั้งคู่ยืนยันหลักฐานแล้ว → โอนเงินได้
-      return { step: chatReviewReady ? 4 : 3 }; // คุย/วิดีโอคอล หรือ กำลังตรวจหลักฐาน
+      return { step: reviewStarted ? 4 : 3 }; // คุย/วิดีโอคอล หรือ กำลังตรวจหลักฐาน
     }
     if (s === 'payment_uploaded') {
       // บั๊กที่เจอ: ถ้าผู้ขายต้องโอนค่าบริการส่วนของตนเองด้วย (fee_payer = seller/split) แต่ยังไม่ได้โอน
