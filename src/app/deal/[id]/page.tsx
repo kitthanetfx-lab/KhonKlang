@@ -546,10 +546,15 @@ export default function DealRoom() {
 
   useEffect(() => {
     // poll chat เสมอสำหรับดีล meetup (แชทฝังใน wizard) หรือเมื่ออยู่ tab chat / jitsi
-    // หยุด poll เมื่อ meetup เสร็จแล้ว (step 9) — ไม่จำเป็นต้องโหลดแชทใน done screen
+    // รวมถึง simple deal ตอนอยู่ขั้นคุย/ตรวจหลักฐาน เพื่อให้อีกฝ่ายเห็นข้อความใหม่ทันที
+    // หยุด poll เมื่ออยู่หน้าจบดีลแล้ว — ไม่จำเป็นต้องโหลดแชทต่อ
     const isMeetupDeal = deal?.deal_type === 'meetup' && deal?.status !== 'completed';
+    const isSimpleDeal = deal?.deal_type === 'simple' && !isFinishedStatus(deal?.status);
+    const simpleActualStep = isSimpleDeal ? getSimpleStep().step : 0;
+    const simpleViewStep = isSimpleDeal ? Math.min(wzViewStep ?? simpleActualStep, simpleActualStep) : 0;
+    const isSimpleChatStage = isSimpleDeal && (simpleViewStep === 3 || simpleViewStep === 4);
     if (!isDealParty(deal, myId)) return;
-    if (tab !== 'chat' && !showJitsi && !isMeetupDeal) return;
+    if (tab !== 'chat' && !showJitsi && !isMeetupDeal && !isSimpleChatStage) return;
     let stopped = false;
     const poll = async () => {
       try {
@@ -558,12 +563,13 @@ export default function DealRoom() {
       } catch { /* เงียบ */ }
     };
     void poll();
-    const timer = window.setInterval(() => { void poll(); }, showJitsi ? 4000 : 5000);
+    const intervalMs = showJitsi ? 4000 : isSimpleChatStage ? 2500 : 5000;
+    const timer = window.setInterval(() => { void poll(); }, intervalMs);
     return () => {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [deal, fetchMsgs, getAuthHeaders, myId, showJitsi, tab]);
+  }, [deal, fetchMsgs, getAuthHeaders, myId, priceState, showJitsi, tab, wzViewStep]);
 
   // แจ้งผู้ร่วมดีลว่ามีคนเข้ามาดูห้องนี้ — ครั้งเดียวต่อ session ต่อดีล กันสแปม
   const visitSent = useRef(false);
