@@ -2377,11 +2377,11 @@ html, body { overflow-x: hidden; max-width: 100%; }
 .cc-btn:hover { background: var(--accent-strong); }
 
 /* ---- ปุ่มลอยกลับหน้าหลัก ---- */
-.home-fab { position: fixed; left: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 140; width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: #fff; border: none; display: grid; place-items: center; box-shadow: 0 6px 20px rgba(0,0,0,.35); transition: transform .2s, background .2s; }
+.home-fab { position: fixed; left: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 140; width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: #fff; border: none; display: grid; place-items: center; box-shadow: var(--sh-lg); transition: transform .2s, background .2s; }
 .home-fab:hover { background: var(--accent-strong); transform: translateY(-3px); }
 .home-fab:focus-visible { outline: none; box-shadow: var(--ring), var(--sh-lg); }
 @media (max-width: 480px) {
-  .home-fab { left: 12px; bottom: 12px; width: 56px; height: 56px; }
+  .home-fab { left: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: 60px; height: 60px; }
 }
 
 /* ---- ข้อ5: Pop-up รับทราบการออกเดินทาง ---- */
@@ -2405,6 +2405,10 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .sw-fab.ring { animation: sw-ring 1s infinite; background: var(--accent-strong); }
 @keyframes sw-ring { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 .sw-fab-badge { position: absolute; top: -2px; right: -2px; width: 14px; height: 14px; border-radius: 50%; background: var(--rose-500); border: 2px solid var(--surface); }
+@media (max-width: 480px) {
+  .sw-wrap { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .sw-fab { width: 60px; height: 60px; }
+}
 
 .sw-panel { width: min(92vw, 380px); max-height: min(74vh, 600px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-lg); display: flex; flex-direction: column; overflow: hidden; }
 .sw-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line-2); background: var(--surface-2); }
