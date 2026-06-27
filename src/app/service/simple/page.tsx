@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 
@@ -37,6 +38,7 @@ export default function ServiceSimplePage() {
       <header className="sub-header">
         <Link href="/service/trade" className="sub-back">←</Link>
         <span className="sub-htitle">ซื้อขายผ่านกลางแบบง่าย</span>
+        <HeaderAccountActions />
       </header>
       <div className="svc-inner svc-simple-stage">
         <div className="svc-simple-panel svc-simple-fade">

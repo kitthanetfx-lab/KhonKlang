@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 
 const PAYMENT = { label: 'ค่าสมาชิกผู้ขาย', amount: 199, period: '1 ปี', features: ['ลงประกาศไม่จำกัด', 'Dashboard จัดการดีล', 'Badge ผู้ขายรับรอง', 'สิทธิ์ขาย Certified'] };
 const BANK = { name: 'ธนาคารกสิกรไทย (KBANK)', acct: '123-4-56789-0', owner: 'บริษัท กลางฮับ จำกัด', pp: '0800000000' };
@@ -25,6 +26,7 @@ export default function PaymentPage() {
       <header className="sub-header">
         <Link href="/register/seller" className="sub-back">←</Link>
         <span className="sub-htitle">ชำระเงิน</span>
+        <HeaderAccountActions />
       </header>
       <div className="pay-inner">
         <div className="pay-summary-card">

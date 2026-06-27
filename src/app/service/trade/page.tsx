@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 
@@ -33,6 +34,7 @@ export default function ServiceTradePage() {
       <header className="sub-header">
         <Link href="/" className="sub-back">←</Link>
         <span className="sub-htitle">บริการผ่านคนกลาง</span>
+        <HeaderAccountActions />
       </header>
       <div className="svc-inner">
         <div className="svc-hero">

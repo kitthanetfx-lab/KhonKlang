@@ -5,6 +5,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
+import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { Icon } from '@/components/Icon';
 import { THAI_BANKS } from '@/lib/banks';
 import { isProfileComplete } from '@/lib/profileComplete';
@@ -259,13 +260,16 @@ function ProfilePage() {
         {locked
           ? <span style={{ width: 18, display: 'inline-block' }} />
           : <Link href="/" className="sub-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>}
-        <span className="sub-htitle" style={{ flex: 1 }}>{locked ? 'กรอกข้อมูลให้ครบเพื่อใช้งานเว็บไซต์' : 'โปรไฟล์ของฉัน'}</span>
-        {!editing
-          ? <button className="btn btn-ghost btn-sm" onClick={openEdit}><Icon name="user" size={14} /> แก้ไข</button>
-          : <div style={{ display: 'flex', gap: 8 }}>
-              {!locked && <button className="btn btn-ghost btn-sm" onClick={cancelEdit}>ยกเลิก</button>}
-              <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
-            </div>}
+        <span className="sub-htitle">{locked ? 'กรอกข้อมูลให้ครบเพื่อใช้งานเว็บไซต์' : 'โปรไฟล์ของฉัน'}</span>
+        <div className="sub-header-actions">
+          {!editing
+            ? <button className="btn btn-ghost btn-sm" onClick={openEdit}><Icon name="user" size={14} /> แก้ไข</button>
+            : <div style={{ display: 'flex', gap: 8 }}>
+                {!locked && <button className="btn btn-ghost btn-sm" onClick={cancelEdit}>ยกเลิก</button>}
+                <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+              </div>}
+          <HeaderAccountActions />
+        </div>
       </header>
 
       <div className="pf-inner">

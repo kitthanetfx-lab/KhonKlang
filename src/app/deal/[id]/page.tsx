@@ -6,8 +6,8 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { DealFlowBrand } from '@/components/DealFlowBrand';
+import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ReviewPanel } from '@/components/ReviewPanel';
-import { NotifyBell } from '@/components/NotifyBell';
 import { AsyncButton } from '@/components/AsyncButton';
 import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
 import { PaymentMethods } from '@/components/PaymentMethods';
@@ -17,6 +17,7 @@ import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { dealCode } from '@/lib/dealNumber';
+import { useUser } from '@/lib/useUser';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -331,6 +332,7 @@ export default function DealRoom() {
   const [sharingLoc, setSharingLoc] = useState(false); // กำลังแชร์ตำแหน่งระหว่างเดินทาง
   const shareLocTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const headersRef = useRef<Record<string, string>>({});
+  const { user, loading: authLoading } = useUser();
 
   const getAuthHeaders = useCallback(async (forceFresh = false) => {
     if (!forceFresh && Object.keys(headersRef.current).length) return headersRef.current;
@@ -450,21 +452,35 @@ export default function DealRoom() {
 
   useEffect(() => {
     (async () => {
-      const loadedDeal = await fetchDeal();
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const user = session?.user ?? null;
-        if (!user) throw new Error('guest');
-        const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
-        setMyId(user.id); setMyName(profile?.display_name || '');
-        const headers = await getAuthHeaders();
-        if ((readDealTab(requestedTab) === 'chat' || requestedCall) && isDealParty(loadedDeal, user.id)) {
-          await fetchMsgs(headers, loadedDeal, user.id);
-        }
-      } catch { /* guest */ }
-      finally { setLoading(false); }
+      await fetchDeal();
+      setLoading(false);
     })();
-  }, [dealId, fetchDeal, fetchMsgs, getAuthHeaders, requestedCall, requestedTab]);
+  }, [dealId, fetchDeal]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!user?.$id) {
+        if (!active) return;
+        setMyId('');
+        setMyName('');
+        headersRef.current = {};
+        setAuthHdrs({});
+        return;
+      }
+      const nextMyId = user.$id;
+      const nextMyName = user.prefs.displayName || user.name || '';
+      if (!active) return;
+      setMyId(nextMyId);
+      setMyName(nextMyName);
+      const headers = await getAuthHeaders();
+      if (!active) return;
+      if ((readDealTab(requestedTab) === 'chat' || requestedCall) && isDealParty(deal, nextMyId)) {
+        await fetchMsgs(headers, deal, nextMyId);
+      }
+    })();
+    return () => { active = false; };
+  }, [deal, fetchMsgs, getAuthHeaders, requestedCall, requestedTab, user]);
 
   useEffect(() => {
     if (deal?.deal_type !== 'simple') {
@@ -699,7 +715,7 @@ export default function DealRoom() {
     }
   }
 
-  if (loading) return (
+  if (loading || authLoading) return (
     <div className="dr-root" style={{ alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'dashSpin .8s linear infinite' }} />
     </div>
@@ -753,6 +769,7 @@ export default function DealRoom() {
         <header className="dr-header">
           <Link href="/" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
           <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div></div>
+          <HeaderAccountActions />
         </header>
         <div style={{ maxWidth: 440, margin: '0 auto', padding: '40px 16px', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <DealFlowBrand className="dr-brand-slot" />
@@ -2548,7 +2565,7 @@ export default function DealRoom() {
         <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
         <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{dealCode(deal.id)} · {statusText(deal)} · ฿{deal.price.toLocaleString()}</div></div>
         <div className="dr-hctas">
-          {myId && <NotifyBell />}
+          <HeaderAccountActions showNotify />
           <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
           {/* ดีลแบบง่าย: ปุ่มวิดีโอคอลอยู่ในขั้นตอน "คุย/วิดีโอคอล" ของ wizard อยู่แล้ว ไม่ต้องมีซ้ำที่นี่ */}
           {!isSimple && !isMeetup && <button className="dr-cta-green" onClick={toggleCall}>📹 Video</button>}

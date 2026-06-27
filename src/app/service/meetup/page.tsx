@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authHeaders } from '@/lib/supabase';
 import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
+import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { RATE_PER_KM } from '@/lib/provinceGeo';
 import { useServiceControls } from '@/lib/useServiceControls';
@@ -80,6 +81,7 @@ function MeetupInner() {
       <header className="sub-header">
         <Link href="/" className="sub-back">←</Link>
         <span className="sub-htitle">นัดรับผ่านกลาง</span>
+        <HeaderAccountActions />
       </header>
       <div className="svc-inner">
 

@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 
@@ -22,6 +23,7 @@ export default function ConsignPage() {
       <header className="sub-header">
         <Link href="/" className="sub-back">←</Link>
         <span className="sub-htitle">ฝากขายผ่านกลาง</span>
+        <HeaderAccountActions />
       </header>
       <div className="svc-inner">
         <div style={{ textAlign: 'center', marginBottom: 28 }}>

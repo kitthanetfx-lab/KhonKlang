@@ -84,7 +84,8 @@ function toAppUser(p: ProfileRow): AppUser {
 }
 
 async function fetchProfile(): Promise<AppUser | null> {
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
+  const authUser = session?.user ?? null;
   if (!authUser) return null;
   const { data: profile } = await supabase
     .from('profiles')
