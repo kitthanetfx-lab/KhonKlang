@@ -445,16 +445,23 @@ export default function DealRoom() {
         setDeal(nextDeal); setDealError('');
         setMeetup(d.meetup || null); setPriceState(d.priceState || null); setEvidence(d.evidence || []);
         setBuyerBank(d.buyerBank || null); setSellerBank(d.sellerBank || null); setMiddlemanBank(d.middlemanBank || null);
+        // #region debug-point A:fetch-deal
+        if (nextDeal.deal_type === 'simple') fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"seller-confirm-sync",runId:"pre-fix",hypothesisId:"A",location:"src/app/deal/[id]/page.tsx:445",msg:"[DEBUG] fetchDeal success",data:{dealId,status:nextDeal.status,viewerId:myId,sellerId:nextDeal.seller_id,buyerId:nextDeal.buyer_id,sellerDone:!!d.priceState?.evidence_done_seller,buyerDone:!!d.priceState?.evidence_done_buyer,wzViewStep},ts:Date.now()})}).catch(()=>{});
+        // #endregion
         return nextDeal;
       } else setDealError(d.error || `Error ${r.status}`);
     } catch (e: any) { setDealError(e?.message || 'Network error'); }
     return null;
-  }, [dealId, setDeal, setDealError]);
+  }, [dealId, myId, setDeal, setDealError, wzViewStep]);
 
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
     const r = await fetch(`/api/messages?dealId=${dealId}`, { headers, cache: 'no-store' }).catch(() => null);
-    if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); }
+    if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []);
+      // #region debug-point B:fetch-msgs
+      if (currentDeal?.deal_type === 'simple') fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"seller-confirm-sync",runId:"pre-fix",hypothesisId:"B",location:"src/app/deal/[id]/page.tsx:457",msg:"[DEBUG] fetchMsgs success",data:{dealId,viewerId:currentUserId,messageCount:Array.isArray(d.messages)?d.messages.length:0,lastMessage:(Array.isArray(d.messages)&&d.messages.length?{role:d.messages[d.messages.length-1]?.role,senderId:d.messages[d.messages.length-1]?.sender_id,content:String(d.messages[d.messages.length-1]?.content||'').slice(0,80)}:null)},ts:Date.now()})}).catch(()=>{});
+      // #endregion
+    }
     else if (r?.status === 401) {
       // token หมดอายุ — ล้าง cache ให้ poll รอบถัดไปขอ token ใหม่จาก Supabase
       headersRef.current = {};
@@ -1787,6 +1794,9 @@ export default function DealRoom() {
     const meDone = myRole === 'seller' ? !!pd.evidence_done_seller : !!pd.evidence_done_buyer;
     const sellerDone = !!pd.evidence_done_seller;
     const buyerDone = !!pd.evidence_done_buyer;
+    // #region debug-point E:render-evidence-review
+    if (deal?.deal_type === 'simple') fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"seller-confirm-sync",runId:"pre-fix",hypothesisId:"E",location:"src/app/deal/[id]/page.tsx:1780",msg:"[DEBUG] render evidence review",data:{dealId,viewerId:myId,myRole,sellerDone,buyerDone,meDone,status:deal?.status,wzViewStep},ts:Date.now()})}).catch(()=>{});
+    // #endregion
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card">

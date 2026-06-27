@@ -482,6 +482,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const sellerDone = isSeller ? true : !!pd.evidence_done_seller;
         const buyerDone = isBuyer ? true : !!pd.evidence_done_buyer;
         const middlemanDone = isMiddleman ? true : !!pd.evidence_done_middleman;
+        // #region debug-point D:evidence-done-input
+        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"seller-confirm-sync",runId:"pre-fix",hypothesisId:"D",location:"src/app/api/deals/[id]/route.ts:482",msg:"[DEBUG] evidence_done received",data:{dealId:id,actorId:me.id,isSeller,isBuyer,isMiddleman,persistedSellerDone:!!pd.evidence_done_seller,persistedBuyerDone:!!pd.evidence_done_buyer,nextSellerDone:sellerDone,nextBuyerDone:buyerDone,nextMiddlemanDone:middlemanDone,status:deal.status},ts:Date.now()})}).catch(()=>{});
+        // #endregion
         priceUpdates = { evidence_done_seller: sellerDone, evidence_done_buyer: buyerDone, evidence_done_middleman: middlemanDone };
         const hasMm = !!deal.middleman_id;
         const allDone = sellerDone && buyerDone && (!hasMm || middlemanDone);
@@ -506,6 +509,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     if (Object.keys(priceUpdates).length > 0) {
       await db.from('deal_price_state').upsert({ deal_id: id, ...priceUpdates }, { onConflict: 'deal_id' });
+      // #region debug-point D:evidence-done-upsert
+      if (action === 'evidence_done') fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"seller-confirm-sync",runId:"pre-fix",hypothesisId:"D",location:"src/app/api/deals/[id]/route.ts:508",msg:"[DEBUG] evidence_done upserted",data:{dealId:id,actorId:me.id,priceUpdates},ts:Date.now()})}).catch(()=>{});
+      // #endregion
     }
     if (Object.keys(meetupUpdates).length > 0) {
       await db.from('deal_meetup').upsert({ deal_id: id, ...meetupUpdates }, { onConflict: 'deal_id' });

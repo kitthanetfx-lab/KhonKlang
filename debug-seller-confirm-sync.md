@@ -1,0 +1,23 @@
+# Debug Session: seller-confirm-sync
+
+- Status: OPEN
+- Started: 2026-06-28
+- Symptom:
+  - ฝั่งผู้ซื้อไม่เห็นสถานะว่าผู้ขายยืนยันแล้วในหน้า step ตรวจหลักฐาน/คุยวิดีโอคอล
+  - ผู้ใช้คาดหวังให้สถานะอัปเดตทันทีเมื่ออีกฝั่งกดยืนยัน
+- Scope:
+  - `src/app/deal/[id]/page.tsx`
+  - `src/app/api/messages/route.ts`
+  - `src/app/api/deals/[id]/route.ts`
+- Hypotheses:
+  - H1: หน้า client ฝั่งผู้ซื้อไม่ได้ poll deal/priceState ในจังหวะที่ผู้ขายกดยืนยัน จึงไม่เห็น `evidence_done_seller` ล่าสุด
+  - H2: มี state local ใน wizard เช่น `wzViewStep` หรือ `chatReviewReady` ทำให้หน้าแสดง step/สถานะค้างแม้ข้อมูล backend เปลี่ยนแล้ว
+  - H3: request ไป `/api/deals/[id]` หรือ `/api/messages` สำเร็จ แต่ response ที่ใช้ render เป็นข้อมูลเก่าจาก browser/runtime cache
+  - H4: ผู้ขายกด action สำเร็จเฉพาะฝั่ง UI local แต่ backend ไม่ persist `evidence_done_seller` หรือ persist ช้าเพราะ race condition
+  - H5: ฝั่งผู้ซื้อ render แถวสถานะจาก field คนละชุดกับที่ผู้ขายอัปเดตจริง
+- Evidence Plan:
+  - เพิ่ม instrumentation log ที่หน้า client ก่อน/หลัง poll deal, poll messages, และตอน render step 3/4
+  - เพิ่ม instrumentation log ที่ API `PATCH /api/deals/[id]` ตอน action `evidence_done`
+  - เปรียบเทียบ pre-fix logs ระหว่างบัญชีผู้ขายและผู้ซื้อในดีลเดียวกัน
+- Progress Log:
+  - Initialized debug session file.
