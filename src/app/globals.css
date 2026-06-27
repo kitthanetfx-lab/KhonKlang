@@ -889,6 +889,48 @@ button.nav-link { background: none; border: none; }
 .svc-pick-card .icon-tile { flex: 0 0 auto; }
 .spc-t { font-family: var(--font-display); font-weight: 600; font-size: 15.5px; color: var(--ink); display: block; margin-bottom: 5px; }
 .spc-d { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.svc-pick-card-role {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 14px;
+  overflow: hidden;
+}
+.svc-pick-role-media {
+  width: 100%;
+  height: 132px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(247, 250, 255, .98), rgba(239, 244, 252, .98));
+  border: 1px solid color-mix(in srgb, var(--accent) 10%, var(--line));
+  display: grid;
+  place-items: center;
+}
+.svc-pick-card-role.sel .svc-pick-role-media {
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--line));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.45);
+}
+.svc-pick-role-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.svc-pick-role-desc {
+  display: block;
+  text-align: left;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+@media (max-width: 559px) {
+  .svc-pick-card-role {
+    padding: 12px;
+  }
+  .svc-pick-role-media {
+    height: 124px;
+    border-radius: 14px;
+  }
+}
 
 /* form fields */
 .deal-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }

@@ -1,4 +1,7 @@
 'use client';
+import buyerImage from '../../../../public/Buyer.webp';
+import sellerImage from '../../../../public/Seller.webp';
+import Image from 'next/image';
 import { useState, useEffect, Suspense } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,6 +12,16 @@ import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { useServiceControls } from '@/lib/useServiceControls';
 
 const CATS = ['สินค้าทั่วไป', 'อิเล็กทรอนิกส์', 'เสื้อผ้า', 'ยานพาหนะ', 'อสังหาริมทรัพย์', 'บริการ', 'อื่นๆ'];
+const ROLE_OPTIONS = {
+  simple: [
+    { key: 'seller', image: sellerImage, imageAlt: 'Seller', desc: 'สร้างดีลแล้วส่งลิงก์ให้ผู้ซื้อเข้าร่วม' },
+    { key: 'buyer', image: buyerImage, imageAlt: 'Buyer', desc: 'สร้างดีลแล้วส่งลิงก์ให้ผู้ขายเข้าร่วม' },
+  ],
+  regular: [
+    { key: 'seller', image: sellerImage, imageAlt: 'Seller', desc: 'สร้างดีลแล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม' },
+    { key: 'buyer', image: buyerImage, imageAlt: 'Buyer', desc: 'สร้างดีลแล้วส่งลิงก์ให้อีกฝ่ายเข้าร่วม' },
+  ],
+} as const;
 
 function CreateDealForm() {
   const router = useRouter();
@@ -33,6 +46,7 @@ function CreateDealForm() {
   }, []);
 
   const feeBreakdown = computeDealFees(fees, Number(price) || 0, isSimple ? 'simple' : '');
+  const roleOptions = isSimple ? ROLE_OPTIONS.simple : ROLE_OPTIONS.regular;
   const serviceEnabled = isSimple ? controls.isEnabled('tradeSimple') : isSafeZone ? controls.isEnabled('meetupSafeZone') : controls.isEnabled('tradeOnline');
   const serviceMessage = isSimple
     ? controls.message('tradeSimple')
@@ -100,13 +114,22 @@ function CreateDealForm() {
           <div className="deal-field">
             <label>คุณเป็น...</label>
             <div className="svc-pick-grid">
-              {(isSimple
-                ? [['seller', 'ผู้ขาย 🛒', 'สร้างดีล → ส่งลิงก์ให้ผู้ซื้อ → ผู้ซื้อโอนเงินเข้าศูนย์กลาง'], ['buyer', 'ผู้ซื้อ 🛍️', 'สร้างดีล → ส่งลิงก์ให้ผู้ขาย → โอนเงินเข้าศูนย์กลาง']] as const
-                : [['seller', 'ผู้ขาย 🛒', 'สร้างดีล → ส่งลิงก์ให้ผู้ซื้อ → ผู้ซื้อเลือกคนกลาง'], ['buyer', 'ผู้ซื้อ 🛍️', 'สร้างดีล → ส่งลิงก์ให้ผู้ขาย → เลือกคนกลางเอง']] as const
-              ).map(([k, l, d]) => (
-                <button key={k} type="button" className={`svc-pick-card${role === k ? ' sel' : ''}`} onClick={() => setRole(k)} style={{ flexDirection: 'column', gap: 6 }}>
-                  <span className="spc-t">{l}</span>
-                  <span className="spc-d">{d}</span>
+              {roleOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`svc-pick-card svc-pick-card-role${role === option.key ? ' sel' : ''}`}
+                  onClick={() => setRole(option.key)}
+                >
+                  <span className="svc-pick-role-media">
+                    <Image
+                      src={option.image}
+                      alt={option.imageAlt}
+                      className="svc-pick-role-image"
+                      sizes="(max-width: 559px) 100vw, 240px"
+                    />
+                  </span>
+                  <span className="spc-d svc-pick-role-desc">{option.desc}</span>
                 </button>
               ))}
             </div>
