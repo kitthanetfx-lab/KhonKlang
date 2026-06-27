@@ -1872,11 +1872,11 @@ button.nav-link { background: none; border: none; }
   margin-bottom: 22px;
 }
 .svc-simple-slide-shell {
-  width: min(100%, 420px);
+  width: min(100%, 520px);
 }
 .svc-simple-slide-frame {
   position: relative;
-  width: min(100%, 420px);
+  width: min(100%, 520px);
   margin: 0 auto;
   border-radius: 24px;
   overflow: hidden;
@@ -2009,7 +2009,7 @@ button.nav-link { background: none; border: none; }
     gap: 12px;
   }
   .svc-simple-slide-shell {
-    width: min(100%, 420px);
+    width: min(100%, 520px);
   }
 }
 @media (max-width: 640px) {

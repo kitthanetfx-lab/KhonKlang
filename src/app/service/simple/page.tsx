@@ -5,7 +5,7 @@ import slide3 from '../../../../public/3.webp';
 import slide4 from '../../../../public/4.webp';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
@@ -23,6 +23,13 @@ export default function ServiceSimplePage() {
 
   const goPrev = () => setActiveSlide((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
   const goNext = () => setActiveSlide((prev) => (prev + 1) % SLIDES.length);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % SLIDES.length);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (!controls.loading && !controls.isEnabled('tradeSimple')) {
     return <ServiceDisabledNotice title="ซื้อขายผ่านกลางแบบง่าย" message={controls.message('tradeSimple')} backHref="/service/trade" backLabel="กลับไปหน้าบริการ" />;
