@@ -21,9 +21,6 @@ export default function ServiceSimplePage() {
   const controls = useServiceControls();
   const [activeSlide, setActiveSlide] = useState(0);
 
-  const goPrev = () => setActiveSlide((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
-  const goNext = () => setActiveSlide((prev) => (prev + 1) % SLIDES.length);
-
   useEffect(() => {
     const timer = window.setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % SLIDES.length);
@@ -58,10 +55,6 @@ export default function ServiceSimplePage() {
 
           <div className="svc-simple-kicker svc-simple-fade">ขั้นตอนการดำเนินงาน</div>
           <div className="svc-simple-slider svc-simple-fade">
-            <button type="button" className="svc-simple-slider-nav is-prev" onClick={goPrev} aria-label="รูปก่อนหน้า">
-              <Icon name="chevronRight" size={20} className="svc-simple-slider-nav-icon is-prev" />
-            </button>
-
             <div className="svc-simple-slide-shell">
               <div className="svc-simple-slide-frame">
                 <Image
@@ -86,10 +79,6 @@ export default function ServiceSimplePage() {
                 ))}
               </div>
             </div>
-
-            <button type="button" className="svc-simple-slider-nav is-next" onClick={goNext} aria-label="รูปถัดไป">
-              <Icon name="chevronRight" size={20} className="svc-simple-slider-nav-icon" />
-            </button>
           </div>
 
           <div className="svc-simple-alert svc-simple-fade">
