@@ -1462,16 +1462,6 @@ export default function DealRoom() {
     );
   }
 
-  /** การ์ดแสดงคู่ดีล (เพื่อนเป็นใคร) — ใช้ซ้ำได้ในหลายขั้น */
-  function renderWizardPartiesMini() {
-    return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
-        <span>🛒 ผู้ขาย: <b style={{ color: 'var(--ink)' }}>{deal!.seller_name || '-'}</b></span>
-        <span>🛍️ ผู้ซื้อ: <b style={{ color: 'var(--ink)' }}>{deal!.buyer_name || '-'}</b></span>
-      </div>
-    );
-  }
-
   // ─── ขั้น 0: รออีกฝ่ายเข้าร่วมดีล ────────────────────────────────────────
   function renderWizardStep0() {
     const waitingFor = !deal!.buyer_id ? 'ผู้ซื้อ' : 'ผู้ขาย';
@@ -1510,9 +1500,18 @@ export default function DealRoom() {
           {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}><span>รวมค่าบริการ</span><span>฿{fb.total.toLocaleString()}</span></div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
-          {[['ผู้ขาย', deal!.seller_accepted_terms], ['ผู้ซื้อ', deal!.buyer_accepted_terms]].map(([l, ok]) => (
-            <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)' }}>{ok ? '✅ ยอมรับแล้ว' : '⏳ รอ'}</span></div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+          {[
+            ['ผู้ขาย', deal!.seller_name || '-', deal!.seller_accepted_terms],
+            ['ผู้ซื้อ', deal!.buyer_name || '-', deal!.buyer_accepted_terms],
+          ].map(([roleLabel, name, ok]) => (
+            <div key={roleLabel as string} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 13.5 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: 'var(--muted)', fontSize: 12 }}>{roleLabel}</div>
+                <div style={{ color: 'var(--ink)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name as string}</div>
+              </div>
+              <span style={{ color: (ok as boolean) ? 'var(--green-600)' : 'var(--faint)', flexShrink: 0 }}>{(ok as boolean) ? '✅ ยอมรับแล้ว' : '⏳ รอ'}</span>
+            </div>
           ))}
         </div>
         {!meAccepted
@@ -2392,12 +2391,6 @@ export default function DealRoom() {
       <div className="dr-inner">
         <DealFlowBrand className="dr-brand-slot" />
         {step > 0 && renderMeetupWizardProgress(step)}
-        {step > 0 && step < 7 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
-            <span>🛒 ผู้ขาย: <b style={{ color: 'var(--ink)' }}>{deal!.seller_name || '-'}</b></span>
-            <span>🛍️ ผู้ซื้อ: <b style={{ color: 'var(--ink)' }}>{deal!.buyer_name || '-'}</b></span>
-          </div>
-        )}
         {isReviewing && (
           <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '8px 12px', marginBottom: 12, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>
             👀 กำลังดูขั้นตอนที่ผ่านมาแล้ว (ดูอย่างเดียว)
@@ -2438,7 +2431,6 @@ export default function DealRoom() {
       <div className="dr-inner">
         <DealFlowBrand className="dr-brand-slot" />
         {step > 0 && renderWizardProgress(step)}
-        {step > 0 && step < 9 && renderWizardPartiesMini()}
         {isReviewing && (
           <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '8px 12px', marginBottom: 12, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>
             👀 กำลังดูขั้นตอนที่ผ่านมาแล้ว (ดูอย่างเดียว) — กด &quot;ถัดไป&quot; เพื่อกลับไปขั้นตอนปัจจุบัน
