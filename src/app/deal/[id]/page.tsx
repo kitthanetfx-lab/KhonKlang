@@ -385,6 +385,7 @@ export default function DealRoom() {
   const buyerEvidInputRef = useRef<HTMLInputElement>(null);
   const sellerFeeInputRef = useRef<HTMLInputElement>(null);
   const [showTerms, setShowTerms] = useState(false);
+  const [showStep3Warning, setShowStep3Warning] = useState(false);
   const [callChatOpen, setCallChatOpen] = useState(true);
   const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
   const [priceInput, setPriceInput] = useState('');
@@ -396,6 +397,7 @@ export default function DealRoom() {
   const chatBundledRef = useRef(false); // กัน bundleChatTranscriptAsEvidence ถูกเรียกซ้ำ
   // wizard แบบง่าย: ขั้นที่กำลังดูอยู่ (ปุ่มย้อนกลับ/ถัดไป) — null แปลว่าให้ตามขั้นจริงปัจจุบันเสมอ
   const [wzViewStep, setWzViewStep] = useState<number | null>(null);
+  const step3PendingRef = useRef<number | null>(null);
   const simpleActualStepRef = useRef<number | null>(null);
   const [meetupEvidReady, setMeetupEvidReady] = useState(false);
   const [savedEvidIds, setSavedEvidIds] = useState<Set<string>>(new Set());
@@ -2437,6 +2439,15 @@ export default function DealRoom() {
     const { step: actualStep, outcome } = getSimpleStep();
     const step = Math.min(wzViewStep ?? actualStep, actualStep); // กันดูล้ำหน้ากว่าความเป็นจริง
     const isReviewing = step < actualStep; // กำลังย้อนดูขั้นที่ผ่านมาแล้ว — ปิดปฏิสัมพันธ์ กันกดซ้ำย้อนสถานะดีล
+    function goToSimpleStep(nextStep: number) {
+      const safeNextStep = Math.min(actualStep, nextStep);
+      if (step === 2 && safeNextStep === 3) {
+        step3PendingRef.current = safeNextStep;
+        setShowStep3Warning(true);
+        return;
+      }
+      setWzViewStep(safeNextStep);
+    }
     return (
       <div className="dr-inner">
         <DealFlowBrand className="dr-brand-slot" />
@@ -2465,7 +2476,7 @@ export default function DealRoom() {
               ? <button type="button" className="btn btn-ghost" onClick={() => setWzViewStep(Math.max(1, step - 1))}>← ย้อนกลับ</button>
               : <span />}
             {step < actualStep && (
-              <button type="button" className="btn btn-primary" onClick={() => setWzViewStep(Math.min(actualStep, step + 1))}>ถัดไป →</button>
+              <button type="button" className="btn btn-primary" onClick={() => goToSimpleStep(step + 1)}>ถัดไป →</button>
             )}
           </div>
         )}
@@ -2747,6 +2758,28 @@ export default function DealRoom() {
           </div>
         </div>
       ); })()}
+      {showStep3Warning && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(11, 18, 32, .72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 110 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 680, background: 'var(--surface)', borderRadius: 'var(--r-xl)', border: '1px solid #f7c6cd', boxShadow: '0 30px 70px rgba(12, 24, 54, .28)', padding: '24px 20px 20px', textAlign: 'center' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(24px, 4vw, 34px)', lineHeight: 1.15, color: '#cf2038', marginBottom: 16 }}>*โปรดอ่านอย่างระเอียด*</div>
+            <img src="/Lawn.webp" alt="คำเตือนก่อนเข้าขั้นตอนที่ 3" style={{ width: 'min(100%, 600px)', height: 'auto', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', margin: '0 auto 16px', borderRadius: 'var(--r-lg)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
+            <div style={{ fontSize: 'clamp(15px, 2.4vw, 18px)', fontWeight: 700, color: 'var(--ink)', marginBottom: 18 }}>*หากละเลยอาจเสียเปรียบในกรณีเกิดปัญหา*</div>
+            <button
+              type="button"
+              className="btn btn-primary btn-lg"
+              style={{ minWidth: 180 }}
+              onClick={() => {
+                const nextStep = step3PendingRef.current ?? 3;
+                step3PendingRef.current = null;
+                setShowStep3Warning(false);
+                setWzViewStep(nextStep);
+              }}
+            >
+              เข้าใจแล้ว
+            </button>
+          </div>
+        </div>
+      )}
       {uploadPreview && (
         <div className="up-toast" role="status" aria-live="polite">
           {uploadPreview.url
