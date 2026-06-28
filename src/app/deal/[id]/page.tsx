@@ -403,6 +403,7 @@ export default function DealRoom() {
   const simpleActualStepRef = useRef<number | null>(null);
   const [meetupEvidReady, setMeetupEvidReady] = useState(false);
   const [savedEvidIds, setSavedEvidIds] = useState<Set<string>>(new Set());
+  const [packingUploadStep, setPackingUploadStep] = useState<1 | 2 | 3 | null>(null);
   const [meetupPropLabel, setMeetupPropLabel] = useState<string | null>(null); // null=hidden ''=custom label
   const [meetupPropAmt, setMeetupPropAmt] = useState('');
   // Pop-Up ตกลงจุดนัด (รวมสถานที่+เงินประกัน+ปรับราคา+ค่าบริการ)
@@ -417,6 +418,7 @@ export default function DealRoom() {
   useEffect(() => {
     setChatReviewReady(false);
     chatBundledRef.current = false;
+    setPackingUploadStep(null);
     setWzViewStep(null);
     setShowStep3Warning(false);
     step3PendingRef.current = null;
@@ -1905,6 +1907,14 @@ export default function DealRoom() {
   // ─── ขั้น 7: ผู้ขายแพ็ค + วิดีโอ + เลขพัสดุ ───────────────────────────────
   function renderWizardStep5() {
     const packingEvidence = evidence.filter(e => e.type === 'packing');
+    const packingEvidenceSlots = [packingEvidence[0] || null, packingEvidence[1] || null, packingEvidence[2] || null] as Array<EvidenceItem | null>;
+    const packingSteps = [
+      { step: 1 as const, imageSrc: '/pack.webp', title: 'แพ็คสินค้า' },
+      { step: 2 as const, imageSrc: '/Logistic.webp', title: 'โลจิสติกส์' },
+      { step: 3 as const, imageSrc: '/Slip.webp', title: 'สลิปและเลขอ้างอิง' },
+    ];
+    const canUploadPackingStep = (step: 1 | 2 | 3) => step === 1 || !!packingEvidenceSlots[step - 2];
+    const hasAllPackingSteps = packingEvidenceSlots.every(Boolean);
     const sellerPacked = !!deal!.tracking_to_buyer || ['shipped_to_buyer', 'completed', 'cancelled', 'disputed'].includes(deal!.status);
     if (myRole !== 'seller') {
       return (
@@ -1926,15 +1936,78 @@ export default function DealRoom() {
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
-          <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6 }}>⚡ ถ่ายวิดีโอทุกขั้นตอน เก็บจุดสำคัญ เช่น Serial Number และเลขชิป หากมีผลเทสต้องถ่ายประกอบ และเลขซีเรียลบนตัวสินค้ากับกล่อง/เอกสารต้องตรงกัน</div>
+        <div className="dr-card">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+            {packingSteps.map(item => (
+              <div key={item.step} style={{ minWidth: 0 }}>
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+                  <img src={item.imageSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <div style={{ position: 'absolute', top: 8, left: 8, minWidth: 26, height: 26, borderRadius: 999, background: 'rgba(15, 23, 42, .72)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>
+                    {item.step}
+                  </div>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, color: 'var(--ink)', textAlign: 'center' }}>{item.title}</div>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="dr-card">
-          <div className="dr-card-title">อัปโหลดวิดีโอแพ็คของ</div>
-          <button onClick={() => evidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> เลือกไฟล์ (รูป/วิดีโอ)</button>
-          <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'packing'); e.target.value = ''; }} />
-          {packingEvidence.length > 0 && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 10 }}>✅ อัปโหลดแล้ว {packingEvidence.length} ไฟล์ — ผู้ซื้อเห็นชุดนี้ด้วย</p>}
-          {renderWizardEvidenceThumbs(packingEvidence)}
+          <div className="dr-card-title">อัปโหลด 3 ขั้นตอน</div>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>อัปโหลดให้ครบตามลำดับ 1 → 2 → 3 แล้วจึงกรอกเลขพัสดุและไปขั้นถัดไป</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+            {packingSteps.map(item => {
+              const uploaded = packingEvidenceSlots[item.step - 1];
+              const previewVisible = packingUploadStep === item.step && uploadPreview?.url;
+              const locked = !canUploadPackingStep(item.step);
+              return (
+                <div key={item.step} style={{ minWidth: 0, border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 10, background: locked ? 'var(--surface-2)' : 'var(--surface)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8, textAlign: 'center' }}>ขั้นตอน {item.step}</div>
+                  <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
+                    {uploaded ? (
+                      uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
+                        ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
+                        : <img src={fileUrl(uploaded.file_id)} alt={uploaded.file_name || item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ) : previewVisible ? (
+                      <img src={uploadPreview!.url} alt={uploadPreview!.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ) : (
+                      <img src={item.imageSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: locked ? 0.38 : 0.92 }} />
+                    )}
+                  </div>
+                  <div style={{ marginTop: 8, minHeight: 34, fontSize: 11.5, color: uploaded ? 'var(--green-600)' : locked ? 'var(--faint)' : 'var(--muted)', textAlign: 'center', lineHeight: 1.45 }}>
+                    {uploaded
+                      ? `✅ อัปโหลดแล้ว`
+                      : locked
+                        ? `รออัปขั้นตอน ${item.step - 1} ก่อน`
+                        : `อัปโหลด${item.title}`}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-block btn-sm"
+                    disabled={locked || !!uploaded}
+                    onClick={() => {
+                      if (packingEvidence.length >= 3) return;
+                      setPackingUploadStep(item.step);
+                      evidInputRef.current?.click();
+                    }}
+                  >
+                    <Icon name="upload" size={14} /> {uploaded ? 'อัปโหลดแล้ว' : `เลือกไฟล์ขั้นตอน ${item.step}`}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={async e => {
+            const f = e.target.files?.[0];
+            const activeStep = packingUploadStep;
+            e.target.value = '';
+            if (!f || !activeStep) return;
+            if (!canUploadPackingStep(activeStep) || packingEvidenceSlots[activeStep - 1]) { setPackingUploadStep(null); return; }
+            await uploadFile(f, true, 'packing');
+            setPackingUploadStep(null);
+          }} />
+          <div style={{ fontSize: 12.5, color: hasAllPackingSteps ? 'var(--green-600)' : 'var(--muted)', marginTop: 12 }}>
+            {hasAllPackingSteps ? '✅ อัปโหลดครบทั้ง 3 ขั้นแล้ว — กรอกเลขพัสดุเพื่อไปต่อได้' : `อัปโหลดแล้ว ${packingEvidence.length}/3 ขั้น`}
+          </div>
         </div>
         <div className="dr-card">
           <div className="dr-card-title">เลขพัสดุ</div>
@@ -1943,7 +2016,11 @@ export default function DealRoom() {
             { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPacked, doneText: '✅ แพ็คและส่งแล้ว', waitText: '⏳ กำลังแพ็ค' },
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
           ], { marginBottom: 12 })}
-          <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => { if (!trackingInput) { alert('กรอกเลขพัสดุ'); return; } return doAction('seller_done_packing', { trackingNumber: trackingInput }); }}>📦 แพ็คเสร็จ — ส่งให้ผู้ซื้อโดยตรง</AsyncButton>
+          <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => {
+            if (!hasAllPackingSteps) { alert('กรุณาอัปโหลดหลักฐานให้ครบทั้ง 3 ขั้นก่อน'); return; }
+            if (!trackingInput) { alert('กรอกเลขพัสดุ'); return; }
+            return doAction('seller_done_packing', { trackingNumber: trackingInput });
+          }}>📦 แพ็คเสร็จ — ส่งให้ผู้ซื้อโดยตรง</AsyncButton>
         </div>
       </div>
     );
