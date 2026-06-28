@@ -228,11 +228,11 @@ button.nav-link { background: none; border: none; }
     z-index: 121;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 3px;
     border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
     border-right: none;
     border-radius: 999px 0 0 999px;
-    padding: 6px 8px 6px 10px;
+    padding: 3px 4px 3px 6px;
     background: color-mix(in srgb, var(--surface) 92%, transparent);
     color: var(--ink);
     box-shadow: var(--sh-md);
@@ -240,23 +240,24 @@ button.nav-link { background: none; border: none; }
     -webkit-backdrop-filter: blur(16px) saturate(150%);
   }
   .pref-dock-toggle-pill {
-    width: 14px;
-    height: 4px;
+    width: 8px;
+    height: 3px;
     border-radius: 999px;
     background: var(--accent);
     flex: 0 0 auto;
   }
   .pref-dock-toggle-text {
     font-family: var(--font-display);
-    font-size: 9px;
+    font-size: 5px;
     font-weight: 700;
-    letter-spacing: .04em;
+    letter-spacing: .02em;
     text-transform: uppercase;
+    line-height: 1;
   }
   .pref-dock {
     top: calc(env(safe-area-inset-top, 0px) + 10px);
     right: 0;
-    transform: translateX(calc(100% - 34px));
+    transform: translateX(calc(100% - 18px));
     transition: transform .24s ease;
     padding: 4px 6px 4px 8px;
     gap: 4px;
