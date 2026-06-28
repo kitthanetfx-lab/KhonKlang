@@ -7,6 +7,7 @@ import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCc
 import { dealCode } from '@/lib/dealNumber';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { splitDealFeeComponents } from '@/lib/financeLedger';
+import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -30,11 +31,22 @@ interface Deal {
   reject_reason: string; created_at: string;
   fee_payer?: 'buyer' | 'seller' | 'split';
   payment_slip_file_id?: string; payment_slip_verified_at?: string;
+  tracking_to_middleman?: string; tracking_to_middleman_provider?: string;
+  tracking_to_buyer?: string; tracking_to_buyer_provider?: string;
   meetup?: DealMeetup | null;
   priceState?: DealPriceState | null;
+  evidence?: EvidenceItem[];
   buyerBank?: BankInfo | null;
   sellerBank?: BankInfo | null;
   middlemanBank?: BankInfo | null;
+}
+
+interface EvidenceItem {
+  id: string;
+  type: string;
+  file_id: string;
+  file_name?: string;
+  uploader_name?: string;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -303,6 +315,42 @@ export default function AdminDeals() {
     return slips;
   }
 
+  function parcelTrackingOf(d: Deal): Array<{ label: string; provider: string; trackingNumber: string; url: string }> {
+    const rows: Array<{ label: string; provider: string; trackingNumber: string; url: string }> = [];
+    if (d.tracking_to_middleman) {
+      rows.push({
+        label: 'ผู้ขาย → คนกลาง',
+        provider: getLogisticsProviderLabel(d.tracking_to_middleman_provider),
+        trackingNumber: d.tracking_to_middleman,
+        url: buildTrackingUrl(d.tracking_to_middleman_provider, d.tracking_to_middleman),
+      });
+    }
+    if (d.tracking_to_buyer) {
+      rows.push({
+        label: `${d.deal_type === 'simple' ? 'ผู้ขาย' : 'คนกลาง'} → ผู้ซื้อ`,
+        provider: getLogisticsProviderLabel(d.tracking_to_buyer_provider),
+        trackingNumber: d.tracking_to_buyer,
+        url: buildTrackingUrl(d.tracking_to_buyer_provider, d.tracking_to_buyer),
+      });
+    }
+    return rows;
+  }
+
+  function parcelEvidenceOf(d: Deal) {
+    const labelMap: Record<string, string> = {
+      packing: 'ผู้ขายอัปโหลดหลักฐานแพ็ค/พัสดุ',
+      receive: 'ผู้ซื้ออัปโหลดหลักฐานรับสินค้า',
+      testing: 'ผู้ขายอัปโหลดหลักฐานทดสอบ',
+      check: 'คนกลางอัปโหลดหลักฐานตรวจสินค้า',
+    };
+    return (d.evidence || [])
+      .filter(item => ['packing', 'receive', 'testing', 'check'].includes(item.type) && item.file_id)
+      .map(item => ({
+        ...item,
+        label: labelMap[item.type] || item.type,
+      }));
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center gap-2 mb-1">
@@ -339,6 +387,8 @@ export default function AdminDeals() {
           const st = statusBadge(d);
           const refund = refundInfo(d);
           const slips = slipsOf(d);
+          const trackingRows = parcelTrackingOf(d);
+          const parcelEvidence = parcelEvidenceOf(d);
           const sellerFeeNeeded = needsSellerFeeSlip(d);
           const buyerSlipVerified = !!d.payment_slip_verified_at;
           const sellerSlipVerified = sellerFeeNeeded ? !!d.priceState?.seller_fee_slip_verified_at : true;
@@ -418,6 +468,48 @@ export default function AdminDeals() {
                       <p className="text-[10px] text-gray-400 mt-0.5 truncate">{s.label}</p>
                     </a>
                   ))}
+                </div>
+              )}
+
+              {(trackingRows.length > 0 || parcelEvidence.length > 0) && (
+                <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-3 space-y-3">
+                  {trackingRows.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-blue-900">ข้อมูลพัสดุ</p>
+                      <div className="grid gap-2">
+                        {trackingRows.map(row => (
+                          <div key={`${d.id}-${row.label}-${row.trackingNumber}`} className="rounded-xl border border-blue-100 bg-white px-3 py-2 text-xs text-gray-700">
+                            <div className="font-semibold text-gray-900">{row.label}</div>
+                            <div className="mt-1">ผู้ให้บริการ: <span className="font-semibold">{row.provider}</span></div>
+                            <div>เลขพัสดุ: <span className="font-mono font-semibold">{row.trackingNumber}</span></div>
+                            {row.url && (
+                              <a href={row.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-blue-600 hover:underline">
+                                <ExternalLink size={12} /> เช็คพัสดุ
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {parcelEvidence.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-blue-900">หลักฐานพัสดุจากคู่ดีล</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {parcelEvidence.map(item => (
+                          <a key={item.id} href={fileUrl(item.file_id)} target="_blank" rel="noreferrer" className="block">
+                            {item.file_name?.match(/\.(mp4|mov|avi|webm)$/i) ? (
+                              <video src={fileUrl(item.file_id)} className="w-full h-20 object-cover rounded-lg border border-blue-100 bg-white" />
+                            ) : (
+                              <img src={fileUrl(item.file_id)} alt={item.label} className="w-full h-20 object-cover rounded-lg border border-blue-100 bg-white" />
+                            )}
+                            <p className="text-[10px] text-gray-500 mt-1 leading-4">{item.label}</p>
+                            {item.uploader_name && <p className="text-[10px] text-gray-400 truncate">{item.uploader_name}</p>}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

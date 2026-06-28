@@ -61,14 +61,21 @@ export async function GET(req: NextRequest) {
 
     // ดึง deal_meetup / deal_price_state ของทุกดีลที่เกี่ยวข้อง มาแนบ — แทน priceData/meetupData JSON blob เดิม
     const dealIds = deals.map(d => d.id);
-    const [{ data: meetups }, { data: priceStates }] = dealIds.length
+    const [{ data: meetups }, { data: priceStates }, { data: evidences }] = dealIds.length
       ? await Promise.all([
         db.from('deal_meetup').select('*').in('deal_id', dealIds),
         db.from('deal_price_state').select('*').in('deal_id', dealIds),
+        db.from('deal_evidence').select('*').in('deal_id', dealIds).order('created_at', { ascending: true }),
       ])
-      : [{ data: [] }, { data: [] }];
+      : [{ data: [] }, { data: [] }, { data: [] }];
     const meetupMap = new Map((meetups || []).map(m => [m.deal_id, m]));
     const priceMap = new Map((priceStates || []).map(p => [p.deal_id, p]));
+    const evidenceMap = new Map<string, typeof evidences>();
+    for (const item of evidences || []) {
+      const prev = evidenceMap.get(item.deal_id) || [];
+      prev.push(item);
+      evidenceMap.set(item.deal_id, prev);
+    }
 
     // เลขบัญชีผู้ซื้อ/ผู้ขาย/คนกลาง — แอดมินต้องเห็นตรงนี้เวลาโอนเงินจริงด้วยมือ (ไม่ต้องเปิดดีลแยก)
     const uids = Array.from(new Set(deals.flatMap(d => [d.buyer_id, d.seller_id, d.middleman_id]).filter(Boolean)));
@@ -79,6 +86,7 @@ export async function GET(req: NextRequest) {
       ...d,
       meetup: meetupMap.get(d.id) || null,
       priceState: priceMap.get(d.id) || null,
+      evidence: evidenceMap.get(d.id) || [],
       buyerBank: bankMap.get(d.buyer_id) || null,
       sellerBank: bankMap.get(d.seller_id) || null,
       middlemanBank: bankMap.get(d.middleman_id) || null,

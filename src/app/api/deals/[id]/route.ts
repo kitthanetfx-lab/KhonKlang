@@ -5,6 +5,7 @@ import { notifyUsers } from '../../_lib/notify';
 import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees } from '@/lib/fees';
+import { getLogisticsProviderLabel } from '@/lib/logistics';
 
 // หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
 async function getAdminIds(db: SupabaseClient): Promise<string[]> {
@@ -201,12 +202,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'seller_done_packing': {
         if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const trackingNumber = String(body.trackingNumber || '').trim();
+        const trackingProvider = String(body.trackingProvider || '').trim();
+        if (!trackingNumber) return NextResponse.json({ error: 'กรุณากรอกเลขพัสดุ' }, { status: 400 });
+        if (!trackingProvider) return NextResponse.json({ error: 'กรุณาเลือกผู้ให้บริการขนส่ง' }, { status: 400 });
+        const providerLabel = getLogisticsProviderLabel(trackingProvider);
         if (deal.deal_type === 'simple') {
-          updates = { status: 'shipped_to_buyer', tracking_to_buyer: body.trackingNumber || '' };
-          systemMsg = `ผู้ขายจัดส่งสินค้าให้ผู้ซื้อโดยตรงแล้ว (เลขพัสดุ: ${body.trackingNumber || '-'}) — ผู้ซื้ออย่าลืมถ่ายวิดีโอก่อนแกะกล่อง`;
+          updates = {
+            status: 'shipped_to_buyer',
+            tracking_to_buyer: trackingNumber,
+            tracking_to_buyer_provider: trackingProvider,
+          };
+          systemMsg = `ผู้ขายจัดส่งสินค้าให้ผู้ซื้อโดยตรงแล้ว (${providerLabel}: ${trackingNumber}) — ผู้ซื้ออย่าลืมถ่ายวิดีโอก่อนแกะกล่อง`;
         } else {
-          updates = { status: 'shipped_to_middleman', tracking_to_middleman: body.trackingNumber || '' };
-          systemMsg = `ผู้ขายจัดส่งสินค้าแล้ว (เลขพัสดุ: ${body.trackingNumber || '-'})`;
+          updates = {
+            status: 'shipped_to_middleman',
+            tracking_to_middleman: trackingNumber,
+            tracking_to_middleman_provider: trackingProvider,
+          };
+          systemMsg = `ผู้ขายจัดส่งสินค้าแล้ว (${providerLabel}: ${trackingNumber})`;
         }
         break;
       }
@@ -225,8 +239,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'middleman_ship_to_buyer': {
         if (!isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!deal.buyer_confirmed_check) return NextResponse.json({ error: 'รอผู้ซื้อยืนยันก่อน' }, { status: 400 });
-        updates = { status: 'shipped_to_buyer', tracking_to_buyer: body.trackingNumber || '' };
-        systemMsg = `คนกลางจัดส่งให้ผู้ซื้อแล้ว (เลขพัสดุ: ${body.trackingNumber || '-'})`;
+        const trackingNumber = String(body.trackingNumber || '').trim();
+        const trackingProvider = String(body.trackingProvider || '').trim();
+        if (!trackingNumber) return NextResponse.json({ error: 'กรุณากรอกเลขพัสดุ' }, { status: 400 });
+        if (!trackingProvider) return NextResponse.json({ error: 'กรุณาเลือกผู้ให้บริการขนส่ง' }, { status: 400 });
+        const providerLabel = getLogisticsProviderLabel(trackingProvider);
+        updates = {
+          status: 'shipped_to_buyer',
+          tracking_to_buyer: trackingNumber,
+          tracking_to_buyer_provider: trackingProvider,
+        };
+        systemMsg = `คนกลางจัดส่งให้ผู้ซื้อแล้ว (${providerLabel}: ${trackingNumber})`;
         break;
       }
       case 'buyer_received': {

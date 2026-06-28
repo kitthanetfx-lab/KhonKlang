@@ -179,7 +179,9 @@ create table deals (
   payment_slip_file_id      text,   -- storage path in 'deal-files'
   payment_slip_verified_at  timestamptz,
   tracking_to_middleman     text,
+  tracking_to_middleman_provider text,
   tracking_to_buyer         text,
+  tracking_to_buyer_provider text,
   reject_reason             text,
 
   wanted_post_id            uuid references wanted_posts(id),

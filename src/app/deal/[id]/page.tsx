@@ -17,6 +17,7 @@ import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { dealCode } from '@/lib/dealNumber';
+import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { useUser } from '@/lib/useUser';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -146,7 +147,7 @@ interface Deal {
   status: string; reject_reason: string;
   seller_accepted_terms: boolean; middleman_accepted_terms: boolean; buyer_accepted_terms: boolean;
   middleman_confirmed_payment: boolean; buyer_confirmed_check: boolean;
-  payment_slip_file_id: string; tracking_to_middleman: string; tracking_to_buyer: string;
+  payment_slip_file_id: string; tracking_to_middleman: string; tracking_to_middleman_provider?: string; tracking_to_buyer: string; tracking_to_buyer_provider?: string;
   deal_type?: string; fee_payer?: string;
 }
 
@@ -313,8 +314,10 @@ export default function DealRoom() {
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
+  const [trackingProviderInput, setTrackingProviderInput] = useState('');
   const [showTrackingRequired, setShowTrackingRequired] = useState(false);
   const trackingInputRef = useRef<HTMLInputElement>(null);
+  const trackingProviderRef = useRef<HTMLSelectElement>(null);
   const [showJitsi, setShowJitsi] = useState(false);
   // ข้อ3: ระหว่างวิดีโอคอล ซ่อนปุ่มลอย "กลับหน้าหลัก" + "บริการลูกค้า" (ผ่าน body.in-call)
   useEffect(() => {
@@ -424,6 +427,8 @@ export default function DealRoom() {
     chatBundledRef.current = false;
     setPackingUploadStep(null);
     setPackingCarouselIndex(0);
+    setTrackingInput('');
+    setTrackingProviderInput('');
     setShowTrackingRequired(false);
     setWzViewStep(null);
     setShowStep3Warning(false);
@@ -1418,10 +1423,26 @@ export default function DealRoom() {
       else return <p style={{ color: 'var(--green-600)', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>✅ คุณยอมรับเงื่อนไขแล้ว — รอฝ่ายอื่น</p>;
     }
     if (s === 'payment_uploaded' && myRole === 'middleman') btns.push({ label: '✅ ยืนยันรับเงิน — เริ่มขั้นตอนแพ็คของ', cls: 'btn-green', fn: () => doAction('confirm_payment') });
-    if (s === 'packing' && myRole === 'seller') btns.push({ label: isSimple ? '📦 แพ็คเสร็จ — จัดส่งให้ผู้ซื้อโดยตรง' : '📦 แพ็คของเสร็จ — จัดส่งให้คนกลาง', cls: 'btn-primary', fn: () => { if (trackingInput) return doAction('seller_done_packing', { trackingNumber: trackingInput }); alert('กรอกเลขพัสดุ'); } });
+    if (s === 'packing' && myRole === 'seller') btns.push({
+      label: isSimple ? '📦 แพ็คเสร็จ — จัดส่งให้ผู้ซื้อโดยตรง' : '📦 แพ็คของเสร็จ — จัดส่งให้คนกลาง',
+      cls: 'btn-primary',
+      fn: () => {
+        const payload = getTrackingPayload();
+        if (!payload) return;
+        return doAction('seller_done_packing', payload);
+      }
+    });
     if (s === 'shipped_to_middleman' && myRole === 'middleman') btns.push({ label: '📬 รับสินค้าแล้ว', cls: 'btn-primary', fn: () => doAction('middleman_received') });
     if (s === 'middleman_checking' && myRole === 'buyer' && !deal!.buyer_confirmed_check) btns.push({ label: '✅ ยืนยันสินค้าไม่มีปัญหา', cls: 'btn-green', fn: () => doAction('buyer_confirm_check') });
-    if (s === 'middleman_checking' && myRole === 'middleman' && deal!.buyer_confirmed_check) btns.push({ label: '🚚 จัดส่งให้ผู้ซื้อแล้ว', cls: 'btn-primary', fn: () => { if (trackingInput) return doAction('middleman_ship_to_buyer', { trackingNumber: trackingInput }); alert('กรอกเลขพัสดุ'); } });
+    if (s === 'middleman_checking' && myRole === 'middleman' && deal!.buyer_confirmed_check) btns.push({
+      label: '🚚 จัดส่งให้ผู้ซื้อแล้ว',
+      cls: 'btn-primary',
+      fn: () => {
+        const payload = getTrackingPayload();
+        if (!payload) return;
+        return doAction('middleman_ship_to_buyer', payload);
+      }
+    });
     if (s === 'shipped_to_buyer' && myRole === 'buyer') btns.push({ label: '🎉 ได้รับสินค้าแล้ว — ดีลเสร็จสมบูรณ์', cls: 'btn-green', fn: () => doAction('buyer_received') });
     if (myRole === 'buyer' && s === 'buyer_joined' && !deal!.middleman_id && !isMeetup && !isSimple) btns.push({ label: showSelectMM ? 'ซ่อนการเลือกคนกลาง' : '🔎 เลือกคนกลาง', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
     if (myRole === 'buyer' && !isSimple && deal!.middleman_id && ['terms_pending', 'payment_pending'].includes(s)) btns.push({ label: showSelectMM ? 'ซ่อนรายการคนกลาง' : '🔄 เลือกคนกลางใหม่', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
@@ -1431,7 +1452,33 @@ export default function DealRoom() {
     return (
       <div className="dr-actions">
         {(['packing', 'middleman_checking'].includes(s) && (myRole === 'seller' || (myRole === 'middleman' && deal!.buyer_confirmed_check))) && (
-          <input type="text" className="dr-select" value={trackingInput} onChange={e => setTrackingInput(e.target.value)} placeholder="เลขพัสดุ / Tracking number" />
+          <div style={{ display: 'grid', gap: 8 }}>
+            <select
+              ref={trackingProviderRef}
+              className="dr-select"
+              value={trackingProviderInput}
+              onChange={e => {
+                setTrackingProviderInput(e.target.value);
+                if (e.target.value.trim() && trackingInput.trim()) setShowTrackingRequired(false);
+              }}
+              style={{ border: `2px solid ${trackingProviderInput.trim() ? 'var(--blue-200)' : '#cf2038'}` }}
+            >
+              <option value="">เลือกผู้ให้บริการโลจิสติกส์</option>
+              {TH_LOGISTICS_PROVIDERS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+            <input
+              ref={trackingInputRef}
+              type="text"
+              className="dr-select"
+              value={trackingInput}
+              onChange={e => {
+                setTrackingInput(e.target.value);
+                if (trackingProviderInput.trim() && e.target.value.trim()) setShowTrackingRequired(false);
+              }}
+              placeholder="เลขพัสดุ / Tracking number"
+              style={{ border: `2px solid ${trackingInput.trim() ? 'var(--blue-200)' : '#cf2038'}` }}
+            />
+          </div>
         )}
         {btns.map(b => <AsyncButton key={b.label} onClick={b.fn} disabled={acting} className={`btn ${b.cls} btn-block`}>{b.label}</AsyncButton>)}
       </div>
@@ -1572,6 +1619,56 @@ export default function DealRoom() {
             <span style={{ color: ok ? 'var(--green-600)' : 'var(--faint)', flexShrink: 0 }}>{ok ? doneText : waitText}</span>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  function getTrackingPayload(): { trackingNumber: string; trackingProvider: string } | null {
+    const trackingNumber = trackingInput.trim();
+    const trackingProvider = trackingProviderInput.trim();
+    if (!trackingProvider) {
+      setShowTrackingRequired(true);
+      trackingProviderRef.current?.focus();
+      alert('กรุณาเลือกผู้ให้บริการโลจิสติกส์ก่อน');
+      return null;
+    }
+    if (!trackingNumber) {
+      setShowTrackingRequired(true);
+      trackingInputRef.current?.focus();
+      alert('กรุณากรอกเลขพัสดุก่อนกดไปขั้นถัดไป');
+      return null;
+    }
+    return { trackingNumber, trackingProvider };
+  }
+
+  function renderTrackingInfoCard(title: string, trackingNumber?: string, trackingProvider?: string) {
+    const cleanTrackingNumber = String(trackingNumber || '').trim();
+    if (!cleanTrackingNumber) return null;
+    const trackingUrl = buildTrackingUrl(trackingProvider, cleanTrackingNumber);
+    return (
+      <div className="dr-card">
+        <div className="dr-card-title">📦 {title}</div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>ผู้ให้บริการ</span>
+            <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{getLogisticsProviderLabel(trackingProvider)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>เลขพัสดุ</span>
+            <span className="dr-track-code">{cleanTrackingNumber}</span>
+          </div>
+          {trackingUrl && (
+            <a
+              href={trackingUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-ghost btn-sm"
+              style={{ width: '100%' }}
+            >
+              🔎 เช็คพัสดุ
+            </a>
+          )}
+        </div>
       </div>
     );
   }
@@ -2011,7 +2108,9 @@ export default function DealRoom() {
                 { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
               ], { marginBottom: 0 })}
             </div>
-            {deal!.tracking_to_buyer && <div className="dr-track-code" style={{ marginTop: 12 }}>📦 {deal!.tracking_to_buyer}</div>}
+            <div style={{ marginTop: 12 }}>
+              {renderTrackingInfoCard('พัสดุจากผู้ขายถึงผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
+            </div>
           </div>
         </div>
       );
@@ -2042,7 +2141,7 @@ export default function DealRoom() {
         </div>
         <div className="dr-card">
           <div className="dr-card-title">อัปโหลด 3 ขั้นตอน</div>
-          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>อัปโหลดให้ครบตามลำดับ 1 → 2 → 3 แล้วจึงกรอกเลขพัสดุและไปขั้นถัดไป</p>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>อัปโหลดให้ครบตามลำดับ 1 → 2 → 3 แล้วจึงเลือกผู้ให้บริการโลจิสติกส์และกรอกเลขพัสดุเพื่อไปขั้นถัดไป</p>
           <div style={{ display: 'grid', gridTemplateColumns: packingUploadColumns, gap: 10 }}>
             {packingSteps.map(item => {
               const uploaded = packingEvidenceSlots[item.step - 1];
@@ -2101,9 +2200,29 @@ export default function DealRoom() {
           </div>
         </div>
         <div className="dr-card">
+          <div style={{ fontSize: 'clamp(18px, 3vw, 24px)', fontWeight: 800, fontFamily: 'var(--font-display)', color: '#cf2038', lineHeight: 1.1, marginBottom: 8 }}>ผู้ให้บริการโลจิสติกส์</div>
+          <select
+            ref={trackingProviderRef}
+            className="dr-select"
+            value={trackingProviderInput}
+            onChange={e => {
+              setTrackingProviderInput(e.target.value);
+              if (e.target.value.trim() && trackingInput.trim()) setShowTrackingRequired(false);
+            }}
+            style={{
+              marginBottom: 12,
+              border: `2px solid ${trackingProviderInput.trim() ? 'var(--blue-200)' : '#cf2038'}`,
+              background: trackingProviderInput.trim() ? 'var(--surface)' : '#fff7f8',
+              boxShadow: showTrackingRequired || !trackingProviderInput.trim() ? '0 0 0 4px rgba(207, 32, 56, 0.12)' : 'var(--sh-xs)',
+              fontWeight: 700,
+            }}
+          >
+            <option value="">เลือกผู้ให้บริการโลจิสติกส์</option>
+            {TH_LOGISTICS_PROVIDERS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
           <div style={{ fontSize: 'clamp(22px, 4vw, 30px)', fontWeight: 800, fontFamily: 'var(--font-display)', color: '#cf2038', lineHeight: 1.1, marginBottom: 6 }}>เลขพัสดุ</div>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: trackingInput.trim() ? 'var(--muted)' : '#cf2038', marginBottom: 10 }}>
-            ต้องกรอกก่อนกดไปขั้นถัดไป
+            ต้องกรอกผู้ให้บริการและเลขพัสดุก่อนกดไปขั้นถัดไป
           </div>
           <input
             ref={trackingInputRef}
@@ -2129,13 +2248,9 @@ export default function DealRoom() {
           ], { marginBottom: 12 })}
           <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => {
             if (!hasAllPackingSteps) { alert('กรุณาอัปโหลดหลักฐานให้ครบทั้ง 3 ขั้นก่อน'); return; }
-            if (!trackingInput.trim()) {
-              setShowTrackingRequired(true);
-              trackingInputRef.current?.focus();
-              alert('กรุณากรอกเลขพัสดุก่อนกดไปขั้นถัดไป');
-              return;
-            }
-            return doAction('seller_done_packing', { trackingNumber: trackingInput.trim() });
+            const payload = getTrackingPayload();
+            if (!payload) return;
+            return doAction('seller_done_packing', payload);
           }}>📦 แพ็คเสร็จ — ส่งให้ผู้ซื้อโดยตรง</AsyncButton>
         </div>
       </div>
@@ -2151,7 +2266,7 @@ export default function DealRoom() {
         <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
           <div style={{ fontSize: 38, marginBottom: 10 }}>🚚</div>
           <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>ส่งสินค้าแล้ว — รอผู้ซื้อยืนยันรับ</div>
-          {deal!.tracking_to_buyer && <div className="dr-track-code" style={{ marginBottom: 8 }}>📦 {deal!.tracking_to_buyer}</div>}
+          {renderTrackingInfoCard('พัสดุจากผู้ขายถึงผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
           <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่อง แล้วกดยืนยันรับสินค้า ดีลจะเสร็จสมบูรณ์อัตโนมัติ</p>
           <div style={{ textAlign: 'left', marginTop: 16 }}>
             {renderParticipantStatusRows([
@@ -2168,7 +2283,7 @@ export default function DealRoom() {
     const hasUnboxEvidence = unboxEvidence.length > 0;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {deal!.tracking_to_buyer && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ</div><div className="dr-track-code">{deal!.tracking_to_buyer}</div></div>}
+        {renderTrackingInfoCard('พัสดุจากผู้ขายถึงผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
         <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
           <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
           <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
@@ -3036,8 +3151,8 @@ export default function DealRoom() {
                 {renderAllSlipsCard()}
                 {renderFinanceSummaryCard()}
 
-                {deal.tracking_to_middleman && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ ผู้ขาย → คนกลาง</div><div className="dr-track-code">{deal.tracking_to_middleman}</div></div>}
-                {deal.tracking_to_buyer && <div className="dr-card"><div className="dr-card-title">📦 เลขพัสดุ {isSimple ? 'ผู้ขาย' : 'คนกลาง'} → ผู้ซื้อ</div><div className="dr-track-code">{deal.tracking_to_buyer}</div></div>}
+                {renderTrackingInfoCard('เลขพัสดุ ผู้ขาย → คนกลาง', deal.tracking_to_middleman, deal.tracking_to_middleman_provider)}
+                {renderTrackingInfoCard(`เลขพัสดุ ${isSimple ? 'ผู้ขาย' : 'คนกลาง'} → ผู้ซื้อ`, deal.tracking_to_buyer, deal.tracking_to_buyer_provider)}
 
                 {deal.status === 'completed' && (
                   <>
