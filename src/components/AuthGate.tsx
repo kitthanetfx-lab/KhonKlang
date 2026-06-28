@@ -19,11 +19,23 @@ import { isProfileComplete, REQUIRED_PROFILE_FIELDS } from '@/lib/profileComplet
  */
 
 const PUBLIC_PATHS = [
+  '/',
   '/login',
+  '/register',
   '/auth/oauth/complete',
   '/auth/line/complete',
+  '/marketplace',
+  '/wanted',
+  '/service',
+  '/check-scam',
+  '/contact',
+  '/faq',
+  '/fees',
+  '/how-it-works',
   '/privacy',
   '/terms',
+  '/cookies',
+  '/status',
 ];
 
 // หน้าที่ยังเข้าได้แม้โปรไฟล์ยังไม่ครบ (หน้ากรอกโปรไฟล์เอง + หน้าออกจากระบบที่อาจอยู่ใน flow เดิม)
@@ -62,29 +74,38 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data } = await supabase.auth.getSession();
-      if (!active) return;
-      if (!data.session) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!active) return;
+        if (!data.session) {
+          setChecked(true);
+          router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
+          return;
+        }
+        if (active) setAuthed(true);
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select(REQUIRED_PROFILE_FIELDS.join(','))
+          .eq('id', data.session.user.id)
+          .maybeSingle();
+        if (!active) return;
+
+        const complete = isProfileComplete(profile as Record<string, unknown> | null);
+        setProfileComplete(complete);
+
+        if (!complete && !isProfileExemptPath(pathname)) {
+          setChecked(true);
+          router.replace('/profile');
+          return;
+        }
+        setChecked(true);
+      } catch {
+        if (!active) return;
+        setChecked(true);
+        setAuthed(false);
         router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
-        return;
       }
-      if (active) setAuthed(true);
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select(REQUIRED_PROFILE_FIELDS.join(','))
-        .eq('id', data.session.user.id)
-        .maybeSingle();
-      if (!active) return;
-
-      const complete = isProfileComplete(profile as Record<string, unknown> | null);
-      setProfileComplete(complete);
-
-      if (!complete && !isProfileExemptPath(pathname)) {
-        router.replace('/profile');
-        return;
-      }
-      setChecked(true);
     }
 
     check();
