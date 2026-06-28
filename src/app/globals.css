@@ -1010,28 +1010,6 @@ button.nav-link { background: none; border: none; }
   padding-top: 0;
   overflow: hidden;
 }
-.create-deal-slider {
-  margin: 4px 0 22px;
-}
-.create-deal-slider-shell {
-  width: 100%;
-  margin: 0 auto;
-}
-.create-deal-slider-frame {
-  position: relative;
-  width: 100%;
-  margin: 0 auto;
-  border-radius: 24px;
-  overflow: hidden;
-  border: 1px solid rgba(170, 192, 219, .72);
-  background: rgba(255,255,255,.86);
-  box-shadow: 0 18px 38px -32px rgba(34, 69, 139, .34);
-}
-.create-deal-slider-image {
-  width: 100%;
-  height: auto;
-  display: block;
-}
 .deal-flow-brand-wrap {
   display: flex;
   justify-content: center;
@@ -1113,13 +1091,6 @@ button.nav-link { background: none; border: none; }
 @media (max-width: 559px) {
   .create-deal-form {
     padding-top: 0;
-  }
-  .create-deal-slider {
-    margin-bottom: 18px;
-  }
-  .create-deal-slider-frame {
-    border-radius: 18px;
-    box-shadow: 0 20px 34px -28px rgba(34, 69, 139, .34);
   }
   .deal-flow-brand {
     min-height: 70px;

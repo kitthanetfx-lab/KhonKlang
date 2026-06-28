@@ -22,6 +22,17 @@ import { useUser } from '@/lib/useUser';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+const REGULAR_DEAL_STEP1_SLIDES = [
+  '/Trade/Buyer1.webp',
+  '/Trade/Buyer2.webp',
+  '/Trade/Buyer3.webp',
+  '/Trade/Buyer4.webp',
+  '/Trade/Buyer5.webp',
+  '/Trade/no1.webp',
+  '/Trade/no2.webp',
+  '/Trade/no3.webp',
+];
+
 // ─── Jitsi Meet via External API ─────────────────────────────────────────
 function JitsiMeet({ roomName, displayName }: { roomName: string; displayName: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -412,6 +423,7 @@ export default function DealRoom() {
   const [packingUploadStep, setPackingUploadStep] = useState<1 | 2 | 3 | null>(null);
   const [packingCarouselIndex, setPackingCarouselIndex] = useState(0);
   const [isPackingCompactLayout, setIsPackingCompactLayout] = useState(false);
+  const [regularDealIntroSlide, setRegularDealIntroSlide] = useState(0);
   const [meetupPropLabel, setMeetupPropLabel] = useState<string | null>(null); // null=hidden ''=custom label
   const [meetupPropAmt, setMeetupPropAmt] = useState('');
   // Pop-Up ตกลงจุดนัด (รวมสถานที่+เงินประกัน+ปรับราคา+ค่าบริการ)
@@ -465,6 +477,13 @@ export default function DealRoom() {
     }, 3000);
     return () => window.clearInterval(timer);
   }, [isPackingCompactLayout]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setRegularDealIntroSlide(prev => (prev + 1) % REGULAR_DEAL_STEP1_SLIDES.length);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -2519,7 +2538,6 @@ export default function DealRoom() {
 
     // ─── step 1: ยอมรับเงื่อนไข ───────────────────────────────────────────
     function renderRStep1() {
-      const t = termsFor(deal!.deal_type);
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
       const myAccepted = (myRole === 'seller' && deal!.seller_accepted_terms)
         || (myRole === 'middleman' && deal!.middleman_accepted_terms)
@@ -2527,16 +2545,26 @@ export default function DealRoom() {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="dr-card">
-            <div className="dr-card-title">📋 สิ่งที่บริการนี้ครอบคลุม</div>
-            <ul style={{ paddingLeft: 18, margin: 0, lineHeight: 1.8, fontSize: 13.5, color: 'var(--green-700)' }}>
-              {t.covers.map((c, i) => <li key={i}>✅ {c}</li>)}
-            </ul>
-          </div>
-          <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
-            <div className="dr-card-title" style={{ color: '#8a5a00' }}>⚠️ ไม่ครอบคลุม</div>
-            <ul style={{ paddingLeft: 18, margin: 0, lineHeight: 1.8, fontSize: 13.5, color: '#8a5a00' }}>
-              {t.excludes.map((c, i) => <li key={i}>{c}</li>)}
-            </ul>
+            <div style={{ position: 'relative', width: '100%', maxWidth: 640, margin: '0 auto', borderRadius: 22, overflow: 'hidden', border: '1px solid rgba(170, 192, 219, .72)', background: 'rgba(255,255,255,.86)', boxShadow: '0 18px 38px -32px rgba(34, 69, 139, .34)' }}>
+              <img
+                key={REGULAR_DEAL_STEP1_SLIDES[regularDealIntroSlide]}
+                src={REGULAR_DEAL_STEP1_SLIDES[regularDealIntroSlide]}
+                alt={`ภาพอธิบายดีลปลอดภัย ${regularDealIntroSlide + 1}`}
+                style={{ display: 'block', width: '100%', height: 'auto' }}
+              />
+            </div>
+            <div className="svc-simple-slider-dots" aria-label="ตัวเลือกภาพขั้นตอนดีลปลอดภัย">
+              {REGULAR_DEAL_STEP1_SLIDES.map((slide, index) => (
+                <button
+                  key={slide}
+                  type="button"
+                  className={`svc-simple-slider-dot${index === regularDealIntroSlide ? ' is-active' : ''}`}
+                  onClick={() => setRegularDealIntroSlide(index)}
+                  aria-label={`ดูภาพขั้นตอน ${index + 1}`}
+                  aria-pressed={index === regularDealIntroSlide}
+                />
+              ))}
+            </div>
           </div>
           <div className="dr-card">
             <div className="dr-card-title">💸 ค่าบริการ (฿{deal!.price.toLocaleString()})</div>

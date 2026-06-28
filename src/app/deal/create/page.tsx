@@ -1,14 +1,6 @@
 'use client';
 import Image from 'next/image';
 import { useState, useEffect, Suspense } from 'react';
-import tradeSlide1 from '../../../../public/Trade/Buyer1.webp';
-import tradeSlide2 from '../../../../public/Trade/Buyer2.webp';
-import tradeSlide3 from '../../../../public/Trade/Buyer3.webp';
-import tradeSlide4 from '../../../../public/Trade/Buyer4.webp';
-import tradeSlide5 from '../../../../public/Trade/Buyer5.webp';
-import tradeSlide6 from '../../../../public/Trade/no1.webp';
-import tradeSlide7 from '../../../../public/Trade/no2.webp';
-import tradeSlide8 from '../../../../public/Trade/no3.webp';
 import { authHeaders } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -31,17 +23,6 @@ const ROLE_OPTIONS = {
   ],
 } as const;
 
-const REGULAR_TRADE_SLIDES = [
-  { src: tradeSlide1, alt: 'ตัวอย่างขั้นตอนดีลปลอดภัย 1' },
-  { src: tradeSlide2, alt: 'ตัวอย่างขั้นตอนดีลปลอดภัย 2' },
-  { src: tradeSlide3, alt: 'ตัวอย่างขั้นตอนดีลปลอดภัย 3' },
-  { src: tradeSlide4, alt: 'ตัวอย่างขั้นตอนดีลปลอดภัย 4' },
-  { src: tradeSlide5, alt: 'ตัวอย่างขั้นตอนดีลปลอดภัย 5' },
-  { src: tradeSlide6, alt: 'ตัวอย่างขั้นตอนดีลปลอดภัย 6' },
-  { src: tradeSlide7, alt: 'ตัวอย่างขั้นตอนดีลปลอดภัย 7' },
-  { src: tradeSlide8, alt: 'ตัวอย่างขั้นตอนดีลปลอดภัย 8' },
-];
-
 function CreateDealForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,21 +38,12 @@ function CreateDealForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fees, setFees] = useState<FeeConfig>(FEE_DEFAULTS);
-  const [activeTradeSlide, setActiveTradeSlide] = useState(0);
 
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
     fetch('/api/fees').then(r => r.json()).then(d => { if (d.fees) setFees(d.fees); }).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (isSimple || isSafeZone) return;
-    const timer = window.setInterval(() => {
-      setActiveTradeSlide(prev => (prev + 1) % REGULAR_TRADE_SLIDES.length);
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [isSafeZone, isSimple]);
 
   const feeBreakdown = computeDealFees(fees, Number(price) || 0, isSimple ? 'simple' : '');
   const roleOptions = isSimple ? ROLE_OPTIONS.simple : ROLE_OPTIONS.regular;
@@ -131,34 +103,6 @@ function CreateDealForm() {
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px 80px' }}>
         <div className="deal-form create-deal-form">
           <DealFlowBrand docked />
-
-          {!isSimple && !isSafeZone && (
-            <div className="create-deal-slider">
-              <div className="create-deal-slider-shell">
-                <div className="create-deal-slider-frame">
-                  <Image
-                    key={activeTradeSlide}
-                    src={REGULAR_TRADE_SLIDES[activeTradeSlide].src}
-                    alt={REGULAR_TRADE_SLIDES[activeTradeSlide].alt}
-                    className="create-deal-slider-image"
-                    priority
-                  />
-                </div>
-                <div className="svc-simple-slider-dots" aria-label="ตัวเลือกภาพขั้นตอนดีล">
-                  {REGULAR_TRADE_SLIDES.map((slide, index) => (
-                    <button
-                      key={slide.alt}
-                      type="button"
-                      className={`svc-simple-slider-dot${index === activeTradeSlide ? ' is-active' : ''}`}
-                      onClick={() => setActiveTradeSlide(index)}
-                      aria-label={`ดูภาพขั้นตอน ${index + 1}`}
-                      aria-pressed={index === activeTradeSlide}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Role */}
           <div className="deal-field">
