@@ -10,6 +10,7 @@ function themeLabel(theme: 'system' | 'light' | 'dark') {
 
 export function GlobalPreferenceDock() {
   const { locale, theme, resolvedTheme, toggleLocale, cycleTheme } = useAppPreferences();
+  const themeValue = theme === 'system' ? `${themeLabel(theme)}:${resolvedTheme}` : themeLabel(theme);
 
   return (
     <div className="pref-dock" aria-label="Display preferences">
@@ -31,7 +32,7 @@ export function GlobalPreferenceDock() {
         title={`Theme ${themeLabel(theme)}`}
       >
         <span className="pref-chip-label">Theme</span>
-        <span className="pref-chip-value">{theme === 'system' ? `${themeLabel(theme)}:${resolvedTheme}` : themeLabel(theme)}</span>
+        <span className="pref-chip-value">{themeValue}</span>
       </button>
     </div>
   );
