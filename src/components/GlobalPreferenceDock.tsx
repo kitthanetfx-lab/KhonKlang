@@ -3,14 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useAppPreferences } from './AppPreferences';
 
-function themeLabel(theme: 'system' | 'light' | 'dark') {
-  if (theme === 'light') return 'Light';
-  if (theme === 'dark') return 'Dark';
-  return 'System';
+function themeLabel(theme: 'light' | 'dark') {
+  return theme === 'light' ? 'Light' : 'Dark';
 }
 
 export function GlobalPreferenceDock() {
-  const { locale, theme, resolvedTheme, toggleLocale, cycleTheme } = useAppPreferences();
+  const { locale, theme, toggleLocale, cycleTheme } = useAppPreferences();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -53,7 +51,7 @@ export function GlobalPreferenceDock() {
           title={`Theme ${themeLabel(theme)}`}
         >
           <span className="pref-chip-label">Theme</span>
-          <span className="pref-chip-value">{theme === 'system' ? `${themeLabel(theme)}:${resolvedTheme}` : themeLabel(theme)}</span>
+          <span className="pref-chip-value">{themeLabel(theme)}</span>
         </button>
       </div>
     </div>
