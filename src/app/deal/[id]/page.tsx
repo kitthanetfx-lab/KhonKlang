@@ -404,6 +404,7 @@ export default function DealRoom() {
   const chatBundledRef = useRef(false); // กัน bundleChatTranscriptAsEvidence ถูกเรียกซ้ำ
   // wizard แบบง่าย: ขั้นที่กำลังดูอยู่ (ปุ่มย้อนกลับ/ถัดไป) — null แปลว่าให้ตามขั้นจริงปัจจุบันเสมอ
   const [wzViewStep, setWzViewStep] = useState<number | null>(null);
+  const [rwzViewRole, setRwzViewRole] = useState<'seller' | 'middleman' | 'buyer'>('seller');
   const step3PendingRef = useRef<number | null>(null);
   const simpleActualStepRef = useRef<number | null>(null);
   const [meetupEvidReady, setMeetupEvidReady] = useState(false);
@@ -1551,6 +1552,18 @@ export default function DealRoom() {
   ];
   const WZ_TOTAL = WIZARD_STEP_TITLES.length;
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // Wizard ขั้นตอนดีล — "ซื้อขายผ่านกลางปลอดภัย" (deal_type === '' / regular) — 14 ขั้น
+  // ═══════════════════════════════════════════════════════════════════════
+  const REGULAR_WZ_TITLES = [
+    'ยอมรับเงื่อนไข', 'เลือกคนกลาง', 'ตกลงราคา', 'คุย/วิดีโอคอล', 'ตรวจหลักฐาน',
+    'โอนเงิน', 'ตรวจสอบการโอน', 'แพ็ค+จัดส่งคนกลาง', 'คนกลางรับสินค้า',
+    'คนกลางตรวจสอบ', 'จัดส่งให้ผู้ซื้อ', 'ผู้ซื้อยืนยันรับ', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
+  ];
+  const RWZ_TOTAL = REGULAR_WZ_TITLES.length; // 14
+  /** ขั้นที่มีศูนย์กลางเข้ามาเกี่ยวข้อง (1-indexed display step) — รับโอนเงิน + จ่ายเงินปลายทาง */
+  const HUB_STEPS = new Set([6, 7, 13, 14]);
+
   /** คำนวณว่าตอนนี้อยู่ขั้นไหนของ wizard (1-10) จากสถานะที่มีอยู่จริง — ไม่เพิ่ม status ใหม่ในฐานข้อมูล */
   function getSimpleStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
     const s = deal!.status;
@@ -1584,6 +1597,43 @@ export default function DealRoom() {
     return { step: 1 };
   }
 
+  function getRegularStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
+    const s = deal!.status;
+    const pd: DealPriceState = priceState || {};
+    if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
+    if (['buyer_joined', 'terms_pending'].includes(s)) {
+      if (!deal!.middleman_id) return { step: 1 }; // ยังไม่เลือกคนกลาง
+      const allAccepted = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms && !!deal!.middleman_accepted_terms;
+      return { step: allAccepted ? 3 : 2 }; // คนกลางเลือกแล้ว รอยืนยัน / ไปตกลงราคา
+    }
+    if (s === 'payment_pending') {
+      if (!pd.agreed) return { step: 3 }; // ยังไม่ตกลงราคา
+      const sellerRS = hasProgressPing('seller') || !!pd.evidence_done_seller;
+      const buyerRS = hasProgressPing('buyer') || !!pd.evidence_done_buyer;
+      const mmRS = hasProgressPing('middleman') || !!pd.evidence_done_middleman;
+      const reviewStarted = sellerRS || buyerRS || mmRS || chatReviewReady;
+      const evReady = !!pd.evidence_done_buyer && !!pd.evidence_done_seller && !!pd.evidence_done_middleman;
+      if (evReady) return { step: 6 }; // โอนเงิน (HUB)
+      return { step: reviewStarted ? 5 : 4 }; // ตรวจหลักฐาน หรือ คุย/วิดีโอ
+    }
+    if (s === 'payment_uploaded') {
+      const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
+      const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
+      const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+      if (sellerShare > 0 && !pd.seller_fee_slip) return { step: 6 }; // ยังรอผู้ขายจ่าย
+      return { step: 7 }; // ตรวจสอบการโอน (HUB)
+    }
+    if (s === 'packing') return { step: 8 };
+    if (s === 'shipped_to_middleman') return { step: 9 };
+    if (['middleman_received', 'middleman_checking'].includes(s)) return { step: 10 };
+    if (s === 'shipped_to_buyer') return { step: 11 };
+    if (s === 'delivered') return { step: 12 };
+    if (s === 'completed') return { step: pd.payout_slip_file_id ? 14 : 13, outcome: 'success' };
+    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 14 : 13, outcome: 'cancelled' };
+    if (s === 'disputed') return { step: 13, outcome: 'disputed' };
+    return { step: 1 };
+  }
+
   function renderWizardProgress(step: number) {
     const clamped = Math.max(1, Math.min(WZ_TOTAL, step));
     return (
@@ -1595,6 +1645,27 @@ export default function DealRoom() {
         <div style={{ display: 'flex', gap: 4 }}>
           {WIZARD_STEP_TITLES.map((t, i) => (
             <div key={t} style={{ flex: 1, height: 6, borderRadius: 4, background: i + 1 < clamped ? 'var(--green-500)' : i + 1 === clamped ? 'var(--accent)' : 'var(--line)', transition: 'background .3s' }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function renderRegularWizardProgress(step: number) {
+    const clamped = Math.max(1, Math.min(RWZ_TOTAL, step));
+    const isHub = HUB_STEPS.has(clamped);
+    return (
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+          <b style={{ fontSize: 13, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+            ขั้นที่ {clamped} จาก {RWZ_TOTAL} · {REGULAR_WZ_TITLES[clamped - 1]}
+            {isHub && <span style={{ marginLeft: 6, fontSize: 10.5, background: '#e8f5e9', color: 'var(--green-700)', borderRadius: 99, padding: '1px 7px', fontWeight: 600, verticalAlign: 'middle' }}>🏦 ศูนย์กลาง</span>}
+          </b>
+          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{Math.round((clamped / RWZ_TOTAL) * 100)}%</span>
+        </div>
+        <div style={{ display: 'flex', gap: 3 }}>
+          {REGULAR_WZ_TITLES.map((t, i) => (
+            <div key={t} style={{ flex: 1, height: 5, borderRadius: 3, background: i + 1 < clamped ? 'var(--green-500)' : i + 1 === clamped ? (HUB_STEPS.has(i + 1) ? 'var(--green-600)' : 'var(--accent)') : 'var(--line)', transition: 'background .3s' }} />
           ))}
         </div>
       </div>
@@ -2378,6 +2449,509 @@ export default function DealRoom() {
 
 
   // ═══════════════════════════════════════════════════════════════════════
+  // renderRegularWizard — ซื้อขายผ่านกลางปลอดภัย (deal_type === '' / regular) — 14 ขั้น
+  // ═══════════════════════════════════════════════════════════════════════
+
+  function renderRegularWizard() {
+    const { step: actualStep, outcome } = getRegularStep();
+    const step = Math.min(wzViewStep ?? actualStep, actualStep);
+    const isReviewing = step < actualStep;
+    const hasMm = !!deal!.middleman_id;
+    // ตัดสินใจว่า rwzViewRole ที่ถูกต้องคืออะไร (จำกัดเฉพาะ role ที่มีในดีลนี้)
+    const effectiveViewRole: 'seller' | 'middleman' | 'buyer' =
+      (rwzViewRole === 'middleman' && !hasMm) ? (myRole === 'buyer' ? 'buyer' : 'seller') : rwzViewRole;
+
+    function goToStep(nextStep: number) {
+      const safe = Math.min(actualStep, nextStep);
+      if (step === 3 && safe === 4) {
+        step3PendingRef.current = safe;
+        setShowStep3Warning(true);
+        return;
+      }
+      setWzViewStep(safe);
+    }
+
+    // ─── แสดงสถานะผู้เกี่ยวข้อง 3 ฝ่าย (หรือ 4 ฝ่ายรวมศูนย์กลาง สำหรับ HUB_STEPS) ───
+    function renderConfirmRows(opts: {
+      sellerDone: boolean; sellerText?: string; sellerWait?: string;
+      mmDone?: boolean; mmText?: string; mmWait?: string;
+      buyerDone: boolean; buyerText?: string; buyerWait?: string;
+      hubDone?: boolean; hubText?: string; hubWait?: string;
+    }) {
+      const showHub = HUB_STEPS.has(step) && opts.hubText;
+      return renderParticipantStatusRows([
+        { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: opts.sellerDone, doneText: opts.sellerText || '✅ เสร็จแล้ว', waitText: opts.sellerWait || '⏳ รอ' },
+        ...(hasMm ? [{ roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: !!opts.mmDone, doneText: opts.mmText || '✅ เสร็จแล้ว', waitText: opts.mmWait || '⏳ รอ' }] : []),
+        { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: opts.buyerDone, doneText: opts.buyerText || '✅ เสร็จแล้ว', waitText: opts.buyerWait || '⏳ รอ' },
+        ...(showHub ? [{ roleLabel: 'ศูนย์กลาง', name: 'บริษัท กลางฮับ จำกัด', ok: !!opts.hubDone, doneText: opts.hubText || '✅ ดำเนินการแล้ว', waitText: opts.hubWait || '⏳ รอดำเนินการ' }] : []),
+      ], { marginBottom: 0 });
+    }
+
+    // ─── Role-view switcher (แสดงหลังเลือกคนกลางแล้ว step >= 2) ────────────
+    function renderRoleBar() {
+      if (!hasMm || step < 2) return null;
+      const roles: Array<{ key: 'seller' | 'middleman' | 'buyer'; label: string; icon: string }> = [
+        { key: 'seller', label: 'ผู้ขาย', icon: '🛒' },
+        { key: 'middleman', label: 'คนกลาง', icon: '🤝' },
+        { key: 'buyer', label: 'ผู้ซื้อ', icon: '🛍️' },
+      ];
+      return (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 14, background: 'var(--surface-2)', borderRadius: 'var(--r-lg)', padding: 4 }}>
+          {roles.map(r => (
+            <button key={r.key} type="button"
+              onClick={() => setRwzViewRole(r.key)}
+              style={{
+                flex: 1, border: 'none', borderRadius: 'var(--r-md)', padding: '7px 4px',
+                fontWeight: effectiveViewRole === r.key ? 700 : 400,
+                fontSize: 12.5, cursor: 'pointer', transition: 'all .18s',
+                background: effectiveViewRole === r.key ? 'var(--surface)' : 'transparent',
+                color: effectiveViewRole === r.key ? 'var(--ink)' : 'var(--muted)',
+                boxShadow: effectiveViewRole === r.key ? 'var(--sh-xs)' : 'none',
+              }}
+            >
+              {r.icon} {r.label}
+              {r.key === myRole && <span style={{ fontSize: 9.5, marginLeft: 3, color: 'var(--accent)' }}>(คุณ)</span>}
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    // ─── step 1: ยอมรับเงื่อนไข ───────────────────────────────────────────
+    function renderRStep1() {
+      const t = termsFor(deal!.deal_type);
+      const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
+      const myAccepted = (myRole === 'seller' && deal!.seller_accepted_terms)
+        || (myRole === 'middleman' && deal!.middleman_accepted_terms)
+        || (myRole === 'buyer' && deal!.buyer_accepted_terms);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="dr-card">
+            <div className="dr-card-title">📋 สิ่งที่บริการนี้ครอบคลุม</div>
+            <ul style={{ paddingLeft: 18, margin: 0, lineHeight: 1.8, fontSize: 13.5, color: 'var(--green-700)' }}>
+              {t.covers.map((c, i) => <li key={i}>✅ {c}</li>)}
+            </ul>
+          </div>
+          <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
+            <div className="dr-card-title" style={{ color: '#8a5a00' }}>⚠️ ไม่ครอบคลุม</div>
+            <ul style={{ paddingLeft: 18, margin: 0, lineHeight: 1.8, fontSize: 13.5, color: '#8a5a00' }}>
+              {t.excludes.map((c, i) => <li key={i}>{c}</li>)}
+            </ul>
+          </div>
+          <div className="dr-card">
+            <div className="dr-card-title">💸 ค่าบริการ (฿{deal!.price.toLocaleString()})</div>
+            {fb.lines.map(l => (
+              <div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', padding: '2px 0' }}>
+                <span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
+              <span>รวม</span><span>฿{fb.total.toLocaleString()}</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>* {fb.note}</div>
+          </div>
+          <div className="dr-card">
+            <div className="dr-card-title">สถานะการยืนยัน</div>
+            {renderParticipantStatusRows([
+              { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!deal!.seller_accepted_terms, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
+              { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.buyer_accepted_terms, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
+            ], { marginBottom: myAccepted ? 0 : 12 })}
+            {!myAccepted
+              ? <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => doAction('accept_terms')}>✅ ยอมรับข้อตกลงและดำเนินการต่อ</AsyncButton>
+              : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', margin: 0 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
+          </div>
+        </div>
+      );
+    }
+
+    // ─── step 2: เลือกคนกลาง ──────────────────────────────────────────────
+    function renderRStep2() {
+      const allAccepted = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms && (hasMm ? !!deal!.middleman_accepted_terms : true);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {hasMm ? (
+            <div className="dr-card" style={{ background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb,var(--accent) 25%,transparent)' }}>
+              <div className="dr-card-title">🤝 เลือกคนกลางแล้ว</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>{deal!.middleman_name}</div>
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>รอทุกฝ่ายยอมรับเงื่อนไข — คนกลางจะเห็นดีลนี้ทันทีที่ได้รับลิงก์</p>
+              {renderParticipantStatusRows([
+                { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!deal!.seller_accepted_terms, doneText: '✅ ยืนยันแล้ว', waitText: '⏳ รอยืนยัน' },
+                { roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: !!deal!.middleman_accepted_terms, doneText: '✅ ยืนยันแล้ว', waitText: '⏳ รอยืนยัน' },
+                { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.buyer_accepted_terms, doneText: '✅ ยืนยันแล้ว', waitText: '⏳ รอยืนยัน' },
+              ], { marginBottom: allAccepted ? 0 : 10 })}
+              {!allAccepted && myRole === 'middleman' && !deal!.middleman_accepted_terms && (
+                <AsyncButton className="btn btn-primary btn-block" onClick={() => doAction('accept_terms')}>✅ ยอมรับและเข้าร่วมดีล</AsyncButton>
+              )}
+              {myRole === 'buyer' && (
+                <button type="button" className="btn btn-ghost btn-sm btn-block" style={{ marginTop: 8 }} onClick={() => setShowSelectMM(v => !v)}>
+                  ✏️ เปลี่ยนคนกลาง
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="dr-card" style={{ textAlign: 'center', padding: '24px 20px' }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🤝</div>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>เลือกคนกลางก่อนดำเนินการต่อ</div>
+              <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>คนกลางจะตรวจสอบสินค้าและเป็นผู้รับของจากผู้ขาย ก่อนส่งต่อให้ผู้ซื้อ — ช่วยป้องกันการโกงทั้งสองฝ่าย</p>
+              {myRole === 'buyer' && (
+                <button type="button" className="btn btn-primary btn-block" style={{ marginTop: 14 }} onClick={() => setShowSelectMM(true)}>
+                  🔍 เลือกคนกลาง
+                </button>
+              )}
+              {myRole !== 'buyer' && (
+                <p style={{ fontSize: 13, color: 'var(--faint)', marginTop: 12 }}>ผู้ซื้อจะเป็นผู้เลือกคนกลาง</p>
+              )}
+            </div>
+          )}
+          {myRole === 'buyer' && showSelectMM && renderMiddlemanPickerPanel()}
+        </div>
+      );
+    }
+
+    // ─── step 8: แพ็ค + จัดส่งให้คนกลาง ──────────────────────────────────
+    function renderRStep8() {
+      const packingEvidence = evidence.filter(e => e.type === 'packing');
+      const hasAllPackingSteps = packingEvidence.length >= 3;
+      const sellerShipped = !!deal!.tracking_to_middleman || ['shipped_to_middleman', 'middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered', 'completed'].includes(deal!.status);
+
+      if (effectiveViewRole !== 'seller') {
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="dr-card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+              <div style={{ fontSize: 38, marginBottom: 10 }}>📦</div>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอผู้ขายแพ็คและจัดส่งสินค้า</div>
+              <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 14 }}>ผู้ขายกำลังถ่ายวิดีโอแพ็คของและส่งให้คนกลาง — คนกลางจะตรวจสอบสินค้าก่อนส่งต่อให้ผู้ซื้อ</p>
+              {renderConfirmRows({
+                sellerDone: sellerShipped, sellerText: '✅ ส่งสินค้าแล้ว', sellerWait: '⏳ กำลังแพ็ค',
+                mmDone: sellerShipped, mmText: '⏳ รอรับสินค้า', mmWait: '⏳ รอรับสินค้า',
+                buyerDone: false, buyerWait: '⏳ รอคนกลางส่งต่อ',
+              })}
+            </div>
+            {renderTrackingInfoCard('พัสดุ ผู้ขาย → คนกลาง', deal!.tracking_to_middleman, deal!.tracking_to_middleman_provider)}
+            {packingEvidence.length > 0 && (
+              <div className="dr-card">
+                <div className="dr-card-title">📷 หลักฐานการแพ็ค</div>
+                {renderWizardEvidenceThumbs(packingEvidence)}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // seller view
+      const packingSteps = [
+        { step: 1 as const, imageSrc: '/pack.webp', title: 'แพ็คสินค้า' },
+        { step: 2 as const, imageSrc: '/Logistic.webp', title: 'โลจิสติกส์' },
+        { step: 3 as const, imageSrc: '/Slip.webp', title: 'สลิปและเลขอ้างอิง' },
+      ];
+      const packingSlots = [packingEvidence[0] || null, packingEvidence[1] || null, packingEvidence[2] || null] as Array<typeof packingEvidence[0] | null>;
+      const canUpStep = (s: 1|2|3) => s === 1 || !!packingSlots[s - 2];
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="dr-card">
+            <div className="dr-card-title">อัปโหลด 3 ขั้นตอน</div>
+            <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>ถ่ายวิดีโอทุกขั้นตอน แพ็ค → โลจิสติกส์ → สลิป แล้วกรอกเลขพัสดุส่งให้คนกลาง</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+              {packingSteps.map(item => {
+                const uploaded = packingSlots[item.step - 1];
+                const locked = !canUpStep(item.step);
+                return (
+                  <div key={item.step} style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 8, background: locked ? 'var(--surface-2)' : 'var(--surface)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink)', marginBottom: 6, textAlign: 'center' }}>ขั้น {item.step}</div>
+                    <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
+                      {uploaded
+                        ? (uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
+                          ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
+                          : <img src={fileUrl(uploaded.file_id)} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />)
+                        : <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 28, fontWeight: 800, color: 'rgba(15,23,42,.12)' }}>{item.step}</div>}
+                    </div>
+                    <button type="button" className="btn btn-soft btn-block btn-sm" style={{ marginTop: 6, fontSize: 11 }}
+                      disabled={locked || !!uploaded}
+                      onClick={() => { if (!uploaded && !locked) { setPackingUploadStep(item.step); evidInputRef.current?.click(); } }}>
+                      {uploaded ? '✅' : locked ? '🔒' : <><Icon name="upload" size={12} /> อัป</>}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={async e => {
+              const f = e.target.files?.[0]; const activeStep = packingUploadStep; e.target.value = '';
+              if (!f || !activeStep) return;
+              await uploadFile(f, true, 'packing'); setPackingUploadStep(null);
+            }} />
+            <div style={{ fontSize: 12, color: hasAllPackingSteps ? 'var(--green-600)' : 'var(--muted)', marginTop: 10 }}>
+              {hasAllPackingSteps ? '✅ อัปโหลดครบ 3 ขั้นแล้ว' : `อัปโหลดแล้ว ${packingEvidence.length}/3 ขั้น`}
+            </div>
+          </div>
+          <div className="dr-card">
+            <div className="dr-card-title">🚚 จัดส่งให้คนกลาง</div>
+            <select className="dr-select" value={trackingProviderInput} onChange={e => setTrackingProviderInput(e.target.value)} style={{ marginBottom: 10 }}>
+              <option value="">เลือกผู้ให้บริการโลจิสติกส์</option>
+              {TH_LOGISTICS_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+            <input ref={trackingInputRef} type="text" className="dr-select" value={trackingInput} onChange={e => setTrackingInput(e.target.value)} placeholder="เลขพัสดุ (ส่งให้คนกลาง)" style={{ marginBottom: 12 }} />
+            {renderConfirmRows({
+              sellerDone: sellerShipped, sellerText: '✅ ส่งสินค้าแล้ว', sellerWait: '⏳ กำลังแพ็ค',
+              mmDone: false, mmWait: '⏳ รอรับสินค้า',
+              buyerDone: false, buyerWait: '⏳ รอคนกลาง',
+            })}
+            <AsyncButton className="btn btn-primary btn-block btn-lg" style={{ marginTop: 12 }} onClick={() => {
+              if (!hasAllPackingSteps) { alert('กรุณาอัปโหลดหลักฐานให้ครบ 3 ขั้นก่อน'); return; }
+              const payload = getTrackingPayload();
+              if (!payload) return;
+              return doAction('seller_done_packing', payload);
+            }}>📦 ส่งสินค้าให้คนกลางแล้ว</AsyncButton>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── step 9: คนกลางรับสินค้า ──────────────────────────────────────────
+    function renderRStep9() {
+      const mmReceived = ['middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered', 'completed'].includes(deal!.status);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="dr-card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+            <div style={{ fontSize: 38, marginBottom: 10 }}>📬</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอคนกลางรับสินค้า</div>
+            <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 14 }}>คนกลางต้องกดยืนยันรับสินค้าเมื่อได้รับพัสดุจากผู้ขาย เพื่อเริ่มขั้นตอนตรวจสอบสินค้า</p>
+            {renderConfirmRows({
+              sellerDone: true, sellerText: '✅ ส่งสินค้าแล้ว',
+              mmDone: mmReceived, mmText: '✅ รับสินค้าแล้ว', mmWait: '⏳ รอรับสินค้า',
+              buyerDone: false, buyerWait: '⏳ รอคนกลาง',
+            })}
+          </div>
+          {renderTrackingInfoCard('พัสดุ ผู้ขาย → คนกลาง', deal!.tracking_to_middleman, deal!.tracking_to_middleman_provider)}
+          {effectiveViewRole === 'middleman' && !mmReceived && (
+            <div className="dr-card">
+              <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => doAction('middleman_received')}>📬 รับสินค้าแล้ว — เริ่มตรวจสอบ</AsyncButton>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ─── step 10: คนกลางตรวจสอบสินค้า ────────────────────────────────────
+    function renderRStep10() {
+      const mmEvidence = evidence.filter(e => e.type === 'packing');
+      const buyerConfirmed = !!deal!.buyer_confirmed_check;
+      const mmDone = deal!.status === 'shipped_to_buyer' || deal!.status === 'delivered' || deal!.status === 'completed';
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="dr-card">
+            <div className="dr-card-title">🔍 การตรวจสอบสินค้า</div>
+            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 12 }}>คนกลางถ่ายวิดีโอตรวจสอบสินค้า — ผู้ซื้อยืนยันว่าสินค้าตรงตามที่ตกลง — แล้วคนกลางจึงส่งต่อให้ผู้ซื้อ</p>
+            {renderConfirmRows({
+              sellerDone: true, sellerText: '✅ ส่งสินค้าแล้ว',
+              mmDone: mmDone, mmText: '✅ ตรวจเสร็จและส่งต่อแล้ว', mmWait: '⏳ กำลังตรวจสอบ',
+              buyerDone: buyerConfirmed, buyerText: '✅ ยืนยันสินค้าไม่มีปัญหา', buyerWait: '⏳ รอยืนยัน',
+            })}
+          </div>
+          {/* คนกลาง: อัปโหลดหลักฐานการตรวจ */}
+          {effectiveViewRole === 'middleman' && !mmDone && (
+            <div className="dr-card">
+              <div className="dr-card-title">📹 อัปโหลดวิดีโอตรวจสินค้า</div>
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>ถ่ายวิดีโอขณะตรวจสอบสินค้าเพื่อเป็นหลักฐาน</p>
+              <button type="button" className="btn btn-soft btn-block" onClick={() => evidInputRef.current?.click()}>
+                <Icon name="upload" size={16} /> อัปโหลดวิดีโอตรวจสอบ
+              </button>
+              <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }}
+                onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; await uploadFile(f, true, 'packing'); }} />
+              {mmEvidence.length > 0 && renderWizardEvidenceThumbs(mmEvidence)}
+            </div>
+          )}
+          {/* ผู้ซื้อ: ยืนยันสินค้าตรงตามที่ตกลง */}
+          {effectiveViewRole === 'buyer' && !buyerConfirmed && (
+            <div className="dr-card" style={{ background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb,var(--accent) 25%,transparent)' }}>
+              <div className="dr-card-title">✅ ยืนยันสินค้าไม่มีปัญหา</div>
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>คนกลางกำลังตรวจสอบสินค้า หากสินค้าตรงตามที่ตกลงไว้ กดยืนยัน เพื่อให้คนกลางส่งของต่อให้คุณได้</p>
+              <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('buyer_confirm_check')}>✅ ยืนยัน — สินค้าตรงตามที่ตกลง</AsyncButton>
+              <AsyncButton className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8, color: '#b22441' }} onClick={() => {
+                const r = prompt('อธิบายปัญหาที่พบ:'); if (!r?.trim()) return; return doAction('dispute', { reason: r.trim() });
+              }}>⚠️ แจ้งปัญหาสินค้าไม่ตรงปก</AsyncButton>
+            </div>
+          )}
+          {/* คนกลาง: ส่งสินค้าให้ผู้ซื้อ (หลังผู้ซื้อยืนยัน) */}
+          {effectiveViewRole === 'middleman' && buyerConfirmed && !mmDone && (
+            <div className="dr-card">
+              <div className="dr-card-title">🚚 จัดส่งให้ผู้ซื้อ</div>
+              <select className="dr-select" value={trackingProviderInput} onChange={e => setTrackingProviderInput(e.target.value)} style={{ marginBottom: 10 }}>
+                <option value="">เลือกผู้ให้บริการโลจิสติกส์</option>
+                {TH_LOGISTICS_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+              <input ref={trackingInputRef} type="text" className="dr-select" value={trackingInput} onChange={e => setTrackingInput(e.target.value)} placeholder="เลขพัสดุส่งให้ผู้ซื้อ" style={{ marginBottom: 12 }} />
+              <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => {
+                const payload = getTrackingPayload(); if (!payload) return;
+                return doAction('middleman_ship_to_buyer', payload);
+              }}>🚚 จัดส่งสินค้าให้ผู้ซื้อแล้ว</AsyncButton>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ─── step 11: จัดส่งให้ผู้ซื้อ (รอผู้ซื้อรับ) ──────────────────────────
+    function renderRStep11() {
+      const buyerReceived = ['delivered', 'completed'].includes(deal!.status);
+      const unboxEvidence = evidence.filter(e => e.type === 'receive');
+      if (effectiveViewRole !== 'buyer') {
+        return (
+          <div className="dr-card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+            <div style={{ fontSize: 38, marginBottom: 10 }}>🚚</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>จัดส่งแล้ว — รอผู้ซื้อรับ</div>
+            {renderTrackingInfoCard('พัสดุ คนกลาง → ผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
+            <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 14 }}>ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่อง แล้วกดยืนยันรับ — ระบบจะโอนเงินให้ผู้ขายและคืนเครดิตคนกลางทันที</p>
+            {renderConfirmRows({
+              sellerDone: true, sellerText: '✅ เสร็จสมบูรณ์',
+              mmDone: true, mmText: '✅ ส่งสินค้าแล้ว',
+              buyerDone: buyerReceived, buyerText: '✅ ยืนยันรับแล้ว', buyerWait: '⏳ รอยืนยันรับ',
+            })}
+            {unboxEvidence.length > 0 && renderWizardEvidenceThumbs(unboxEvidence)}
+          </div>
+        );
+      }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {renderTrackingInfoCard('พัสดุ คนกลาง → ผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
+          <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
+            <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
+            <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
+            <button onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดวิดีโอก่อนแกะ</button>
+            <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
+            {unboxEvidence.length > 0 && <><p style={{ fontSize: 12, color: 'var(--green-600)', marginTop: 8 }}>✅ อัปโหลดแล้ว {unboxEvidence.length} ไฟล์</p>{renderWizardEvidenceThumbs(unboxEvidence)}</>}
+          </div>
+          <div className="dr-card">
+            {renderConfirmRows({
+              sellerDone: true, sellerText: '✅ เสร็จสมบูรณ์',
+              mmDone: true, mmText: '✅ ส่งสินค้าแล้ว',
+              buyerDone: buyerReceived, buyerText: '✅ ยืนยันรับแล้ว', buyerWait: '⏳ รอยืนยัน',
+            })}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+              <AsyncButton className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => {
+                if (!unboxEvidence.length && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return;
+                return doAction('buyer_received');
+              }}>🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์</AsyncButton>
+              <AsyncButton className="btn btn-ghost btn-block" disabled={acting} onClick={() => {
+                const r = prompt('อธิบายปัญหาที่พบ:'); if (!r?.trim()) return; return doAction('dispute', { reason: r.trim() });
+              }} style={{ color: '#b22441' }}>⚠️ แจ้งปัญหากับสินค้า</AsyncButton>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── step 13: โอนเงินให้ผู้ขาย (HUB) ────────────────────────────────
+    function renderRStep13(outcome?: 'success' | 'cancelled' | 'disputed') {
+      const pd: DealPriceState = priceState || {};
+      if (outcome === 'disputed') {
+        return (
+          <div className="dr-card" style={{ textAlign: 'center', padding: '28px 20px', borderColor: '#fbd5dd' }}>
+            <div style={{ fontSize: 38, marginBottom: 10 }}>⚠️</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: '#b22441', marginBottom: 8 }}>มีข้อพิพาท — เงินถูกอายัดไว้</div>
+            {deal!.reject_reason && <p style={{ fontSize: 13.5, color: 'var(--ink)', background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12, textAlign: 'left' }}>{deal!.reject_reason}</p>}
+            <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 14 }}>ทีมงานกำลังตรวจสอบข้อพิพาท — คุยรายละเอียดเพิ่มเติมในแชตได้</p>
+            {renderConfirmRows({
+              sellerDone: false, sellerWait: '⚠️ รอทีมงาน',
+              mmDone: false, mmWait: '⚠️ รอทีมงาน',
+              buyerDone: false, buyerWait: '⚠️ รอทีมงาน',
+              hubDone: false, hubText: '⏳ กำลังตรวจสอบ', hubWait: '⏳ กำลังตรวจสอบ',
+            })}
+          </div>
+        );
+      }
+      const isCancelled = outcome === 'cancelled';
+      return (
+        <div className="dr-card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+          <div style={{ fontSize: 38, marginBottom: 10 }}>💸</div>
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>
+            {isCancelled ? 'ดีลถูกยกเลิก — กำลังคืนเงิน' : '🎉 ดีลสำเร็จ — กำลังโอนเงินให้ผู้ขาย'}
+          </div>
+          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 14 }}>ทีมงานกำลังโอนเงินและจะแนบสลิปยืนยันให้เห็นที่นี่</p>
+          {renderConfirmRows({
+            sellerDone: !isCancelled, sellerText: '⏳ รอรับเงิน', sellerWait: isCancelled ? '⏳ ดีลยกเลิก' : '⏳ รอโอนเงิน',
+            mmDone: true, mmText: '✅ เสร็จสิ้น',
+            buyerDone: !isCancelled, buyerText: isCancelled ? '⏳ รอรับเงินคืน' : '✅ ยืนยันรับแล้ว', buyerWait: isCancelled ? '⏳ รอรับเงินคืน' : '✅ ยืนยันรับแล้ว',
+            hubDone: false, hubText: '✅ โอนแล้ว', hubWait: '⏳ กำลังโอนเงิน',
+          })}
+          {isCancelled && deal!.reject_reason && <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 10 }}>เหตุผล: {deal!.reject_reason}</p>}
+        </div>
+      );
+    }
+
+    // ─── step 14: เสร็จสมบูรณ์ (HUB) ────────────────────────────────────
+    function renderRStep14(outcome?: 'success' | 'cancelled' | 'disputed') {
+      const pd: DealPriceState = priceState || {};
+      const isCancelled = outcome === 'cancelled';
+      const slipId = isCancelled ? pd.refund_slip_file_id : pd.payout_slip_file_id;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="dr-card dr-done-card">
+            <div className="dr-done-emoji">{isCancelled ? '↩️' : '🎉'}</div>
+            <div className="dr-done-title">{isCancelled ? 'ดีลถูกยกเลิก — คืนเงินแล้ว' : 'ดีลเสร็จสมบูรณ์!'}</div>
+            <div className="dr-done-sub">{isCancelled ? 'ศูนย์กลางโอนเงินคืนผู้ซื้อเรียบร้อยแล้ว' : 'ศูนย์กลางโอนเงินให้ผู้ขายและคืนเครดิตคนกลางเรียบร้อยแล้ว'}</div>
+          </div>
+          {slipId && (
+            <div className="dr-card">
+              <div className="dr-card-title">📎 {isCancelled ? 'สลิปคืนเงิน' : 'สลิปโอนเงินให้ผู้ขาย'}</div>
+              <a href={fileUrl(slipId)} target="_blank" rel="noreferrer"><img src={fileUrl(slipId)} alt="สลิป" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+            </div>
+          )}
+          <div className="dr-card">
+            {renderConfirmRows({
+              sellerDone: true, sellerText: isCancelled ? '✅ ดีลยกเลิก' : '✅ รับเงินแล้ว',
+              mmDone: true, mmText: '✅ ได้รับเครดิตคืนแล้ว',
+              buyerDone: true, buyerText: isCancelled ? '✅ รับเงินคืนแล้ว' : '✅ ดีลเสร็จสมบูรณ์',
+              hubDone: true, hubText: '✅ โอนเงินครบแล้ว',
+            })}
+          </div>
+          {!isCancelled && <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />}
+        </div>
+      );
+    }
+
+    // ─── Main render ──────────────────────────────────────────────────────
+    return (
+      <div className="dr-inner">
+        <DealFlowBrand className="dr-brand-slot" />
+        {step > 0 && renderRegularWizardProgress(step)}
+        {isReviewing && (
+          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '8px 12px', marginBottom: 12, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>
+            👀 กำลังดูขั้นตอนที่ผ่านมาแล้ว (ดูอย่างเดียว) — กด &quot;ถัดไป&quot; เพื่อกลับสู่ขั้นตอนปัจจุบัน
+          </div>
+        )}
+        {renderRoleBar()}
+        <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
+          {step === 0 && renderWizardStep0()}
+          {step === 1 && renderRStep1()}
+          {step === 2 && renderRStep2()}
+          {step === 3 && renderWizardStepPrice()}
+          {step === 4 && renderWizardStepChat()}
+          {step === 5 && renderWizardStepEvidenceReview()}
+          {step === 6 && renderPaymentSection()}
+          {step === 7 && renderWizardStep4()}
+          {step === 8 && renderRStep8()}
+          {step === 9 && renderRStep9()}
+          {step === 10 && renderRStep10()}
+          {step === 11 && renderRStep11()}
+          {step === 12 && renderWizardStep6()}
+          {step === 13 && renderRStep13(outcome)}
+          {step === 14 && renderRStep14(outcome)}
+        </div>
+        {step >= 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>
+            {step > 1
+              ? <button type="button" className="btn btn-ghost" onClick={() => setWzViewStep(Math.max(1, step - 1))}>← ย้อนกลับ</button>
+              : <span />}
+            {step < actualStep && (
+              <button type="button" className="btn btn-primary" onClick={() => goToStep(step + 1)}>ถัดไป →</button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
   // Wizard ขั้นตอน "ประกันการเดินทาง" (deal_type === 'meetup') — 7 ขั้น
   // ═══════════════════════════════════════════════════════════════════════
   const MEETUP_WZ_TITLES = [
@@ -3043,39 +3617,21 @@ export default function DealRoom() {
               <button type="button" onClick={toggleCall}>เข้าร่วมเลย</button>
             </div>
           )}
-          {!isSimple && !isMeetup && (
-          <div className="dr-progress-wrap">
-            <div className="dr-prog-meta"><span className="dr-prog-status">{statusText(deal)}</span><span className="dr-prog-pct">{pct}%</span></div>
-            <div className="dr-prog-track"><div className="dr-prog-fill" style={{ width: `${pct}%`, background: deal.status === 'completed' ? 'var(--green-500)' : 'var(--accent)' }} /></div>
-          </div>
-          )}
+          {/* regular + simple: wizard มี progress bar ของตัวเองแล้ว — ไม่ต้องแสดง progress bar แยก */}
 
-          {/* แถบ "ถึงตาคุณ" — เด้งไปแท็บขั้นตอนเมื่อมีงานรอผู้ใช้คนนี้ทำ (กันหลงว่าไม่มีปุ่มให้ไปต่อ) — ซ่อนสำหรับ simple wizard เพราะมีปุ่มในแต่ละขั้นแล้ว */}
-          {!isSimple && !isMeetup && (() => {
-            const s = deal.status;
-            let label: string | null = null;
-            if (['buyer_joined', 'terms_pending'].includes(s)) {
-              const accepted = (myRole === 'seller' && deal.seller_accepted_terms) || (myRole === 'middleman' && deal.middleman_accepted_terms) || (myRole === 'buyer' && deal.buyer_accepted_terms);
-              if (!accepted) label = 'ยอมรับเงื่อนไขข้อตกลง';
-            } else if (s === 'payment_pending' && myRole === 'buyer') label = 'ชำระเงิน — โอน + อัปโหลดสลิป';
-            else if (s === 'payment_uploaded' && myRole === 'middleman') label = 'ยืนยันรับเงิน';
-            else if (s === 'packing' && myRole === 'seller') label = 'แพ็ค + จัดส่งสินค้า';
-            else if (s === 'shipped_to_middleman' && myRole === 'middleman') label = 'รับสินค้า';
-            else if (s === 'middleman_checking' && myRole === 'buyer' && !deal.buyer_confirmed_check) label = 'ยืนยันสินค้าไม่มีปัญหา';
-            else if (s === 'middleman_checking' && myRole === 'middleman' && deal.buyer_confirmed_check) label = 'จัดส่งให้ผู้ซื้อ';
-            else if (s === 'shipped_to_buyer' && myRole === 'buyer') label = 'ยืนยันรับสินค้า';
-            if (!label || tab === 'steps') return null;
-            return (
-              <button onClick={() => setTab('steps')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--r-md)', padding: '11px 14px', margin: '4px 0 8px', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
-                <span>👉 ถึงตาคุณ: {label}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, opacity: .95 }}>ไปที่ขั้นตอน →</span>
-              </button>
-            );
-          })()}
-
-          {/* ดีลแบบง่าย: แชทและหลักฐานถูกฝังอยู่ในขั้นตอนของ wizard แล้ว ไม่ต้องมีแท็บแยก */}
-          {!isSimple && !isMeetup && (
+          {/* ดีลแบบง่าย + ดีล regular: แชทและหลักฐานถูกฝังอยู่ใน wizard แล้ว ไม่ต้องมีแท็บแยก */}
+          {isMeetup && (
           <nav className="dr-tabs">
+            {(['steps', 'chat', 'evidence'] as const).map(k => (
+              <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
+                {k === 'steps' ? 'ขั้นตอน' : k === 'chat' ? `แชท (${msgs.filter(m => m.role !== 'system').length})` : 'หลักฐาน'}
+              </button>
+            ))}
+          </nav>
+          )}
+          {/* Regular deal: แถบแชท + หลักฐาน ซ่อนในโหมด wizard แต่ยังเข้าถึงได้ผ่านปุ่มลิงก์ */}
+          {!isSimple && !isMeetup && (
+          <nav className="dr-tabs" style={{ display: 'none' }}>
             {(['steps', 'chat', 'evidence'] as const).map(k => (
               <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
                 {k === 'steps' ? 'ขั้นตอน' : k === 'chat' ? `แชท (${msgs.filter(m => m.role !== 'system').length})` : 'หลักฐาน'}
@@ -3087,83 +3643,7 @@ export default function DealRoom() {
           <main className="dr-body">
             {tab === 'steps' && isSimple && renderSimpleWizard()}
             {tab === 'steps' && isMeetup && renderMeetupWizard()}
-            {tab === 'steps' && !isSimple && !isMeetup && (
-              <div className="dr-inner">
-                <DealFlowBrand className="dr-brand-slot" />
-                <div className="dr-card">
-                  <div className="dr-card-title">ผู้เกี่ยวข้อง</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    {[
-                      ['ผู้ขาย', deal.seller_name || '(รอผู้ขาย)'],
-                      ['ผู้ซื้อ', deal.buyer_name || '(รอผู้ซื้อ)'],
-                      ['คนกลาง', isMeetup ? 'ไม่ต้องใช้ (รับประกันเดินทาง)' : isSimple ? 'ไม่ต้องใช้ (ศูนย์กลางดูแลเอง)' : (deal.middleman_name || '(ยังไม่ได้เลือก)')],
-                      ['ศูนย์กลาง', 'บริษัท กลางฮับ จำกัด'],
-                    ].map(([l, v]) => (
-                      <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--line-2)', fontSize: 14 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ fontWeight: 600, color: 'var(--ink)' }}>{v}</span></div>
-                    ))}
-                  </div>
-                  {!isMeetup && !isSimple && myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && (
-                    <div style={{ marginTop: 14 }}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setShowSelectMM(v => !v)}>
-                        {showSelectMM ? 'ซ่อนแผงเลือกคนกลาง' : deal.middleman_id ? 'เปลี่ยนคนกลาง' : 'เลือกคนกลาง'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {!isMeetup && !isSimple && myRole === 'buyer' && ['buyer_joined', 'terms_pending', 'payment_pending'].includes(deal.status) && showSelectMM && renderMiddlemanPickerPanel()}
-
-                {(deal.seller_accepted_terms || deal.buyer_accepted_terms || deal.middleman_accepted_terms) && (
-                  <div className="dr-card">
-                    <div className="dr-card-title">ยอมรับเงื่อนไข</div>
-                    {renderParticipantStatusRows([
-                      { roleLabel: 'ผู้ขาย', name: deal.seller_name || '-', ok: deal.seller_accepted_terms, doneText: '✅ ยอมรับแล้ว' },
-                      ...(deal.middleman_id ? [{ roleLabel: 'คนกลาง', name: deal.middleman_name || '-', ok: deal.middleman_accepted_terms, doneText: '✅ ยอมรับแล้ว' }] : []),
-                      { roleLabel: 'ผู้ซื้อ', name: deal.buyer_name || '-', ok: deal.buyer_accepted_terms, doneText: '✅ ยอมรับแล้ว' },
-                    ], { marginBottom: 0, gap: 9, fontSize: 14 })}
-                  </div>
-                )}
-
-                {/* Timeline */}
-                <div className="dr-card">
-                  <div className="dr-card-title">{isMeetup ? 'ขั้นตอนรับประกันเดินทาง' : isSimple ? 'ขั้นตอน Escrow (ส่งตรง)' : 'ขั้นตอน Escrow'}</div>
-                  <div className="dr-timeline">
-                    {(isMeetup ? MEETUP_TIMELINE : isSimple ? SIMPLE_TIMELINE : TIMELINE).map(st => {
-                      const si = STEP_ORDER.indexOf(deal.status);
-                      const ti = STEP_ORDER.indexOf(st.key);
-                      const d = ti < si, a = ti === si;
-                      return (
-                        <div key={st.key} className={`dr-tl-item${d ? ' done' : ''}${a ? ' active' : ''}`}>
-                          <div className="dr-tl-dot">{d ? <Icon name="check" size={10} /> : a ? <div className="dr-tl-pulse" /> : null}</div>
-                          <span className="dr-tl-label">{st.label}</span>
-                          {a && <span className="dr-tl-now">กำลังดำเนินการ</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {renderMeetupPanel()}
-                {renderPricePanel()}
-                {renderEvidenceDonePanel()}
-                {renderPaymentSection()}
-
-                {renderAllSlipsCard()}
-                {renderFinanceSummaryCard()}
-
-                {renderTrackingInfoCard('เลขพัสดุ ผู้ขาย → คนกลาง', deal.tracking_to_middleman, deal.tracking_to_middleman_provider)}
-                {renderTrackingInfoCard(`เลขพัสดุ ${isSimple ? 'ผู้ขาย' : 'คนกลาง'} → ผู้ซื้อ`, deal.tracking_to_buyer, deal.tracking_to_buyer_provider)}
-
-                {deal.status === 'completed' && (
-                  <>
-                    <div className="dr-card dr-done-card"><div className="dr-done-emoji">🎉</div><div className="dr-done-title">ดีลเสร็จสมบูรณ์!</div><div className="dr-done-sub">{isMeetup ? 'บริษัท กลางฮับ จำกัด จะโอนเงินประกันคืนทั้งสองฝ่าย' : isSimple ? 'ศูนย์กลางจะโอนเงินให้ผู้ขายเรียบร้อยแล้ว (ดำเนินการโดยทีมงาน)' : 'เงินถูกโอนให้ผู้ขายเรียบร้อยแล้ว'}</div></div>
-                    <ReviewPanel deal={deal} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />
-                  </>
-                )}
-
-                <div className="dr-card"><div className="dr-card-title">การกระทำ</div>{renderActionPanel()}</div>
-              </div>
-            )}
+            {tab === 'steps' && !isSimple && !isMeetup && renderRegularWizard()}
 
             {tab === 'chat' && (
               <div className="dr-chat-root">
