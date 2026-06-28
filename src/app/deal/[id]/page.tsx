@@ -1940,7 +1940,7 @@ export default function DealRoom() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
             {packingSteps.map(item => (
               <div key={item.step} style={{ minWidth: 0 }}>
-                <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
                   <img src={item.imageSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   <div style={{ position: 'absolute', top: 8, left: 8, minWidth: 26, height: 26, borderRadius: 999, background: 'rgba(15, 23, 42, .72)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>
                     {item.step}
@@ -1962,7 +1962,7 @@ export default function DealRoom() {
               return (
                 <div key={item.step} style={{ minWidth: 0, border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 10, background: locked ? 'var(--surface-2)' : 'var(--surface)' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8, textAlign: 'center' }}>ขั้นตอน {item.step}</div>
-                  <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
+                  <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)' }}>
                     {uploaded ? (
                       uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
                         ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
@@ -1970,7 +1970,9 @@ export default function DealRoom() {
                     ) : previewVisible ? (
                       <img src={uploadPreview!.url} alt={uploadPreview!.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     ) : (
-                      <img src={item.imageSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: locked ? 0.38 : 0.92 }} />
+                      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(15, 23, 42, 0.14)', fontSize: 'clamp(34px, 6vw, 54px)', fontWeight: 800, lineHeight: 1 }}>
+                        {item.step}
+                      </div>
                     )}
                   </div>
                   <div style={{ marginTop: 8, minHeight: 34, fontSize: 11.5, color: uploaded ? 'var(--green-600)' : locked ? 'var(--faint)' : 'var(--muted)', textAlign: 'center', lineHeight: 1.45 }}>
