@@ -205,7 +205,7 @@ function fileUrl(id: string) { return fileViewUrl(DEAL_BUCKET, id); }
 
 const STEP_LABEL: Record<string, string> = {
   posted: 'รอผู้ซื้อ', waiting_seller: 'รอผู้ขาย', waiting_buyer: 'รอผู้ซื้อ', buyer_joined: 'รอเลือกคนกลาง',
-  terms_pending: 'รอยอมรับเงื่อนไข', payment_pending: 'รอโอนเงิน', payment_uploaded: 'รอคนกลางยืนยัน',
+  terms_pending: 'รอยอมรับเงื่อนไข', payment_pending: 'คุย/หลักฐาน/ตกลงราคา', payment_uploaded: 'รอคนกลางยืนยัน',
   packing: 'ผู้ขายแพ็คของ', shipped_to_middleman: 'รอคนกลางรับ', middleman_received: 'คนกลางรับแล้ว',
   middleman_checking: 'คนกลางตรวจ', shipped_to_buyer: 'จัดส่งให้ผู้ซื้อ', delivered: 'รอยืนยันรับ',
   completed: 'เสร็จสมบูรณ์', cancelled: 'ยกเลิก', disputed: 'มีปัญหา',
@@ -219,7 +219,7 @@ const MEETUP_TIMELINE = [
   { key: 'completed', label: 'คืนเงินประกัน + เสร็จสมบูรณ์' },
 ];
 const TIMELINE = [
-  { key: 'terms_pending', label: 'รอยอมรับเงื่อนไข' }, { key: 'payment_pending', label: 'รอโอนเงิน' },
+  { key: 'terms_pending', label: 'รอยอมรับเงื่อนไข' }, { key: 'payment_pending', label: 'คุย 3 ฝ่าย/ตรวจหลักฐาน/ตกลงราคา' },
   { key: 'payment_uploaded', label: 'รอยืนยันเงิน' }, { key: 'packing', label: 'ผู้ขายแพ็คของ' },
   { key: 'shipped_to_middleman', label: 'รอคนกลางรับ' }, { key: 'middleman_received', label: 'คนกลางรับแล้ว' },
   { key: 'middleman_checking', label: 'คนกลางตรวจสอบ' }, { key: 'shipped_to_buyer', label: 'จัดส่งให้ผู้ซื้อ' },
@@ -227,7 +227,7 @@ const TIMELINE = [
 ];
 // โหมดง่าย: ไม่มีคนกลางบุคคล ผู้ขายส่งตรงถึงผู้ซื้อ
 const SIMPLE_TIMELINE = [
-  { key: 'terms_pending', label: 'รอยอมรับเงื่อนไข' }, { key: 'payment_pending', label: 'ผู้ซื้อโอนเงินเข้าศูนย์กลาง' },
+  { key: 'terms_pending', label: 'รอยอมรับเงื่อนไข' }, { key: 'payment_pending', label: 'ตกลงราคา/คุย/ตรวจหลักฐาน' },
   { key: 'payment_uploaded', label: 'รอศูนย์กลางยืนยันรับเงิน' }, { key: 'packing', label: 'ผู้ขายแพ็ค+ถ่ายวิดีโอ' },
   { key: 'shipped_to_buyer', label: 'ส่งตรงถึงผู้ซื้อ' }, { key: 'completed', label: 'ผู้ซื้อรับของ → ศูนย์กลางโอนเงิน' },
 ];
@@ -1575,7 +1575,7 @@ export default function DealRoom() {
   // Wizard ขั้นตอนดีล — "ซื้อขายผ่านกลางปลอดภัย" (deal_type === '' / regular) — 14 ขั้น
   // ═══════════════════════════════════════════════════════════════════════
   const REGULAR_WZ_TITLES = [
-    'ยอมรับเงื่อนไข', 'เลือกคนกลาง', 'ตกลงราคา', 'คุย/วิดีโอคอล', 'ตรวจหลักฐาน',
+    'เลือกคนกลาง', 'ยอมรับเงื่อนไข', 'คุย/วิดีโอคอล', 'ตรวจหลักฐาน', 'ตกลงราคา',
     'โอนเงิน', 'ตรวจสอบการโอน', 'แพ็ค+จัดส่งคนกลาง', 'คนกลางรับสินค้า',
     'คนกลางตรวจสอบ', 'จัดส่งให้ผู้ซื้อ', 'ผู้ซื้อยืนยันรับ', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
   ];
@@ -1623,17 +1623,18 @@ export default function DealRoom() {
     if (['buyer_joined', 'terms_pending'].includes(s)) {
       if (!deal!.middleman_id) return { step: 1 }; // ยังไม่เลือกคนกลาง
       const allAccepted = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms && !!deal!.middleman_accepted_terms;
-      return { step: allAccepted ? 3 : 2 }; // คนกลางเลือกแล้ว รอยืนยัน / ไปตกลงราคา
+      return { step: allAccepted ? 3 : 2 }; // คนกลางเลือกแล้ว -> รอยืนยัน / เข้าห้องคุย 3 ฝ่าย
     }
     if (s === 'payment_pending') {
-      if (!pd.agreed) return { step: 3 }; // ยังไม่ตกลงราคา
       const sellerRS = hasProgressPing('seller') || !!pd.evidence_done_seller;
       const buyerRS = hasProgressPing('buyer') || !!pd.evidence_done_buyer;
       const mmRS = hasProgressPing('middleman') || !!pd.evidence_done_middleman;
       const reviewStarted = sellerRS || buyerRS || mmRS || chatReviewReady;
       const evReady = !!pd.evidence_done_buyer && !!pd.evidence_done_seller && !!pd.evidence_done_middleman;
-      if (evReady) return { step: 6 }; // โอนเงิน (HUB)
-      return { step: reviewStarted ? 5 : 4 }; // ตรวจหลักฐาน หรือ คุย/วิดีโอ
+      if (!reviewStarted) return { step: 3 }; // คุย 3 ฝ่ายก่อน
+      if (!evReady) return { step: 4 }; // ตรวจ/ยืนยันหลักฐานก่อน
+      if (!pd.agreed) return { step: 5 }; // ค่อยตกลงราคาและค่าบริการ
+      return { step: 6 }; // โอนเงิน (HUB)
     }
     if (s === 'payment_uploaded') {
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
@@ -1825,7 +1826,7 @@ export default function DealRoom() {
     );
   }
 
-  // ─── ขั้น 2: ตกลงราคา-สินค้าและค่าบริการ (เฉพาะส่วนราคา ไม่รวมแชท) ─────────
+  // ─── ขั้นตกลงราคา-สินค้าและค่าบริการ (เฉพาะส่วนราคา ไม่รวมแชท) ─────────────
   function renderWizardStepPrice() {
     const pd: DealPriceState = priceState || {};
     const fpName = (fp?: string) => fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
@@ -1834,12 +1835,19 @@ export default function DealRoom() {
     const selectedFeePayer = feePayerInput || currentFeePayer;
     const sellerReady = !!pd.seller_agreed;
     const buyerReady = !!pd.buyer_agreed;
-    const meReady = myRole === 'seller' ? sellerReady : buyerReady;
+    const middlemanReady = !!pd.middleman_agreed;
+    const isRegularDeal = deal!.deal_type !== 'simple';
+    const hasMm = !!deal!.middleman_id;
+    const meReady = myRole === 'seller' ? sellerReady : myRole === 'buyer' ? buyerReady : middlemanReady;
 
     return (
       <div className="dr-card">
         <div className="dr-card-title">💰 ตกลงราคาสินค้าและค่าบริการ</div>
-        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>ยืนยันราคาและผู้จ่ายค่าบริการก่อนเริ่มคุยรายละเอียดสินค้า</p>
+        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>
+          {isRegularDeal
+            ? 'หลังคุยกันและตรวจหลักฐานครบแล้ว ให้ตกลงราคาและผู้จ่ายค่าบริการก่อนเข้าสู่ขั้นตอนโอนเงิน'
+            : 'ยืนยันราคาและผู้จ่ายค่าบริการก่อนเริ่มคุยรายละเอียดสินค้า'}
+        </p>
 
         <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}><span>ราคาปัจจุบัน</span><span>฿{currentPrice.toLocaleString()}</span></div>
@@ -1866,10 +1874,11 @@ export default function DealRoom() {
         {renderParticipantStatusRows([
           { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerReady, doneText: '✅ ตกลงแล้ว' },
           { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerReady, doneText: '✅ ตกลงแล้ว' },
+          ...(isRegularDeal && hasMm ? [{ roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: middlemanReady, doneText: '✅ รับทราบแล้ว' }] : []),
         ], { marginBottom: 12 })}
 
         {!meReady
-          ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>✅ ตกลงราคานี้ — ไปคุยรายละเอียดสินค้า</AsyncButton>
+          ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => doAction('price_agree', { feePayer: selectedFeePayer })}>✅ ตกลงราคานี้ — ไปขั้นโอนเงิน</AsyncButton>
           : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณตกลงแล้ว — รออีกฝ่ายยืนยัน</p>}
       </div>
     );
@@ -1944,12 +1953,19 @@ export default function DealRoom() {
     const chatMsgs = msgs.filter(m => m.role !== 'system').slice(-30);
     const sellerChatReady = hasProgressPing('seller') || (myRole === 'seller' && chatReviewReady);
     const buyerChatReady = hasProgressPing('buyer') || (myRole === 'buyer' && chatReviewReady);
-    const meChatReady = myRole === 'seller' ? sellerChatReady : myRole === 'buyer' ? buyerChatReady : false;
-    const allChatReady = sellerChatReady && buyerChatReady;
+    const middlemanChatReady = hasProgressPing('middleman') || (myRole === 'middleman' && chatReviewReady);
+    const isRegularDeal = deal!.deal_type !== 'simple';
+    const hasMm = !!deal!.middleman_id;
+    const meChatReady = myRole === 'seller' ? sellerChatReady : myRole === 'buyer' ? buyerChatReady : myRole === 'middleman' ? middlemanChatReady : false;
+    const allChatReady = sellerChatReady && buyerChatReady && (!isRegularDeal || !hasMm || middlemanChatReady);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
-          <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6 }}>💬 คุยรายละเอียดสินค้า ส่งรูปหรือเริ่มวิดีโอคอลให้พอใจทั้งสองฝ่าย (วิดีโอคอลถูกบันทึกเป็นหลักฐานได้) แล้วกด &quot;คุยกันจบแล้ว&quot; ด้านล่างเพื่อไปตรวจหลักฐานและยืนยัน</div>
+          <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6 }}>
+            {isRegularDeal
+              ? '💬 คุยรายละเอียดสินค้าแบบ 3 ฝ่าย ส่งรูปหรือเริ่มวิดีโอคอลให้ทุกฝ่ายเข้าใจตรงกัน แล้วกด "คุยกันจบแล้ว" เพื่อไปตรวจหลักฐาน'
+              : '💬 คุยรายละเอียดสินค้า ส่งรูปหรือเริ่มวิดีโอคอลให้พอใจทั้งสองฝ่าย (วิดีโอคอลถูกบันทึกเป็นหลักฐานได้) แล้วกด "คุยกันจบแล้ว" ด้านล่างเพื่อไปตรวจหลักฐานและยืนยัน'}
+          </div>
         </div>
         <div className="dr-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -1957,7 +1973,7 @@ export default function DealRoom() {
             <button type="button" className="btn btn-green btn-sm" onClick={toggleCall}>📹 เริ่มวิดีโอคอล</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto', marginBottom: 10, padding: '4px 2px' }}>
-            {chatMsgs.length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12.5, padding: '14px 0' }}>ยังไม่มีข้อความ — เริ่มคุยกับอีกฝ่ายได้เลย</p>}
+            {chatMsgs.length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12.5, padding: '14px 0' }}>{isRegularDeal && hasMm ? 'ยังไม่มีข้อความ — เริ่มคุยกันทั้ง 3 ฝ่ายได้เลย' : 'ยังไม่มีข้อความ — เริ่มคุยกับอีกฝ่ายได้เลย'}</p>}
             {chatMsgs.map(m => {
               const isMe = m.sender_id === myId;
               const isMedia = m.type === 'image' || m.type === 'file';
@@ -1990,6 +2006,7 @@ export default function DealRoom() {
           {renderParticipantStatusRows([
             { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerChatReady, doneText: '✅ ยืนยันแล้ว' },
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerChatReady, doneText: '✅ ยืนยันแล้ว' },
+            ...(isRegularDeal && hasMm ? [{ roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: middlemanChatReady, doneText: '✅ ยืนยันแล้ว' }] : []),
           ], { marginBottom: 12 })}
           {!meChatReady ? (
             <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={async () => {
@@ -2019,9 +2036,12 @@ export default function DealRoom() {
   // ─── ขั้น 4: ตรวจหลักฐาน + ยืนยัน ─────────────────────────────────────────
   function renderWizardStepEvidenceReview(nextStep = 5) {
     const pd: DealPriceState = priceState || {};
-    const meDone = myRole === 'seller' ? !!pd.evidence_done_seller : !!pd.evidence_done_buyer;
     const sellerDone = !!pd.evidence_done_seller;
     const buyerDone = !!pd.evidence_done_buyer;
+    const middlemanDone = !!pd.evidence_done_middleman;
+    const isRegularDeal = deal!.deal_type !== 'simple';
+    const hasMm = !!deal!.middleman_id;
+    const meDone = myRole === 'seller' ? sellerDone : myRole === 'buyer' ? buyerDone : middlemanDone;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card">
@@ -2033,6 +2053,7 @@ export default function DealRoom() {
           {renderParticipantStatusRows([
             { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerDone, doneText: '✅ ยืนยันถูกต้องแล้ว' },
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerDone, doneText: '✅ ยืนยันถูกต้องแล้ว' },
+            ...(isRegularDeal && hasMm ? [{ roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: middlemanDone, doneText: '✅ ยืนยันถูกต้องแล้ว' }] : []),
           ])}
           {!meDone
             ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={async () => {
@@ -2041,6 +2062,7 @@ export default function DealRoom() {
                 ...(prev || {}),
                 evidence_done_seller: myRole === 'seller' ? true : !!prev?.evidence_done_seller,
                 evidence_done_buyer: myRole === 'buyer' ? true : !!prev?.evidence_done_buyer,
+                evidence_done_middleman: myRole === 'middleman' ? true : !!prev?.evidence_done_middleman,
               }));
               const nextDeal = await doAction('evidence_done');
               if (!nextDeal) {
@@ -2056,12 +2078,14 @@ export default function DealRoom() {
               const freshPd: DealPriceState = fresh?.priceState || {};
               const nextSellerDone = !!freshPd.evidence_done_seller;
               const nextBuyerDone = !!freshPd.evidence_done_buyer;
-              if ((freshDeal?.deal_type === 'simple' && (freshPd.evidence_done_buyer && freshPd.evidence_done_seller)) || (nextSellerDone && nextBuyerDone)) {
+              const nextMiddlemanDone = !!freshPd.evidence_done_middleman;
+              if ((freshDeal?.deal_type === 'simple' && (freshPd.evidence_done_buyer && freshPd.evidence_done_seller))
+                || (nextSellerDone && nextBuyerDone && (!isRegularDeal || !hasMm || nextMiddlemanDone))) {
                 setWzViewStep(nextStep);
               }
             }}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</AsyncButton>
-            : sellerDone && buyerDone
-              ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ดำเนินการต่อ →</button>
+            : sellerDone && buyerDone && (!isRegularDeal || !hasMm || middlemanDone)
+              ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ไปตกลงราคา →</button>
               : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
           <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => setChatReviewReady(false)}>⬅ ย้อนกลับไปคุยต่อ</button>
         </div>
@@ -2536,7 +2560,7 @@ export default function DealRoom() {
       );
     }
 
-    // ─── step 1: ยอมรับเงื่อนไข ───────────────────────────────────────────
+    // ─── step 2: ยอมรับเงื่อนไข ───────────────────────────────────────────
     function renderRStep1() {
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
       const myAccepted = (myRole === 'seller' && deal!.seller_accepted_terms)
@@ -2582,17 +2606,18 @@ export default function DealRoom() {
             <div className="dr-card-title">สถานะการยืนยัน</div>
             {renderParticipantStatusRows([
               { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!deal!.seller_accepted_terms, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
+              ...(deal!.middleman_id ? [{ roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: !!deal!.middleman_accepted_terms, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' }] : []),
               { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.buyer_accepted_terms, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
             ], { marginBottom: myAccepted ? 0 : 12 })}
             {!myAccepted
-              ? <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => doAction('accept_terms')}>✅ ยอมรับข้อตกลงและดำเนินการต่อ</AsyncButton>
+              ? <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => doAction('accept_terms')}>✅ ยอมรับข้อตกลง</AsyncButton>
               : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', margin: 0 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
           </div>
         </div>
       );
     }
 
-    // ─── step 2: เลือกคนกลาง ──────────────────────────────────────────────
+    // ─── step 1: เลือกคนกลาง ──────────────────────────────────────────────
     function renderRStep2() {
       const allAccepted = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms && (hasMm ? !!deal!.middleman_accepted_terms : true);
       return (
@@ -2950,11 +2975,11 @@ export default function DealRoom() {
         {renderRoleBar()}
         <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
           {step === 0 && renderWizardStep0()}
-          {step === 1 && renderRStep1()}
-          {step === 2 && renderRStep2()}
-          {step === 3 && renderWizardStepPrice()}
-          {step === 4 && renderWizardStepChat()}
-          {step === 5 && renderWizardStepEvidenceReview()}
+          {step === 1 && renderRStep2()}
+          {step === 2 && renderRStep1()}
+          {step === 3 && renderWizardStepChat()}
+          {step === 4 && renderWizardStepEvidenceReview()}
+          {step === 5 && renderWizardStepPrice()}
           {step === 6 && renderPaymentSection()}
           {step === 7 && renderWizardStep4()}
           {step === 8 && renderRStep8()}

@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     let current = deal;
     // Self-heal: ทั้งสองฝ่าย (และคนกลางถ้ามี) ยอมรับครบแล้วแต่สถานะค้างที่ขั้นยอมรับ
-    // (เกิดได้จาก race ตอนสองฝ่ายกดยอมรับพร้อมกัน) → ดันไปขั้นโอนเงินให้อัตโนมัติ
+    // (เกิดได้จาก race ตอนสองฝ่ายกดยอมรับพร้อมกัน) → ดันไปขั้นคุย/เก็บหลักฐานก่อนโอนเงิน
     if (['buyer_joined', 'terms_pending'].includes(String(deal.status))
       && deal.seller_accepted_terms && deal.buyer_accepted_terms
       && (!deal.middleman_id || deal.middleman_accepted_terms)) {
@@ -159,7 +159,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const hasMm = !!deal.middleman_id;
         if (sc && bc && (!hasMm || mc)) {
           updates.status = 'payment_pending';
-          systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — รอผู้ซื้อโอนเงิน';
+          systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — เริ่มคุย 3 ฝ่ายและเก็บหลักฐานได้';
         } else {
           const who = isSeller ? 'ผู้ขาย' : isMiddleman ? 'คนกลาง' : 'ผู้ซื้อ';
           systemMsg = `${who} ยอมรับเงื่อนไขแล้ว`;
@@ -417,7 +417,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // ข้อ4: แจ้งเตือนอีกฝ่ายเมื่อเรากดไปขั้นต่อไป (ไม่เปลี่ยนสถานะดีล แจ้งเตือนอย่างเดียว)
         if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const whoLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
-        if (body.stage === 'to_evidence') systemMsg = `📋 ${whoLabel}คุยรายละเอียดเสร็จแล้ว — กำลังไปขั้นตรวจหลักฐาน`;
+        if (body.stage === 'to_evidence') {
+          systemMsg = deal.middleman_id
+            ? `📋 ${whoLabel}คุย 3 ฝ่ายเสร็จแล้ว — กำลังไปขั้นตรวจหลักฐาน`
+            : `📋 ${whoLabel}คุยรายละเอียดเสร็จแล้ว — กำลังไปขั้นตรวจหลักฐาน`;
+        }
         else return NextResponse.json({ error: 'Unknown stage' }, { status: 400 });
         break;
       }
@@ -491,8 +495,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           }
           const fpLabel = proposedFeePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : proposedFeePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
           systemMsg = proposalKind === 'reprice'
-            ? `✅ ทุกฝ่ายตกลงราคา ฿${Number(proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(mmDepositHeld).toLocaleString()})` : ''}`
-            : `✅ ทุกฝ่ายยืนยันใช้ราคาเดิม ฿${Number(proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(mmDepositHeld).toLocaleString()})` : ''}`;
+            ? `✅ ทุกฝ่ายตกลงราคา ฿${Number(proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(mmDepositHeld).toLocaleString()})` : ''} — พร้อมเข้าสู่ขั้นโอนเงิน`
+            : `✅ ทุกฝ่ายยืนยันใช้ราคาเดิม ฿${Number(proposedPrice).toLocaleString()} · ค่าบริการ: ${fpLabel} แล้ว${hasMm ? ` (คนกลางวางเครดิตประกัน ฿${Number(mmDepositHeld).toLocaleString()})` : ''} — พร้อมเข้าสู่ขั้นโอนเงิน`;
         } else {
           const whoLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
           systemMsg = proposalKind === 'reprice'
@@ -509,7 +513,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         priceUpdates = { evidence_done_seller: sellerDone, evidence_done_buyer: buyerDone, evidence_done_middleman: middlemanDone };
         const hasMm = !!deal.middleman_id;
         const allDone = sellerDone && buyerDone && (!hasMm || middlemanDone);
-        systemMsg = allDone ? '📁 ทุกฝ่ายยืนยันเก็บหลักฐานเรียบร้อย — เข้าสู่ขั้นตอนโอนเงินได้' : `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ยืนยันเก็บหลักฐานแล้ว — รอฝ่ายอื่น`;
+        systemMsg = allDone ? '📁 ทุกฝ่ายยืนยันเก็บหลักฐานเรียบร้อย — ไปตกลงราคาและค่าบริการต่อได้' : `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ยืนยันเก็บหลักฐานแล้ว — รอฝ่ายอื่น`;
         break;
       }
       case 'seller_fee_paid': {
@@ -558,14 +562,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    // กัน race ตอนยอมรับเงื่อนไข: ถ้าหลังอัปเดตแล้วทุกฝ่ายยอมรับครบแต่สถานะยังค้าง → ดันไปขั้นโอนเงินทันที
+    // กัน race ตอนยอมรับเงื่อนไข: ถ้าหลังอัปเดตแล้วทุกฝ่ายยอมรับครบแต่สถานะยังค้าง → ดันไปขั้นคุย/เก็บหลักฐานก่อน
     if (['buyer_joined', 'terms_pending'].includes(String(updated.status))
       && updated.seller_accepted_terms && updated.buyer_accepted_terms
       && (!updated.middleman_id || updated.middleman_accepted_terms)) {
       const { data: fixed } = await db.from('deals').update({ status: 'payment_pending' }).eq('id', id).select().single();
       if (fixed) {
         updated = fixed;
-        if (!systemMsg || /ยอมรับเงื่อนไขแล้ว$/.test(systemMsg)) systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — รอผู้ซื้อโอนเงิน';
+        if (!systemMsg || /ยอมรับเงื่อนไขแล้ว$/.test(systemMsg)) systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — เริ่มคุย 3 ฝ่ายและเก็บหลักฐานได้';
       }
     }
 
