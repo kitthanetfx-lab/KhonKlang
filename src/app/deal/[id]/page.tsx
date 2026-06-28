@@ -313,6 +313,8 @@ export default function DealRoom() {
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
+  const [showTrackingRequired, setShowTrackingRequired] = useState(false);
+  const trackingInputRef = useRef<HTMLInputElement>(null);
   const [showJitsi, setShowJitsi] = useState(false);
   // ข้อ3: ระหว่างวิดีโอคอล ซ่อนปุ่มลอย "กลับหน้าหลัก" + "บริการลูกค้า" (ผ่าน body.in-call)
   useEffect(() => {
@@ -422,6 +424,7 @@ export default function DealRoom() {
     chatBundledRef.current = false;
     setPackingUploadStep(null);
     setPackingCarouselIndex(0);
+    setShowTrackingRequired(false);
     setWzViewStep(null);
     setShowStep3Warning(false);
     step3PendingRef.current = null;
@@ -2098,16 +2101,41 @@ export default function DealRoom() {
           </div>
         </div>
         <div className="dr-card">
-          <div className="dr-card-title">เลขพัสดุ</div>
-          <input type="text" className="dr-select" value={trackingInput} onChange={e => setTrackingInput(e.target.value)} placeholder="กรอกเลขพัสดุ" style={{ marginBottom: 12 }} />
+          <div style={{ fontSize: 'clamp(22px, 4vw, 30px)', fontWeight: 800, fontFamily: 'var(--font-display)', color: '#cf2038', lineHeight: 1.1, marginBottom: 6 }}>เลขพัสดุ</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: trackingInput.trim() ? 'var(--muted)' : '#cf2038', marginBottom: 10 }}>
+            ต้องกรอกก่อนกดไปขั้นถัดไป
+          </div>
+          <input
+            ref={trackingInputRef}
+            type="text"
+            className="dr-select"
+            value={trackingInput}
+            onChange={e => {
+              setTrackingInput(e.target.value);
+              if (e.target.value.trim()) setShowTrackingRequired(false);
+            }}
+            placeholder="กรอกเลขพัสดุ"
+            style={{
+              marginBottom: 12,
+              border: `2px solid ${trackingInput.trim() ? 'var(--blue-200)' : '#cf2038'}`,
+              background: trackingInput.trim() ? 'var(--surface)' : '#fff7f8',
+              boxShadow: showTrackingRequired || !trackingInput.trim() ? '0 0 0 4px rgba(207, 32, 56, 0.12)' : 'var(--sh-xs)',
+              fontWeight: 700,
+            }}
+          />
           {renderParticipantStatusRows([
             { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPacked, doneText: '✅ แพ็คและส่งแล้ว', waitText: '⏳ กำลังแพ็ค' },
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
           ], { marginBottom: 12 })}
           <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => {
             if (!hasAllPackingSteps) { alert('กรุณาอัปโหลดหลักฐานให้ครบทั้ง 3 ขั้นก่อน'); return; }
-            if (!trackingInput) { alert('กรอกเลขพัสดุ'); return; }
-            return doAction('seller_done_packing', { trackingNumber: trackingInput });
+            if (!trackingInput.trim()) {
+              setShowTrackingRequired(true);
+              trackingInputRef.current?.focus();
+              alert('กรุณากรอกเลขพัสดุก่อนกดไปขั้นถัดไป');
+              return;
+            }
+            return doAction('seller_done_packing', { trackingNumber: trackingInput.trim() });
           }}>📦 แพ็คเสร็จ — ส่งให้ผู้ซื้อโดยตรง</AsyncButton>
         </div>
       </div>
