@@ -6,7 +6,7 @@ import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 
 const MODES = [
-  { title: 'ซื้อขายผ่านกลาง', href: '/deal/create', image: '/Full.webp' },
+  { title: 'ซื้อขายผ่านกลางปลอดภัย', href: '/service/trade/online', image: '/Full.webp' },
   { title: 'ซื้อขายผ่านกลางแบบง่าย', href: '/service/simple', image: '/Eazy.webp' },
 ];
 
