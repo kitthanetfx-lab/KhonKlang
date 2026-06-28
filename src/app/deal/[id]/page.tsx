@@ -2545,12 +2545,12 @@ export default function DealRoom() {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="dr-card">
-            <div style={{ position: 'relative', width: '100%', maxWidth: 640, margin: '0 auto', borderRadius: 22, overflow: 'hidden', border: '1px solid rgba(170, 192, 219, .72)', background: 'rgba(255,255,255,.86)', boxShadow: '0 18px 38px -32px rgba(34, 69, 139, .34)' }}>
+            <div className="regular-step1-slider-frame">
               <img
                 key={REGULAR_DEAL_STEP1_SLIDES[regularDealIntroSlide]}
                 src={REGULAR_DEAL_STEP1_SLIDES[regularDealIntroSlide]}
                 alt={`ภาพอธิบายดีลปลอดภัย ${regularDealIntroSlide + 1}`}
-                style={{ display: 'block', width: '100%', height: 'auto' }}
+                className="regular-step1-slider-image"
               />
             </div>
             <div className="svc-simple-slider-dots" aria-label="ตัวเลือกภาพขั้นตอนดีลปลอดภัย">

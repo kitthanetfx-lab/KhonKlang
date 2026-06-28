@@ -2156,6 +2156,24 @@ button.nav-link { background: none; border: none; }
   width: 28px;
   background: var(--accent);
 }
+.regular-step1-slider-frame {
+  position: relative;
+  width: min(100%, 620px);
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(170, 192, 219, .72);
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 18px 38px -32px rgba(34, 69, 139, .34);
+}
+.regular-step1-slider-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: rgba(255,255,255,.86);
+}
 .svc-simple-alert {
   position: relative;
   z-index: 1;
@@ -2290,6 +2308,10 @@ button.nav-link { background: none; border: none; }
   }
   .svc-simple-slide-frame {
     width: 100%;
+    border-radius: 18px;
+    box-shadow: 0 20px 34px -28px rgba(34, 69, 139, .34);
+  }
+  .regular-step1-slider-frame {
     border-radius: 18px;
     box-shadow: 0 20px 34px -28px rgba(34, 69, 139, .34);
   }
