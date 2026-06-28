@@ -6,6 +6,7 @@ import { Icon } from '@/components/Icon';
 import { Nav, Footer, CountUp, useReveal, useTilt } from '@/components/Site';
 import { EscrowStage } from '@/components/EscrowStage';
 import { ServiceSlider } from '@/components/ServiceSlider';
+import { useAppPreferences } from '@/components/AppPreferences';
 import { useServiceControls } from '@/lib/useServiceControls';
 
 interface SiteStats {
@@ -30,6 +31,7 @@ function useSiteStats() {
 }
 
 function buildStatItems(s: SiteStats | null) {
+  // default labels in Thai; locale mapping happens in page
   const value = s?.protectedValue ?? 0;
   const inMillions = value >= 1_000_000;
   return [
@@ -59,7 +61,7 @@ function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: 
   );
 }
 
-function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnType<typeof useServiceControls> }) {
+function Hero({ stats, controls, locale }: { stats: SiteStats | null; controls: ReturnType<typeof useServiceControls>; locale: 'th' | 'en' }) {
   const { ref: stageTiltRef, onMouseLeave, onMouseMove } = useTilt(7);
   const hasReviews = !!stats && stats.reviewCount > 0;
   const avgStars = hasReviews ? Math.round((stats!.satisfaction / 20) * 10) / 10 : 0;
@@ -83,24 +85,24 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
           <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '140ms' }}>
             {stats?.promoVideoUrl ? (
               <div className="promo-video-wrap">
-                <iframe src={stats.promoVideoUrl} title="วีดีโอแนะนำการใช้งาน" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                <iframe src={stats.promoVideoUrl} title={locale === 'th' ? 'วีดีโอแนะนำการใช้งาน' : 'How it works video'} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
               </div>
             ) : PROMO_IMAGE ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={PROMO_IMAGE} alt="แนะนำการใช้งาน" className="promo-image" />
+              <img src={PROMO_IMAGE} alt={locale === 'th' ? 'แนะนำการใช้งาน' : 'How it works'} className="promo-image" />
             ) : (
               <div className="promo-placeholder">
                 <Icon name="film" size={20} />
-                <p>เร็ว ๆ นี้ — วีดีโอ/ภาพแนะนำการใช้งาน</p>
+                <p>{locale === 'th' ? 'เร็ว ๆ นี้ — วีดีโอ/ภาพแนะนำการใช้งาน' : 'Coming soon — product walkthrough video/image'}</p>
               </div>
             )}
           </div>
         </div>
         <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
           <EscrowStage speed={1} />
-          <div className="eyebrow reveal"><Icon name="shieldCheck" size={19} /> ซื้อขายปลอดภัยผ่านคนกลางรับรอง</div>
+          <div className="eyebrow reveal"><Icon name="shieldCheck" size={19} /> {locale === 'th' ? 'ซื้อขายปลอดภัยผ่านคนกลางรับรอง' : 'Safer trading with trusted escrow support'}</div>
           <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
-            จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span>
+            {locale === 'th' ? <>จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span></> : <>Pay with confidence<br /><span className="gradient-text">Get the real item, avoid scams</span></>}
           </h1>
         </div>
       </div>
@@ -110,8 +112,21 @@ function Hero({ stats, controls }: { stats: SiteStats | null; controls: ReturnTy
 
 export default function HomePage() {
   useReveal();
+  const { locale } = useAppPreferences();
   const stats = useSiteStats();
-  const statItems = buildStatItems(stats);
+  const statItems = buildStatItems(stats).map(item => ({
+    ...item,
+    label: locale === 'th'
+      ? item.label
+      : ({
+          'สมาชิกทั้งหมด': 'Total Members',
+          'ผู้ขายในระบบ': 'Registered Sellers',
+          'คนกลางผ่านการรับรอง': 'Verified Middlemen',
+          'ดีลสำเร็จปลอดภัย': 'Completed Protected Deals',
+          'มูลค่าที่คุ้มครอง': 'Protected Value',
+          'ความพึงพอใจผู้ใช้': 'User Satisfaction',
+        }[item.label] || item.label),
+  }));
   const controls = useServiceControls();
   useEffect(() => {
     const r = document.documentElement;
@@ -123,7 +138,7 @@ export default function HomePage() {
   return (
     <>
       <Nav active="home" />
-      <Hero stats={stats} controls={controls} />
+      <Hero stats={stats} controls={controls} locale={locale} />
 
       <section className="stats-band">
         <div className="container stats-grid">
@@ -138,7 +153,7 @@ export default function HomePage() {
 
       <section className="section" style={{ background: 'var(--surface)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="container">
-          <SectionHead kicker="บริการผ่านคนกลาง" title="ทุกปัญหาการซื้อขาย เรามีทางแก้ให้" lead="เลื่อนดูบริการที่ออกแบบมาแก้ปัญหาที่คนซื้อ–ขายเจอบ่อยที่สุด พร้อมข้อดีที่คุณจะได้รับ" center />
+          <SectionHead kicker={locale === 'th' ? 'บริการผ่านคนกลาง' : 'Escrow Services'} title={locale === 'th' ? 'ทุกปัญหาการซื้อขาย เรามีทางแก้ให้' : 'We design services for real trading problems'} lead={locale === 'th' ? 'เลื่อนดูบริการที่ออกแบบมาแก้ปัญหาที่คนซื้อ–ขายเจอบ่อยที่สุด พร้อมข้อดีที่คุณจะได้รับ' : 'Browse services built to solve the most common buyer-seller risks, with clear benefits for both sides.'} center />
           <div className="reveal"><ServiceSlider stats={stats} /></div>
         </div>
       </section>
@@ -147,10 +162,10 @@ export default function HomePage() {
         <div className="container scam-inner reveal">
           <div className="scam-ic"><Icon name="search" size={30} /></div>
           <div style={{ flex: 1, minWidth: 240 }}>
-            <h2 style={{ fontSize: 'clamp(22px,3vw,30px)', color: '#fff' }}>สงสัยว่าจะโดนโกง? เช็คก่อนโอน</h2>
-            <p style={{ color: 'rgba(255,255,255,.78)', marginTop: 8, maxWidth: '52ch' }}>ค้นหาชื่อ เลขบัญชี หรือเบอร์โทรศัพท์จากฐานข้อมูลคนโกง เพื่อความปลอดภัยก่อนทำธุรกรรมทุกครั้ง</p>
+            <h2 style={{ fontSize: 'clamp(22px,3vw,30px)', color: '#fff' }}>{locale === 'th' ? 'สงสัยว่าจะโดนโกง? เช็คก่อนโอน' : 'Think it might be a scam? Check before you pay'}</h2>
+            <p style={{ color: 'rgba(255,255,255,.78)', marginTop: 8, maxWidth: '52ch' }}>{locale === 'th' ? 'ค้นหาชื่อ เลขบัญชี หรือเบอร์โทรศัพท์จากฐานข้อมูลคนโกง เพื่อความปลอดภัยก่อนทำธุรกรรมทุกครั้ง' : 'Search names, bank accounts, or phone numbers against scam reports before every transaction.'}</p>
           </div>
-          <Link className="btn btn-lg" href="/check-scam" style={{ background: '#fff', color: 'var(--ink)' }}>ตรวจสอบเลย <Icon name="arrowRight" size={18} /></Link>
+          <Link className="btn btn-lg" href="/check-scam" style={{ background: '#fff', color: 'var(--ink)' }}>{locale === 'th' ? 'ตรวจสอบเลย' : 'Check Now'} <Icon name="arrowRight" size={18} /></Link>
         </div>
       </section>
 

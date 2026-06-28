@@ -4,28 +4,49 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useAppPreferences } from '@/components/AppPreferences';
 import {
   LayoutDashboard, Store, Shield, Users, Settings, SlidersHorizontal,
   LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, MapPin, Wallet, MessageCircle, Banknote,
 } from 'lucide-react';
 
-const NAV = [
-  { href: '/admin',             icon: LayoutDashboard, label: 'ภาพรวม' },
-  { href: '/admin/support',     icon: MessageCircle,   label: 'แชทลูกค้า' },
-  { href: '/admin/sellers',     icon: Store,           label: 'ผู้ขาย' },
-  { href: '/admin/middlemen',   icon: Shield,          label: 'คนกลาง' },
-  { href: '/admin/middleman-deposits', icon: Banknote, label: 'เงินค้ำประกันคนกลาง' },
-  { href: '/admin/scam-reports',icon: ShieldAlert,     label: 'รายงานคนโกง' },
-  { href: '/admin/finance',     icon: Wallet,          label: 'การเงิน' },
-  { href: '/admin/deals',       icon: Handshake,       label: 'ดีล & ข้อพิพาท' },
-  { href: '/admin/onsite-jobs', icon: MapPin,          label: 'งานนัดออนไซต์' },
-  { href: '/admin/moderate',    icon: EyeOff,          label: 'ตรวจสอบเนื้อหา' },
-  { href: '/admin/users',       icon: Users,           label: 'ผู้ใช้ทั้งหมด' },
-  { href: '/admin/service-controls', icon: SlidersHorizontal, label: 'ควบคุมบริการ' },
-  { href: '/admin/settings',    icon: Settings,        label: 'ค่าธรรมเนียม' },
-];
+function getAdminNav(locale: 'th' | 'en') {
+  return locale === 'th'
+    ? [
+        { href: '/admin', icon: LayoutDashboard, label: 'ภาพรวม' },
+        { href: '/admin/support', icon: MessageCircle, label: 'แชทลูกค้า' },
+        { href: '/admin/sellers', icon: Store, label: 'ผู้ขาย' },
+        { href: '/admin/middlemen', icon: Shield, label: 'คนกลาง' },
+        { href: '/admin/middleman-deposits', icon: Banknote, label: 'เงินค้ำประกันคนกลาง' },
+        { href: '/admin/scam-reports', icon: ShieldAlert, label: 'รายงานคนโกง' },
+        { href: '/admin/finance', icon: Wallet, label: 'การเงิน' },
+        { href: '/admin/deals', icon: Handshake, label: 'ดีล & ข้อพิพาท' },
+        { href: '/admin/onsite-jobs', icon: MapPin, label: 'งานนัดออนไซต์' },
+        { href: '/admin/moderate', icon: EyeOff, label: 'ตรวจสอบเนื้อหา' },
+        { href: '/admin/users', icon: Users, label: 'ผู้ใช้ทั้งหมด' },
+        { href: '/admin/service-controls', icon: SlidersHorizontal, label: 'ควบคุมบริการ' },
+        { href: '/admin/settings', icon: Settings, label: 'ค่าธรรมเนียม' },
+      ]
+    : [
+        { href: '/admin', icon: LayoutDashboard, label: 'Overview' },
+        { href: '/admin/support', icon: MessageCircle, label: 'Customer Chat' },
+        { href: '/admin/sellers', icon: Store, label: 'Sellers' },
+        { href: '/admin/middlemen', icon: Shield, label: 'Middlemen' },
+        { href: '/admin/middleman-deposits', icon: Banknote, label: 'Middleman Deposits' },
+        { href: '/admin/scam-reports', icon: ShieldAlert, label: 'Scam Reports' },
+        { href: '/admin/finance', icon: Wallet, label: 'Finance' },
+        { href: '/admin/deals', icon: Handshake, label: 'Deals & Disputes' },
+        { href: '/admin/onsite-jobs', icon: MapPin, label: 'On-site Jobs' },
+        { href: '/admin/moderate', icon: EyeOff, label: 'Moderation' },
+        { href: '/admin/users', icon: Users, label: 'Users' },
+        { href: '/admin/service-controls', icon: SlidersHorizontal, label: 'Service Controls' },
+        { href: '/admin/settings', icon: Settings, label: 'Fees' },
+      ];
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { locale } = useAppPreferences();
+  const NAV = getAdminNav(locale);
   const router   = useRouter();
   const pathname = usePathname();
   const [adminName, setAdminName] = useState('');
@@ -51,13 +72,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-        <p className="text-gray-500 animate-pulse text-base font-medium">กำลังตรวจสอบสิทธิ์...</p>
+        <p className="text-gray-500 animate-pulse text-base font-medium">{locale === 'th' ? 'กำลังตรวจสอบสิทธิ์...' : 'Checking access...'}</p>
       </div>
     );
   }
 
   const activeHref = NAV.slice(1).find(n => pathname.startsWith(n.href))?.href ?? '/admin';
-  const activeLabel = NAV.find(n => n.href === activeHref)?.label ?? 'ภาพรวม';
+  const activeLabel = NAV.find(n => n.href === activeHref)?.label ?? (locale === 'th' ? 'ภาพรวม' : 'Overview');
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
@@ -70,7 +91,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         lg:relative lg:translate-x-0
       `}>
         <div className="h-14 flex items-center px-5 border-b border-gray-200 dark:border-gray-800 shrink-0">
-          <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">🛡️ คนกลาง Admin</span>
+          <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">🛡️ {locale === 'th' ? 'คนกลาง Admin' : 'Glanghub Admin'}</span>
         </div>
 
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
@@ -128,7 +149,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <nav className="flex items-center gap-1.5 text-[15px] min-w-0">
             <Link href="/admin" className="text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors shrink-0 font-medium">
-              Admin
+              {locale === 'th' ? 'Admin' : 'Admin'}
             </Link>
             {pathname !== '/admin' && (
               <>
@@ -141,9 +162,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="ml-auto flex items-center gap-2">
             <Link href="/" target="_blank"
               className="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
-              ดูหน้าเว็บ ↗
+              {locale === 'th' ? 'ดูหน้าเว็บ ↗' : 'Open Website ↗'}
             </Link>
-            <button className="relative p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" aria-label="การแจ้งเตือน">
+            <button className="relative p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" aria-label={locale === 'th' ? 'การแจ้งเตือน' : 'Notifications'}>
               <Bell size={18} className="text-gray-500" />
             </button>
           </div>
