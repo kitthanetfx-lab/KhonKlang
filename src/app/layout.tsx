@@ -8,7 +8,6 @@ import { HomeButton } from "@/components/HomeButton";
 import { AuthGate } from "@/components/AuthGate";
 import { AppPreferencesProvider } from "@/components/AppPreferences";
 import { GlobalPreferenceDock } from "@/components/GlobalPreferenceDock";
-import { GlobalAutoTranslate } from "@/components/GlobalAutoTranslate";
 
 const displayFont = Anuphan({
   subsets: ["latin", "thai"],
@@ -53,7 +52,6 @@ export default function RootLayout({
           <DialogProvider>
             <AuthGate>
               {children}
-              <GlobalAutoTranslate />
               <GlobalPreferenceDock />
               <HomeButton />
               <SupportWidget />

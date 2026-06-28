@@ -91,13 +91,12 @@ export function CountUp({ to, suffix = '', prefix = '', dur = 1600, delay = 350,
 
 /* ---------- Logo ---------- */
 export function Logo({ sub = true }: { sub?: boolean }) {
-  const { locale } = useAppPreferences();
   return (
-    <Link href="/" className="logo" aria-label={locale === 'th' ? 'กลางฮับ หน้าแรก' : 'Glanghub home'}>
+    <Link href="/" className="logo" aria-label="กลางฮับ หน้าแรก">
       <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}>
-        <Image src="/logo.png" alt={locale === 'th' ? 'กลางฮับ' : 'Glanghub'} width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <Image src="/logo.png" alt="กลางฮับ" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
       </span>
-      <span className="logo-word">{locale === 'th' ? 'กลางฮับ' : 'Glanghub'}{sub && <small>GLANGHUB</small>}</span>
+      <span className="logo-word">กลางฮับ{sub && <small>GLANGHUB</small>}</span>
     </Link>
   );
 }
