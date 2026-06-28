@@ -404,6 +404,8 @@ export default function DealRoom() {
   const [meetupEvidReady, setMeetupEvidReady] = useState(false);
   const [savedEvidIds, setSavedEvidIds] = useState<Set<string>>(new Set());
   const [packingUploadStep, setPackingUploadStep] = useState<1 | 2 | 3 | null>(null);
+  const [packingCarouselIndex, setPackingCarouselIndex] = useState(0);
+  const [isPackingCompactLayout, setIsPackingCompactLayout] = useState(false);
   const [meetupPropLabel, setMeetupPropLabel] = useState<string | null>(null); // null=hidden ''=custom label
   const [meetupPropAmt, setMeetupPropAmt] = useState('');
   // Pop-Up ตกลงจุดนัด (รวมสถานที่+เงินประกัน+ปรับราคา+ค่าบริการ)
@@ -419,6 +421,7 @@ export default function DealRoom() {
     setChatReviewReady(false);
     chatBundledRef.current = false;
     setPackingUploadStep(null);
+    setPackingCarouselIndex(0);
     setWzViewStep(null);
     setShowStep3Warning(false);
     step3PendingRef.current = null;
@@ -429,6 +432,30 @@ export default function DealRoom() {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 1024px) and (orientation: portrait)');
+    const syncLayout = () => setIsPackingCompactLayout(media.matches);
+    syncLayout();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', syncLayout);
+      return () => media.removeEventListener('change', syncLayout);
+    }
+    media.addListener(syncLayout);
+    return () => media.removeListener(syncLayout);
+  }, []);
+
+  useEffect(() => {
+    if (!isPackingCompactLayout) {
+      setPackingCarouselIndex(0);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setPackingCarouselIndex(prev => (prev + 1) % 3);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [isPackingCompactLayout]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1915,13 +1942,16 @@ export default function DealRoom() {
     ];
     const canUploadPackingStep = (step: 1 | 2 | 3) => step === 1 || !!packingEvidenceSlots[step - 2];
     const hasAllPackingSteps = packingEvidenceSlots.every(Boolean);
+    const packingHeaderSteps = isPackingCompactLayout ? [packingSteps[packingCarouselIndex]] : packingSteps;
+    const packingHeaderColumns = isPackingCompactLayout ? '1fr' : 'repeat(3, minmax(0, 1fr))';
+    const packingUploadColumns = isPackingCompactLayout ? '1fr' : 'repeat(3, minmax(0, 1fr))';
     const sellerPacked = !!deal!.tracking_to_buyer || ['shipped_to_buyer', 'completed', 'cancelled', 'disputed'].includes(deal!.status);
     if (myRole !== 'seller') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="dr-card">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-              {packingSteps.map(item => (
+            <div style={{ display: 'grid', gridTemplateColumns: packingHeaderColumns, gap: 10 }}>
+              {packingHeaderSteps.map(item => (
                 <div key={item.step} style={{ minWidth: 0 }}>
                   <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
                     <img src={item.imageSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -1933,10 +1963,17 @@ export default function DealRoom() {
                 </div>
               ))}
             </div>
+            {isPackingCompactLayout && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 10 }}>
+                {packingSteps.map((item, index) => (
+                  <span key={item.step} style={{ width: 8, height: 8, borderRadius: '50%', background: index === packingCarouselIndex ? 'var(--accent)' : 'var(--line)' }} />
+                ))}
+              </div>
+            )}
           </div>
           <div className="dr-card">
             <div className="dr-card-title">หลักฐานจากผู้ขาย</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: packingUploadColumns, gap: 10 }}>
               {packingSteps.map(item => {
                 const uploaded = packingEvidenceSlots[item.step - 1];
                 return (
@@ -1979,8 +2016,8 @@ export default function DealRoom() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-            {packingSteps.map(item => (
+          <div style={{ display: 'grid', gridTemplateColumns: packingHeaderColumns, gap: 10 }}>
+            {packingHeaderSteps.map(item => (
               <div key={item.step} style={{ minWidth: 0 }}>
                 <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
                   <img src={item.imageSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -1992,11 +2029,18 @@ export default function DealRoom() {
               </div>
             ))}
           </div>
+          {isPackingCompactLayout && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 10 }}>
+              {packingSteps.map((item, index) => (
+                <span key={item.step} style={{ width: 8, height: 8, borderRadius: '50%', background: index === packingCarouselIndex ? 'var(--accent)' : 'var(--line)' }} />
+              ))}
+            </div>
+          )}
         </div>
         <div className="dr-card">
           <div className="dr-card-title">อัปโหลด 3 ขั้นตอน</div>
           <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>อัปโหลดให้ครบตามลำดับ 1 → 2 → 3 แล้วจึงกรอกเลขพัสดุและไปขั้นถัดไป</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: packingUploadColumns, gap: 10 }}>
             {packingSteps.map(item => {
               const uploaded = packingEvidenceSlots[item.step - 1];
               const previewVisible = packingUploadStep === item.step && uploadPreview?.url;
