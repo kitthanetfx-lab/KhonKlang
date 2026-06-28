@@ -6,6 +6,25 @@ import { translateText } from '@/lib/autoTranslate';
 
 const textNodeCache = new WeakMap<Text, string>();
 const attrCache = new WeakMap<Element, Map<string, string>>();
+const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
+const DEBUG_SESSION_ID = 'page-freeze-access';
+
+function reportDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown> = {}) {
+  fetch(DEBUG_SERVER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    keepalive: true,
+    body: JSON.stringify({
+      sessionId: DEBUG_SESSION_ID,
+      runId: 'pre-fix',
+      hypothesisId,
+      location,
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+}
 
 function shouldSkipElement(el: Element | null): boolean {
   if (!el) return true;
@@ -98,11 +117,39 @@ export function GlobalAutoTranslate() {
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
+    let mutationCount = 0;
+    let mutationBatchCount = 0;
+    let reportedMutationSpike = false;
+    // #region debug-point A:effect-start
+    reportDebug('A', 'GlobalAutoTranslate:effect:start', 'Auto translate effect start', {
+      locale,
+      bodyChildCount: document.body?.childElementCount || 0,
+      title: document.title,
+    });
+    // #endregion
     const originalTitle = document.title;
     document.title = locale === 'en' ? translateText(originalTitle, locale) : originalTitle;
     processSubtree(document.body, locale);
+    // #region debug-point A:initial-process
+    reportDebug('A', 'GlobalAutoTranslate:effect:processed', 'Auto translate initial subtree processed', {
+      locale,
+      bodyChildCount: document.body?.childElementCount || 0,
+    });
+    // #endregion
 
     const observer = new MutationObserver(mutations => {
+      mutationBatchCount += 1;
+      mutationCount += mutations.length;
+      if (!reportedMutationSpike && (mutationCount >= 200 || mutationBatchCount >= 25)) {
+        reportedMutationSpike = true;
+        // #region debug-point A:mutation-spike
+        reportDebug('A', 'GlobalAutoTranslate:observer:spike', 'Auto translate mutation spike detected', {
+          locale,
+          mutationCount,
+          mutationBatchCount,
+        });
+        // #endregion
+      }
       for (const mutation of mutations) {
         if (mutation.type === 'characterData') {
           processTextNode(mutation.target as Text, locale);
@@ -116,6 +163,9 @@ export function GlobalAutoTranslate() {
       childList: true,
       characterData: true,
     });
+    // #region debug-point A:observer-ready
+    reportDebug('A', 'GlobalAutoTranslate:observer:ready', 'Auto translate observer attached', { locale });
+    // #endregion
 
     const originalAlert = window.alert;
     const originalConfirm = window.confirm;
@@ -127,6 +177,13 @@ export function GlobalAutoTranslate() {
       originalPrompt(typeof message === 'string' ? translateText(message, locale) : message, defaultValue);
 
     return () => {
+      // #region debug-point A:cleanup
+      reportDebug('A', 'GlobalAutoTranslate:effect:cleanup', 'Auto translate effect cleanup', {
+        locale,
+        mutationCount,
+        mutationBatchCount,
+      });
+      // #endregion
       observer.disconnect();
       window.alert = originalAlert;
       window.confirm = originalConfirm;

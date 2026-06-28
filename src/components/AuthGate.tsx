@@ -5,6 +5,26 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { isProfileComplete, REQUIRED_PROFILE_FIELDS } from '@/lib/profileComplete';
 
+const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
+const DEBUG_SESSION_ID = 'page-freeze-access';
+
+function reportDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown> = {}) {
+  fetch(DEBUG_SERVER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    keepalive: true,
+    body: JSON.stringify({
+      sessionId: DEBUG_SESSION_ID,
+      runId: 'pre-fix',
+      hypothesisId,
+      location,
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+}
+
 /**
  * บังคับให้ต้องล็อกอินก่อนเข้าใช้งานเว็บไซต์ทุกหน้า (ยกเว้นหน้าที่อยู่ใน allowlist
  * ด้านล่าง เช่น หน้าล็อกอินเอง และหน้า bridge ของ OAuth ที่ยังไม่มี session ระหว่างขั้นตอน)
@@ -69,15 +89,27 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     let active = true;
 
     async function check() {
+      // #region debug-point B:effect-start
+      reportDebug('B', 'AuthGate:check:start', 'AuthGate check start', { pathname, publicPath: isPublicPath(pathname) });
+      // #endregion
       if (isPublicPath(pathname)) {
+        // #region debug-point B:public-bypass
+        reportDebug('B', 'AuthGate:check:public', 'AuthGate bypassed for public path', { pathname });
+        // #endregion
         if (active) { setAuthed(true); setChecked(true); }
         return;
       }
 
       try {
         const { data } = await supabase.auth.getSession();
+        // #region debug-point B:session-result
+        reportDebug('B', 'AuthGate:check:session', 'AuthGate session resolved', { pathname, hasSession: !!data.session });
+        // #endregion
         if (!active) return;
         if (!data.session) {
+          // #region debug-point B:redirect-login
+          reportDebug('B', 'AuthGate:check:redirect-login', 'AuthGate redirecting to login', { pathname });
+          // #endregion
           setChecked(true);
           router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
           return;
@@ -92,9 +124,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         if (!active) return;
 
         const complete = isProfileComplete(profile as Record<string, unknown> | null);
+        // #region debug-point B:profile-result
+        reportDebug('B', 'AuthGate:check:profile', 'AuthGate profile loaded', { pathname, complete, hasProfile: !!profile });
+        // #endregion
         setProfileComplete(complete);
 
         if (!complete && !isProfileExemptPath(pathname)) {
+          // #region debug-point B:redirect-profile
+          reportDebug('B', 'AuthGate:check:redirect-profile', 'AuthGate redirecting to profile', { pathname });
+          // #endregion
           setChecked(true);
           router.replace('/profile');
           return;
@@ -102,6 +140,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         setChecked(true);
       } catch {
         if (!active) return;
+        // #region debug-point B:catch
+        reportDebug('B', 'AuthGate:check:catch', 'AuthGate check failed', { pathname });
+        // #endregion
         setChecked(true);
         setAuthed(false);
         router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
@@ -111,6 +152,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     check();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      // #region debug-point B:auth-change
+      reportDebug('B', 'AuthGate:auth-change', 'Auth state changed', { pathname, hasSession: !!session });
+      // #endregion
       if (!active) return;
       if (!session && !isPublicPath(pathname)) {
         router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
