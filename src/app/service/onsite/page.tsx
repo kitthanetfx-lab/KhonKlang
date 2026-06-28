@@ -27,9 +27,12 @@ export default function ServiceOnsitePage() {
   }
 
   return (
-    <div className="sub-page">
+    <div className="sub-page service-sub-page">
       <header className="sub-header">
-        <Link href="/" className="sub-back">←</Link>
+        <Link href="/" className="sub-back" aria-label="ย้อนกลับ">
+          <span className="sub-back-arrow">←</span>
+          <span className="sub-back-text">ย้อนกลับ</span>
+        </Link>
         <span className="sub-htitle">บริการออนไซต์</span>
         <HeaderAccountActions />
       </header>

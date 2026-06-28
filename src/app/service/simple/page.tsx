@@ -34,9 +34,12 @@ export default function ServiceSimplePage() {
   }
 
   return (
-    <div className="sub-page svc-simple-page">
+    <div className="sub-page service-sub-page svc-simple-page">
       <header className="sub-header">
-        <Link href="/service/trade" className="sub-back">←</Link>
+        <Link href="/service/trade" className="sub-back" aria-label="ย้อนกลับ">
+          <span className="sub-back-arrow">←</span>
+          <span className="sub-back-text">ย้อนกลับ</span>
+        </Link>
         <span className="sub-htitle">ซื้อขายผ่านกลางแบบง่าย</span>
         <HeaderAccountActions />
       </header>

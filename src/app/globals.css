@@ -172,19 +172,15 @@ button.nav-link { background: none; border: none; }
 
 .pref-dock-wrap {
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: calc(env(safe-area-inset-top, 0px) + 74px);
+  right: 0;
   z-index: 95;
-}
-
-.pref-dock-toggle {
-  display: none;
 }
 
 .pref-dock {
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: calc(env(safe-area-inset-top, 0px) + 74px);
+  right: 0;
   z-index: 96;
   display: flex;
   align-items: center;
@@ -196,6 +192,48 @@ button.nav-link { background: none; border: none; }
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   box-shadow: var(--sh-md);
+}
+
+.pref-dock-toggle {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 74px);
+  right: 0;
+  z-index: 97;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  width: 14px;
+  min-width: 14px;
+  padding: 5px 2px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--ink);
+  box-shadow: var(--sh-md);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+
+.pref-dock-toggle-pill {
+  width: 8px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+
+.pref-dock-toggle-text {
+  font-family: var(--font-display);
+  font-size: 5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  line-height: 1;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
 }
 
 .pref-chip {
@@ -215,62 +253,29 @@ button.nav-link { background: none; border: none; }
 .pref-chip-label { color: var(--muted); }
 .pref-chip-value { color: var(--ink); font-family: var(--font-display); }
 
+.pref-dock {
+  transform: translateX(calc(100% - 18px));
+  transition: transform .24s ease;
+  padding: 4px 6px 4px 8px;
+  gap: 4px;
+  border-right: none;
+  border-radius: 999px 0 0 999px;
+}
+
+.pref-dock-wrap.is-open .pref-dock { transform: translateX(0); }
+
 @media (max-width: 979px) {
   .pref-dock-wrap {
-    top: calc(env(safe-area-inset-top, 0px) + 8px);
-    right: 0;
+    top: calc(env(safe-area-inset-top, 0px) + 68px);
     z-index: 120;
   }
   .pref-dock-toggle {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 8px);
-    right: 0;
+    top: calc(env(safe-area-inset-top, 0px) + 68px);
     z-index: 121;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
-    border-right: none;
-    border-radius: 10px 0 0 10px;
-    width: 14px;
-    min-width: 14px;
-    padding: 5px 2px 5px 2px;
-    background: color-mix(in srgb, var(--surface) 92%, transparent);
-    color: var(--ink);
-    box-shadow: var(--sh-md);
-    backdrop-filter: blur(16px) saturate(150%);
-    -webkit-backdrop-filter: blur(16px) saturate(150%);
-  }
-  .pref-dock-toggle-pill {
-    width: 8px;
-    height: 3px;
-    border-radius: 999px;
-    background: var(--accent);
-    flex: 0 0 auto;
-  }
-  .pref-dock-toggle-text {
-    font-family: var(--font-display);
-    font-size: 5px;
-    font-weight: 700;
-    letter-spacing: .02em;
-    text-transform: uppercase;
-    line-height: 1;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
   }
   .pref-dock {
-    top: calc(env(safe-area-inset-top, 0px) + 8px);
-    right: 0;
-    transform: translateX(calc(100% - 18px));
-    transition: transform .24s ease;
-    padding: 4px 6px 4px 8px;
-    gap: 4px;
-    border-right: none;
-    border-radius: 999px 0 0 999px;
+    top: calc(env(safe-area-inset-top, 0px) + 68px);
   }
-  .pref-dock-wrap.is-open .pref-dock { transform: translateX(0); }
   .pref-chip { padding: 4px 7px; font-size: 9.5px; gap: 4px; }
 }
 
@@ -1715,9 +1720,12 @@ button.nav-link { background: none; border: none; }
 /* ---------- GENERIC SUBPAGE HEADER (svc/cs/pf/pay) ---------- */
 .sub-page { min-height:100vh; background:var(--bg); }
 .sub-header { position:sticky; top:0; z-index:40; background:color-mix(in srgb,var(--surface) 94%,transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-bottom:1px solid var(--line); box-shadow:var(--sh-xs); padding:0 20px; height:64px; display:flex; align-items:center; gap:12px; }
-.sub-back { width:36px; height:36px; border-radius:var(--r-sm); display:grid; place-items:center; color:var(--muted); transition:all .2s; flex-shrink:0; }
-.sub-back:hover { background:var(--surface-2); color:var(--ink); }
+.sub-back { min-width: auto; height: 40px; border-radius: 999px; display:inline-flex; align-items:center; gap:8px; padding:0 14px 0 10px; border:1px solid color-mix(in srgb,var(--line) 88%, transparent); background:linear-gradient(180deg, color-mix(in srgb,var(--surface) 95%, transparent), var(--surface-2)); color:var(--ink); box-shadow:var(--sh-xs); transition:all .2s; flex-shrink:0; text-decoration:none; font-family:var(--font-display); font-weight:700; font-size:13px; }
+.sub-back:hover { background:var(--surface-2); color:var(--ink); transform: translateY(-1px); }
+.sub-back-arrow { display:grid; place-items:center; width:22px; height:22px; border-radius:999px; background:color-mix(in srgb,var(--accent) 12%, white); color:var(--accent-strong); font-size:15px; line-height:1; }
+.sub-back-text { white-space:nowrap; line-height:1; }
 .sub-htitle { font-family:var(--font-display); font-weight:700; font-size:17px; color:var(--ink); flex:1; min-width:0; }
+.service-sub-page .sub-htitle { display:none; }
 .sub-header-actions, .header-account-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
 .header-account-actions { margin-left:auto; }
 .header-account-actions .btn { white-space:nowrap; }
@@ -1726,6 +1734,8 @@ button.nav-link { background: none; border: none; }
   .header-account-logout,
   .header-account-register { display:none; }
   .sub-header { padding: 0 14px; gap: 10px; }
+  .sub-back { height: 36px; padding: 0 12px 0 9px; gap: 7px; font-size: 12px; }
+  .sub-back-arrow { width: 20px; height: 20px; font-size: 14px; }
 }
 
 /* ---------- CHECK-SCAM ---------- */

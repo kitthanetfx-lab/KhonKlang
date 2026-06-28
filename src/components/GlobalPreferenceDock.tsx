@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAppPreferences } from './AppPreferences';
 
 function themeLabel(theme: 'light' | 'dark') {
@@ -10,15 +10,6 @@ function themeLabel(theme: 'light' | 'dark') {
 export function GlobalPreferenceDock() {
   const { locale, theme, toggleLocale, cycleTheme } = useAppPreferences();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia('(min-width: 980px)');
-    const syncState = (matches: boolean) => setMobileOpen(matches);
-    syncState(media.matches);
-    const onChange = (event: MediaQueryListEvent) => syncState(event.matches);
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
-  }, []);
 
   return (
     <div className={`pref-dock-wrap ${mobileOpen ? 'is-open' : ''}`}>
