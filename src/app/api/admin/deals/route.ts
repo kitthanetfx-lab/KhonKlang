@@ -115,6 +115,9 @@ export async function PATCH(req: NextRequest) {
     // ดึงดีลปัจจุบัน
     const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('id', id).maybeSingle();
     if (dealErr || !deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+    const { data: priceState } = await db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle();
+    const feePayer = String(priceState?.proposed_fee_payer || deal.fee_payer || 'split');
+    const sellerSlipRequired = deal.deal_type !== 'meetup' && (feePayer === 'seller' || feePayer === 'split');
 
     switch (action) {
       case 'resolve_dispute': {
@@ -147,6 +150,14 @@ export async function PATCH(req: NextRequest) {
       case 'confirm_payment': {
         // ยืนยันรับเงิน (admin แทน middleman) — meetup ไป meetup_ready, ดีลปกติไป packing
         const isMeetup = deal.deal_type === 'meetup';
+        if (!isMeetup) {
+          if (!deal.payment_slip_file_id) return NextResponse.json({ error: 'ยังไม่มีสลิปผู้ซื้อให้ตรวจ' }, { status: 400 });
+          if (!deal.payment_slip_verified_at) return NextResponse.json({ error: 'กรุณาตรวจสลิปผู้ซื้อก่อน' }, { status: 400 });
+          if (sellerSlipRequired) {
+            if (!priceState?.seller_fee_slip) return NextResponse.json({ error: 'ยังไม่มีสลิปค่าบริการของผู้ขาย' }, { status: 400 });
+            if (!priceState?.seller_fee_slip_verified_at) return NextResponse.json({ error: 'กรุณาตรวจสลิปค่าบริการของผู้ขายก่อน' }, { status: 400 });
+          }
+        }
         await db.from('deals').update({
           status: isMeetup ? 'meetup_ready' : 'packing',
           middleman_confirmed_payment: true,
@@ -162,6 +173,46 @@ export async function PATCH(req: NextRequest) {
           content: isMeetup
             ? `แอดมินยืนยันสลิปเงินประกันแล้ว — เริ่มขั้นตอนนัดพบได้เลย${note ? ` (${note})` : ''}`
             : `แอดมินยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้าได้เลย${note ? ` (${note})` : ''}`,
+        });
+        break;
+      }
+      case 'verify_payment_slip': {
+        if (deal.deal_type === 'meetup') return NextResponse.json({ error: 'ดีลนี้ใช้การตรวจสลิปแบบนัดรับอยู่แล้ว' }, { status: 400 });
+        if (whichSlip !== 'buyer' && whichSlip !== 'seller') return NextResponse.json({ error: 'whichSlip ไม่ถูกต้อง' }, { status: 400 });
+        const sideLabel = whichSlip === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
+        let msg = '';
+        if (whichSlip === 'buyer') {
+          if (!deal.payment_slip_file_id) return NextResponse.json({ error: 'ยังไม่มีสลิปผู้ซื้อ' }, { status: 400 });
+          if (ok) {
+            await db.from('deals').update({ payment_slip_verified_at: new Date().toISOString() }).eq('id', id);
+            msg = sellerSlipRequired && !priceState?.seller_fee_slip_verified_at
+              ? '✅ ศูนย์กลางตรวจสลิปผู้ซื้อแล้ว (ถูกต้อง) — รอตรวจสลิปค่าบริการของผู้ขาย'
+              : '✅ ศูนย์กลางตรวจสลิปผู้ซื้อแล้ว (ถูกต้อง)';
+          } else {
+            await db.from('deals').update({
+              status: 'payment_pending',
+              payment_slip_file_id: null,
+              payment_slip_verified_at: null,
+              reject_reason: note || null,
+            }).eq('id', id);
+            msg = `❌ สลิป${sideLabel}ไม่ถูกต้อง — กรุณาอัปโหลดใหม่อีกครั้ง${note ? ` (${note})` : ''}`;
+          }
+        } else {
+          if (!sellerSlipRequired) return NextResponse.json({ error: 'ดีลนี้ไม่ต้องมีสลิปค่าบริการฝั่งผู้ขาย' }, { status: 400 });
+          if (!priceState?.seller_fee_slip) return NextResponse.json({ error: 'ยังไม่มีสลิปค่าบริการของผู้ขาย' }, { status: 400 });
+          if (ok) {
+            await db.from('deal_price_state').upsert({ deal_id: id, seller_fee_slip_verified_at: new Date().toISOString() }, { onConflict: 'deal_id' });
+            msg = deal.payment_slip_verified_at
+              ? '✅ ศูนย์กลางตรวจสลิปค่าบริการของผู้ขายแล้ว (ถูกต้อง) — พร้อมยืนยันรับเงิน'
+              : '✅ ศูนย์กลางตรวจสลิปค่าบริการของผู้ขายแล้ว (ถูกต้อง) — รอตรวจสลิปผู้ซื้อ';
+          } else {
+            await db.from('deal_price_state').upsert({ deal_id: id, seller_fee_slip: null, seller_fee_slip_verified_at: null }, { onConflict: 'deal_id' });
+            msg = `❌ สลิป${sideLabel}ไม่ถูกต้อง — กรุณาอัปโหลดใหม่อีกครั้ง${note ? ` (${note})` : ''}`;
+          }
+        }
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ',
+          role: 'system', type: 'system', content: msg,
         });
         break;
       }

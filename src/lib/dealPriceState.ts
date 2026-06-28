@@ -15,6 +15,7 @@ export interface DealPriceState {
   evidenceDoneBuyer?: boolean;
   evidenceDoneMiddleman?: boolean;
   sellerFeeSlip?: string;
+  sellerFeeSlipVerifiedAt?: string;
   // บัญชี/สถานะการโอนเงิน "ออก" จากศูนย์กลาง — จ่ายคืนผู้ขายเมื่อจบดีล / คืนเงินผู้ซื้อเมื่อยกเลิก
   payoutSentAt?: string;
   payoutSlipFileId?: string;
@@ -66,6 +67,7 @@ function normalizeDealPriceState(value: JsonRecord): DealPriceState {
     evidenceDoneBuyer: asBoolean(value.evidenceDoneBuyer),
     evidenceDoneMiddleman: asBoolean(value.evidenceDoneMiddleman),
     sellerFeeSlip: typeof value.sellerFeeSlip === 'string' ? value.sellerFeeSlip : undefined,
+    sellerFeeSlipVerifiedAt: typeof value.sellerFeeSlipVerifiedAt === 'string' ? value.sellerFeeSlipVerifiedAt : undefined,
     payoutSentAt: typeof value.payoutSentAt === 'string' ? value.payoutSentAt : undefined,
     payoutSlipFileId: typeof value.payoutSlipFileId === 'string' ? value.payoutSlipFileId : undefined,
     payoutNote: typeof value.payoutNote === 'string' ? value.payoutNote : undefined,

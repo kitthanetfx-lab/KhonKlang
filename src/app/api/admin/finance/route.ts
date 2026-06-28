@@ -574,6 +574,9 @@ export async function PATCH(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'missing id' }, { status: 400 });
     const { data: deal } = await db.from('deals').select('*').eq('id', id).single();
     if (!deal) return NextResponse.json({ error: 'ไม่พบดีล' }, { status: 404 });
+    const { data: priceState } = await db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle();
+    const feePayer = String(priceState?.proposed_fee_payer || deal.fee_payer || 'split');
+    const sellerSlipRequired = deal.deal_type !== 'meetup' && (feePayer === 'seller' || feePayer === 'split');
     if (deal.status !== 'payment_uploaded') {
       return NextResponse.json({ error: 'ดีลนี้ไม่ได้อยู่สถานะรอตรวจสอบการโอน' }, { status: 400 });
     }
@@ -581,6 +584,12 @@ export async function PATCH(req: NextRequest) {
     const recipients = [deal.seller_id, deal.buyer_id, deal.middleman_id].filter((x): x is string => typeof x === 'string' && !!x);
 
     if (action === 'approve_payment') {
+      if (!deal.payment_slip_file_id) return NextResponse.json({ error: 'ยังไม่มีสลิปผู้ซื้อให้ตรวจ' }, { status: 400 });
+      if (!deal.payment_slip_verified_at) return NextResponse.json({ error: 'กรุณาตรวจสลิปผู้ซื้อก่อนอนุมัติ' }, { status: 400 });
+      if (sellerSlipRequired) {
+        if (!priceState?.seller_fee_slip) return NextResponse.json({ error: 'ยังไม่มีสลิปค่าบริการของผู้ขาย' }, { status: 400 });
+        if (!priceState?.seller_fee_slip_verified_at) return NextResponse.json({ error: 'กรุณาตรวจสลิปค่าบริการของผู้ขายก่อนอนุมัติ' }, { status: 400 });
+      }
       const { data: updated } = await db.from('deals').update({ status: 'packing', middleman_confirmed_payment: true }).eq('id', id).select().single();
       const msg = 'ศูนย์กลางยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้า';
       await sysMsg(db, id, msg);
@@ -591,7 +600,7 @@ export async function PATCH(req: NextRequest) {
     if (action === 'reject_payment') {
       const reason = String(note || '').slice(0, 300);
       const { data: updated } = await db.from('deals').update({
-        status: 'payment_pending', payment_slip_file_id: '', reject_reason: `[ปฏิเสธการโอน] ${reason}`,
+        status: 'payment_pending', payment_slip_file_id: '', payment_slip_verified_at: null, reject_reason: `[ปฏิเสธการโอน] ${reason}`,
       }).eq('id', id).select().single();
       const msg = `ศูนย์กลางปฏิเสธหลักฐานการโอน${reason ? ': ' + reason : ''} — กรุณาตรวจสอบและอัปโหลดสลิปใหม่`;
       await sysMsg(db, id, msg);

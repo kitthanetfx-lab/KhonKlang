@@ -177,6 +177,7 @@ create table deals (
   buyer_confirmed_check     boolean not null default false,
 
   payment_slip_file_id      text,   -- storage path in 'deal-files'
+  payment_slip_verified_at  timestamptz,
   tracking_to_middleman     text,
   tracking_to_buyer         text,
   reject_reason             text,
@@ -210,6 +211,7 @@ create table deal_price_state (
   evidence_done_buyer   boolean not null default false,
   evidence_done_middleman boolean not null default false,
   seller_fee_slip       text,
+  seller_fee_slip_verified_at timestamptz,
   payout_sent_at        timestamptz,
   payout_slip_file_id   text,
   payout_note           text,

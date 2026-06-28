@@ -19,7 +19,8 @@ interface DealMeetup {
   refund_decision_note?: string;
 }
 interface DealPriceState {
-  seller_fee_slip?: string; payout_slip_file_id?: string; refund_slip_file_id?: string;
+  proposed_fee_payer?: 'buyer' | 'seller' | 'split';
+  seller_fee_slip?: string; seller_fee_slip_verified_at?: string; payout_slip_file_id?: string; refund_slip_file_id?: string;
   middleman_fee_sent_at?: string; middleman_fee_slip_file_id?: string;
 }
 interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
@@ -27,7 +28,8 @@ interface Deal {
   id: string; title: string; price: number; status: string; deal_type?: string;
   buyer_name: string; seller_name: string; middleman_name: string; middleman_id?: string;
   reject_reason: string; created_at: string;
-  payment_slip_file_id?: string;
+  fee_payer?: 'buyer' | 'seller' | 'split';
+  payment_slip_file_id?: string; payment_slip_verified_at?: string;
   meetup?: DealMeetup | null;
   priceState?: DealPriceState | null;
   buyerBank?: BankInfo | null;
@@ -144,6 +146,31 @@ export default function AdminDeals() {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action: 'verify_meetup_slip', whichSlip: side, ok, note }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { load(tab); loadCounts(); } else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
+    } finally { setActing(''); }
+  }
+
+  function needsSellerFeeSlip(d: Deal) {
+    const feePayer = d.priceState?.proposed_fee_payer || d.fee_payer || 'split';
+    return d.deal_type !== 'meetup' && (feePayer === 'seller' || feePayer === 'split');
+  }
+
+  async function verifyNormalSlip(id: string, side: 'buyer' | 'seller', ok: boolean) {
+    let note = '';
+    if (!ok) {
+      const v = window.prompt(`เหตุผลที่สลิป${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ไม่ถูกต้อง:`);
+      if (v === null) return;
+      note = v;
+    }
+    setActing(id);
+    try {
+      const headers = await authHeaders();
+      const r = await fetch('/api/admin/deals', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'verify_payment_slip', whichSlip: side, ok, note }),
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok) { load(tab); loadCounts(); } else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
@@ -312,6 +339,10 @@ export default function AdminDeals() {
           const st = statusBadge(d);
           const refund = refundInfo(d);
           const slips = slipsOf(d);
+          const sellerFeeNeeded = needsSellerFeeSlip(d);
+          const buyerSlipVerified = !!d.payment_slip_verified_at;
+          const sellerSlipVerified = sellerFeeNeeded ? !!d.priceState?.seller_fee_slip_verified_at : true;
+          const canConfirmPayment = !!d.payment_slip_file_id && buyerSlipVerified && sellerSlipVerified;
           // refund (คืนเงินประกัน) ทำได้เฉพาะตอนดีลจบแล้ว (เจอกันเสร็จ = completed) เท่านั้น
           const refundStage = d.deal_type === 'meetup' && d.status === 'completed';
           // ตรวจสลิปเงินประกัน: meetup ที่ยังไม่จบ มีสลิปอย่างน้อย 1 ฝ่าย และยังตรวจไม่ครบ
@@ -404,11 +435,53 @@ export default function AdminDeals() {
                   </>
                 )}
                 {d.status === 'payment_uploaded' && d.deal_type !== 'meetup' && (
-                  <button onClick={() => act(d.id, 'confirm_payment', 'หมายเหตุ (เช่น เลขอ้างอิงสลิป) — เว้นว่างได้:')} disabled={!!acting}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
-                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    ยืนยันรับเงิน — เริ่มแพ็ค
-                  </button>
+                  <>
+                    {buyerSlipVerified ? (
+                      <span className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">✅ สลิปผู้ซื้อถูกต้อง</span>
+                    ) : d.payment_slip_file_id ? (
+                      <span className="inline-flex gap-1">
+                        <button onClick={() => verifyNormalSlip(d.id, 'buyer', true)} disabled={!!acting}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
+                          <CheckCircle2 size={14} /> สลิปผู้ซื้อถูกต้อง
+                        </button>
+                        <button onClick={() => verifyNormalSlip(d.id, 'buyer', false)} disabled={!!acting}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 flex items-center gap-1 disabled:opacity-50">
+                          ❌ ไม่ถูกต้อง
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-500 border border-gray-200">⏳ ผู้ซื้อยังไม่อัปสลิป</span>
+                    )}
+                    {sellerFeeNeeded ? (
+                      sellerSlipVerified ? (
+                        <span className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">✅ สลิปผู้ขายถูกต้อง</span>
+                      ) : d.priceState?.seller_fee_slip ? (
+                        <span className="inline-flex gap-1">
+                          <button onClick={() => verifyNormalSlip(d.id, 'seller', true)} disabled={!!acting}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
+                            <CheckCircle2 size={14} /> สลิปผู้ขายถูกต้อง
+                          </button>
+                          <button onClick={() => verifyNormalSlip(d.id, 'seller', false)} disabled={!!acting}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 flex items-center gap-1 disabled:opacity-50">
+                            ❌ ไม่ถูกต้อง
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-500 border border-gray-200">⏳ ผู้ขายยังไม่อัปสลิปค่าบริการ</span>
+                      )
+                    ) : (
+                      <span className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200">ℹ️ ดีลนี้ไม่ต้องมีสลิปค่าบริการฝั่งผู้ขาย</span>
+                    )}
+                    {canConfirmPayment ? (
+                      <button onClick={() => act(d.id, 'confirm_payment', 'หมายเหตุ (เช่น เลขอ้างอิงสลิป) — เว้นว่างได้:')} disabled={!!acting}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
+                        {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                        ยืนยันรับเงิน — เริ่มแพ็ค
+                      </button>
+                    ) : (
+                      <span className="text-xs px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">⏳ ตรวจสลิปที่อัปโหลดให้ครบก่อนเริ่มแพ็ค</span>
+                    )}
+                  </>
                 )}
                 {/* ข้อ5: meetup รอตรวจสลิป — ปุ่มตรวจถูกต้อง/ไม่ถูกต้อง รายฝ่าย */}
                 {needsSlipVerify && (
