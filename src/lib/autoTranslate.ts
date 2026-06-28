@@ -47,7 +47,6 @@ const EXACT_TRANSLATIONS: Record<string, string> = {
   'ขอบคุณสำหรับรีวิว': 'Thank you for your review',
   'ติดต่อทีมงาน มีข้อความใหม่': 'Support has a new message',
   'ติดต่อทีมงาน มีสายเข้า': 'Support has an incoming call',
-  'ติดต่อทีมงาน': 'Contact Support',
   'กลับหน้าหลัก': 'Back to Home',
   'ดูหน้าเว็บ ↗': 'Open Website ↗',
   'การแจ้งเตือน': 'Notifications',
