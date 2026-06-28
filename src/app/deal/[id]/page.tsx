@@ -1918,19 +1918,61 @@ export default function DealRoom() {
     const sellerPacked = !!deal!.tracking_to_buyer || ['shipped_to_buyer', 'completed', 'cancelled', 'disputed'].includes(deal!.status);
     if (myRole !== 'seller') {
       return (
-        <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
-          <div style={{ fontSize: 38, marginBottom: 10 }}>📦</div>
-          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอผู้ขายแพ็คสินค้าและจัดส่ง</div>
-          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ขายกำลังถ่ายวิดีโอแพ็คของและจัดส่งตรงถึงคุณ — ระบบจะแจ้งเลขพัสดุให้ทันทีที่ส่งแล้ว</p>
-          <div style={{ textAlign: 'left', marginTop: 16 }}>
-            {renderParticipantStatusRows([
-              { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPacked, doneText: '✅ แพ็คและส่งแล้ว', waitText: '⏳ กำลังแพ็ค' },
-              { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
-            ], { marginBottom: 0 })}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="dr-card">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+              {packingSteps.map(item => (
+                <div key={item.step} style={{ minWidth: 0 }}>
+                  <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+                    <img src={item.imageSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    <div style={{ position: 'absolute', top: 8, left: 8, minWidth: 26, height: 26, borderRadius: 999, background: 'rgba(15, 23, 42, .72)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>
+                      {item.step}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, color: 'var(--ink)', textAlign: 'center' }}>{item.title}</div>
+                </div>
+              ))}
+            </div>
           </div>
-          {packingEvidence.length > 0
-            ? renderWizardEvidenceThumbs(packingEvidence)
-            : <p style={{ fontSize: 12.5, color: 'var(--faint)', marginTop: 10 }}>ยังไม่มีรูป/วิดีโอแพ็คของ</p>}
+          <div className="dr-card">
+            <div className="dr-card-title">หลักฐานจากผู้ขาย</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+              {packingSteps.map(item => {
+                const uploaded = packingEvidenceSlots[item.step - 1];
+                return (
+                  <div key={item.step} style={{ minWidth: 0, border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 10, background: 'var(--surface)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8, textAlign: 'center' }}>ขั้นตอน {item.step}</div>
+                    <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)' }}>
+                      {uploaded ? (
+                        uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
+                          ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
+                          : <img src={fileUrl(uploaded.file_id)} alt={uploaded.file_name || item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      ) : (
+                        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(15, 23, 42, 0.14)', fontSize: 'clamp(34px, 6vw, 54px)', fontWeight: 800, lineHeight: 1 }}>
+                          {item.step}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ marginTop: 8, minHeight: 34, fontSize: 11.5, color: uploaded ? 'var(--green-600)' : 'var(--faint)', textAlign: 'center', lineHeight: 1.45 }}>
+                      {uploaded ? '✅ ผู้ขายอัปโหลดแล้ว' : '⏳ รอผู้ขายอัปโหลด'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="dr-card" style={{ textAlign: 'center', padding: '24px 20px' }}>
+            <div style={{ fontSize: 38, marginBottom: 10 }}>📦</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอผู้ขายแพ็คสินค้าและจัดส่ง</div>
+            <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ขายกำลังถ่ายวิดีโอแพ็คของและจัดส่งตรงถึงคุณ — ระบบจะแจ้งเลขพัสดุให้ทันทีที่ส่งแล้ว</p>
+            <div style={{ textAlign: 'left', marginTop: 16 }}>
+              {renderParticipantStatusRows([
+                { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPacked, doneText: '✅ แพ็คและส่งแล้ว', waitText: '⏳ กำลังแพ็ค' },
+                { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
+              ], { marginBottom: 0 })}
+            </div>
+            {deal!.tracking_to_buyer && <div className="dr-track-code" style={{ marginTop: 12 }}>📦 {deal!.tracking_to_buyer}</div>}
+          </div>
         </div>
       );
     }
