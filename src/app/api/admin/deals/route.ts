@@ -61,13 +61,14 @@ export async function GET(req: NextRequest) {
 
     // ดึง deal_meetup / deal_price_state ของทุกดีลที่เกี่ยวข้อง มาแนบ — แทน priceData/meetupData JSON blob เดิม
     const dealIds = deals.map(d => d.id);
-    const [{ data: meetups }, { data: priceStates }, { data: evidences }] = dealIds.length
+    const [{ data: meetups }, { data: priceStates }, { data: evidences }, { data: reviews }] = dealIds.length
       ? await Promise.all([
         db.from('deal_meetup').select('*').in('deal_id', dealIds),
         db.from('deal_price_state').select('*').in('deal_id', dealIds),
         db.from('deal_evidence').select('*').in('deal_id', dealIds).order('created_at', { ascending: true }),
+        db.from('reviews').select('id, deal_id, reviewer_name, reviewer_role, target_role, rating, tags, comment, created_at').in('deal_id', dealIds).order('created_at', { ascending: false }),
       ])
-      : [{ data: [] }, { data: [] }, { data: [] }];
+      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
     const meetupMap = new Map((meetups || []).map(m => [m.deal_id, m]));
     const priceMap = new Map((priceStates || []).map(p => [p.deal_id, p]));
     const evidenceMap = new Map<string, typeof evidences>();
@@ -75,6 +76,12 @@ export async function GET(req: NextRequest) {
       const prev = evidenceMap.get(item.deal_id) || [];
       prev.push(item);
       evidenceMap.set(item.deal_id, prev);
+    }
+    const reviewMap = new Map<string, typeof reviews>();
+    for (const item of reviews || []) {
+      const prev = reviewMap.get(item.deal_id) || [];
+      prev.push(item);
+      reviewMap.set(item.deal_id, prev);
     }
 
     // เลขบัญชีผู้ซื้อ/ผู้ขาย/คนกลาง — แอดมินต้องเห็นตรงนี้เวลาโอนเงินจริงด้วยมือ (ไม่ต้องเปิดดีลแยก)
@@ -87,6 +94,7 @@ export async function GET(req: NextRequest) {
       meetup: meetupMap.get(d.id) || null,
       priceState: priceMap.get(d.id) || null,
       evidence: evidenceMap.get(d.id) || [],
+      reviews: reviewMap.get(d.id) || [],
       buyerBank: bankMap.get(d.buyer_id) || null,
       sellerBank: bankMap.get(d.seller_id) || null,
       middlemanBank: bankMap.get(d.middleman_id) || null,

@@ -36,6 +36,7 @@ interface Deal {
   meetup?: DealMeetup | null;
   priceState?: DealPriceState | null;
   evidence?: EvidenceItem[];
+  reviews?: DealReview[];
   buyerBank?: BankInfo | null;
   sellerBank?: BankInfo | null;
   middlemanBank?: BankInfo | null;
@@ -47,6 +48,17 @@ interface EvidenceItem {
   file_id: string;
   file_name?: string;
   uploader_name?: string;
+}
+
+interface DealReview {
+  id: string;
+  reviewer_name?: string;
+  reviewer_role: string;
+  target_role: string;
+  rating: number;
+  tags?: string[];
+  comment?: string;
+  created_at: string;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -351,6 +363,21 @@ export default function AdminDeals() {
       }));
   }
 
+  function reviewSummaryOf(d: Deal) {
+    const reviews = d.reviews || [];
+    const count = reviews.length;
+    const average = count ? reviews.reduce((sum, item) => sum + (Number(item.rating) || 0), 0) / count : 0;
+    return { reviews, count, average: Number(average.toFixed(1)) };
+  }
+
+  function roleLabel(role: string) {
+    if (role === 'buyer') return 'ผู้ซื้อ';
+    if (role === 'seller') return 'ผู้ขาย';
+    if (role === 'middleman') return 'คนกลาง';
+    if (role === 'platform') return 'แพลตฟอร์ม';
+    return role || '-';
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center gap-2 mb-1">
@@ -389,6 +416,7 @@ export default function AdminDeals() {
           const slips = slipsOf(d);
           const trackingRows = parcelTrackingOf(d);
           const parcelEvidence = parcelEvidenceOf(d);
+          const reviewSummary = reviewSummaryOf(d);
           const sellerFeeNeeded = needsSellerFeeSlip(d);
           const buyerSlipVerified = !!d.payment_slip_verified_at;
           const sellerSlipVerified = sellerFeeNeeded ? !!d.priceState?.seller_fee_slip_verified_at : true;
@@ -510,6 +538,53 @@ export default function AdminDeals() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {reviewSummary.count > 0 && (
+                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="text-xs font-semibold text-amber-900">คะแนนรีวิวหลังจบดีล</p>
+                      <p className="text-[11px] text-amber-700">ข้อมูลนี้ถูกเก็บอยู่ในตาราง reviews ของระบบ</p>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 shadow-sm">
+                      <span className="text-amber-500 text-lg leading-none">★★★★★</span>
+                      <span className="text-sm font-bold text-amber-900">{reviewSummary.average}</span>
+                      <span className="text-xs text-gray-500">({reviewSummary.count})</span>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    {reviewSummary.reviews.map(rv => (
+                      <div key={rv.id} className="rounded-xl border border-amber-100 bg-white p-3 shadow-sm">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                                {'★'.repeat(rv.rating)}{'☆'.repeat(5 - rv.rating)}
+                              </span>
+                              <span className="text-xs text-gray-500">{roleLabel(rv.reviewer_role)} → {roleLabel(rv.target_role)}</span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">โดย {rv.reviewer_name || '-'} · {new Date(rv.created_at).toLocaleDateString('th-TH')}</p>
+                          </div>
+                        </div>
+                        {!!rv.tags?.length && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {rv.tags.map(tag => (
+                              <span key={`${rv.id}-${tag}`} className="px-2 py-1 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {rv.comment && (
+                          <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 whitespace-pre-wrap">
+                            {rv.comment}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

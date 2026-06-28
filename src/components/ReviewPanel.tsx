@@ -9,10 +9,18 @@ const ROLE_LABEL: Record<Role, string> = {
   buyer: 'ผู้ซื้อ', seller: 'ผู้ขาย', middleman: 'คนกลาง', platform: 'แพลตฟอร์มคนกลาง',
 };
 const QUICK_TAGS: Record<Role, string[]> = {
-  seller:    ['ส่งของไว', 'สินค้าตรงปก', 'สื่อสารดี'],
-  middleman: ['ตรวจละเอียด', 'รวดเร็ว', 'มืออาชีพ'],
-  buyer:     ['โอนไว', 'สื่อสารดี', 'ให้ความร่วมมือดี'],
-  platform:  ['ใช้งานง่าย', 'รู้สึกปลอดภัย', 'จะใช้อีกแน่นอน'],
+  seller:    ['ส่งของไว', 'สินค้าตรงปก', 'แพ็คดี', 'สื่อสารดี', 'ตรงเวลา'],
+  middleman: ['ตรวจละเอียด', 'รวดเร็ว', 'มืออาชีพ', 'อธิบายชัดเจน', 'เป็นกลางดี'],
+  buyer:     ['โอนไว', 'สื่อสารดี', 'ให้ความร่วมมือดี', 'ยืนยันไว', 'นัดหมายชัดเจน'],
+  platform:  ['ใช้งานง่าย', 'รู้สึกปลอดภัย', 'ติดต่อทีมงานง่าย', 'ขั้นตอนชัดเจน', 'จะใช้อีกแน่นอน'],
+};
+
+const RATING_LABEL: Record<number, string> = {
+  1: 'ควรปรับปรุง',
+  2: 'ยังไม่ดีพอ',
+  3: 'พอใช้',
+  4: 'ดีมาก',
+  5: 'ยอดเยี่ยม',
 };
 
 interface DealParties {
@@ -128,26 +136,39 @@ export function ReviewPanel({ deal, myRole, headers }: { deal: DealParties; myRo
               </div>
             </div>
             {st.rating > 0 && (
-              <div className="rv-tags">
-                {QUICK_TAGS[t.role].map(tag => (
-                  <button key={tag} type="button" className={`rv-tag ${st.tags.includes(tag) ? 'on' : ''}`} onClick={() => toggleTag(t.role, tag)}>
-                    {tag}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="rv-rating-meta">
+                  <span className="rv-rating-pill">{st.rating} / 5 ดาว</span>
+                  <span className="rv-rating-text">{RATING_LABEL[st.rating]}</span>
+                </div>
+                <div className="rv-tag-wrap">
+                  <div className="rv-tag-title">เหตุผลที่อยากแนะนำ</div>
+                  <div className="rv-tags">
+                    {QUICK_TAGS[t.role].map(tag => (
+                      <button key={tag} type="button" className={`rv-tag ${st.tags.includes(tag) ? 'on' : ''}`} onClick={() => toggleTag(t.role, tag)}>
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         );
       })}
 
+      <div className="rv-comment-wrap">
+        <div className="rv-comment-title">ข้อเสนอแนะเพิ่มเติม</div>
+        <div className="rv-comment-sub">เขียนถึงทีมงานหรือประสบการณ์ใช้งานเพิ่มเติมได้</div>
       <textarea
         className="rv-comment"
         value={comment}
         onChange={e => setComment(e.target.value)}
-        placeholder="ข้อเสนอแนะถึงทีมงาน (ไม่บังคับ)"
-        rows={2}
+        placeholder="พิมพ์ข้อเสนอแนะถึงทีมงานหรือสิ่งที่อยากให้ปรับปรุง (ไม่บังคับ)"
+        rows={3}
         maxLength={1000}
       />
+      </div>
 
       {error && <p className="rv-error">{error}</p>}
       <button type="button" className="btn btn-primary btn-block" disabled={!allRated || sending} onClick={submit}>

@@ -1809,7 +1809,7 @@ button.nav-link { background: none; border: none; }
    ============================================================ */
 .rv-card { display: flex; flex-direction: column; gap: 14px; }
 .rv-lead { font-size: 13px; color: var(--muted); margin-top: -6px; }
-.rv-row { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; background: var(--surface-2); display: flex; flex-direction: column; gap: 10px; }
+.rv-row { border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--line)); border-radius: var(--r-lg); padding: 14px 16px; background: linear-gradient(180deg, #fff, var(--surface-2)); display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05); }
 .rv-row-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .rv-av { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; color: #fff; background: var(--accent); }
 .rv-av.seller { background: #6841d9; }
@@ -1818,22 +1818,35 @@ button.nav-link { background: none; border: none; }
 .rv-who { flex: 1; min-width: 120px; line-height: 1.3; }
 .rv-who b { display: block; font-family: var(--font-display); font-size: 14px; color: var(--ink); }
 .rv-who span { font-size: 12px; color: var(--muted); }
-.rv-stars { display: flex; gap: 2px; }
-.rv-star { display: grid; place-items: center; width: 40px; height: 40px; border: none; background: none; color: var(--line); padding: 0; border-radius: var(--r-sm); transition: transform .15s var(--ease-spring), color .15s; }
+.rv-stars { display: flex; gap: 6px; padding: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.86); border: 1px solid color-mix(in srgb, var(--amber-400) 22%, var(--line)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 8px 18px rgba(245, 158, 11, 0.10); }
+.rv-star { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid color-mix(in srgb, var(--amber-400) 18%, var(--line)); background: linear-gradient(180deg, #fff, #f8fafc); color: #cbd5e1; padding: 0; border-radius: 12px; transition: transform .15s var(--ease-spring), color .15s, border-color .15s, box-shadow .15s, background .15s; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05); }
 .rv-star svg { fill: currentColor; }
-.rv-star.on { color: var(--amber-400); }
-.rv-star:hover { transform: scale(1.15); }
+.rv-star.on { color: #f59e0b; border-color: #f59e0b; background: linear-gradient(180deg, #fff7d6, #ffe8a3); box-shadow: 0 10px 20px rgba(245, 158, 11, 0.22); }
+.rv-star:hover { transform: translateY(-2px) scale(1.05); border-color: #f59e0b; }
 .rv-star:active { transform: scale(.95); }
+.rv-rating-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rv-rating-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: #fff7d6; border: 1px solid #f5d27a; color: #9a6700; font-size: 12px; font-weight: 700; }
+.rv-rating-text { font-size: 12.5px; color: var(--ink); font-weight: 700; }
+.rv-tag-wrap { border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--line)); border-radius: var(--r-md); background: rgba(255,255,255,.85); padding: 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,.85); }
+.rv-tag-title { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--ink); margin-bottom: 8px; }
 .rv-tags { display: flex; flex-wrap: wrap; gap: 7px; }
-.rv-tag { font-family: var(--font-body); font-size: 12.5px; font-weight: 500; padding: 6px 12px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); transition: all .15s; }
-.rv-tag.on { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent-strong); font-weight: 600; }
-.rv-comment { font-family: var(--font-body); font-size: 14px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px; resize: vertical; min-height: 44px; }
-.rv-comment:focus { outline: none; box-shadow: var(--ring); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.rv-tag { font-family: var(--font-body); font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: var(--r-pill); border: 1px solid #d9e2f2; background: #fff; color: var(--ink-2); transition: all .15s; box-shadow: 0 3px 8px rgba(15, 23, 42, 0.04); }
+.rv-tag.on { background: linear-gradient(180deg, #eef4ff, #dbeafe); border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent-strong); font-weight: 700; box-shadow: 0 8px 18px rgba(47, 107, 240, 0.16); }
+.rv-comment-wrap { border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--line)); border-radius: var(--r-lg); background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,250,255,0.96)); box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08); padding: 14px; }
+.rv-comment-title { font-size: 13px; font-weight: 800; color: var(--ink); margin-bottom: 4px; }
+.rv-comment-sub { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+.rv-comment { font-family: var(--font-body); font-size: 14px; color: var(--ink-2); background: #fff; border: 1.5px solid #d9e2f2; border-radius: var(--r-md); padding: 12px 14px; resize: vertical; min-height: 72px; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03); }
+.rv-comment:focus { outline: none; box-shadow: 0 0 0 4px rgba(47, 107, 240, 0.12); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
 .rv-error { font-size: 13px; color: #b22441; background: #fdeef1; border: 1px solid #fbd5dd; border-radius: var(--r-sm); padding: 8px 12px; }
 .rv-thanks { display: flex; align-items: center; gap: 12px; }
 .rv-thanks-ic { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--green-50); color: var(--green-600); border: 1px solid var(--green-100); }
 .rv-thanks b { display: block; font-family: var(--font-display); font-size: 14.5px; color: var(--ink); }
 .rv-thanks span { font-size: 12.5px; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .rv-stars { width: 100%; justify-content: space-between; }
+  .rv-star { width: 38px; height: 38px; }
+}
 
 /* ============================================================
    Content pages (help / legal)
