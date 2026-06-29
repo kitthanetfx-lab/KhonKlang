@@ -1939,7 +1939,6 @@ export default function DealRoom() {
     return !!(deal.buyer_id && deal.seller_id);
   }
 
-  /** รวมประวัติแชท (ข้อความล้วน ไม่รวมรูป/ไฟล์ที่ดูได้จากแท็บแชทอยู่แล้ว) เป็นหลักฐาน "ชิ้นเดียว" — ไม่เก็บทีละข้อความ */
   async function bundleChatTranscriptAsEvidence() {
     const lines = msgs.filter(m => m.role !== 'system' && m.type === 'text' && m.content?.trim());
     if (lines.length === 0) return;
@@ -3782,7 +3781,7 @@ export default function DealRoom() {
       {showStep3Warning && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(11, 18, 32, .72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 110 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 680, background: 'var(--surface)', borderRadius: 'var(--r-xl)', border: '1px solid #f7c6cd', boxShadow: '0 30px 70px rgba(12, 24, 54, .28)', padding: '24px 20px 20px', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(24px, 4vw, 34px)', lineHeight: 1.15, color: '#cf2038', marginBottom: 16 }}>*โปรดอ่านอย่างระเอียด*</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(24px, 4vw, 34px)', lineHeight: 1.15, color: '#cf2038', marginBottom: 16 }}>*โปรดอ่านอย่างละเอียด*</div>
             <img src="/Lawn.webp" alt="คำเตือนก่อนเข้าขั้นตอนที่ 3" style={{ width: 'min(100%, 600px)', height: 'auto', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', margin: '0 auto 16px', borderRadius: 'var(--r-lg)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
             <div style={{ fontSize: 'clamp(15px, 2.4vw, 18px)', fontWeight: 700, color: 'var(--ink)', marginBottom: 18 }}>*หากละเลยอาจเสียเปรียบในกรณีเกิดปัญหา*</div>
             <button
