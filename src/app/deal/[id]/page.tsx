@@ -418,6 +418,8 @@ export default function DealRoom() {
   const [rwzViewRole, setRwzViewRole] = useState<'seller' | 'middleman' | 'buyer'>('seller');
   const step3PendingRef = useRef<number | null>(null);
   const simpleActualStepRef = useRef<number | null>(null);
+  const regularActualStepRef = useRef<number | null>(null);
+  const meetupActualStepRef = useRef<number | null>(null);
   const [meetupEvidReady, setMeetupEvidReady] = useState(false);
   const [savedEvidIds, setSavedEvidIds] = useState<Set<string>>(new Set());
   const [packingUploadStep, setPackingUploadStep] = useState<1 | 2 | 3 | null>(null);
@@ -447,6 +449,8 @@ export default function DealRoom() {
     setShowStep3Warning(false);
     step3PendingRef.current = null;
     simpleActualStepRef.current = null;
+    regularActualStepRef.current = null;
+    meetupActualStepRef.current = null;
   }, [dealId, myId]);
 
   useEffect(() => {
@@ -556,9 +560,16 @@ export default function DealRoom() {
       return;
     }
     const nextStep = getSimpleStep().step;
+    const prevStep = simpleActualStepRef.current;
+    const enteringChat = prevStep !== null && prevStep < 3 && nextStep >= 3;
+    if (enteringChat && !showStep3Warning) {
+      step3PendingRef.current = 3;
+      setWzViewStep(2);
+      setShowStep3Warning(true);
+    }
     // ถ้าสถานะจริงของดีลเดินหน้าแล้ว ให้ยกเลิกโหมด "ดูขั้นเก่า" อัตโนมัติ
     // เพื่อไม่ให้ค้างที่หน้าขั้นเดิมหลังยืนยันหลักฐาน/ขยับสเต็ปสำเร็จ
-    if (simpleActualStepRef.current !== null && nextStep > simpleActualStepRef.current) {
+    if (prevStep !== null && nextStep > prevStep && !enteringChat) {
       setWzViewStep(null);
     }
     simpleActualStepRef.current = nextStep;
@@ -579,6 +590,85 @@ export default function DealRoom() {
     priceState?.refund_slip_file_id,
     chatReviewReady,
     feeConfig,
+    showStep3Warning,
+  ]);
+
+  useEffect(() => {
+    if (!deal || deal.deal_type === 'simple' || deal.deal_type === 'meetup') {
+      regularActualStepRef.current = null;
+      return;
+    }
+    const nextStep = getRegularStep().step;
+    const prevStep = regularActualStepRef.current;
+    const enteringChat = prevStep !== null && prevStep < 3 && nextStep >= 3;
+    if (enteringChat && !showStep3Warning) {
+      step3PendingRef.current = 3;
+      setWzViewStep(2);
+      setShowStep3Warning(true);
+    }
+    if (prevStep !== null && nextStep > prevStep && !enteringChat) {
+      setWzViewStep(null);
+    }
+    regularActualStepRef.current = nextStep;
+  }, [
+    deal,
+    dealId,
+    loading,
+    wzViewStep,
+    deal?.status,
+    deal?.price,
+    deal?.fee_payer,
+    deal?.seller_accepted_terms,
+    deal?.buyer_accepted_terms,
+    deal?.middleman_id,
+    deal?.middleman_accepted_terms,
+    priceState?.agreed,
+    priceState?.evidence_done_buyer,
+    priceState?.evidence_done_seller,
+    priceState?.evidence_done_middleman,
+    priceState?.seller_fee_slip,
+    priceState?.payout_slip_file_id,
+    priceState?.refund_slip_file_id,
+    chatReviewReady,
+    feeConfig,
+    showStep3Warning,
+  ]);
+
+  useEffect(() => {
+    if (deal?.deal_type !== 'meetup') {
+      meetupActualStepRef.current = null;
+      return;
+    }
+    const nextStep = getMeetupStep().step;
+    const prevStep = meetupActualStepRef.current;
+    const enteringChat = prevStep !== null && prevStep < 2 && nextStep >= 2;
+    if (enteringChat && !showStep3Warning) {
+      step3PendingRef.current = 2;
+      setWzViewStep(1);
+      setShowStep3Warning(true);
+    }
+    if (prevStep !== null && nextStep > prevStep && !enteringChat) {
+      setWzViewStep(null);
+    }
+    meetupActualStepRef.current = nextStep;
+  }, [
+    deal,
+    dealId,
+    loading,
+    wzViewStep,
+    deal?.status,
+    deal?.price,
+    deal?.fee_payer,
+    deal?.seller_accepted_terms,
+    deal?.buyer_accepted_terms,
+    meetup?.deposit,
+    meetup?.refund_outcome,
+    priceState?.agreed,
+    priceState?.evidence_done_buyer,
+    priceState?.evidence_done_seller,
+    chatReviewReady,
+    feeConfig,
+    showStep3Warning,
   ]);
 
   useEffect(() => {
@@ -2505,7 +2595,7 @@ export default function DealRoom() {
 
     function goToStep(nextStep: number) {
       const safe = Math.min(actualStep, nextStep);
-      if (step === 3 && safe === 4) {
+      if (step === 2 && safe === 3) {
         step3PendingRef.current = safe;
         setShowStep3Warning(true);
         return;
@@ -3513,6 +3603,15 @@ export default function DealRoom() {
     const step = Math.min(wzViewStep ?? defaultStep, actualStep);
     const chatPreFlow = negotiatePreFlow; // ใช้ชื่อเดิมในส่วนปุ่มถัดไปด้านล่าง
     const isReviewing = negotiatePreFlow ? step < 2 : step < actualStep;
+    function goToMeetupStep(nextStep: number) {
+      const safeNextStep = Math.min(actualStep, nextStep);
+      if (step === 1 && safeNextStep === 2) {
+        step3PendingRef.current = safeNextStep;
+        setShowStep3Warning(true);
+        return;
+      }
+      setWzViewStep(safeNextStep);
+    }
     return (
       <div className="dr-inner">
         <DealFlowBrand className="dr-brand-slot" />
@@ -3541,7 +3640,7 @@ export default function DealRoom() {
               : <span />}
             {/* ซ่อนปุ่มถัดไปใน pre-flow (แชท/ตรวจหลักฐาน/ตกลงจุดนัด) — ต้องกดปุ่มหลักในแต่ละขั้น */}
             {step < actualStep && !(chatPreFlow && step >= 2) && (
-              <button type="button" className="btn btn-primary" onClick={() => setWzViewStep(Math.min(actualStep, step + 1))}>ถัดไป →</button>
+              <button type="button" className="btn btn-primary" onClick={() => goToMeetupStep(step + 1)}>ถัดไป →</button>
             )}
           </div>
         )}
@@ -3782,7 +3881,7 @@ export default function DealRoom() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(11, 18, 32, .72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 110 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 680, background: 'var(--surface)', borderRadius: 'var(--r-xl)', border: '1px solid #f7c6cd', boxShadow: '0 30px 70px rgba(12, 24, 54, .28)', padding: '24px 20px 20px', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(24px, 4vw, 34px)', lineHeight: 1.15, color: '#cf2038', marginBottom: 16 }}>*โปรดอ่านอย่างละเอียด*</div>
-            <img src="/Lawn.webp" alt="คำเตือนก่อนเข้าขั้นตอนที่ 3" style={{ width: 'min(100%, 600px)', height: 'auto', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', margin: '0 auto 16px', borderRadius: 'var(--r-lg)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
+            <img src="/Lawn.webp" alt="คำเตือนก่อนเข้าหน้าพูดคุย" style={{ width: 'min(100%, 600px)', height: 'auto', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', margin: '0 auto 16px', borderRadius: 'var(--r-lg)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
             <div style={{ fontSize: 'clamp(15px, 2.4vw, 18px)', fontWeight: 700, color: 'var(--ink)', marginBottom: 18 }}>*หากละเลยอาจเสียเปรียบในกรณีเกิดปัญหา*</div>
             <button
               type="button"
