@@ -32,6 +32,10 @@ const REGULAR_DEAL_STEP1_SLIDES = [
   '/Trade/no2.webp',
   '/Trade/no3.webp',
 ];
+const SIMPLE_DEAL_STEP1_SLIDES = [
+  '/Eazy/St1.webp',
+  '/Eazy/St2.webp',
+];
 
 // ─── Jitsi Meet via External API ─────────────────────────────────────────
 function JitsiMeet({ roomName, displayName }: { roomName: string; displayName: string }) {
@@ -425,6 +429,7 @@ export default function DealRoom() {
   const [packingUploadStep, setPackingUploadStep] = useState<1 | 2 | 3 | null>(null);
   const [packingCarouselIndex, setPackingCarouselIndex] = useState(0);
   const [isPackingCompactLayout, setIsPackingCompactLayout] = useState(false);
+  const [simpleDealIntroSlide, setSimpleDealIntroSlide] = useState(0);
   const [regularDealIntroSlide, setRegularDealIntroSlide] = useState(0);
   const [meetupPropLabel, setMeetupPropLabel] = useState<string | null>(null); // null=hidden ''=custom label
   const [meetupPropAmt, setMeetupPropAmt] = useState('');
@@ -481,6 +486,13 @@ export default function DealRoom() {
     }, 3000);
     return () => window.clearInterval(timer);
   }, [isPackingCompactLayout]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSimpleDealIntroSlide(prev => (prev + 1) % SIMPLE_DEAL_STEP1_SLIDES.length);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1892,14 +1904,26 @@ export default function DealRoom() {
           <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>อ่านและยอมรับเงื่อนไขก่อนเริ่มดีล</div>
           <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>{t.name}</p>
         </div>
-        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--green-600)', marginBottom: 6 }}>✅ บริการนี้ครอบคลุม</div>
-        <ul style={{ margin: '0 0 14px', paddingLeft: 18, fontSize: 13.5, lineHeight: 1.7, color: 'var(--ink)' }}>
-          {t.covers.map((c, i) => <li key={i}>{c}</li>)}
-        </ul>
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#b22441', marginBottom: 6 }}>⚠️ ไม่ครอบคลุม</div>
-        <ul style={{ margin: '0 0 14px', paddingLeft: 18, fontSize: 13.5, lineHeight: 1.7, color: 'var(--muted)' }}>
-          {t.excludes.map((c, i) => <li key={i}>{c}</li>)}
-        </ul>
+        <div className="simple-step1-slider-frame">
+          <img
+            key={SIMPLE_DEAL_STEP1_SLIDES[simpleDealIntroSlide]}
+            src={SIMPLE_DEAL_STEP1_SLIDES[simpleDealIntroSlide]}
+            alt={`ภาพอธิบายเงื่อนไขดีลแบบง่าย ${simpleDealIntroSlide + 1}`}
+            className="simple-step1-slider-image"
+          />
+        </div>
+        <div className="svc-simple-slider-dots" aria-label="ตัวเลือกภาพเงื่อนไขดีลแบบง่าย" style={{ marginBottom: 16 }}>
+          {SIMPLE_DEAL_STEP1_SLIDES.map((slide, index) => (
+            <button
+              key={slide}
+              type="button"
+              className={`svc-simple-slider-dot${index === simpleDealIntroSlide ? ' is-active' : ''}`}
+              onClick={() => setSimpleDealIntroSlide(index)}
+              aria-label={`ดูภาพเงื่อนไข ${index + 1}`}
+              aria-pressed={index === simpleDealIntroSlide}
+            />
+          ))}
+        </div>
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
           <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>💸 ค่าบริการโดยประมาณ (มูลค่า ฿{deal!.price.toLocaleString()})</div>
           {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
