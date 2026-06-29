@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -10,6 +11,10 @@ import { RATE_PER_KM } from '@/lib/provinceGeo';
 import { useServiceControls } from '@/lib/useServiceControls';
 
 const PLATFORM = 50, MM_FEE = 300;
+const MODES = [
+  { title: 'รับประกันเดินทาง EzDrive', href: '/service/meetup?step=2', image: '/Drive/Ezdrive.webp', kind: 'guarantee' as const },
+  { title: 'Safedrive นัดรับเซฟโซน', href: '/deal/create?safezone=1', image: '/Drive/Safedrive.webp', kind: 'safezone' as const },
+];
 
 function MeetupInner() {
   const router = useRouter();
@@ -17,7 +22,6 @@ function MeetupInner() {
   const controls = useServiceControls();
   // เปิดจากปุ่ม "นัดรับ" ในหน้าสินค้า/ประกาศหา → ข้ามมาขั้นกรอกที่อยู่เลย พร้อม prefill
   const preset = sp.get('step') === '2';
-  const [mode, setMode] = useState<string | null>(preset ? 'guarantee' : null);
   const [feeWho, setFeeWho] = useState('split');
   const [step, setStep] = useState<1 | 2>(preset ? 2 : 1);
 
@@ -28,7 +32,7 @@ function MeetupInner() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const total = mode === 'safezone' ? PLATFORM + MM_FEE : PLATFORM;
+  const total = PLATFORM;
   const buyerFee = feeWho === 'split' ? total / 2 : feeWho === 'buyer' ? total : 0;
   const sellerFee = feeWho === 'split' ? total / 2 : feeWho === 'seller' ? total : 0;
   const guaranteeEnabled = controls.isEnabled('meetupGuarantee');
@@ -77,7 +81,7 @@ function MeetupInner() {
   }
 
   return (
-    <div className="sub-page service-sub-page">
+    <div className="sub-page service-sub-page service-trade-page service-meetup-page">
       <header className="sub-header">
         <Link href="/" className="sub-back" aria-label="ย้อนกลับ">
           <span className="sub-back-arrow">←</span>
@@ -90,57 +94,34 @@ function MeetupInner() {
 
         {step === 1 && (
           <>
-            <h2 style={{ marginBottom: 6 }}>เลือกรูปแบบนัดรับ</h2>
-            <p style={{ color: 'var(--muted)', fontSize: 14.5, marginBottom: 24, lineHeight: 1.6 }}>คนกลางช่วยจัดการจุดนัดพบให้ปลอดภัย ไม่ต้องเจอกันสองต่อสองโดยไม่มีพยาน</p>
-
-            {[
-              { k: 'guarantee', icon: '🚗', title: 'รับประกันเดินทาง', sub: 'ทั้งสองฝ่ายวางเงินประกันเท่ากัน มาตามนัดได้คืนเต็มจำนวน ผิดนัดเงินประกันชดเชยให้ฝ่ายที่มา — ไม่ต้องใช้คนกลาง', fee: PLATFORM },
-              { k: 'safezone', icon: '🏪', title: 'Safe Zone (จุดนัดพบปลอดภัย)', sub: 'คนกลางเป็นผู้ดูแลสถานที่นัดพบ เช่น ร้านมือถือ อู่รถ หน้าร้านค้า', fee: PLATFORM + MM_FEE },
-            ].map(o => {
-              const enabled = o.k === 'guarantee' ? guaranteeEnabled : safeZoneEnabled;
-              const note = o.k === 'guarantee' ? controls.message('meetupGuarantee') : controls.message('meetupSafeZone');
-              return (
-              <div
-                key={o.k}
-                className={`svc-card${mode === o.k ? ' sel' : ''}`}
-                onClick={() => { if (enabled) setMode(o.k); }}
-                style={!enabled ? { opacity: 0.68, cursor: 'not-allowed' } : undefined}
-              >
-                <div className="svc-card-head">
-                  <div className="svc-card-icon">{o.icon}</div>
-                  <div><div className="svc-card-title">{o.title}</div><div className="svc-card-sub">{o.sub}</div></div>
-                </div>
-                {!enabled && <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700', lineHeight: 1.6 }}>{note}</div>}
-                {mode === o.k && (
-                  <div className="svc-fee-box">
-                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>ค่าใช้จ่าย</div>
-                    <div className="svc-fee-row"><span className="svc-fee-lbl">ค่าธรรมเนียมแพลตฟอร์ม</span><span className="svc-fee-val">฿{PLATFORM}</span></div>
-                    {o.k === 'safezone' && <div className="svc-fee-row"><span className="svc-fee-lbl">ค่าบริการคนกลาง</span><span className="svc-fee-val">฿{MM_FEE}</span></div>}
-                    {o.k === 'guarantee' && <div className="svc-fee-row"><span className="svc-fee-lbl">เงินประกันเดินทาง (ได้คืนเมื่อมาตามนัด)</span><span className="svc-fee-val">ตกลงกันในห้องดีล</span></div>}
-                    <div className="svc-fee-total"><span className="svc-fee-lbl">รวม</span><span className="svc-fee-val">฿{o.fee}{o.k === 'guarantee' ? ' + ประกัน' : ''}</span></div>
-                    <div style={{ marginTop: 10 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 7 }}>ใครออกค่าธรรมเนียม?</div>
-                      <div className="svc-who-chips">
-                        {[{ k: 'split', l: 'หารกัน' }, { k: 'buyer', l: 'ผู้ซื้อออก' }, { k: 'seller', l: 'ผู้ขายออก' }].map(w => (
-                          <button key={w.k} className={`svc-chip${feeWho === w.k ? ' sel' : ''}`} onClick={e => { e.stopPropagation(); setFeeWho(w.k); }}>{w.l}</button>
-                        ))}
-                      </div>
-                      {feeWho === 'split' && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>ผู้ซื้อออก ฿{buyerShareText(buyerFee)} · ผู้ขายออก ฿{buyerShareText(sellerFee)}</p>}
+            <div className="svc-hero">
+              <div className="svc-hero-icon">🚗</div>
+              <h1 className="svc-hero-title">เลือกรูปแบบบริการ</h1>
+            </div>
+            <div className="svc-modes">
+              {MODES.map(m => {
+                const enabled = m.kind === 'guarantee' ? guaranteeEnabled : safeZoneEnabled;
+                const note = m.kind === 'guarantee' ? controls.message('meetupGuarantee') : controls.message('meetupSafeZone');
+                return enabled ? (
+                  <Link key={m.title} href={m.href} className="svc-mode">
+                    <div className="svc-mode-media">
+                      <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 100vw, 50vw" />
                     </div>
+                    <div className="svc-mode-title">{m.title}</div>
+                    <div className="svc-mode-cta">เริ่มต้น <span>→</span></div>
+                  </Link>
+                ) : (
+                  <div key={m.title} className="svc-mode" style={{ opacity: 0.7, cursor: 'not-allowed' }}>
+                    <div className="svc-mode-media">
+                      <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 100vw, 50vw" />
+                    </div>
+                    <div className="svc-mode-title">{m.title}</div>
+                    <div className="svc-mode-cta" style={{ color: '#b7791f' }}>ปิดชั่วคราว</div>
+                    <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700', lineHeight: 1.6 }}>{note}</div>
                   </div>
-                )}
-              </div>
-              );
-            })}
-
-            {mode === 'guarantee' && guaranteeEnabled && (
-              <button className="btn btn-primary btn-block" style={{ marginTop: 8 }} onClick={() => setStep(2)}>
-                ถัดไป: ระบุที่อยู่ของฉัน →
-              </button>
-            )}
-            {mode === 'safezone' && safeZoneEnabled && (
-              <Link href="/deal/create?safezone=1" className="btn btn-primary btn-block" style={{ marginTop: 8, display: 'flex', textDecoration: 'none', justifyContent: 'center' }}>สร้างดีลนัดรับ →</Link>
-            )}
+                );
+              })}
+            </div>
           </>
         )}
 
@@ -195,8 +176,6 @@ function MeetupInner() {
     </div>
   );
 }
-
-function buyerShareText(n: number) { return n.toLocaleString(); }
 
 export default function MeetupPage() {
   return (
