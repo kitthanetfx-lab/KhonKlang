@@ -2181,7 +2181,7 @@ export default function DealRoom() {
                         : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.file_name}</a>
                         : m.content}
                     </div>
-                    {isMedia && <span style={{ marginLeft: isMe ? 'auto' : 0 }}>{pinBtn(m, true)}</span>}
+                    {isMedia && !isMe && <span style={{ marginLeft: 0 }}>{pinBtn(m, true)}</span>}
                   </div>
                 </div>
               );
@@ -3444,7 +3444,7 @@ export default function DealRoom() {
               deal={deal!}
               myRole={myRole as 'buyer' | 'seller' | 'middleman'}
               headers={authHdrs}
-              onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); router.push('/'); }}
+              onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
               onRatedChange={setCompletionAllRated}
               onSubmitError={() => setCompletionSending(false)}
               externalSubmitTrigger={completionSubmitTrigger}
@@ -4321,7 +4321,7 @@ export default function DealRoom() {
                           </div>
                           <span className="dr-bubble-t">
                             {new Date(m.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                            <span style={{ marginLeft: 8 }}>{pinBtn(m)}</span>
+                            {!isMe && <span style={{ marginLeft: 8 }}>{pinBtn(m)}</span>}
                           </span>
                         </div>
                       </div>
