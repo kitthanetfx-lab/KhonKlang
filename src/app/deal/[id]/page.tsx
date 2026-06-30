@@ -3942,7 +3942,7 @@ export default function DealRoom() {
     const myDepartedAt = myRole === 'buyer' ? md.buyer_departed_at : md.seller_departed_at;
     const myMet = myRole === 'buyer' ? md.buyer_met : md.seller_met;
     // หลักฐานการเจอกัน — บังคับอัปโหลดอย่างน้อย 1 ชิ้นก่อนกด "เจอกันแล้ว"
-    const meetEvidence = evidence.filter(e => e.type === 'meet' && e.uploader_id === myId);
+    const meetEvidence = evidence.filter(e => e.type === 'meet' && e.uploaded_by === myId);
     const hasMeetEvidence = meetEvidence.length > 0;
     // ข้อ5: สถานะรับทราบการออกเดินทาง (buyer_departed_ack_at = ผู้ขายรับทราบของผู้ซื้อ)
     const otherDepartedAt = myRole === 'buyer' ? md.seller_departed_at : md.buyer_departed_at;
