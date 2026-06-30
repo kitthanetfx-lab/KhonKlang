@@ -9,6 +9,7 @@ import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { RATE_PER_KM } from '@/lib/provinceGeo';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { DealFlowBrand } from '@/components/DealFlowBrand';
 
 const PLATFORM = 50, MM_FEE = 300;
 const MODES = [
@@ -135,6 +136,7 @@ function MeetupInner() {
 
         {step === 2 && (
           <>
+            <DealFlowBrand docked />
             <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => setStep(1)}>← ย้อนกลับ</button>
             <h2 style={{ marginBottom: 6 }}>🚗 นัดรับ + รับประกันเดินทาง</h2>
             <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 20, lineHeight: 1.65 }}>
