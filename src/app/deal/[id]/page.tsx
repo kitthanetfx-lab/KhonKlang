@@ -413,6 +413,7 @@ export default function DealRoom() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const evidInputRef = useRef<HTMLInputElement>(null);
   const meetupSlipInputRef = useRef<HTMLInputElement>(null);
+  const meetupMeetEvidInputRef = useRef<HTMLInputElement>(null);
   const buyerEvidInputRef = useRef<HTMLInputElement>(null);
   const sellerFeeInputRef = useRef<HTMLInputElement>(null);
   const [showTerms, setShowTerms] = useState(false);
@@ -1773,7 +1774,8 @@ export default function DealRoom() {
       const sellerRS = !!pd.chat_done_seller || !!pd.evidence_done_seller;
       const buyerRS = !!pd.chat_done_buyer || !!pd.evidence_done_buyer;
       const mmRS = !!pd.chat_done_middleman || !!pd.evidence_done_middleman;
-      const reviewStarted = sellerRS || buyerRS || mmRS || chatReviewReady;
+      // ต้องครบทุกฝ่าย (&&) ถึงจะข้ามไป step ถัดไป — กันฝ่ายเดียวกดแล้ว actualStep เพิ่ม ทำให้อีกฝ่ายกด "ถัดไป" ข้ามได้
+      const reviewStarted = sellerRS && buyerRS && mmRS;
       const evReady = !!pd.evidence_done_buyer && !!pd.evidence_done_seller && !!pd.evidence_done_middleman;
       if (!reviewStarted) return { step: 3 }; // คุย 3 ฝ่ายก่อน
       if (!evReady) return { step: 4 }; // ตรวจ/ยืนยันหลักฐานก่อน
@@ -3939,6 +3941,9 @@ export default function DealRoom() {
     const isParty = myRole === 'buyer' || myRole === 'seller';
     const myDepartedAt = myRole === 'buyer' ? md.buyer_departed_at : md.seller_departed_at;
     const myMet = myRole === 'buyer' ? md.buyer_met : md.seller_met;
+    // หลักฐานการเจอกัน — บังคับอัปโหลดอย่างน้อย 1 ชิ้นก่อนกด "เจอกันแล้ว"
+    const meetEvidence = evidence.filter(e => e.type === 'meet' && e.uploader_id === myId);
+    const hasMeetEvidence = meetEvidence.length > 0;
     // ข้อ5: สถานะรับทราบการออกเดินทาง (buyer_departed_ack_at = ผู้ขายรับทราบของผู้ซื้อ)
     const otherDepartedAt = myRole === 'buyer' ? md.seller_departed_at : md.buyer_departed_at;
     const iAckedOther = !!(myRole === 'buyer' ? md.seller_departed_ack_at : md.buyer_departed_ack_at);
@@ -4010,38 +4015,154 @@ export default function DealRoom() {
           </div>
         ))}
         {isParty && !myMet && (
-          <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {!myDepartedAt && (
-              <AsyncButton className="btn btn-primary btn-block" onClick={() => { startShareLoc(); return doAction('meetup_depart'); }}>🚗 ออกเดินทางแล้ว — แชร์ตำแหน่ง</AsyncButton>
-            )}
-            {myDepartedAt && (
-              <AsyncButton className="btn btn-green btn-block btn-lg" onClick={() => { if (!confirm('ยืนยันว่านัดเจอกันสำเร็จแล้ว?')) return; stopShareLoc(); return doAction('meetup_met'); }}>✅ เจอกันแล้ว — ยืนยัน</AsyncButton>
-            )}
-          </div>
+          <>
+            {/* อัปโหลดหลักฐานการเจอกัน — บังคับก่อนกด "เจอกันแล้ว" */}
+            <div className="dr-card">
+              <div className="dr-card-title">📷 หลักฐานการเจอกัน (บังคับ)</div>
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>ถ่ายรูปหรือวิดีโอขณะเจอกัน — ต้องอัปโหลดอย่างน้อย 1 ชิ้นก่อนกดยืนยัน</p>
+              {meetEvidence.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 8, marginBottom: 10 }}>
+                  {meetEvidence.map((item, i) => {
+                    const url = item.file_id ? fileUrl(item.file_id) : '';
+                    const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
+                    return (
+                      <a key={item.id || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', position: 'relative' }}>
+                        {isVid
+                          ? <video src={url} style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
+                          : <img src={url} alt={item.file_name} style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8 }} />}
+                        {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 18, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>▶</span>}
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+              <button type="button" className="btn btn-soft btn-block btn-sm" onClick={() => meetupMeetEvidInputRef.current?.click()}>
+                <Icon name="upload" size={15} /> {meetEvidence.length > 0 ? 'เพิ่มหลักฐาน' : 'อัปโหลดรูป/วิดีโอหลักฐาน'}
+              </button>
+              <input ref={meetupMeetEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }}
+                onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; await uploadFile(f, true, 'meet'); }} />
+            </div>
+            <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {!myDepartedAt && (
+                <AsyncButton className="btn btn-primary btn-block" onClick={() => { startShareLoc(); return doAction('meetup_depart'); }}>🚗 ออกเดินทางแล้ว — แชร์ตำแหน่ง</AsyncButton>
+              )}
+              {myDepartedAt && (
+                <>
+                  {!hasMeetEvidence && (
+                    <p style={{ fontSize: 12.5, color: '#b22441', textAlign: 'center' }}>⚠️ อัปโหลดหลักฐานการเจอกันก่อน จึงจะยืนยันได้</p>
+                  )}
+                  <AsyncButton
+                    className="btn btn-green btn-block btn-lg"
+                    disabled={!hasMeetEvidence}
+                    onClick={() => { if (!confirm('ยืนยันว่านัดเจอกันสำเร็จแล้ว?')) return; stopShareLoc(); return doAction('meetup_met'); }}
+                  >✅ เจอกันแล้ว — ยืนยัน</AsyncButton>
+                </>
+              )}
+            </div>
+          </>
         )}
       </div>
     );
   }
 
   function renderMeetupWizardStepWaitRefund(outcome?: 'completed' | 'cancelled') {
-    if (outcome === 'cancelled') {
-      return (
-        <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px', borderColor: '#fbd5dd' }}>
-          <div style={{ fontSize: 38, marginBottom: 10 }}>↩️</div>
-          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: '#b22441', marginBottom: 8 }}>ดีลถูกยกเลิก</div>
-          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ศูนย์กลางกำลังดำเนินการคืนเงินประกันให้ทั้งสองฝ่าย</p>
-        </div>
-      );
-    }
+    const md: MeetupData = meetup || {};
+    const isCancelled = outcome === 'cancelled';
+    // gallery หลักฐานทั้งหมด: สลิปประกัน + หลักฐานการเจอกัน (สลิปคืนเงินยังไม่มีในขั้นนี้)
+    const depositSlips = [
+      md.buyer_slip && { label: 'สลิปประกันผู้ซื้อ', id: md.buyer_slip },
+      md.seller_slip && { label: 'สลิปประกันผู้ขาย', id: md.seller_slip },
+    ].filter(Boolean) as { label: string; id: string }[];
+    const meetEvidItems = evidence.filter(e => e.type === 'meet');
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
-          <div style={{ fontSize: 38, marginBottom: 10 }}>⏳</div>
-          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>นัดพบสำเร็จ! 🎉 — ศูนย์กลางกำลังคืนเงินประกัน</div>
-          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ทีมงานกำลังตัดสินและโอนเงินประกันคืน — จะแจ้งให้ทราบเมื่อโอนแล้ว</p>
-        </div>
-        {/* ให้รีวิว+ดาว ตรงนี้เลย — ส่วนใหญ่ผู้ใช้ไม่กลับเข้าดีลอีกหลังได้เงินคืน */}
-        <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />
+        {isCancelled ? (
+          <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px', borderColor: '#fbd5dd' }}>
+            <div style={{ fontSize: 38, marginBottom: 10 }}>↩️</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: '#b22441', marginBottom: 8 }}>ดีลถูกยกเลิก</div>
+            <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ศูนย์กลางกำลังดำเนินการคืนเงินประกันให้ทั้งสองฝ่าย</p>
+          </div>
+        ) : (
+          <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
+            <div style={{ fontSize: 38, marginBottom: 10 }}>⏳</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>นัดพบสำเร็จ! 🎉 — ศูนย์กลางกำลังคืนเงินประกัน</div>
+            <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ทีมงานกำลังตัดสินและโอนเงินประกันคืน — จะแจ้งให้ทราบเมื่อโอนแล้ว</p>
+          </div>
+        )}
+        {/* gallery สลิปวางประกัน */}
+        {depositSlips.length > 0 && (
+          <div className="dr-card">
+            <div className="dr-card-title">🧾 สลิปเงินประกัน</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+              {depositSlips.map(s => (
+                <div key={s.id}>
+                  <a href={fileUrl(s.id)} target="_blank" rel="noreferrer">
+                    <img src={fileUrl(s.id)} alt={s.label} style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} />
+                  </a>
+                  <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* gallery หลักฐานการเจอกัน */}
+        {meetEvidItems.length > 0 && (
+          <div className="dr-card">
+            <div className="dr-card-title">📷 หลักฐานการเจอกัน</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
+              {meetEvidItems.map((item, i) => {
+                const url = item.file_id ? fileUrl(item.file_id) : '';
+                const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
+                return (
+                  <a key={item.id || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', position: 'relative' }}>
+                    {isVid
+                      ? <video src={url} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
+                      : <img src={url} alt={item.file_name} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8 }} />}
+                    {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 18, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>▶</span>}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {/* ระบบ review + completion เหมือน simple wizard */}
+        {!isCancelled && (
+          <ReviewPanel
+            deal={deal!}
+            myRole={myRole as 'buyer' | 'seller' | 'middleman'}
+            headers={authHdrs}
+            onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
+            onRatedChange={setCompletionAllRated}
+            onSubmitError={() => setCompletionSending(false)}
+            externalSubmitTrigger={completionSubmitTrigger}
+          />
+        )}
+        {(() => {
+          if (isCancelled) return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>🏠 กลับหน้าหลัก</button>
+            </div>
+          );
+          const alreadyDone = completionReviewed;
+          if (alreadyDone) return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>🏠 เสร็จสิ้น-กลับหน้าหลัก</button>
+            </div>
+          );
+          if (completionAllRated) return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-primary btn-block btn-lg" disabled={completionSending}
+                onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}>
+                {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
+              </button>
+            </div>
+          );
+          return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>🔒 บันทึกหลักฐาน-จบดีล</button>
+            </div>
+          );
+        })()}
       </div>
     );
   }
@@ -4053,10 +4174,16 @@ export default function DealRoom() {
       both: 'คืนให้ทั้งสองฝ่าย', frozen: 'อายัดไว้ชั่วคราว',
     };
     const outcomeLabel = md.refund_outcome ? OUTCOME_LABEL[md.refund_outcome] : '';
-    const slips = [
+    const depositSlips = [
+      md.buyer_slip && { label: 'สลิปประกันผู้ซื้อ', id: md.buyer_slip },
+      md.seller_slip && { label: 'สลิปประกันผู้ขาย', id: md.seller_slip },
+    ].filter(Boolean) as { label: string; id: string }[];
+    const refundSlips = [
       md.buyer_refund_slip && { label: 'สลิปคืนเงินผู้ซื้อ', id: md.buyer_refund_slip },
       md.seller_refund_slip && { label: 'สลิปคืนเงินผู้ขาย', id: md.seller_refund_slip },
     ].filter(Boolean) as { label: string; id: string }[];
+    const meetEvidItems = evidence.filter(e => e.type === 'meet');
+    const allSlips = [...depositSlips, ...refundSlips];
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card dr-done-card">
@@ -4065,20 +4192,73 @@ export default function DealRoom() {
           {outcomeLabel && <div className="dr-done-sub">ผลการคืนเงินประกัน: {outcomeLabel}</div>}
           {md.refund_decision_note && <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>{md.refund_decision_note}</div>}
         </div>
-        {slips.length > 0 && (
+        {/* gallery สลิปทั้งหมด */}
+        {allSlips.length > 0 && (
           <div className="dr-card">
-            <div className="dr-card-title">📎 สลิปคืนเงินประกัน</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-              {slips.map(s => (
+            <div className="dr-card-title">🧾 สลิปทั้งหมดในดีล</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+              {allSlips.map(s => (
                 <div key={s.id}>
-                  <a href={fileUrl(s.id)} target="_blank" rel="noreferrer"><img src={fileUrl(s.id)} alt={s.label} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+                  <a href={fileUrl(s.id)} target="_blank" rel="noreferrer">
+                    <img src={fileUrl(s.id)} alt={s.label} style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} />
+                  </a>
                   <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{s.label}</p>
                 </div>
               ))}
             </div>
           </div>
         )}
-        <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />
+        {/* gallery หลักฐานการเจอกัน */}
+        {meetEvidItems.length > 0 && (
+          <div className="dr-card">
+            <div className="dr-card-title">📷 หลักฐานการเจอกัน</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
+              {meetEvidItems.map((item, i) => {
+                const url = item.file_id ? fileUrl(item.file_id) : '';
+                const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
+                return (
+                  <a key={item.id || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', position: 'relative' }}>
+                    {isVid
+                      ? <video src={url} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
+                      : <img src={url} alt={item.file_name} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8 }} />}
+                    {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 18, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>▶</span>}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {/* ระบบ review + completion เหมือน simple wizard */}
+        <ReviewPanel
+          deal={deal!}
+          myRole={myRole as 'buyer' | 'seller' | 'middleman'}
+          headers={authHdrs}
+          onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
+          onRatedChange={setCompletionAllRated}
+          onSubmitError={() => setCompletionSending(false)}
+          externalSubmitTrigger={completionSubmitTrigger}
+        />
+        {(() => {
+          const alreadyDone = completionReviewed;
+          if (alreadyDone) return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>🏠 เสร็จสิ้น-กลับหน้าหลัก</button>
+            </div>
+          );
+          if (completionAllRated) return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-primary btn-block btn-lg" disabled={completionSending}
+                onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}>
+                {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
+              </button>
+            </div>
+          );
+          return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>🔒 บันทึกหลักฐาน-จบดีล</button>
+            </div>
+          );
+        })()}
       </div>
     );
   }

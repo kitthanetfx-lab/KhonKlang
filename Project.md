@@ -1,5 +1,19 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-01 (ต่อ 3)
+
+### ป้องกันฝ่ายเดียวเปลี่ยน step + บังคับหลักฐาน + completion meetup
+
+1. **แก้ getRegularStep()** — `reviewStarted` เปลี่ยนจาก `||` → `&&` ต้องครบทุกฝ่ายกด chat_done ถึงจะข้าม step คุย
+2. **step 7 meetup (เจอกัน)** — เพิ่มส่วน upload หลักฐาน type='meet', ปุ่ม "เจอกันแล้ว" disabled จนกว่าจะอัปโหลดอย่างน้อย 1 ชิ้น, เพิ่ม ref `meetupMeetEvidInputRef`
+3. **step 8 meetup (รอคืนเงิน)** — เพิ่ม gallery สลิปประกัน + หลักฐานเจอกัน + completion review system (🔒→💾→🏠)
+4. **step 9 meetup (จบ)** — เพิ่ม gallery สลิปทั้งหมด (ประกัน+คืนเงิน) + หลักฐาน + completion review system เหมือนกัน
+
+### ไฟล์ที่แก้ไข (2026-07-01 ต่อ 3)
+- `src/app/deal/[id]/page.tsx`
+
+---
+
 ## 2026-07-01 (ต่อ 2)
 
 ### ซ่อนปุ่ม "เก็บหลักฐาน" จากผู้ส่งรูปเอง
