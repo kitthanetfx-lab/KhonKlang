@@ -106,13 +106,18 @@ function MeetupInner() {
                 const enabled = m.kind === 'guarantee' ? guaranteeEnabled : safeZoneEnabled;
                 const note = m.kind === 'guarantee' ? controls.message('meetupGuarantee') : controls.message('meetupSafeZone');
                 return enabled ? (
-                  <Link key={m.title} href={m.href} className="svc-mode">
+                  <div
+                    key={m.title}
+                    className="svc-mode"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => m.kind === 'guarantee' ? setStep(2) : router.push(m.href)}
+                  >
                     <div className="svc-mode-media">
                       <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 100vw, 50vw" />
                     </div>
                     <div className="svc-mode-title">{m.title}</div>
                     <div className="svc-mode-cta">เริ่มต้น <span>→</span></div>
-                  </Link>
+                  </div>
                 ) : (
                   <div key={m.title} className="svc-mode" style={{ opacity: 0.7, cursor: 'not-allowed' }}>
                     <div className="svc-mode-media">
