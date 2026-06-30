@@ -694,7 +694,7 @@ export default function DealRoom() {
   useEffect(() => {
     if (!dealId) return;
     const simpleStep = deal?.deal_type === 'simple' ? getSimpleStep().step : null;
-    const waitSyncFast = deal?.deal_type === 'simple' && (simpleStep === 3 || simpleStep === 4);
+    const waitSyncFast = deal?.deal_type === 'simple' && (simpleStep === 2 || simpleStep === 3);
     const intervalMs = isFinishedStatus(deal?.status) ? 45000 : waitSyncFast ? 4000 : 15000;
     const timer = window.setInterval(() => { void fetchDeal(headersRef.current); }, intervalMs);
     return () => window.clearInterval(timer);
@@ -733,7 +733,7 @@ export default function DealRoom() {
     const isSimpleDeal = deal?.deal_type === 'simple' && !isFinishedStatus(deal?.status);
     const simpleActualStep = isSimpleDeal ? getSimpleStep().step : 0;
     const simpleViewStep = isSimpleDeal ? Math.min(wzViewStep ?? simpleActualStep, simpleActualStep) : 0;
-    const isSimpleChatStage = isSimpleDeal && (simpleViewStep === 3 || simpleViewStep === 4);
+    const isSimpleChatStage = isSimpleDeal && (simpleViewStep === 2 || simpleViewStep === 3);
     if (!isDealParty(deal, myId)) return;
     if (tab !== 'chat' && !showJitsi && !isMeetupDeal && !isSimpleChatStage) return;
     let stopped = false;
