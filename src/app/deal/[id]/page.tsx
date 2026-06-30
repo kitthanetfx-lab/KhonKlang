@@ -3240,7 +3240,7 @@ export default function DealRoom() {
   // Wizard ขั้นตอน "ประกันการเดินทาง" (deal_type === 'meetup') — 7 ขั้น
   // ═══════════════════════════════════════════════════════════════════════
   const MEETUP_WZ_TITLES = [
-    'ยอมรับเงื่อนไข', 'แชทและ Video Call', 'ตรวจหลักฐาน', 'ตกลงจุดนัด',
+    'ระบุที่อยู่', 'แชทและ Video Call', 'ตรวจหลักฐาน', 'ตกลงจุดนัด',
     'วางเงินประกัน', 'รอยืนยันรับเงิน', 'เดินทาง+นัดพบ', 'รอคืนเงินประกัน', 'เสร็จสมบูรณ์',
   ];
   const MWZ_TOTAL = MEETUP_WZ_TITLES.length;
@@ -3275,6 +3275,59 @@ export default function DealRoom() {
             <div key={t} style={{ flex: 1, height: 6, borderRadius: 4, background: i + 1 < clamped ? 'var(--green-500)' : i + 1 === clamped ? 'var(--accent)' : 'var(--line)', transition: 'background .3s' }} />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  function renderMeetupWizardStepJoin() {
+    const md: MeetupData = meetup || {};
+    const myLoc = myRole === 'buyer' ? md.buyer_loc : myRole === 'seller' ? md.seller_loc : undefined;
+    const meAccepted = (myRole === 'seller' && !!deal!.seller_accepted_terms) || (myRole === 'buyer' && !!deal!.buyer_accepted_terms);
+    const isParty = myRole === 'buyer' || myRole === 'seller';
+    async function submitJoin() {
+      if (!meetAddr.tambon) { alert('กรุณาเลือกที่อยู่ให้ถึงระดับตำบล'); return; }
+      await doAction('meetup_set_location', { loc: meetAddr });
+      await doAction('accept_terms');
+    }
+    return (
+      <div className="dr-card">
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 38, marginBottom: 6 }}>📍</div>
+          <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>
+            ระบุที่อยู่ของคุณเพื่อเริ่มดีลนัดรับ
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4, lineHeight: 1.6 }}>ระบบจะใช้จังหวัดเพื่อคำนวณระยะทางและแนะนำจุดนัดพบที่เหมาะสม</p>
+        </div>
+        {isParty && (
+          myLoc?.province ? (
+            <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12, fontSize: 13.5, color: 'var(--green-600)' }}>
+              ✅ ที่อยู่ของคุณ: {addressLabel(myLoc)}
+            </div>
+          ) : (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', display: 'block', marginBottom: 8 }}>
+                📍 ที่อยู่ของฉัน ({myRole === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}) — เลือกถึงระดับตำบล
+              </label>
+              <AddressPicker value={meetAddr} onChange={setMeetAddr} />
+            </div>
+          )
+        )}
+        {renderParticipantStatusRows([
+          { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!deal!.seller_accepted_terms, doneText: '✅ ระบุที่อยู่แล้ว' },
+          { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.buyer_accepted_terms, doneText: '✅ ระบุที่อยู่แล้ว' },
+        ], { marginTop: 12, marginBottom: 14 })}
+        {isParty && !meAccepted && (
+          <AsyncButton
+            className="btn btn-primary btn-block btn-lg"
+            disabled={acting || !meetAddr.tambon}
+            onClick={submitJoin}
+          >
+            📍 ยืนยันที่อยู่และเริ่มดีล →
+          </AsyncButton>
+        )}
+        {isParty && meAccepted && (
+          <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันที่อยู่แล้ว — รออีกฝ่าย</p>
+        )}
       </div>
     );
   }
@@ -3766,7 +3819,7 @@ export default function DealRoom() {
         )}
         <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
           {step === 0 && renderWizardStep0()}
-          {step === 1 && renderWizardStep1()}
+          {step === 1 && renderMeetupWizardStepJoin()}
           {step === 2 && renderWizardStepChat(3)}
           {step === 3 && renderWizardStepEvidenceReview(4)}
           {step === 4 && renderMeetupWizardStepNegotiate()}
