@@ -1674,7 +1674,7 @@ export default function DealRoom() {
   // โฟกัสทีละขั้นตอน (การ์ดเดียว) แทนการแสดงทุกการ์ดพร้อมกันแบบเดิม — ลดความสับสน
   // ═══════════════════════════════════════════════════════════════════════
   const WIZARD_STEP_TITLES = [
-    'ยอมรับเงื่อนไข', 'ตกลงราคา', 'คุย/วิดีโอคอล', 'ตรวจหลักฐาน', 'โอนเงิน',
+    'ยอมรับเงื่อนไข', 'พูดคุย', 'ตรวจหลักฐาน', 'ตกลงราคา', 'โอนเงิน',
     'ตรวจสอบ', 'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
   ];
   const WZ_TOTAL = WIZARD_STEP_TITLES.length;
@@ -1702,10 +1702,10 @@ export default function DealRoom() {
     const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
     if (s === 'payment_pending') {
-      if (!pd.agreed) return { step: 2 }; // ยังไม่ตกลงราคา/ค่าบริการ
+      if (pd.agreed) return { step: 5 }; // ตกลงราคาแล้ว → โอนเงินได้
       const evReady = !!pd.evidence_done_buyer && !!pd.evidence_done_seller;
-      if (evReady) return { step: 5 }; // ทั้งคู่ยืนยันหลักฐานแล้ว → โอนเงินได้
-      return { step: reviewStarted ? 4 : 3 }; // คุย/วิดีโอคอล หรือ กำลังตรวจหลักฐาน
+      if (evReady) return { step: 4 }; // ตรวจหลักฐานเสร็จทั้งคู่ → ตกลงราคา
+      return { step: reviewStarted ? 3 : 2 }; // กำลังตรวจหลักฐาน หรือ พูดคุย
     }
     if (s === 'payment_uploaded') {
       // บั๊กที่เจอ: ถ้าผู้ขายต้องโอนค่าบริการส่วนของตนเองด้วย (fee_payer = seller/split) แต่ยังไม่ได้โอน
@@ -3852,7 +3852,7 @@ export default function DealRoom() {
     const isReviewing = step < actualStep; // กำลังย้อนดูขั้นที่ผ่านมาแล้ว — ปิดปฏิสัมพันธ์ กันกดซ้ำย้อนสถานะดีล
     function goToSimpleStep(nextStep: number) {
       const safeNextStep = Math.min(actualStep, nextStep);
-      if (step === 2 && safeNextStep === 3) {
+      if (step === 1 && safeNextStep === 2) {
         step3PendingRef.current = safeNextStep;
         setShowStep3Warning(true);
         return;
@@ -3871,9 +3871,9 @@ export default function DealRoom() {
         <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
           {step === 0 && renderWizardStep0()}
           {step === 1 && renderWizardStep1()}
-          {step === 2 && renderWizardStepPrice()}
-          {step === 3 && renderWizardStepChat()}
-          {step === 4 && renderWizardStepEvidenceReview()}
+          {step === 2 && renderWizardStepChat()}
+          {step === 3 && renderWizardStepEvidenceReview()}
+          {step === 4 && renderWizardStepPrice()}
           {step === 5 && renderPaymentSection()}
           {step === 6 && renderWizardStep4()}
           {step === 7 && renderWizardStep5()}
