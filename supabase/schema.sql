@@ -853,4 +853,8 @@ create policy reviews_insert_own on reviews
 -- an Authorization header anyway). Access control was "unguessable file id",
 -- not real per-user permission checks at the storage layer — ported as-is,
 -- see supabase/migrations/0003_public_buckets.sql for the rationale in full.
-insert into storage.buckets 
+insert into storage.buckets (id, name, public) values
+  ('deal-files', 'deal-files', true),
+  ('kyc-docs', 'kyc-docs', true),
+  ('report-files', 'report-files', true)
+on conflict (id) do nothing;

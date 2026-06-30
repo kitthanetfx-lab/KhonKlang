@@ -4399,4 +4399,22 @@ export default function DealRoom() {
                 step3PendingRef.current = null;
                 setShowStep3Warning(false);
                 setWzViewStep(nextStep);
-          
+              }}
+            >
+              เข้าใจแล้ว
+            </button>
+          </div>
+        </div>
+      )}
+      {uploadPreview && (
+        <div className="up-toast" role="status" aria-live="polite">
+          {uploadPreview.url
+            ? <img src={uploadPreview.url} alt={`พรีวิว ${uploadPreview.name}`} />
+            : <span className="up-ic">📎</span>}
+          <div className="up-tx"><b>กำลังอัปโหลด...</b><span>{uploadPreview.name}</span></div>
+          <span className="up-spin" aria-hidden="true" />
+        </div>
+      )}
+    </div>
+  );
+}
