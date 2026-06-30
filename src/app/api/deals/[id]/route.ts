@@ -102,7 +102,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
 
     // โหลด deal_price_state / deal_meetup ตามต้องการ (เฉพาะ action ที่ใช้)
-    const needsPriceState = ['price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid'].includes(action);
+    const needsPriceState = ['price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees'].includes(action);
     const needsMeetup = action.startsWith('meetup_');
     const [pdRow, mdRow] = await Promise.all([
       needsPriceState ? db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data) : Promise.resolve(null),
@@ -164,6 +164,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           const who = isSeller ? 'ผู้ขาย' : isMiddleman ? 'คนกลาง' : 'ผู้ซื้อ';
           systemMsg = `${who} ยอมรับเงื่อนไขแล้ว`;
         }
+        break;
+      }
+      case 'propose_mm_fees': {
+        if (!isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const mmFee = Math.max(0, Math.round(Number(body.mmFee) || 0));
+        const inspFee = Math.max(0, Math.round(Number(body.inspectionFee) || 0));
+        priceUpdates = { proposed_mm_fee: mmFee, proposed_inspection_fee: inspFee, mm_fee_accepted_seller: false, mm_fee_accepted_buyer: false };
+        systemMsg = `คนกลางเสนอค่าบริการ ฿${mmFee.toLocaleString()} และค่าตรวจสอบสินค้า ฿${inspFee.toLocaleString()} — รอผู้ซื้อและผู้ขายยืนยัน`;
+        break;
+      }
+      case 'accept_mm_fees': {
+        if (!isSeller && !isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (isSeller) priceUpdates = { mm_fee_accepted_seller: true };
+        if (isBuyer)  priceUpdates = { mm_fee_accepted_buyer:  true };
+        const sellerOk = isSeller ? true : !!pd.mm_fee_accepted_seller;
+        const buyerOk  = isBuyer  ? true : !!pd.mm_fee_accepted_buyer;
+        const who = isSeller ? 'ผู้ขาย' : 'ผู้ซื้อ';
+        systemMsg = sellerOk && buyerOk
+          ? `ทั้งผู้ซื้อและผู้ขายยอมรับค่าบริการคนกลางแล้ว`
+          : `${who} ยอมรับค่าบริการคนกลางแล้ว — รออีกฝ่าย`;
         break;
       }
       case 'upload_payment': {

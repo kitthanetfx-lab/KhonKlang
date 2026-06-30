@@ -200,6 +200,9 @@ interface DealPriceState {
   evidence_done_seller?: boolean; evidence_done_buyer?: boolean; evidence_done_middleman?: boolean;
   seller_fee_slip?: string;
   payout_slip_file_id?: string; refund_slip_file_id?: string;
+  // ค่าบริการที่คนกลางเสนอเอง
+  proposed_mm_fee?: number; proposed_inspection_fee?: number;
+  mm_fee_accepted_seller?: boolean; mm_fee_accepted_buyer?: boolean;
 }
 interface EvidenceItem { id: string; deal_id: string; type: string; file_id: string; file_name: string; content?: string; uploaded_by?: string; uploader_name?: string; created_at: string; }
 interface Msg { id: string; sender_id: string; sender_name: string; role: string; type: string; content: string; file_id: string; file_name: string; created_at: string; }
@@ -437,6 +440,9 @@ export default function DealRoom() {
   const [meetupPopOpen, setMeetupPopOpen] = useState(false);
   const [meetupPropPrice, setMeetupPropPrice] = useState('');           // ราคาสินค้าใหม่ ('' = ไม่เปลี่ยน)
   const [meetupPropFeePayer, setMeetupPropFeePayer] = useState<'buyer' | 'seller' | 'split' | ''>(''); // '' = ไม่เปลี่ยน
+  // ค่าบริการคนกลาง/ตรวจสินค้า (คนกลางกำหนดเองใน step 2)
+  const [mmFeeInput, setMmFeeInput] = useState('');
+  const [inspFeeInput, setInspFeeInput] = useState('');
   // รีเซ็ตกลับไปดูขั้นปัจจุบันเมื่อสถานะดีลเปลี่ยน หรือ meetup ตกลงยอดประกันแล้ว (ขยับไปขั้นวางเงินอัตโนมัติ)
   useEffect(() => { setWzViewStep(null); }, [deal?.status, meetup?.deposit]);
 
@@ -2733,8 +2739,51 @@ export default function DealRoom() {
     // ─── step 1: เลือกคนกลาง ──────────────────────────────────────────────
     function renderRStep2() {
       const allAccepted = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms && (hasMm ? !!deal!.middleman_accepted_terms : true);
+      const pd = priceState || {};
+      const hasFeeProposal = pd.proposed_mm_fee != null;
+      const myMmFeeAccepted = myRole === 'seller' ? !!pd.mm_fee_accepted_seller : myRole === 'buyer' ? !!pd.mm_fee_accepted_buyer : true;
+      const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
+      const defaultMmFee = fb.lines.find(l => l.label.includes('คนกลาง'))?.amount ?? feeConfig.middlemanFeeMin;
+      const defaultInspFee = feeConfig.inspectionFee;
+
+      // ── Popup สำหรับผู้ซื้อ/ผู้ขาย เมื่อคนกลางเสนอราคา ──────────────────
+      const showPopup = hasFeeProposal && (myRole === 'seller' || myRole === 'buyer') && !myMmFeeAccepted;
+
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* ── Popup overlay ─────────────────────────────────────────────── */}
+          {showPopup && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+              <div style={{ background: 'var(--surface)', borderRadius: 'var(--r-xl)', padding: '24px 22px', maxWidth: 360, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,.22)' }}>
+                <div style={{ fontSize: 28, textAlign: 'center', marginBottom: 6 }}>💼</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', textAlign: 'center', marginBottom: 4 }}>คนกลางเสนอค่าบริการ</div>
+                <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', marginBottom: 16 }}>{deal!.middleman_name} กำหนดค่าบริการดังนี้</p>
+                <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: 'var(--ink)', padding: '4px 0', borderBottom: '1px solid #e8eeff', marginBottom: 6 }}>
+                    <span>ค่าบริการคนกลาง</span><span style={{ fontWeight: 700 }}>฿{(pd.proposed_mm_fee ?? 0).toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: 'var(--ink)', padding: '4px 0', borderBottom: '1px solid #e8eeff', marginBottom: 6 }}>
+                    <span>ค่าตรวจสอบสินค้า</span><span style={{ fontWeight: 700 }}>฿{(pd.proposed_inspection_fee ?? 0).toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: 'var(--ink)', paddingTop: 4 }}>
+                    <span>รวม</span><span>฿{((pd.proposed_mm_fee ?? 0) + (pd.proposed_inspection_fee ?? 0)).toLocaleString()}</span>
+                  </div>
+                </div>
+                {renderParticipantStatusRows([
+                  { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!pd.mm_fee_accepted_seller, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
+                  { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!pd.mm_fee_accepted_buyer, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
+                ], { marginBottom: 14 })}
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.6, textAlign: 'center' }}>
+                  หากไม่เห็นด้วย ติดต่อคนกลางผ่านแชทเพื่อเจรจา
+                </p>
+                <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => doAction('accept_mm_fees')}>
+                  ✅ ยอมรับค่าบริการนี้
+                </AsyncButton>
+              </div>
+            </div>
+          )}
+
           {hasMm ? (
             <div className="dr-card" style={{ background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb,var(--accent) 25%,transparent)' }}>
               <div className="dr-card-title">🤝 เลือกคนกลางแล้ว</div>
@@ -2769,6 +2818,76 @@ export default function DealRoom() {
               )}
             </div>
           )}
+
+          {/* ── คนกลางกำหนดค่าบริการ ──────────────────────────────────────── */}
+          {hasMm && effectiveViewRole === 'middleman' && deal!.middleman_accepted_terms && (
+            <div className="dr-card">
+              <div className="dr-card-title">💼 กำหนดค่าบริการของคุณ</div>
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>
+                กำหนดค่าบริการคนกลางและค่าตรวจสอบสินค้าที่คุณต้องการ แล้วกดเสนอราคาให้ผู้ซื้อและผู้ขายยืนยัน
+              </p>
+              <div className="field-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>ค่าบริการคนกลาง (฿)</label>
+                  <input
+                    type="number" min="0" className="dr-select"
+                    value={mmFeeInput}
+                    onChange={e => setMmFeeInput(e.target.value)}
+                    placeholder={String(defaultMmFee)}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>ค่าตรวจสอบสินค้า (฿)</label>
+                  <input
+                    type="number" min="0" className="dr-select"
+                    value={inspFeeInput}
+                    onChange={e => setInspFeeInput(e.target.value)}
+                    placeholder={String(defaultInspFee)}
+                  />
+                </div>
+              </div>
+              {hasFeeProposal && (
+                <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 12px', marginBottom: 12, fontSize: 13 }}>
+                  <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>ข้อเสนอปัจจุบัน</div>
+                  {renderParticipantStatusRows([
+                    { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!pd.mm_fee_accepted_seller, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
+                    { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!pd.mm_fee_accepted_buyer, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
+                  ], { marginBottom: 0 })}
+                </div>
+              )}
+              <AsyncButton
+                className="btn btn-primary btn-block"
+                onClick={() => {
+                  const mmF = Math.max(0, Math.round(Number(mmFeeInput) || defaultMmFee));
+                  const insF = Math.max(0, Math.round(Number(inspFeeInput) || defaultInspFee));
+                  return doAction('propose_mm_fees', { mmFee: mmF, inspectionFee: insF });
+                }}
+              >
+                📨 เสนอราคาให้ผู้ซื้อและผู้ขายยืนยัน
+              </AsyncButton>
+            </div>
+          )}
+
+          {/* ── แสดงสถานะข้อเสนอสำหรับผู้ซื้อ/ผู้ขาย (ไม่ใช่ popup) ─────── */}
+          {hasMm && effectiveViewRole !== 'middleman' && hasFeeProposal && (
+            <div className="dr-card">
+              <div className="dr-card-title">💼 ค่าบริการที่คนกลางเสนอ</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--ink)', padding: '4px 0' }}>
+                <span>ค่าบริการคนกลาง</span><span style={{ fontWeight: 700 }}>฿{(pd.proposed_mm_fee ?? 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--ink)', padding: '4px 0', marginBottom: 10 }}>
+                <span>ค่าตรวจสอบสินค้า</span><span style={{ fontWeight: 700 }}>฿{(pd.proposed_inspection_fee ?? 0).toLocaleString()}</span>
+              </div>
+              {renderParticipantStatusRows([
+                { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!pd.mm_fee_accepted_seller, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
+                { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!pd.mm_fee_accepted_buyer, doneText: '✅ ยอมรับแล้ว', waitText: '⏳ รอยืนยัน' },
+              ], { marginBottom: myMmFeeAccepted ? 0 : 10 })}
+              {!myMmFeeAccepted && (
+                <AsyncButton className="btn btn-primary btn-block" onClick={() => doAction('accept_mm_fees')}>✅ ยอมรับค่าบริการนี้ — คุณยืนยันแล้ว</AsyncButton>
+              )}
+            </div>
+          )}
+
           {myRole === 'buyer' && showSelectMM && renderMiddlemanPickerPanel()}
         </div>
       );
