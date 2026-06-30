@@ -583,10 +583,11 @@ export default function DealRoom() {
     }
     const nextStep = getSimpleStep().step;
     const prevStep = simpleActualStepRef.current;
-    const enteringChat = prevStep !== null && prevStep < 3 && nextStep >= 3;
+    // popup เตือนเฉพาะตอนเข้า step 2 (พูดคุย) จากขั้นก่อนหน้า
+    // step 2→3 (ตรวจหลักฐาน) ไม่ต้องมี popup
+    const enteringChat = prevStep !== null && prevStep < 2 && nextStep >= 2;
     if (enteringChat && !showStep3Warning) {
-      step3PendingRef.current = 3;
-      setWzViewStep(2);
+      step3PendingRef.current = 2;
       setShowStep3Warning(true);
     }
     // ถ้าสถานะจริงของดีลเดินหน้าแล้ว ให้ยกเลิกโหมด "ดูขั้นเก่า" อัตโนมัติ
