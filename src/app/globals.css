@@ -2734,10 +2734,4 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .sw-callbar.pending { background: var(--accent-soft); color: var(--accent-strong); }
 .sw-callbar.ring { background: color-mix(in srgb, var(--rose-500) 14%, var(--surface)); color: var(--rose-500); animation: sw-pulse 1.4s infinite; }
 .sw-callbar.active { background: color-mix(in srgb, var(--green-500) 12%, var(--surface)); color: var(--ink); }
-@keyframes sw-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
-.sw-callbtns { display: flex; gap: 8px; }
-.sw-roundbtn { width: 36px; height: 36px; min-width: 36px; border-radius: 50%; border: none; display: grid; place-items: center; cursor: pointer; background: var(--surface); color: var(--ink-2); box-shadow: var(--sh-xs); transition: transform .15s, background .15s; }
-.sw-roundbtn:hover { transform: translateY(-1px); }
-.sw-roundbtn:focus-visible { outline: none; box-shadow: var(--ring); }
-.sw-roundbtn.accept { background: var(--green-500); color: #fff; }
-.sw-roundbtn.decline { background: var(--red-500); color: #fff; }
+@keyframes sw-pulse { 0%, 100% { opacity: 1; } 50% { opacity:

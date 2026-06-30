@@ -198,6 +198,7 @@ interface DealPriceState {
   agreed?: boolean; seller_agreed?: boolean; buyer_agreed?: boolean; middleman_agreed?: boolean;
   mm_deposit_held?: number;
   evidence_done_seller?: boolean; evidence_done_buyer?: boolean; evidence_done_middleman?: boolean;
+  chat_done_seller?: boolean; chat_done_buyer?: boolean; chat_done_middleman?: boolean;
   seller_fee_slip?: string;
   payout_slip_file_id?: string; refund_slip_file_id?: string;
   // ค่าบริการที่คนกลางเสนอเอง
@@ -1727,8 +1728,9 @@ export default function DealRoom() {
   function getSimpleStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
     const s = deal!.status;
     const pd: DealPriceState = priceState || {};
-    const sellerReviewStarted = hasProgressPing('seller') || !!pd.evidence_done_seller;
-    const buyerReviewStarted = hasProgressPing('buyer') || !!pd.evidence_done_buyer;
+    // ใช้ chat_done_* จาก priceState แทน hasProgressPing (system message เก่าค้างใน DB ทำให้ step ขึ้นเอง)
+    const sellerReviewStarted = !!pd.chat_done_seller || !!pd.evidence_done_seller;
+    const buyerReviewStarted = !!pd.chat_done_buyer || !!pd.evidence_done_buyer;
     // ต้องครบ 2 ฝ่าย ถึงจะข้ามไป step 3 — กันไม่ให้ฝ่ายเดียวดัน step อีกฝ่ายไปด้วย
     const reviewStarted = sellerReviewStarted && buyerReviewStarted;
     if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
@@ -1767,9 +1769,10 @@ export default function DealRoom() {
       return { step: allAccepted ? 3 : 2 }; // คนกลางเลือกแล้ว -> รอยืนยัน / เข้าห้องคุย 3 ฝ่าย
     }
     if (s === 'payment_pending') {
-      const sellerRS = hasProgressPing('seller') || !!pd.evidence_done_seller;
-      const buyerRS = hasProgressPing('buyer') || !!pd.evidence_done_buyer;
-      const mmRS = hasProgressPing('middleman') || !!pd.evidence_done_middleman;
+      // ใช้ chat_done_* จาก priceState แทน hasProgressPing (system message เก่าค้างใน DB ทำให้ step ขึ้นเอง)
+      const sellerRS = !!pd.chat_done_seller || !!pd.evidence_done_seller;
+      const buyerRS = !!pd.chat_done_buyer || !!pd.evidence_done_buyer;
+      const mmRS = !!pd.chat_done_middleman || !!pd.evidence_done_middleman;
       const reviewStarted = sellerRS || buyerRS || mmRS || chatReviewReady;
       const evReady = !!pd.evidence_done_buyer && !!pd.evidence_done_seller && !!pd.evidence_done_middleman;
       if (!reviewStarted) return { step: 3 }; // คุย 3 ฝ่ายก่อน
@@ -2140,9 +2143,11 @@ export default function DealRoom() {
   // ─── ขั้น 3: คุย/วิดีโอคอลรายละเอียดสินค้า ────────────────────────────────
   function renderWizardStepChat(nextStep = 4) {
     const chatMsgs = msgs.filter(m => m.role !== 'system').slice(-30);
-    const sellerChatReady = hasProgressPing('seller') || (myRole === 'seller' && chatReviewReady);
-    const buyerChatReady = hasProgressPing('buyer') || (myRole === 'buyer' && chatReviewReady);
-    const middlemanChatReady = hasProgressPing('middleman') || (myRole === 'middleman' && chatReviewReady);
+    const pd: DealPriceState = priceState || {};
+    // ใช้ chat_done_* จาก priceState แทน hasProgressPing (system message เก่าค้างใน DB ทำให้ step ขึ้นเอง)
+    const sellerChatReady = !!pd.chat_done_seller || (myRole === 'seller' && chatReviewReady);
+    const buyerChatReady = !!pd.chat_done_buyer || (myRole === 'buyer' && chatReviewReady);
+    const middlemanChatReady = !!pd.chat_done_middleman || (myRole === 'middleman' && chatReviewReady);
     const isRegularDeal = deal!.deal_type !== 'simple';
     const hasMm = !!deal!.middleman_id;
     const meChatReady = myRole === 'seller' ? sellerChatReady : myRole === 'buyer' ? buyerChatReady : myRole === 'middleman' ? middlemanChatReady : false;
@@ -4394,22 +4399,4 @@ export default function DealRoom() {
                 step3PendingRef.current = null;
                 setShowStep3Warning(false);
                 setWzViewStep(nextStep);
-              }}
-            >
-              เข้าใจแล้ว
-            </button>
-          </div>
-        </div>
-      )}
-      {uploadPreview && (
-        <div className="up-toast" role="status" aria-live="polite">
-          {uploadPreview.url
-            ? <img src={uploadPreview.url} alt={`พรีวิว ${uploadPreview.name}`} />
-            : <span className="up-ic">📎</span>}
-          <div className="up-tx"><b>กำลังอัปโหลด...</b><span>{uploadPreview.name}</span></div>
-          <span className="up-spin" aria-hidden="true" />
-        </div>
-      )}
-    </div>
-  );
-}
+          

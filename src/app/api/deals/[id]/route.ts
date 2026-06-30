@@ -434,10 +434,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'progress_ping': {
-        // ข้อ4: แจ้งเตือนอีกฝ่ายเมื่อเรากดไปขั้นต่อไป (ไม่เปลี่ยนสถานะดีล แจ้งเตือนอย่างเดียว)
+        // ข้อ4: แจ้งเตือนอีกฝ่ายเมื่อเรากดไปขั้นต่อไป + บันทึก chat_done_* ลง priceState
+        // (เดิมใช้ system message แต่ message persist ค้างทำให้ step ขึ้นเองโดยไม่ได้กด)
         if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const whoLabel = isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง';
         if (body.stage === 'to_evidence') {
+          // บันทึก flag ใน priceState — ใช้แทน hasProgressPing เพื่อกัน stale system message
+          priceUpdates = isSeller
+            ? { chat_done_seller: true }
+            : isBuyer
+            ? { chat_done_buyer: true }
+            : { chat_done_middleman: true };
           systemMsg = deal.middleman_id
             ? `📋 ${whoLabel}คุย 3 ฝ่ายเสร็จแล้ว — กำลังไปขั้นตรวจหลักฐาน`
             : `📋 ${whoLabel}คุยรายละเอียดเสร็จแล้ว — กำลังไปขั้นตรวจหลักฐาน`;
@@ -635,17 +642,4 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             title: isPay ? `💰 มีการโอนเงินรอตรวจสอบ: ${updated.title || 'ดีล'}` : `⚠️ มีข้อพิพาท: ${updated.title || 'ดีล'}`,
             body: isPay
               ? `ผู้ซื้อโอนเงิน ฿${Number(updated.price || 0).toLocaleString()} แล้ว — เข้าไปตรวจสอบและอนุมัติที่หน้าการเงิน`
-              : `${systemMsg} — เข้าไปจัดการที่หน้าดีล & ข้อพิพาท`,
-            link: isPay ? '/admin/finance' : '/admin/deals',
-          });
-        }
-      }
-    }
-
-    await syncDealLedger(db, updated as Record<string, unknown>).catch(() => {});
-    return NextResponse.json({ deal: updated });
-  } catch (err: unknown) {
-    const status = err instanceof HttpError ? err.status : 500;
-    return NextResponse.json({ error: String(err) }, { status });
-  }
-}
+              : `${systemMsg} — เข้าไปจัดการที่หน้าดีล &
