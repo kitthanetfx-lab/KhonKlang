@@ -3312,10 +3312,12 @@ export default function DealRoom() {
             </div>
           )
         )}
-        {renderParticipantStatusRows([
-          { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!deal!.seller_accepted_terms, doneText: '✅ ระบุที่อยู่แล้ว' },
-          { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.buyer_accepted_terms, doneText: '✅ ระบุที่อยู่แล้ว' },
-        ], { marginTop: 12, marginBottom: 14 })}
+        <div style={{ marginTop: 12 }}>
+          {renderParticipantStatusRows([
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!deal!.seller_accepted_terms, doneText: '✅ ระบุที่อยู่แล้ว' },
+            { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.buyer_accepted_terms, doneText: '✅ ระบุที่อยู่แล้ว' },
+          ], { marginBottom: 14 })}
+        </div>
         {isParty && !meAccepted && (
           <AsyncButton
             className="btn btn-primary btn-block btn-lg"
