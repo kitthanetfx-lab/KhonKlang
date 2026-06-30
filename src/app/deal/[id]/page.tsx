@@ -980,7 +980,6 @@ export default function DealRoom() {
             {canBeSeller && <AsyncButton onClick={() => handleJoin('seller')} className="btn btn-block btn-lg" style={{ background: '#6841d9', color: '#fff' }}>{notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ขาย' : '🛒 เข้าร่วมเป็นผู้ขาย'}</AsyncButton>}
             {!canBeBuyer && !canBeSeller && <p style={{ textAlign: 'center', color: 'var(--muted)' }}>ดีลนี้มีผู้ซื้อและผู้ขายครบแล้ว</p>}
           </div>
-          <button onClick={copyLink} className="btn btn-ghost btn-block">{copied ? '✅ คัดลอกลิงก์แล้ว' : '🔗 คัดลอกลิงก์แชร์'}</button>
         </div>
       </div>
     );
