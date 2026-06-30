@@ -3285,8 +3285,8 @@ export default function DealRoom() {
     const meAccepted = (myRole === 'seller' && !!deal!.seller_accepted_terms) || (myRole === 'buyer' && !!deal!.buyer_accepted_terms);
     const isParty = myRole === 'buyer' || myRole === 'seller';
     async function submitJoin() {
-      if (!meetAddr.tambon) { alert('กรุณาเลือกที่อยู่ให้ถึงระดับตำบล'); return; }
-      await doAction('meetup_set_location', { loc: meetAddr });
+      if (!myLoc?.province && !meetAddr.tambon) { alert('กรุณาเลือกที่อยู่ให้ถึงระดับตำบล'); return; }
+      if (!myLoc?.province) await doAction('meetup_set_location', { loc: meetAddr });
       await doAction('accept_terms');
     }
     return (
@@ -3321,7 +3321,7 @@ export default function DealRoom() {
         {isParty && !meAccepted && (
           <AsyncButton
             className="btn btn-primary btn-block btn-lg"
-            disabled={acting || !meetAddr.tambon}
+            disabled={acting || (!myLoc?.province && !meetAddr.tambon)}
             onClick={submitJoin}
           >
             📍 ยืนยันที่อยู่และเริ่มดีล →
