@@ -1430,10 +1430,21 @@ export default function DealRoom() {
                 <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 สรุปยอด · ค่าบริการ: {fpName}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ราคาสินค้า</span><span>฿{deal!.price.toLocaleString()}</span></div>
                 {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}><span>ผู้ซื้อโอนเข้าศูนย์กลาง</span><span>฿{buyerTotal.toLocaleString()}</span></div>
+                {/* แถวผู้ซื้อ — bold เฉพาะเมื่อดู role ผู้ซื้อ, มิฉะนั้น muted */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'buyer' ? 700 : 400, color: myRole === 'buyer' ? 'var(--ink)' : 'var(--muted)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
+                  <span>ผู้ซื้อ {deal!.buyer_name || ''} โอนเงินเข้าศูนย์กลาง</span>
+                  <span>฿{buyerTotal.toLocaleString()}</span>
+                </div>
                 <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>= ราคาสินค้า ฿{deal!.price.toLocaleString()} + ค่าบริการส่วนผู้ซื้อ ฿{buyerShare.toLocaleString()}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: sellerShare > 0 ? '#8a5a00' : 'var(--muted)', marginTop: 4 }}><span>ผู้ขายชำระค่าบริการแยก</span><span>{sellerShare > 0 ? `฿${sellerShare.toLocaleString()}` : '฿0'}</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginTop: 4 }}><span>ยอดสุทธิที่ผู้ขายได้รับเมื่อดีลสำเร็จ</span><span>฿{sellerNet.toLocaleString()}</span></div>
+                {/* แถวผู้ขาย — bold เฉพาะเมื่อดู role ผู้ขาย */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'seller' ? 700 : 400, color: myRole === 'seller' ? 'var(--ink)' : (sellerShare > 0 ? '#8a5a00' : 'var(--muted)'), marginTop: 4 }}>
+                  <span>ผู้ขาย {deal!.seller_name || ''} ชำระค่าบริการแยก</span>
+                  <span>{sellerShare > 0 ? `฿${sellerShare.toLocaleString()}` : '฿0'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginTop: 4 }}>
+                  <span>ยอดสุทธิที่ผู้ขาย {deal!.seller_name || ''} ได้รับเมื่อดีลสำเร็จ</span>
+                  <span>฿{sellerNet.toLocaleString()}</span>
+                </div>
               </div>
               {renderParticipantStatusRows([
                 { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPaymentDone, doneText: sellerShare > 0 ? '✅ ส่งสลิปแล้ว' : '✅ ไม่ต้องชำระเพิ่ม', waitText: sellerShare > 0 ? '⏳ รอส่งสลิป' : '⏳ รอเงื่อนไขถัดไป' },
