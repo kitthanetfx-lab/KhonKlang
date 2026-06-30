@@ -324,6 +324,7 @@ export default function DealRoom() {
   const [sellerBank, setSellerBank] = useState<BankInfo | null>(null);
   const [middlemanBank, setMiddlemanBank] = useState<BankInfo | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [msgsLoaded, setMsgsLoaded] = useState(false); // กัน flash step 2 ก่อน msgs โหลดถึง
   const [middlemen, setMiddlemen] = useState<Middleman[]>([]);
   const [myId, setMyId] = useState('');
   const [myName, setMyName] = useState('');
@@ -451,6 +452,7 @@ export default function DealRoom() {
   // เพื่อกันสถานะ "ฉันกดยืนยันแล้ว" จากผู้ใช้ก่อนหน้าติดมาหลอกอีกบัญชี
   useEffect(() => {
     setChatReviewReady(false);
+    setMsgsLoaded(false);
     chatBundledRef.current = false;
     setPackingUploadStep(null);
     setPackingCarouselIndex(0);
@@ -535,7 +537,7 @@ export default function DealRoom() {
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
     const r = await fetch(`/api/messages?dealId=${dealId}`, { headers, cache: 'no-store' }).catch(() => null);
-    if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); }
+    if (r?.ok) { const d = await r.json(); setMsgs(d.messages || []); setMsgsLoaded(true); }
     else if (r?.status === 401) {
       // token หมดอายุ — ล้าง cache ให้ poll รอบถัดไปขอ token ใหม่จาก Supabase
       headersRef.current = {};
@@ -711,19 +713,9 @@ export default function DealRoom() {
     chatReviewReady,
   ]);
 
-  // แสดง popup เตือนครั้งแรกที่เข้า step 2 (พูดคุย) ไม่ว่าจะมาจากทางไหน
-  // — กดถัดไป, กดยืนยันเงื่อนไข, โหลดหน้าใหม่, รีเฟรช
-  useEffect(() => {
-    if (!deal || deal.deal_type !== 'simple') return;
-    if (simpleStep2WarnShownRef.current) return;
-    const { step } = getSimpleStep();
-    if (step >= 2) {
-      simpleStep2WarnShownRef.current = true;
-      step3PendingRef.current = step;
-      setShowStep3Warning(true);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deal?.seller_accepted_terms, deal?.buyer_accepted_terms, deal?.status]);
+  // popup เตือนก่อนเข้า step 2 (พูดคุย) — trigger เฉพาะใน goToSimpleStep (step 1 → 2)
+  // ไม่ trigger จาก useEffect อีกต่อไป: เพราะ getSimpleStep() ยังไม่รู้ขั้นจริงก่อน msgs โหลด
+  // → ป้องกัน popup ยิงตอน reload แล้ว setWzViewStep(2) ทำให้ค้างที่ step 2 ถาวร
 
   useEffect(() => {
     // poll chat เสมอสำหรับดีล meetup (แชทฝังใน wizard) หรือเมื่ออยู่ tab chat / jitsi
@@ -2252,7 +2244,7 @@ export default function DealRoom() {
             : sellerDone && buyerDone && (!isRegularDeal || !hasMm || middlemanDone)
               ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ไปตกลงราคา →</button>
               : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
-          <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => setChatReviewReady(false)}>⬅ ย้อนกลับไปคุยต่อ</button>
+          <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => { setChatReviewReady(false); setWzViewStep(2); }}>⬅ ย้อนกลับไปคุยต่อ</button>
         </div>
       </div>
     );
@@ -3893,6 +3885,22 @@ export default function DealRoom() {
   }
 
   function renderSimpleWizard() {
+    const pd0: DealPriceState = priceState || {};
+    // กัน flash: ถ้า msgs ยังไม่โหลดถึง และยังไม่มีสัญญาณชัดว่าอยู่ขั้นไหน
+    // (status=payment_pending + ไม่มี evidence + ยังไม่ตกลงราคา) → รอ msgs มาก่อนค่อย render
+    const msgsAmbiguous = !msgsLoaded
+      && deal!.status === 'payment_pending'
+      && !pd0.agreed
+      && !pd0.evidence_done_seller
+      && !pd0.evidence_done_buyer;
+    if (msgsAmbiguous) {
+      return (
+        <div className="dr-inner" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--muted)' }}>
+          <div style={{ fontSize: 22, marginBottom: 10 }}>⏳</div>
+          <div style={{ fontSize: 13.5 }}>กำลังโหลดข้อมูลขั้นตอน...</div>
+        </div>
+      );
+    }
     const { step: actualStep, outcome } = getSimpleStep();
     const step = Math.min(wzViewStep ?? actualStep, actualStep); // กันดูล้ำหน้ากว่าความเป็นจริง
     const isReviewing = step < actualStep; // กำลังย้อนดูขั้นที่ผ่านมาแล้ว — ปิดปฏิสัมพันธ์ กันกดซ้ำย้อนสถานะดีล
