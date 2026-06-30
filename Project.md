@@ -23,26 +23,25 @@
 
 ---
 
-## 2026-06-30
+## 2026-06-30 (ต่อ 4)
 
-### Simple Wizard — แก้บัค step ข้ามไป 3 โดยฝ่ายเดียวกด
-- `getSimpleStep()`: เปลี่ยน `reviewStarted = ... || chatReviewReady` → `reviewStarted = sellerReviewStarted && buyerReviewStarted`
-- ต้องครบทั้งสองฝ่ายกด "คุยกันจบแล้ว" ก่อน ถึงจะข้ามไป step 3 พร้อมกัน
-- ลบ `setWzViewStep(nextStep)` ออกจากปุ่ม — ผู้ที่กดแล้วยังค้าง step 2 แสดง "รออีกฝ่ายยืนยัน"
-- เมื่อทั้งคู่กดแล้ว polling ดึง step 3 อัตโนมัติ
+### ดาวที่ยังไม่ได้เลือก — ข้างในใช้สีขาว
+- `.rv-star` (unselected): `background: #fff`, SVG ใช้ `fill: none; stroke: currentColor; stroke-width: 1.5px`
+- `.rv-star.on` (selected): `background: linear-gradient(...)`, SVG ใช้ `fill: currentColor; stroke: none`
+- แก้ไขใน `src/app/globals.css`
 
-### ปุ่ม "เก็บหลักฐาน" ใต้รูปในแชท
-- ออกแบบ `pinBtn(m, true)` ใหม่เป็น pill button: พื้นหลังสีฟ้า ตัวอักษรขาว
-- กดแล้วแสดง "✅ บันทึก" พร้อมพื้นหลังเขียวอ่อน
+### หน้าเสร็จสมบูรณ์ — แสดงหลักฐานและรีวิวทุกฝ่าย
+- `renderWizardStep8()` เพิ่ม card "📁 หลักฐานทั้งหมดในดีล" แสดงทุกประเภท (packing/receive/inspection/chat)
+- `ReviewPanel` ดึง `?all=true` เพื่อรวบรวมรีวิวจากทุกฝ่าย และแสดงผ่าน `AllReviewsSummary`
+- `AllReviewsSummary` — card แสดงดาวและ tags ของแต่ละ reviewer จัดกลุ่มตาม role
+- API `GET /api/reviews?dealId=...&all=true` — ส่งคืนรีวิวทั้งหมดในดีล
 
 ### ไฟล์ที่แก้ไข
+- `src/app/globals.css`
 - `src/app/deal/[id]/page.tsx`
-
----
-
-## 2026-06-30 (ต่อ 2)
-
-### แก้ breakdown โอนเงิน — เพิ่มชื่อและ highlight ตาม role
+- `src/components/ReviewPanel.tsx`
+- `src/app/api/reviews/route.ts`
+��ม role
 - เพิ่มชื่อผู้ซื้อและผู้ขายใน 3 แถว breakdown: "ผู้ซื้อ [ชื่อ] โอนเงินเข้าศูนย์กลาง", "ผู้ขาย [ชื่อ] ชำระค่าบริการแยก", "ยอดสุทธิที่ผู้ขาย [ชื่อ] ได้รับ"
 - highlight (bold+สีเข้ม) ตาม role: ผู้ซื้อเห็นแถว buyer เด่น / ผู้ขายเห็นแถว seller เด่น / อีก role แสดง muted
 

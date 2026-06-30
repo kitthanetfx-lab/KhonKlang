@@ -10,6 +10,17 @@ export async function GET(req: NextRequest) {
     const dealId = req.nextUrl.searchParams.get('dealId') || '';
     const targetId = req.nextUrl.searchParams.get('targetId') || '';
 
+    // All reviews for a deal (for deal members) — ?dealId=...&all=true
+    if (dealId && req.nextUrl.searchParams.get('all') === 'true') {
+      await verifyUser(req); // must be authenticated
+      const { data } = await db.from('reviews')
+        .select('reviewer_name, reviewer_role, target_role, rating, tags, created_at')
+        .eq('deal_id', dealId)
+        .order('reviewer_role')
+        .order('target_role');
+      return NextResponse.json({ items: data || [] });
+    }
+
     // Has the current user already reviewed this deal?
     if (dealId) {
       const me = await verifyUser(req);

@@ -2664,6 +2664,14 @@ export default function DealRoom() {
     const pd: DealPriceState = priceState || {};
     const isCancelled = outcome === 'cancelled';
     const slipId = isCancelled ? pd.refund_slip_file_id : pd.payout_slip_file_id;
+
+    // รวบรวมหลักฐานทุกประเภท
+    const packingEvid = evidence.filter(e => e.type === 'packing');
+    const receiveEvid = evidence.filter(e => e.type === 'receive');
+    const chatEvid = evidence.filter(e => e.type === 'chat');
+    const inspectionEvid = evidence.filter(e => e.type === 'inspection');
+    const hasAnyEvidence = packingEvid.length > 0 || receiveEvid.length > 0 || chatEvid.length > 0 || inspectionEvid.length > 0;
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card dr-done-card">
@@ -2683,6 +2691,38 @@ export default function DealRoom() {
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: true, doneText: isCancelled ? '✅ ได้รับเงินคืนแล้ว' : '✅ ดีลเสร็จสมบูรณ์' },
           ], { marginBottom: 0 })}
         </div>
+
+        {/* ─ หลักฐานทั้งหมดในดีล ─ */}
+        {hasAnyEvidence && (
+          <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="dr-card-title">📁 หลักฐานทั้งหมดในดีล</div>
+            {packingEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📦 แพ็คสินค้า ({packingEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(packingEvid)}
+              </div>
+            )}
+            {receiveEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📹 วิดีโอแกะกล่อง ({receiveEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(receiveEvid)}
+              </div>
+            )}
+            {inspectionEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>🔍 ตรวจสอบสินค้า ({inspectionEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(inspectionEvid)}
+              </div>
+            )}
+            {chatEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>💬 หลักฐานจากแชท ({chatEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(chatEvid)}
+              </div>
+            )}
+          </div>
+        )}
+
         {!isCancelled && <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />}
       </div>
     );
@@ -4164,7 +4204,7 @@ export default function DealRoom() {
               </div>
             ); })()}
             <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 18 }}>
-              📹 สำคัญ: โปรดเข้าหน้าแชทและวิดีโอคอล เพื่อพูดคุย ดูสภาพสินค้า และตกลงรายละเอียดให้เรียบร้อยก่อน — บันทึกบทสนทนา / วิดีโอคอล / รูปภาพไว้เป็นหลักฐาน โดยกดปุ่ม “📌 เก็บเป็นหลักฐาน” ที่แต่ละข้อความ
+              📹 สำคัญ: โปรดเข้าหน้าแชทและวิดีโอคอล เพื่อพูดคุย ดูสภาพสินค้า และตกลงรายละเอียดให้เรียบร้อยก่อน — บันทึกบทสนทนา / วิดีโอคอล / รูปภาพไว้เป็นหลักฐาน โดยกดปุ่ม "📌 เก็บเป็นหลักฐาน" ที่แต่ละข้อความ
             </div>
             <button className="btn btn-primary btn-block" onClick={() => { setShowTerms(false); setTab('chat'); doAction('accept_terms'); }}>✅ ยอมรับข้อตกลงและดำเนินการต่อ</button>
             <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => setShowTerms(false)}>ยกเลิก</button>
