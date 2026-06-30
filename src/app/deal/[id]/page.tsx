@@ -2563,8 +2563,38 @@ export default function DealRoom() {
       );
     }
     const hasUnboxEvidence = unboxEvidence.length > 0;
+    const packingEvidence = evidence.filter(e => e.type === 'packing');
+    const packingSlots = [packingEvidence[0] || null, packingEvidence[1] || null, packingEvidence[2] || null] as Array<EvidenceItem | null>;
+    const packingStepLabels = ['แพ็คสินค้า', 'โลจิสติกส์', 'สลิปและเลขอ้างอิง'];
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* ─ หลักฐานแพ็คสินค้าจากผู้ขาย (step 7) ─ */}
+        {packingEvidence.length > 0 && (
+          <div className="dr-card">
+            <div className="dr-card-title">📦 หลักฐานแพ็คสินค้าจากผู้ขาย</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+              {packingSlots.map((uploaded, idx) => (
+                <div key={idx} style={{ minWidth: 0, border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 10, background: 'var(--surface)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8, textAlign: 'center' }}>ขั้นตอน {idx + 1}</div>
+                  <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
+                    {uploaded ? (
+                      uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
+                        ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} controls />
+                        : <img src={fileUrl(uploaded.file_id)} alt={packingStepLabels[idx]} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ) : (
+                      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(15,23,42,0.14)', fontSize: 'clamp(34px,6vw,54px)', fontWeight: 800, lineHeight: 1 }}>
+                        {idx + 1}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 11.5, color: uploaded ? 'var(--green-600)' : 'var(--faint)', textAlign: 'center', lineHeight: 1.45 }}>
+                    {uploaded ? `✅ ${packingStepLabels[idx]}` : '⏳ ยังไม่ได้อัปโหลด'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {renderTrackingInfoCard('พัสดุจากผู้ขายถึงผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
         <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
           <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>

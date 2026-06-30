@@ -50,3 +50,16 @@
 1. **ปุ่ม "ย้อนกลับไปคุยต่อ" กดไม่ได้**: เพิ่ม `setWzViewStep(2)` ใน onClick — ปุ่มนี้ต้องขยับ view กลับ step 2 ด้วย ไม่ใช่แค่ reset `chatReviewReady`
 2. **popup ขึ้นผิดที่ใน step 3**: ลบ `useEffect` ที่ยิง popup เมื่อ deal load — ปัญหาคือ msgs ยังไม่โหลดตอน effect ยิง ทำให้ `getSimpleStep()` คืน step 2 ผิดพลาด → `step3PendingRef = 2` → กด "เข้าใจแล้ว" → `setWzViewStep(2)` → ค้างที่ step 2 ถาวร popup ตอนนี้ trigger เฉพาะจาก `goToSimpleStep()` step 1→2
 3. **reload กลับ step 2**: เพิ่ม `msgsLoaded` state — ถ้า msgs ยังไม่โหลดและอยู่ใน payment_pending ที่ยังไม่มี evidence → แสดง "กำลังโหลด..." แทนที่จะ flash ไป step 2 ก่อน
+
+---
+
+## 2026-06-30 (ต่อ 3)
+
+### step 8 รับสินค้า — แสดงหลักฐานแพ็คสินค้าจากผู้ขาย
+- เพิ่ม card "📦 หลักฐานแพ็คสินค้าจากผู้ขาย" ใน `renderWizardStep6()` ฝั่งผู้ซื้อ
+- แสดง 3 slot (`evidence.filter(e => e.type === 'packing')`) ก่อน tracking card และ section วิดีโอแกะกล่อง
+- ถ้าผู้ขายยังไม่ได้ upload เลย → card ไม่แสดง (conditional render)
+- slot ที่ upload แล้วแสดงรูป/วิดีโอ ส่วน slot ที่ว่างแสดงตัวเลข ghost
+
+### ไฟล์ที่แก้ไข
+- `src/app/deal/[id]/page.tsx`
