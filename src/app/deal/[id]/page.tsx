@@ -1713,7 +1713,8 @@ export default function DealRoom() {
     const pd: DealPriceState = priceState || {};
     const sellerReviewStarted = hasProgressPing('seller') || !!pd.evidence_done_seller;
     const buyerReviewStarted = hasProgressPing('buyer') || !!pd.evidence_done_buyer;
-    const reviewStarted = sellerReviewStarted || buyerReviewStarted || chatReviewReady;
+    // ต้องครบ 2 ฝ่าย ถึงจะข้ามไป step 3 — กันไม่ให้ฝ่ายเดียวดัน step อีกฝ่ายไปด้วย
+    const reviewStarted = sellerReviewStarted && buyerReviewStarted;
     if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
     const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
@@ -2038,10 +2039,38 @@ export default function DealRoom() {
   function pinBtn(m: Msg, small = false): React.ReactNode {
     const saved = savedEvidIds.has(m.id);
     if (!(m.content || m.file_id)) return null;
+    if (small) {
+      // ปุ่มใต้รูป — ดีไซน์เป็น pill button ชัดเจน สวยงาม
+      return (
+        <button
+          type="button"
+          onClick={() => !saved && saveMsgEvidence(m)}
+          disabled={acting || saved}
+          style={{
+            marginTop: 5,
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: saved ? '#15803d' : '#fff',
+            background: saved ? '#dcfce7' : 'var(--accent)',
+            border: saved ? '1.5px solid #86efac' : '1.5px solid transparent',
+            borderRadius: 20,
+            cursor: saved ? 'default' : 'pointer',
+            padding: '4px 12px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            boxShadow: saved ? 'none' : '0 1px 4px rgba(47,107,240,.25)',
+            letterSpacing: 0.2,
+          }}
+        >
+          {saved ? '✅ บันทึก' : '📌 เก็บหลักฐาน'}
+        </button>
+      );
+    }
     return (
       <button type="button" onClick={() => !saved && saveMsgEvidence(m)} disabled={acting || saved}
-        style={{ fontSize: small ? 10 : 10.5, color: saved ? 'var(--green-600)' : 'var(--accent)', background: 'none', border: 'none', cursor: saved ? 'default' : 'pointer', padding: '2px 0 0', display: 'block', opacity: saved ? 1 : undefined }}>
-        {saved ? '✅ เก็บหลักฐานแล้ว' : '📌 เก็บเป็นหลักฐาน'}
+        style={{ fontSize: 10.5, color: saved ? 'var(--green-600)' : 'var(--accent)', background: 'none', border: 'none', cursor: saved ? 'default' : 'pointer', padding: '2px 0 0', display: 'block', opacity: saved ? 1 : undefined }}>
+        {saved ? '✅ บันทึก' : '📌 เก็บหลักฐาน'}
       </button>
     );
   }
@@ -2156,7 +2185,8 @@ export default function DealRoom() {
                 return;
               }
               setChatReviewReady(true);
-              setWzViewStep(nextStep);
+              // ไม่ setWzViewStep ทันที — รออีกฝ่ายกดยืนยันก่อน
+              // เมื่อทั้งคู่กดแล้ว getSimpleStep() จะ return step 3 อัตโนมัติ
             }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</AsyncButton>
           ) : allChatReady ? (
             <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ไปขั้นถัดไป</button>

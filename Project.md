@@ -20,3 +20,20 @@
 - `src/app/service/meetup/page.tsx`
 - `src/app/deal/[id]/page.tsx`
 - `src/app/api/deals/[id]/route.ts`
+
+---
+
+## 2026-06-30
+
+### Simple Wizard — แก้บัค step ข้ามไป 3 โดยฝ่ายเดียวกด
+- `getSimpleStep()`: เปลี่ยน `reviewStarted = ... || chatReviewReady` → `reviewStarted = sellerReviewStarted && buyerReviewStarted`
+- ต้องครบทั้งสองฝ่ายกด "คุยกันจบแล้ว" ก่อน ถึงจะข้ามไป step 3 พร้อมกัน
+- ลบ `setWzViewStep(nextStep)` ออกจากปุ่ม — ผู้ที่กดแล้วยังค้าง step 2 แสดง "รออีกฝ่ายยืนยัน"
+- เมื่อทั้งคู่กดแล้ว polling ดึง step 3 อัตโนมัติ
+
+### ปุ่ม "เก็บหลักฐาน" ใต้รูปในแชท
+- ออกแบบ `pinBtn(m, true)` ใหม่เป็น pill button: พื้นหลังสีฟ้า ตัวอักษรขาว
+- กดแล้วแสดง "✅ บันทึก" พร้อมพื้นหลังเขียวอ่อน
+
+### ไฟล์ที่แก้ไข
+- `src/app/deal/[id]/page.tsx`
