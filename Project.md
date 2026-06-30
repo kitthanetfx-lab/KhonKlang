@@ -51,10 +51,13 @@
 - `renderWizardStepPrice()`: กล่อง "ราคาปัจจุบัน" แสดง "ค่าบริการรวม ฿X · หารครึ่ง (คนละ ฿Y)"
 
 ### ปุ่มเสร็จสิ้น + รีวิวบังคับในหน้าจบดีล
-- เพิ่ม `completionReviewed` state ใน DealRoom
-- `ReviewPanel`: เพิ่ม `onReviewed?: () => void` prop — เรียกเมื่อรีวิวสำเร็จ หรือตรวจพบว่ารีวิวแล้ว (on load)
-- Fix "รีวิวไม่แสดงทันที": เมื่อ `headers.Authorization` ยังไม่พร้อม → `setReviewed(false)` แสดงฟอร์มก่อน ไม่ต้อง refresh; ขณะ loading แสดง skeleton "⏳ กำลังโหลด..."
-- `renderWizardStep8()` และ `renderRStep14()`: เพิ่มปุ่ม "🏠 บันทึกดีลไว้เป็นหลักฐาน — กลับหน้าหลัก" ที่ enabled เมื่อ `completionReviewed === true`; ก่อนรีวิวแสดงเป็น "🔒 กรุณาให้คะแนนรีวิวก่อน" (disabled)
+- เพิ่ม `completionReviewed`, `completionAllRated`, `completionSubmitTrigger`, `completionSending` states ใน DealRoom
+- `ReviewPanel`: redesign เป็น "headless submit" — ลบปุ่ม "ส่งรีวิว" ออก, เพิ่ม props `onRatedChange`, `externalSubmitTrigger`, `onSubmitError`
+- `externalSubmitTrigger`: พ่อ (page.tsx) increment → ReviewPanel submit เอง ผ่าน submitRef pattern (แก้ stale closure)
+- `onRatedChange(bool)`: ReviewPanel แจ้งพ่อทุกครั้งที่ allRated เปลี่ยน → พ่อ enable/disable ปุ่ม
+- Fix "รีวิวไม่แสดงทันที": `headers.Authorization` ยังไม่พร้อม → `setReviewed(false)` ทันที; ขณะโหลดแสดง "⏳ กำลังโหลด..."
+- ปุ่มใน completion pages มี 3 state: `🔒 บันทึกหลักฐาน-จบดีล` (disabled) → `💾 บันทึกหลักฐาน-จบดีล` (กดได้เมื่อดาวครบ → ส่งรีวิว+ไปหน้าหลัก) → `🏠 เสร็จสิ้น-กลับหน้าหลัก` (รีวิวแล้ว)
+- ลบปุ่ม "คัดลอกลิงก์แชร์" ออกจาก guest join panel
 
 ### ไฟล์ที่แก้ไข (2026-07-01)
 - `src/app/deal/[id]/page.tsx`

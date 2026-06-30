@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { authHeaders } from '@/lib/supabase';
 
@@ -101,7 +101,22 @@ function AllReviewsSummary({ byReviewer }: { byReviewer: Record<string, AllRevie
 }
 
 // ── ReviewPanel: ฟอร์มให้คะแนน + แสดงสรุปรีวิวทุกฝ่าย ────────────────────
-export function ReviewPanel({ deal, myRole, headers, onReviewed }: { deal: DealParties; myRole: Role | 'guest' | ''; headers: Record<string, string>; onReviewed?: () => void }) {
+export function ReviewPanel({
+  deal, myRole, headers,
+  onReviewed, onRatedChange, onSubmitError,
+  externalSubmitTrigger,
+}: {
+  deal: DealParties;
+  myRole: Role | 'guest' | '';
+  headers: Record<string, string>;
+  onReviewed?: () => void;
+  onRatedChange?: (allRated: boolean) => void;
+  onSubmitError?: () => void;
+  externalSubmitTrigger?: number;
+}) {
+  const isParty = myRole === 'buyer' || myRole === 'seller' || myRole === 'middleman';
+
+  // ── State ──────────────────────────────────────────────────────────────────
   const [reviewed, setReviewed] = useState<boolean | null>(null);
   const [allReviews, setAllReviews] = useState<AllReviewItem[] | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
@@ -109,9 +124,7 @@ export function ReviewPanel({ deal, myRole, headers, onReviewed }: { deal: DealP
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  const isParty = myRole === 'buyer' || myRole === 'seller' || myRole === 'middleman';
-
-  // Who do I review? Everyone in the deal except me, plus the platform.
+  // ── Computed (safe before hooks because these are not hooks) ───────────────
   const targets: { role: Role; name: string }[] = [];
   if (isParty) {
     if (myRole !== 'buyer' && deal.buyer_id) targets.push({ role: 'buyer', name: deal.buyer_name || 'ผู้ซื้อ' });
@@ -119,71 +132,10 @@ export function ReviewPanel({ deal, myRole, headers, onReviewed }: { deal: DealP
     if (myRole !== 'middleman' && deal.middleman_id) targets.push({ role: 'middleman', name: deal.middleman_name || 'คนกลาง' });
     targets.push({ role: 'platform', name: 'คนกลาง (เว็บไซต์/แอป)' });
   }
-
-  useEffect(() => {
-    if (!isParty) return;
-    // ถ้ายังไม่มี auth — แสดงฟอร์มทันที (สมมติยังไม่ได้รีวิว)
-    if (!headers.Authorization) {
-      setReviewed(false);
-      setAllReviews([]);
-      return;
-    }
-    let cancelled = false;
-    Promise.all([
-      fetch(`/api/reviews?dealId=${deal.id}`, { headers }).then(r => r.json()),
-      fetch(`/api/reviews?dealId=${deal.id}&all=true`, { headers }).then(r => r.json()).catch(() => ({ items: [] })),
-    ]).then(([d1, d2]) => {
-      if (!cancelled) {
-        const alreadyReviewed = !!d1.reviewed;
-        setReviewed(alreadyReviewed);
-        setAllReviews(d2.items || []);
-        if (alreadyReviewed) onReviewed?.();
-      }
-    }).catch(() => { if (!cancelled) { setReviewed(false); setAllReviews([]); } });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deal.id, isParty, headers.Authorization]);
-
-  if (!isParty) return null;
-  // ถ้ายัง loading (reviewed === null) แสดง skeleton เพื่อไม่ให้ผู้ใช้เห็นหน้าว่าง
-  if (reviewed === null) {
-    return (
-      <div className="dr-card" style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
-        <div style={{ fontSize: 14 }}>⏳ กำลังโหลดข้อมูลรีวิว...</div>
-      </div>
-    );
-  }
-
-  // จัด allReviews เป็นกลุ่มตาม reviewer_role
-  const byReviewer: Record<string, AllReviewItem[]> = {};
-  (allReviews || []).forEach(rv => {
-    if (!byReviewer[rv.reviewer_role]) byReviewer[rv.reviewer_role] = [];
-    byReviewer[rv.reviewer_role].push(rv);
-  });
-  const hasAnyReview = (allReviews || []).length > 0;
-
-  if (reviewed) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="dr-card rv-thanks">
-          <span className="rv-thanks-ic"><Icon name="badgeCheck" size={22} /></span>
-          <div><b>ขอบคุณสำหรับรีวิว</b><span>คะแนนของคุณช่วยให้ชุมชนซื้อขายปลอดภัยขึ้น</span></div>
-        </div>
-        {hasAnyReview && <AllReviewsSummary byReviewer={byReviewer} />}
-      </div>
-    );
-  }
-
   const getRow = (role: string): RowState => rows[role] || { rating: 0, tags: [] };
-  const setRating = (role: string, rating: number) => setRows(r => ({ ...r, [role]: { ...getRow(role), rating } }));
-  const toggleTag = (role: string, tag: string) => setRows(r => {
-    const cur = getRow(role);
-    const tags = cur.tags.includes(tag) ? cur.tags.filter(t => t !== tag) : [...cur.tags, tag];
-    return { ...r, [role]: { ...cur, tags } };
-  });
+  const allRated = targets.length > 0 && targets.every(t => getRow(t.role).rating > 0);
 
-  const allRated = targets.every(t => getRow(t.role).rating > 0);
-
+  // ── Submit (ใช้ ref เพื่อให้ effect เรียกเวอร์ชันล่าสุดเสมอ) ───────────────
   async function submit() {
     if (!allRated || sending) return;
     setSending(true); setError('');
@@ -203,17 +155,95 @@ export function ReviewPanel({ deal, myRole, headers, onReviewed }: { deal: DealP
       });
       const d = await r.json();
       if (r.ok) { setReviewed(true); onReviewed?.(); }
-      else setError(d.error || 'บันทึกรีวิวไม่สำเร็จ');
-    } catch { setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง'); }
+      else { setError(d.error || 'บันทึกรีวิวไม่สำเร็จ'); onSubmitError?.(); }
+    } catch { setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง'); onSubmitError?.(); }
     finally { setSending(false); }
   }
+  // ref เก็บ submit ล่าสุดเสมอ (แก้ stale-closure ใน effect)
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+
+  // ── Effects ────────────────────────────────────────────────────────────────
+  // 1) โหลดสถานะรีวิว
+  useEffect(() => {
+    if (!isParty) return;
+    if (!headers.Authorization) { setReviewed(false); setAllReviews([]); return; }
+    let cancelled = false;
+    Promise.all([
+      fetch(`/api/reviews?dealId=${deal.id}`, { headers }).then(r => r.json()),
+      fetch(`/api/reviews?dealId=${deal.id}&all=true`, { headers }).then(r => r.json()).catch(() => ({ items: [] })),
+    ]).then(([d1, d2]) => {
+      if (!cancelled) {
+        const already = !!d1.reviewed;
+        setReviewed(already);
+        setAllReviews(d2.items || []);
+        if (already) onReviewed?.();
+      }
+    }).catch(() => { if (!cancelled) { setReviewed(false); setAllReviews([]); } });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal.id, isParty, headers.Authorization]);
+
+  // 2) แจ้งพ่อเมื่อ allRated เปลี่ยน
+  useEffect(() => {
+    if (isParty && reviewed === false) onRatedChange?.(allRated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRated, isParty, reviewed]);
+
+  // 3) รับ trigger จากพ่อ → ส่งรีวิว
+  const prevTrigger = useRef(0);
+  useEffect(() => {
+    if (!externalSubmitTrigger || externalSubmitTrigger === prevTrigger.current) return;
+    prevTrigger.current = externalSubmitTrigger;
+    submitRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalSubmitTrigger]);
+
+  // ── Conditional returns (หลัง hooks ทั้งหมด) ──────────────────────────────
+  if (!isParty) return null;
+  if (reviewed === null) {
+    return (
+      <div className="dr-card" style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
+        <div style={{ fontSize: 14 }}>⏳ กำลังโหลดข้อมูลรีวิว...</div>
+      </div>
+    );
+  }
+
+  // จัด allReviews เป็นกลุ่มตาม reviewer_role
+  const byReviewer: Record<string, AllReviewItem[]> = {};
+  (allReviews || []).forEach(rv => {
+    if (!byReviewer[rv.reviewer_role]) byReviewer[rv.reviewer_role] = [];
+    byReviewer[rv.reviewer_role].push(rv);
+  });
+  const hasAnyReview = (allReviews || []).length > 0;
+
+  // ── รีวิวแล้ว: แสดงขอบคุณ + สรุปทุกฝ่าย ──────────────────────────────────
+  if (reviewed) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="dr-card rv-thanks">
+          <span className="rv-thanks-ic"><Icon name="badgeCheck" size={22} /></span>
+          <div><b>ขอบคุณสำหรับรีวิว</b><span>คะแนนของคุณช่วยให้ชุมชนซื้อขายปลอดภัยขึ้น</span></div>
+        </div>
+        {hasAnyReview && <AllReviewsSummary byReviewer={byReviewer} />}
+      </div>
+    );
+  }
+
+  // ── ฟอร์มให้คะแนน (ไม่มีปุ่มส่ง — พ่อเป็นคนกดแทน) ───────────────────────
+  const setRating = (role: string, rating: number) => setRows(r => ({ ...r, [role]: { ...getRow(role), rating } }));
+  const toggleTag = (role: string, tag: string) => setRows(r => {
+    const cur = getRow(role);
+    const tags = cur.tags.includes(tag) ? cur.tags.filter(t => t !== tag) : [...cur.tags, tag];
+    return { ...r, [role]: { ...cur, tags } };
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {hasAnyReview && <AllReviewsSummary byReviewer={byReviewer} />}
       <div className="dr-card rv-card">
         <div className="dr-card-title">⭐ ให้คะแนนดีลนี้</div>
-        <p className="rv-lead">แตะดาวเพื่อให้คะแนน — ใช้เวลาไม่ถึง 10 วินาที</p>
+        <p className="rv-lead">แตะดาวเพื่อให้คะแนนทุกรายการ — จากนั้นกดปุ่มบันทึกด้านล่าง</p>
 
         {targets.map(t => {
           const st = getRow(t.role);
@@ -240,6 +270,7 @@ export function ReviewPanel({ deal, myRole, headers, onReviewed }: { deal: DealP
               </div>
               {st.rating > 0 && (
                 <>
+
                   <div className="rv-rating-meta">
                     <span className="rv-rating-pill">{st.rating} / 5 ดาว</span>
                     <span className="rv-rating-text">{RATING_LABEL[st.rating]}</span>
@@ -265,7 +296,6 @@ export function ReviewPanel({ deal, myRole, headers, onReviewed }: { deal: DealP
           <div className="rv-comment-sub">เขียนถึงทีมงานหรือประสบการณ์ใช้งานเพิ่มเติมได้</div>
           <textarea
             className="rv-comment"
-
             value={comment}
             onChange={e => setComment(e.target.value)}
             placeholder="พิมพ์ข้อเสนอแนะถึงทีมงานหรือสิ่งที่อยากให้ปรับปรุง (ไม่บังคับ)"
@@ -275,9 +305,6 @@ export function ReviewPanel({ deal, myRole, headers, onReviewed }: { deal: DealP
         </div>
 
         {error && <p className="rv-error">{error}</p>}
-        <button type="button" className="btn btn-primary btn-block" disabled={!allRated || sending} onClick={submit}>
-          {sending ? 'กำลังบันทึก...' : allRated ? 'ส่งรีวิว' : 'แตะดาวให้ครบทุกรายการก่อนส่ง'}
-        </button>
       </div>
     </div>
   );

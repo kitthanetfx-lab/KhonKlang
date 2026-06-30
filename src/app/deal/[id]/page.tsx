@@ -349,6 +349,9 @@ export default function DealRoom() {
   const [copied, setCopied] = useState(false);
   const [authHdrs, setAuthHdrs] = useState<Record<string, string>>({});
   const [completionReviewed, setCompletionReviewed] = useState(false);
+  const [completionAllRated, setCompletionAllRated] = useState(false);
+  const [completionSubmitTrigger, setCompletionSubmitTrigger] = useState(0);
+  const [completionSending, setCompletionSending] = useState(false);
   const [dealError, setDealError] = useState('');
   const [showSelectMM, setShowSelectMM] = useState(false);
   const [uploadPreview, setUploadPreview] = useState<{ url: string; name: string } | null>(null);
@@ -2761,23 +2764,39 @@ export default function DealRoom() {
             deal={deal!}
             myRole={myRole as 'buyer' | 'seller' | 'middleman'}
             headers={authHdrs}
-            onReviewed={() => setCompletionReviewed(true)}
+            onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); router.push('/'); }}
+            onRatedChange={setCompletionAllRated}
+            onSubmitError={() => setCompletionSending(false)}
+            externalSubmitTrigger={completionSubmitTrigger}
           />
         )}
-        {/* ปุ่มบันทึกดีล — กดได้เมื่อรีวิวครบ หรือไม่ใช่คู่สัญญา */}
+        {/* ── ปุ่มบันทึกหลักฐาน-จบดีล ── */}
         {(() => {
-          const canFinish = completionReviewed || isCancelled || myRole === 'guest' || myRole === '';
-          return (
-            <div style={{ textAlign: 'center', marginTop: 8 }}>
+          const isNotParty = myRole === 'guest' || myRole === '';
+          const alreadyDone = completionReviewed || isCancelled || isNotParty;
+          if (alreadyDone) return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>
+                🏠 เสร็จสิ้น-กลับหน้าหลัก
+              </button>
+            </div>
+          );
+          if (completionAllRated) return (
+            <div style={{ marginTop: 8 }}>
               <button
                 type="button"
-                className={`btn btn-block btn-lg ${canFinish ? 'btn-primary' : 'btn-ghost'}`}
-                style={{ opacity: canFinish ? 1 : 0.55 }}
-                disabled={!canFinish}
-                title={canFinish ? undefined : 'กรุณาให้คะแนนรีวิวก่อนกดปุ่มนี้'}
-                onClick={() => router.push('/')}
+                className="btn btn-primary btn-block btn-lg"
+                disabled={completionSending}
+                onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
               >
-                {canFinish ? '🏠 บันทึกดีลไว้เป็นหลักฐาน — กลับหน้าหลัก' : '🔒 กรุณาให้คะแนนรีวิวก่อน'}
+                {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
+              </button>
+            </div>
+          );
+          return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>
+                🔒 บันทึกหลักฐาน-จบดีล
               </button>
             </div>
           );
@@ -3420,23 +3439,39 @@ export default function DealRoom() {
               deal={deal!}
               myRole={myRole as 'buyer' | 'seller' | 'middleman'}
               headers={authHdrs}
-              onReviewed={() => setCompletionReviewed(true)}
+              onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); router.push('/'); }}
+              onRatedChange={setCompletionAllRated}
+              onSubmitError={() => setCompletionSending(false)}
+              externalSubmitTrigger={completionSubmitTrigger}
             />
           )}
-          {/* ปุ่มบันทึกดีล — กดได้เมื่อรีวิวครบ หรือไม่ใช่คู่สัญญา */}
+          {/* ── ปุ่มบันทึกหลักฐาน-จบดีล ── */}
           {(() => {
-            const canFinish = completionReviewed || isCancelled || myRole === 'guest' || myRole === '';
-            return (
-              <div style={{ textAlign: 'center', marginTop: 8 }}>
+            const isNotParty = myRole === 'guest' || myRole === '';
+            const alreadyDone = completionReviewed || isCancelled || isNotParty;
+            if (alreadyDone) return (
+              <div style={{ marginTop: 8 }}>
+                <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>
+                  🏠 เสร็จสิ้น-กลับหน้าหลัก
+                </button>
+              </div>
+            );
+            if (completionAllRated) return (
+              <div style={{ marginTop: 8 }}>
                 <button
                   type="button"
-                  className={`btn btn-block btn-lg ${canFinish ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ opacity: canFinish ? 1 : 0.55 }}
-                  disabled={!canFinish}
-                  title={canFinish ? undefined : 'กรุณาให้คะแนนรีวิวก่อนกดปุ่มนี้'}
-                  onClick={() => router.push('/')}
+                  className="btn btn-primary btn-block btn-lg"
+                  disabled={completionSending}
+                  onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
                 >
-                  {canFinish ? '🏠 บันทึกดีลไว้เป็นหลักฐาน — กลับหน้าหลัก' : '🔒 กรุณาให้คะแนนรีวิวก่อน'}
+                  {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
+                </button>
+              </div>
+            );
+            return (
+              <div style={{ marginTop: 8 }}>
+                <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>
+                  🔒 บันทึกหลักฐาน-จบดีล
                 </button>
               </div>
             );
@@ -4347,7 +4382,7 @@ export default function DealRoom() {
       {showStep3Warning && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(11, 18, 32, .72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 110 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 680, background: 'var(--surface)', borderRadius: 'var(--r-xl)', border: '1px solid #f7c6cd', boxShadow: '0 30px 70px rgba(12, 24, 54, .28)', padding: '24px 20px 20px', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(24px, 4vw, 34px)', lineHeight: 1.15, color: '#cf2038', marginBottom: 16 }}>*โปรดอ่านอย่างละเอียด*</div>
+
             <img src="/Lawn.webp" alt="คำเตือนก่อนเข้าหน้าพูดคุย" style={{ width: 'min(100%, 600px)', height: 'auto', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', margin: '0 auto 16px', borderRadius: 'var(--r-lg)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
             <div style={{ fontSize: 'clamp(15px, 2.4vw, 18px)', fontWeight: 700, color: 'var(--ink)', marginBottom: 18 }}>*หากละเลยอาจเสียเปรียบในกรณีเกิดปัญหา*</div>
             <button
