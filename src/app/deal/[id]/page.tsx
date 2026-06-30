@@ -424,6 +424,7 @@ export default function DealRoom() {
   const [wzViewStep, setWzViewStep] = useState<number | null>(null);
   const [rwzViewRole, setRwzViewRole] = useState<'seller' | 'middleman' | 'buyer'>('seller');
   const step3PendingRef = useRef<number | null>(null);
+  const simpleStep2WarnShownRef = useRef(false);
   const simpleActualStepRef = useRef<number | null>(null);
   const regularActualStepRef = useRef<number | null>(null);
   const meetupActualStepRef = useRef<number | null>(null);
@@ -459,6 +460,7 @@ export default function DealRoom() {
     setWzViewStep(null);
     setShowStep3Warning(false);
     step3PendingRef.current = null;
+    simpleStep2WarnShownRef.current = false;
     simpleActualStepRef.current = null;
     regularActualStepRef.current = null;
     meetupActualStepRef.current = null;
@@ -708,6 +710,20 @@ export default function DealRoom() {
     priceState?.evidence_done_middleman,
     chatReviewReady,
   ]);
+
+  // แสดง popup เตือนครั้งแรกที่เข้า step 2 (พูดคุย) ไม่ว่าจะมาจากทางไหน
+  // — กดถัดไป, กดยืนยันเงื่อนไข, โหลดหน้าใหม่, รีเฟรช
+  useEffect(() => {
+    if (!deal || deal.deal_type !== 'simple') return;
+    if (simpleStep2WarnShownRef.current) return;
+    const { step } = getSimpleStep();
+    if (step >= 2) {
+      simpleStep2WarnShownRef.current = true;
+      step3PendingRef.current = step;
+      setShowStep3Warning(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal?.seller_accepted_terms, deal?.buyer_accepted_terms, deal?.status]);
 
   useEffect(() => {
     // poll chat เสมอสำหรับดีล meetup (แชทฝังใน wizard) หรือเมื่ออยู่ tab chat / jitsi
@@ -3853,6 +3869,7 @@ export default function DealRoom() {
     function goToSimpleStep(nextStep: number) {
       const safeNextStep = Math.min(actualStep, nextStep);
       if (step === 1 && safeNextStep === 2) {
+        simpleStep2WarnShownRef.current = true;
         step3PendingRef.current = safeNextStep;
         setShowStep3Warning(true);
         return;
