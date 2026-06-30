@@ -41,13 +41,24 @@
 - `src/app/deal/[id]/page.tsx`
 - `src/components/ReviewPanel.tsx`
 - `src/app/api/reviews/route.ts`
-��ม role
-- เพิ่มชื่อผู้ซื้อและผู้ขายใน 3 แถว breakdown: "ผู้ซื้อ [ชื่อ] โอนเงินเข้าศูนย์กลาง", "ผู้ขาย [ชื่อ] ชำระค่าบริการแยก", "ยอดสุทธิที่ผู้ขาย [ชื่อ] ได้รับ"
-- highlight (bold+สีเข้ม) ตาม role: ผู้ซื้อเห็นแถว buyer เด่น / ผู้ขายเห็นแถว seller เด่น / อีก role แสดง muted
 
-### แก้ 3 บัคใน Simple Wizard step 2→3
-1. **ปุ่ม "ย้อนกลับไปคุยต่อ" กดไม่ได้**: เพิ่ม `setWzViewStep(2)` ใน onClick — ปุ่มนี้ต้องขยับ view กลับ step 2 ด้วย ไม่ใช่แค่ reset `chatReviewReady`
-2. **popup ขึ้นผิดที่ใน step 3**: ลบ `useEffect` ที่ยิง popup เมื่อ deal load — ปัญหาคือ msgs ยังไม่โหลดตอน effect ยิง ทำให้ `getSimpleStep()` คืน step 2 ผิดพลาด → `step3PendingRef = 2` → กด "เข้าใจแล้ว" → `setWzViewStep(2)` → ค้างที่ step 2 ถาวร popup ตอนนี้ trigger เฉพาะจาก `goToSimpleStep()` step 1→2
+---
+
+## 2026-06-30 (ต่อ 5)
+
+### หน้าจบดีล — แสดงสลิปทุกใบ + หลักฐานแชท/วิดีโอคอล
+- `renderWizardStep8()` และ `renderRStep14()`: เปลี่ยนจากแสดงสลิปใบเดียว → รวบรวมสลิปทุกใบ (buyer/seller/payout/refund) แสดงเป็น grid
+- เพิ่ม `chat` และ `call` evidence type ใน filter (ครอบคลุมหลักฐานแชทและวิดีโอคอล)
+- `renderRStep14()` เพิ่ม evidence gallery ครบทุกประเภทเหมือน simple wizard
+
+### หน้าแอดมิน — เพิ่ม evidence ทุกประเภท
+- `parcelEvidenceOf()` ใน admin/deals: เพิ่ม `inspection`, `chat`, `call` ใน filter + labelMap
+- เปลี่ยนหัวข้อจาก "หลักฐานพัสดุจากคู่ดีล" → "หลักฐานทั้งหมดในดีล"
+
+### ไฟล์ที่แก้ไข
+- `src/app/deal/[id]/page.tsx`
+- `src/app/admin/deals/page.tsx`
+getSimpleStep()` คืน step 2 ผิดพลาด → `step3PendingRef = 2` → กด "เข้าใจแล้ว" → `setWzViewStep(2)` → ค้างที่ step 2 ถาวร popup ตอนนี้ trigger เฉพาะจาก `goToSimpleStep()` step 1→2
 3. **reload กลับ step 2**: เพิ่ม `msgsLoaded` state — ถ้า msgs ยังไม่โหลดและอยู่ใน payment_pending ที่ยังไม่มี evidence → แสดง "กำลังโหลด..." แทนที่จะ flash ไป step 2 ก่อน
 
 ---

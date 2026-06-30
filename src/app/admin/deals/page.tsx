@@ -354,9 +354,12 @@ export default function AdminDeals() {
       receive: 'ผู้ซื้ออัปโหลดหลักฐานรับสินค้า',
       testing: 'ผู้ขายอัปโหลดหลักฐานทดสอบ',
       check: 'คนกลางอัปโหลดหลักฐานตรวจสินค้า',
+      inspection: 'คนกลางอัปโหลดหลักฐานตรวจสินค้า',
+      chat: 'หลักฐานจากแชท',
+      call: 'บันทึกวิดีโอคอล',
     };
     return (d.evidence || [])
-      .filter(item => ['packing', 'receive', 'testing', 'check'].includes(item.type) && item.file_id)
+      .filter(item => ['packing', 'receive', 'testing', 'check', 'inspection', 'chat', 'call'].includes(item.type) && item.file_id)
       .map(item => ({
         ...item,
         label: labelMap[item.type] || item.type,
@@ -522,7 +525,7 @@ export default function AdminDeals() {
                   )}
                   {parcelEvidence.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-xs font-semibold text-blue-900">หลักฐานพัสดุจากคู่ดีล</p>
+                      <p className="text-xs font-semibold text-blue-900">หลักฐานทั้งหมดในดีล</p>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {parcelEvidence.map(item => (
                           <a key={item.id} href={fileUrl(item.file_id)} target="_blank" rel="noreferrer" className="block">

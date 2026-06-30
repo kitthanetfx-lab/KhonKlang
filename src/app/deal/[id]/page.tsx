@@ -2663,13 +2663,19 @@ export default function DealRoom() {
   function renderWizardStep8(outcome?: 'success' | 'cancelled' | 'disputed') {
     const pd: DealPriceState = priceState || {};
     const isCancelled = outcome === 'cancelled';
-    const slipId = isCancelled ? pd.refund_slip_file_id : pd.payout_slip_file_id;
+
+    // รวบรวมสลิปทุกใบ
+    const allSlips: { label: string; fileId: string }[] = [];
+    if (deal!.payment_slip_file_id) allSlips.push({ label: 'สลิปผู้ซื้อ (ค่าสินค้า)', fileId: deal!.payment_slip_file_id });
+    if (pd.seller_fee_slip) allSlips.push({ label: 'สลิปผู้ขาย (ค่าบริการ)', fileId: pd.seller_fee_slip });
+    if (pd.payout_slip_file_id) allSlips.push({ label: 'สลิปโอนเงินให้ผู้ขาย', fileId: pd.payout_slip_file_id });
+    if (pd.refund_slip_file_id) allSlips.push({ label: 'สลิปคืนเงินให้ผู้ซื้อ', fileId: pd.refund_slip_file_id });
 
     // รวบรวมหลักฐานทุกประเภท
     const packingEvid = evidence.filter(e => e.type === 'packing');
     const receiveEvid = evidence.filter(e => e.type === 'receive');
-    const chatEvid = evidence.filter(e => e.type === 'chat');
-    const inspectionEvid = evidence.filter(e => e.type === 'inspection');
+    const chatEvid = evidence.filter(e => e.type === 'chat' || e.type === 'call');
+    const inspectionEvid = evidence.filter(e => e.type === 'inspection' || e.type === 'check');
     const hasAnyEvidence = packingEvid.length > 0 || receiveEvid.length > 0 || chatEvid.length > 0 || inspectionEvid.length > 0;
 
     return (
@@ -2679,10 +2685,19 @@ export default function DealRoom() {
           <div className="dr-done-title">{isCancelled ? 'ดีลถูกยกเลิก — คืนเงินผู้ซื้อแล้ว' : 'ดีลเสร็จสมบูรณ์!'}</div>
           <div className="dr-done-sub">{isCancelled ? 'ศูนย์กลางโอนเงินคืนผู้ซื้อเรียบร้อยแล้ว' : 'ศูนย์กลางโอนเงินให้ผู้ขายเรียบร้อยแล้ว (ดำเนินการโดยทีมงาน)'}</div>
         </div>
-        {slipId && (
+        {allSlips.length > 0 && (
           <div className="dr-card">
-            <div className="dr-card-title">📎 {isCancelled ? 'สลิปคืนเงินให้ผู้ซื้อ' : 'สลิปโอนเงินให้ผู้ขาย'}</div>
-            <a href={fileUrl(slipId)} target="_blank" rel="noreferrer"><img src={fileUrl(slipId)} alt="สลิป" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+            <div className="dr-card-title">📎 สลิปทั้งหมดในดีล</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(allSlips.length, 2)}, 1fr)`, gap: 10 }}>
+              {allSlips.map(s => (
+                <div key={s.fileId}>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 5, textAlign: 'center' }}>{s.label}</div>
+                  <a href={fileUrl(s.fileId)} target="_blank" rel="noreferrer">
+                    <img src={fileUrl(s.fileId)} alt={s.label} style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
+                  </a>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <div className="dr-card">
@@ -3286,7 +3301,18 @@ export default function DealRoom() {
     function renderRStep14(outcome?: 'success' | 'cancelled' | 'disputed') {
       const pd: DealPriceState = priceState || {};
       const isCancelled = outcome === 'cancelled';
-      const slipId = isCancelled ? pd.refund_slip_file_id : pd.payout_slip_file_id;
+      // รวบรวมสลิปทุกใบ
+      const allSlips14: { label: string; fileId: string }[] = [];
+      if (deal!.payment_slip_file_id) allSlips14.push({ label: 'สลิปผู้ซื้อ (ค่าสินค้า)', fileId: deal!.payment_slip_file_id });
+      if (pd.seller_fee_slip) allSlips14.push({ label: 'สลิปผู้ขาย (ค่าบริการ)', fileId: pd.seller_fee_slip });
+      if (pd.payout_slip_file_id) allSlips14.push({ label: 'สลิปโอนเงินให้ผู้ขาย', fileId: pd.payout_slip_file_id });
+      if (pd.refund_slip_file_id) allSlips14.push({ label: 'สลิปคืนเงินให้ผู้ซื้อ', fileId: pd.refund_slip_file_id });
+      // รวบรวมหลักฐานทุกประเภท
+      const packingEvid14 = evidence.filter(e => e.type === 'packing');
+      const receiveEvid14 = evidence.filter(e => e.type === 'receive');
+      const chatEvid14 = evidence.filter(e => e.type === 'chat' || e.type === 'call');
+      const inspectionEvid14 = evidence.filter(e => e.type === 'inspection' || e.type === 'check');
+      const hasEvid14 = packingEvid14.length > 0 || receiveEvid14.length > 0 || chatEvid14.length > 0 || inspectionEvid14.length > 0;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="dr-card dr-done-card">
@@ -3294,10 +3320,19 @@ export default function DealRoom() {
             <div className="dr-done-title">{isCancelled ? 'ดีลถูกยกเลิก — คืนเงินแล้ว' : 'ดีลเสร็จสมบูรณ์!'}</div>
             <div className="dr-done-sub">{isCancelled ? 'ศูนย์กลางโอนเงินคืนผู้ซื้อเรียบร้อยแล้ว' : 'ศูนย์กลางโอนเงินให้ผู้ขายและคืนเครดิตคนกลางเรียบร้อยแล้ว'}</div>
           </div>
-          {slipId && (
+          {allSlips14.length > 0 && (
             <div className="dr-card">
-              <div className="dr-card-title">📎 {isCancelled ? 'สลิปคืนเงิน' : 'สลิปโอนเงินให้ผู้ขาย'}</div>
-              <a href={fileUrl(slipId)} target="_blank" rel="noreferrer"><img src={fileUrl(slipId)} alt="สลิป" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+              <div className="dr-card-title">📎 สลิปทั้งหมดในดีล</div>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(allSlips14.length, 2)}, 1fr)`, gap: 10 }}>
+                {allSlips14.map(s => (
+                  <div key={s.fileId}>
+                    <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 5, textAlign: 'center' }}>{s.label}</div>
+                    <a href={fileUrl(s.fileId)} target="_blank" rel="noreferrer">
+                      <img src={fileUrl(s.fileId)} alt={s.label} style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
+                    </a>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           <div className="dr-card">
@@ -3308,6 +3343,35 @@ export default function DealRoom() {
               hubDone: true, hubText: '✅ โอนเงินครบแล้ว',
             })}
           </div>
+          {hasEvid14 && (
+            <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="dr-card-title">📁 หลักฐานทั้งหมดในดีล</div>
+              {packingEvid14.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📦 แพ็คสินค้า ({packingEvid14.length} ไฟล์)</div>
+                  {renderWizardEvidenceThumbs(packingEvid14)}
+                </div>
+              )}
+              {receiveEvid14.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📹 วิดีโอแกะกล่อง ({receiveEvid14.length} ไฟล์)</div>
+                  {renderWizardEvidenceThumbs(receiveEvid14)}
+                </div>
+              )}
+              {inspectionEvid14.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>🔍 ตรวจสอบสินค้า ({inspectionEvid14.length} ไฟล์)</div>
+                  {renderWizardEvidenceThumbs(inspectionEvid14)}
+                </div>
+              )}
+              {chatEvid14.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>💬 หลักฐานแชท/วิดีโอคอล ({chatEvid14.length} ไฟล์)</div>
+                  {renderWizardEvidenceThumbs(chatEvid14)}
+                </div>
+              )}
+            </div>
+          )}
           {!isCancelled && <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />}
         </div>
       );
