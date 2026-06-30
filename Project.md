@@ -44,6 +44,24 @@
 
 ---
 
+## 2026-07-01
+
+### ค่าบริการหารครึ่ง — แสดงรายละเอียดจำนวนเงินต่อคน
+- `renderPricePanel()`: เพิ่ม `fpNameWithAmount()` helper คำนวณ `Math.round(total/2)` และแสดง "หารครึ่ง (คนละ ฿X)" แทน "หารครึ่ง" เฉยๆ
+- `renderWizardStepPrice()`: กล่อง "ราคาปัจจุบัน" แสดง "ค่าบริการรวม ฿X · หารครึ่ง (คนละ ฿Y)"
+
+### ปุ่มเสร็จสิ้น + รีวิวบังคับในหน้าจบดีล
+- เพิ่ม `completionReviewed` state ใน DealRoom
+- `ReviewPanel`: เพิ่ม `onReviewed?: () => void` prop — เรียกเมื่อรีวิวสำเร็จ หรือตรวจพบว่ารีวิวแล้ว (on load)
+- Fix "รีวิวไม่แสดงทันที": เมื่อ `headers.Authorization` ยังไม่พร้อม → `setReviewed(false)` แสดงฟอร์มก่อน ไม่ต้อง refresh; ขณะ loading แสดง skeleton "⏳ กำลังโหลด..."
+- `renderWizardStep8()` และ `renderRStep14()`: เพิ่มปุ่ม "🏠 บันทึกดีลไว้เป็นหลักฐาน — กลับหน้าหลัก" ที่ enabled เมื่อ `completionReviewed === true`; ก่อนรีวิวแสดงเป็น "🔒 กรุณาให้คะแนนรีวิวก่อน" (disabled)
+
+### ไฟล์ที่แก้ไข (2026-07-01)
+- `src/app/deal/[id]/page.tsx`
+- `src/components/ReviewPanel.tsx`
+
+---
+
 ## 2026-06-30 (ต่อ 5)
 
 ### หน้าจบดีล — แสดงสลิปทุกใบ + หลักฐานแชท/วิดีโอคอล

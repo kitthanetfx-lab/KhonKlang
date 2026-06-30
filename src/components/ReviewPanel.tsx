@@ -101,7 +101,7 @@ function AllReviewsSummary({ byReviewer }: { byReviewer: Record<string, AllRevie
 }
 
 // ── ReviewPanel: ฟอร์มให้คะแนน + แสดงสรุปรีวิวทุกฝ่าย ────────────────────
-export function ReviewPanel({ deal, myRole, headers }: { deal: DealParties; myRole: Role | 'guest' | ''; headers: Record<string, string> }) {
+export function ReviewPanel({ deal, myRole, headers, onReviewed }: { deal: DealParties; myRole: Role | 'guest' | ''; headers: Record<string, string>; onReviewed?: () => void }) {
   const [reviewed, setReviewed] = useState<boolean | null>(null);
   const [allReviews, setAllReviews] = useState<AllReviewItem[] | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
@@ -121,22 +121,38 @@ export function ReviewPanel({ deal, myRole, headers }: { deal: DealParties; myRo
   }
 
   useEffect(() => {
-    if (!isParty || !headers.Authorization) return;
+    if (!isParty) return;
+    // ถ้ายังไม่มี auth — แสดงฟอร์มทันที (สมมติยังไม่ได้รีวิว)
+    if (!headers.Authorization) {
+      setReviewed(false);
+      setAllReviews([]);
+      return;
+    }
     let cancelled = false;
     Promise.all([
       fetch(`/api/reviews?dealId=${deal.id}`, { headers }).then(r => r.json()),
       fetch(`/api/reviews?dealId=${deal.id}&all=true`, { headers }).then(r => r.json()).catch(() => ({ items: [] })),
     ]).then(([d1, d2]) => {
       if (!cancelled) {
-        setReviewed(!!d1.reviewed);
+        const alreadyReviewed = !!d1.reviewed;
+        setReviewed(alreadyReviewed);
         setAllReviews(d2.items || []);
+        if (alreadyReviewed) onReviewed?.();
       }
     }).catch(() => { if (!cancelled) { setReviewed(false); setAllReviews([]); } });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deal.id, isParty, headers.Authorization]);
 
-  if (!isParty || reviewed === null) return null;
+  if (!isParty) return null;
+  // ถ้ายัง loading (reviewed === null) แสดง skeleton เพื่อไม่ให้ผู้ใช้เห็นหน้าว่าง
+  if (reviewed === null) {
+    return (
+      <div className="dr-card" style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
+        <div style={{ fontSize: 14 }}>⏳ กำลังโหลดข้อมูลรีวิว...</div>
+      </div>
+    );
+  }
 
   // จัด allReviews เป็นกลุ่มตาม reviewer_role
   const byReviewer: Record<string, AllReviewItem[]> = {};
@@ -186,7 +202,7 @@ export function ReviewPanel({ deal, myRole, headers }: { deal: DealParties; myRo
         body: JSON.stringify({ dealId: deal.id, items }),
       });
       const d = await r.json();
-      if (r.ok) setReviewed(true);
+      if (r.ok) { setReviewed(true); onReviewed?.(); }
       else setError(d.error || 'บันทึกรีวิวไม่สำเร็จ');
     } catch { setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง'); }
     finally { setSending(false); }
@@ -249,6 +265,7 @@ export function ReviewPanel({ deal, myRole, headers }: { deal: DealParties; myRo
           <div className="rv-comment-sub">เขียนถึงทีมงานหรือประสบการณ์ใช้งานเพิ่มเติมได้</div>
           <textarea
             className="rv-comment"
+
             value={comment}
             onChange={e => setComment(e.target.value)}
             placeholder="พิมพ์ข้อเสนอแนะถึงทีมงานหรือสิ่งที่อยากให้ปรับปรุง (ไม่บังคับ)"

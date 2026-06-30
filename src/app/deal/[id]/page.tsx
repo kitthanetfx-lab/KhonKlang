@@ -348,6 +348,7 @@ export default function DealRoom() {
   const [evidenceType, setEvidenceType] = useState('packing');
   const [copied, setCopied] = useState(false);
   const [authHdrs, setAuthHdrs] = useState<Record<string, string>>({});
+  const [completionReviewed, setCompletionReviewed] = useState(false);
   const [dealError, setDealError] = useState('');
   const [showSelectMM, setShowSelectMM] = useState(false);
   const [uploadPreview, setUploadPreview] = useState<{ url: string; name: string } | null>(null);
@@ -1275,6 +1276,15 @@ export default function DealRoom() {
     const pd: DealPriceState = priceState || {};
     const hasMm = !!deal!.middleman_id;
     const fpName = (fp?: string) => fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
+    const fpNameWithAmount = (fp?: string, price?: number) => {
+      if (fp === 'split') {
+        const _p = price || Number(pd.proposed_price || deal!.price);
+        const _fb = computeDealFees(feeConfig, _p, deal!.deal_type);
+        const _half = Math.round(_fb.total / 2);
+        return `หารครึ่ง (คนละ ฿${_half.toLocaleString()})`;
+      }
+      return fpName(fp);
+    };
     const meAgreed = (myRole === 'seller' && pd.seller_agreed) || (myRole === 'buyer' && pd.buyer_agreed) || (myRole === 'middleman' && pd.middleman_agreed);
     const canProposeNewPrice = myRole === 'buyer' || myRole === 'seller';
     const isRepriceFlow = pd.proposal_kind === 'reprice' && !!pd.proposed_price;
@@ -1286,12 +1296,12 @@ export default function DealRoom() {
         <div className="dr-card-title">💬 ตกลงราคา & ค่าบริการ</div>
         {pd.agreed ? (
           <div style={{ fontSize: 14, color: 'var(--green-700)', background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-md)', padding: '10px 14px' }}>
-            ✅ ตกลงราคาแล้ว <b>฿{Number(pd.proposed_price || deal!.price).toLocaleString()}</b> · ค่าบริการ: {fpName(selectedFeePayer)}
+            ✅ ตกลงราคาแล้ว <b>฿{Number(pd.proposed_price || deal!.price).toLocaleString()}</b> · ค่าบริการ: {fpNameWithAmount(selectedFeePayer, Number(pd.proposed_price || deal!.price))}
             {hasMm && pd.mm_deposit_held ? ` · คนกลางวางเครดิตประกัน ฿${Number(pd.mm_deposit_held).toLocaleString()}` : ''}
           </div>
         ) : isRepriceFlow ? (
           <div>
-            <div style={{ fontSize: 14, marginBottom: 8 }}>{proposerLabel}เสนอราคาใหม่: <b>฿{Number(pd.proposed_price).toLocaleString()}</b> · ค่าบริการ: {fpName(pd.proposed_fee_payer)}</div>
+            <div style={{ fontSize: 14, marginBottom: 8 }}>{proposerLabel}เสนอราคาใหม่: <b>฿{Number(pd.proposed_price).toLocaleString()}</b> · ค่าบริการ: {fpNameWithAmount(pd.proposed_fee_payer, Number(pd.proposed_price))}</div>
             {renderParticipantStatusRows([
               { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!pd.seller_agreed, doneText: '✅ ตกลงแล้ว' },
               { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!pd.buyer_agreed, doneText: '✅ ตกลงแล้ว' },
@@ -1990,10 +2000,19 @@ export default function DealRoom() {
             : 'ยืนยันราคาและผู้จ่ายค่าบริการก่อนเริ่มคุยรายละเอียดสินค้า'}
         </p>
 
-        <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}><span>ราคาปัจจุบัน</span><span>฿{currentPrice.toLocaleString()}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', marginTop: 2 }}><span>ค่าบริการ</span><span>{fpName(currentFeePayer)}</span></div>
-        </div>
+        {(() => {
+          const _fb = computeDealFees(feeConfig, currentPrice, deal!.deal_type);
+          const _half = Math.round(_fb.total / 2);
+          const feeLabel = currentFeePayer === 'split'
+            ? `หารครึ่ง (คนละ ฿${_half.toLocaleString()})`
+            : fpName(currentFeePayer);
+          return (
+            <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}><span>ราคาปัจจุบัน</span><span>฿{currentPrice.toLocaleString()}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', marginTop: 2 }}><span>ค่าบริการรวม ฿{_fb.total.toLocaleString()}</span><span>{feeLabel}</span></div>
+            </div>
+          );
+        })()}
 
         {!showPriceProposal ? (
           <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => { setShowPriceProposal(true); setPriceInput(String(currentPrice)); setFeePayerInput(currentFeePayer); }}>✏️ เสนอราคาหรือค่าบริการใหม่</button>
@@ -2738,7 +2757,32 @@ export default function DealRoom() {
           </div>
         )}
 
-        {!isCancelled && <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />}
+        {!isCancelled && (
+          <ReviewPanel
+            deal={deal!}
+            myRole={myRole as 'buyer' | 'seller' | 'middleman'}
+            headers={authHdrs}
+            onReviewed={() => setCompletionReviewed(true)}
+          />
+        )}
+        {/* ปุ่มบันทึกดีล — กดได้เมื่อรีวิวครบ หรือไม่ใช่คู่สัญญา */}
+        {(() => {
+          const canFinish = completionReviewed || isCancelled || myRole === 'guest' || myRole === '';
+          return (
+            <div style={{ textAlign: 'center', marginTop: 8 }}>
+              <button
+                type="button"
+                className={`btn btn-block btn-lg ${canFinish ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ opacity: canFinish ? 1 : 0.55 }}
+                disabled={!canFinish}
+                title={canFinish ? undefined : 'กรุณาให้คะแนนรีวิวก่อนกดปุ่มนี้'}
+                onClick={() => router.push('/')}
+              >
+                {canFinish ? '🏠 บันทึกดีลไว้เป็นหลักฐาน — กลับหน้าหลัก' : '🔒 กรุณาให้คะแนนรีวิวก่อน'}
+              </button>
+            </div>
+          );
+        })()}
       </div>
     );
   }
@@ -3372,7 +3416,32 @@ export default function DealRoom() {
               )}
             </div>
           )}
-          {!isCancelled && <ReviewPanel deal={deal!} myRole={myRole as 'buyer' | 'seller' | 'middleman'} headers={authHdrs} />}
+          {!isCancelled && (
+            <ReviewPanel
+              deal={deal!}
+              myRole={myRole as 'buyer' | 'seller' | 'middleman'}
+              headers={authHdrs}
+              onReviewed={() => setCompletionReviewed(true)}
+            />
+          )}
+          {/* ปุ่มบันทึกดีล — กดได้เมื่อรีวิวครบ หรือไม่ใช่คู่สัญญา */}
+          {(() => {
+            const canFinish = completionReviewed || isCancelled || myRole === 'guest' || myRole === '';
+            return (
+              <div style={{ textAlign: 'center', marginTop: 8 }}>
+                <button
+                  type="button"
+                  className={`btn btn-block btn-lg ${canFinish ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ opacity: canFinish ? 1 : 0.55 }}
+                  disabled={!canFinish}
+                  title={canFinish ? undefined : 'กรุณาให้คะแนนรีวิวก่อนกดปุ่มนี้'}
+                  onClick={() => router.push('/')}
+                >
+                  {canFinish ? '🏠 บันทึกดีลไว้เป็นหลักฐาน — กลับหน้าหลัก' : '🔒 กรุณาให้คะแนนรีวิวก่อน'}
+                </button>
+              </div>
+            );
+          })()}
         </div>
       );
     }
@@ -4266,6 +4335,7 @@ export default function DealRoom() {
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>* {fb.note}</div>
               </div>
+
             ); })()}
             <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 18 }}>
               📹 สำคัญ: โปรดเข้าหน้าแชทและวิดีโอคอล เพื่อพูดคุย ดูสภาพสินค้า และตกลงรายละเอียดให้เรียบร้อยก่อน — บันทึกบทสนทนา / วิดีโอคอล / รูปภาพไว้เป็นหลักฐาน โดยกดปุ่ม "📌 เก็บเป็นหลักฐาน" ที่แต่ละข้อความ
