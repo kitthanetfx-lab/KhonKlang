@@ -642,4 +642,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             title: isPay ? `💰 มีการโอนเงินรอตรวจสอบ: ${updated.title || 'ดีล'}` : `⚠️ มีข้อพิพาท: ${updated.title || 'ดีล'}`,
             body: isPay
               ? `ผู้ซื้อโอนเงิน ฿${Number(updated.price || 0).toLocaleString()} แล้ว — เข้าไปตรวจสอบและอนุมัติที่หน้าการเงิน`
-              : `${systemMsg} — เข้าไปจัดการที่หน้าดีล &
+              : `${systemMsg} — เข้าไปจัดการที่หน้าดีล & ข้อพิพาท`,
+            link: isPay ? '/admin/finance' : '/admin/deals',
+          });
+        }
+      }
+    }
+
+    await syncDealLedger(db, updated as Record<string, unknown>).catch(() => {});
+    return NextResponse.json({ deal: updated });
+  } catch (err: unknown) {
+    const status = err instanceof HttpError ? err.status : 500;
+    return NextResponse.json({ error: String(err) }, { status });
+  }
+}
