@@ -165,7 +165,7 @@ export function ReviewPanel({ deal, myRole, headers }: { deal: DealParties; myRo
         value={comment}
         onChange={e => setComment(e.target.value)}
         placeholder="พิมพ์ข้อเสนอแนะถึงทีมงานหรือสิ่งที่อยากให้ปรับปรุง (ไม่บังคับ)"
-        rows={3}
+        rows={5}
         maxLength={1000}
       />
       </div>
