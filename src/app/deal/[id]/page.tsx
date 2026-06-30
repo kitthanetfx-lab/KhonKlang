@@ -2245,7 +2245,6 @@ export default function DealRoom() {
             : sellerDone && buyerDone && (!isRegularDeal || !hasMm || middlemanDone)
               ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ไปตกลงราคา →</button>
               : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
-          <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => { setChatReviewReady(false); setWzViewStep(2); }}>⬅ ย้อนกลับไปคุยต่อ</button>
         </div>
       </div>
     );
