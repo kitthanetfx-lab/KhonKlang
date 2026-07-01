@@ -857,11 +857,13 @@ export default function DealRoom() {
         if (error) { alert(`อัปโหลดวิดีโอไม่สำเร็จ: ${error.message}`); return; }
         fileId = path;
       } else {
-        const headers = await getAuthHeaders();
+        const headers = await getAuthHeaders(true); // force-fresh — ป้องกัน cached token หมดอายุ
+        if (!headers.Authorization) { alert('กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง'); return; }
         const prepared = await compressImage(file); // บีบอัดเฉพาะรูป
         const form = new FormData(); form.append('file', prepared);
         const r = await fetch('/api/upload-deal', { method: 'POST', headers, body: form });
         const d = await r.json();
+        if (r.status === 401) { headersRef.current = {}; alert('เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่'); return; }
         if (!r.ok) { alert(d.error || 'Upload failed'); return; }
         fileId = d.fileId; fileName = d.fileName;
       }
@@ -1053,11 +1055,13 @@ export default function DealRoom() {
   async function uploadMeetupSlip(f: File) {
     const purl = beginUploadPreview(f);
     try {
-      const headers = await getAuthHeaders();
+      const headers = await getAuthHeaders(true); // force-fresh — ป้องกัน cached token หมดอายุ
+      if (!headers.Authorization) { alert('กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง'); return; }
       const prepared = await compressImage(f);
       const form = new FormData(); form.append('file', prepared);
       const r = await fetch('/api/upload-deal', { method: 'POST', headers, body: form });
       const d = await r.json();
+      if (r.status === 401) { headersRef.current = {}; alert('เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่'); return; }
       if (r.ok) await doAction('meetup_deposit', { fileId: d.fileId });
       else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ');
     } finally { endUploadPreview(purl); }

@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ fileId, fileName: file.name, url, mimeType: file.type });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[upload-deal]', msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const status = (err != null && typeof err === 'object' && 'status' in err && typeof (err as { status: unknown }).status === 'number')
+      ? (err as { status: number }).status
+      : 500;
+    console.error('[upload-deal]', status, msg);
+    return NextResponse.json({ error: msg }, { status });
   }
 }

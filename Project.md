@@ -1,5 +1,22 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-01 (ต่อ 4)
+
+### แก้ 500 error บน /api/upload-deal (Unauthorized)
+
+**สาเหตุ**: `verifyUser` throw `HttpError('Unauthorized', 401)` แต่ `catch` block ใน route คืน 500 เสมอ + `uploadFile`/`uploadMeetupSlip` ใช้ `getAuthHeaders()` แบบไม่ force-fresh
+
+**แก้ไข**:
+1. `upload-deal/route.ts` — `catch` block ตรวจสอบ `err.status` (HttpError) แล้วคืน status นั้นแทน 500
+2. `page.tsx` → `uploadFile` — เปลี่ยนเป็น `getAuthHeaders(true)` + เช็ค `!headers.Authorization` + จัดการ 401 แยก (ล้าง cache + แจ้งเข้าระบบใหม่)
+3. `page.tsx` → `uploadMeetupSlip` — แก้เหมือนกัน
+
+### ไฟล์ที่แก้ไข (2026-07-01 ต่อ 4)
+- `src/app/api/upload-deal/route.ts`
+- `src/app/deal/[id]/page.tsx`
+
+---
+
 ## 2026-07-01 (ต่อ 3)
 
 ### ป้องกันฝ่ายเดียวเปลี่ยน step + บังคับหลักฐาน + completion meetup
