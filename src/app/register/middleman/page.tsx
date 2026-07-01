@@ -512,12 +512,16 @@ function MiddlemanForm() {
                 {promoActive && membershipFee !== fees.middlemanRegFee && (
                   <p className="text-sm text-gray-400 line-through">฿{fees.middlemanRegFee.toLocaleString()}</p>
                 )}
-                <p className="text-4xl font-bold text-purple-600">฿{membershipFee.toLocaleString()}</p>
+                {membershipFee === 0 ? (
+                  <p className="text-4xl font-bold text-green-600">ฟรี!</p>
+                ) : (
+                  <p className="text-4xl font-bold text-purple-600">฿{membershipFee.toLocaleString()}</p>
+                )}
                 <p className="text-xs text-gray-400 mt-1">ชำระครั้งเดียว (ต่ออายุรายปี) — ไม่รวมเงินค้ำประกัน (โอนทีหลังที่หน้าบอร์ดคนกลาง)</p>
               </div>
 
-              {/* QR Code */}
-              {qrSrc && (
+              {/* QR Code — แสดงเฉพาะเมื่อมีค่าสมัคร */}
+              {membershipFee > 0 && qrSrc && (
                 <div className="text-center space-y-3">
                   <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">สแกน QR PromptPay (ค่าสมัคร ฿{membershipFee.toLocaleString()})</p>
                   <div className="inline-block bg-white p-3 rounded-2xl shadow-lg border border-gray-200">
@@ -536,8 +540,8 @@ function MiddlemanForm() {
                 </div>
               )}
 
-              {/* Bank transfer */}
-              {fees.companyBankAcct ? (
+              {/* Bank transfer — แสดงเฉพาะเมื่อมีค่าสมัคร */}
+              {membershipFee > 0 && (fees.companyBankAcct ? (
                 <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2 text-sm">
                   <p className="font-semibold mb-2">หรือโอนผ่านธนาคาร</p>
                   <div className="flex justify-between">
@@ -565,9 +569,9 @@ function MiddlemanForm() {
                 </div>
               ) : !qrSrc && (
                 <p className="text-sm text-amber-600 text-center">⚠️ ทีมงานยังไม่ได้ตั้งบัญชีรับเงิน กรุณาติดต่อแอดมินก่อนโอนเงิน</p>
-              )}
+              ))}
 
-              {/* Slip upload */}
+              {/* Slip upload / ฟรีค่าสมัคร */}
               {membershipFee > 0 ? (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
                   <FileUpload
@@ -580,7 +584,10 @@ function MiddlemanForm() {
                   />
                 </div>
               ) : (
-                <p className="text-sm text-green-600 text-center border-t border-gray-200 dark:border-gray-700 pt-5">✅ ฟรีค่าสมัคร — ไม่ต้องโอนเงินหรือแนบสลิป</p>
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 text-center">
+                  <p className="text-green-700 dark:text-green-300 font-semibold">🎉 ฟรีค่าสมัคร!</p>
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">ไม่ต้องโอนเงินหรือแนบสลิป — กดยืนยันการสมัครได้เลย</p>
+                </div>
               )}
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}

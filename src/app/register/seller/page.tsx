@@ -681,10 +681,14 @@ function SellerForm() {
                 {promoActive && membershipFee !== fees.sellerRegFee && (
                   <p className="text-sm text-gray-400 line-through">฿{fees.sellerRegFee.toLocaleString()}</p>
                 )}
-                <p className="text-4xl font-bold text-blue-600">฿{membershipFee.toLocaleString()}</p>
+                {membershipFee === 0 ? (
+                  <p className="text-4xl font-bold text-green-600">ฟรี!</p>
+                ) : (
+                  <p className="text-4xl font-bold text-blue-600">฿{membershipFee.toLocaleString()}</p>
+                )}
                 <p className="text-xs text-gray-400 mt-1">ชำระครั้งเดียว (ต่ออายุรายปี)</p>
               </div>
-              {qrSrc && (
+              {membershipFee > 0 && qrSrc && (
                 <div className="text-center space-y-3">
                   <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">สแกน QR PromptPay</p>
                   <div className="inline-block bg-white p-3 rounded-2xl shadow-lg border border-gray-200">
@@ -701,7 +705,7 @@ function SellerForm() {
                   )}
                 </div>
               )}
-              {fees.companyBankAcct ? (
+              {membershipFee > 0 && (fees.companyBankAcct ? (
                 <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2 text-sm">
                   <p className="font-semibold mb-2">หรือโอนผ่านธนาคาร</p>
                   <div className="flex justify-between"><span className="text-gray-500">ธนาคาร</span><span className="font-medium">{fees.companyBankName}</span></div>
@@ -719,8 +723,8 @@ function SellerForm() {
                 </div>
               ) : !qrSrc && (
                 <p className="text-sm text-amber-600 text-center">⚠️ ทีมงานยังไม่ได้ตั้งบัญชีรับเงิน กรุณาติดต่อแอดมินก่อนโอนเงิน</p>
-              )}
-              {/* Slip upload */}
+              ))}
+              {/* Slip upload / ฟรีค่าสมัคร */}
               {membershipFee > 0 ? (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
                   <FileUpload
@@ -733,7 +737,10 @@ function SellerForm() {
                   />
                 </div>
               ) : (
-                <p className="text-sm text-green-600 text-center border-t border-gray-200 dark:border-gray-700 pt-5">✅ ฟรีค่าสมัคร — ไม่ต้องโอนเงินหรือแนบสลิป</p>
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 text-center">
+                  <p className="text-green-700 dark:text-green-300 font-semibold">🎉 ฟรีค่าสมัคร!</p>
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">ไม่ต้องโอนเงินหรือแนบสลิป — กดยืนยันการสมัครได้เลย</p>
+                </div>
               )}
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
               <label className="flex items-start gap-2.5 mb-4 p-3 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 cursor-pointer text-sm">
