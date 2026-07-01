@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { Nav, Footer, useReveal } from '@/components/Site';
 import { isCertifiedMode } from '@/lib/listingMode';
+import { useServiceControls } from '@/lib/useServiceControls';
+import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 
 interface Listing {
   id: string;
@@ -74,6 +76,7 @@ export default function Marketplace() {
   const [sort,       setSort]       = useState('ล่าสุด');
 
   useReveal();
+  const controls = useServiceControls();
 
   useEffect(() => {
     const r = document.documentElement;
@@ -184,6 +187,17 @@ export default function Marketplace() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (!controls.loading && !controls.isEnabled('marketplace')) {
+    return (
+      <ServiceDisabledNotice
+        title="โซนตลาด"
+        message={controls.message('marketplace')}
+        backHref="/"
+        backLabel="กลับหน้าหลัก"
+      />
     );
   }
 

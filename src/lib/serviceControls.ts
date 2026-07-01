@@ -5,6 +5,7 @@ export type ServiceControlKey =
   | 'meetupSafeZone'
   | 'consign'
   | 'onsite'
+  | 'marketplace'
   | 'sellerRegistration'
   | 'middlemanRegistration';
 
@@ -22,6 +23,7 @@ export const SERVICE_CONTROL_DEFAULTS: ServiceControlMap = {
   meetupSafeZone: { enabled: true, note: '' },
   consign: { enabled: true, note: '' },
   onsite: { enabled: true, note: '' },
+  marketplace: { enabled: true, note: '' },
   sellerRegistration: { enabled: true, note: '' },
   middlemanRegistration: { enabled: true, note: '' },
 };
@@ -55,6 +57,12 @@ export const SERVICE_CONTROL_CATALOG: Array<{
     title: 'นัดรับ Safe Zone',
     description: 'เปิด/ปิดบริการนัดรับในจุดปลอดภัยที่มีคนกลางดูแลสถานที่นัดพบ',
     group: 'นัดรับผ่านกลาง',
+  },
+  {
+    key: 'marketplace',
+    title: 'โซนตลาด (ประกาศซื้อขาย)',
+    description: 'เปิด/ปิดหน้าตลาดประกาศซื้อขายสินค้า — ถ้าปิด ผู้ใช้จะเห็นข้อความแทนที่หน้ารายการสินค้า',
+    group: 'บริการเสริม',
   },
   {
     key: 'consign',

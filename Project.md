@@ -1,5 +1,21 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-01 (ต่อ 8)
+
+### เพิ่มปุ่มเปิด/ปิดโซนตลาด (Marketplace) ในหน้า Admin Service Controls
+
+**งานที่ทำ**:
+1. `src/lib/serviceControls.ts` — เพิ่ม `'marketplace'` เข้า `ServiceControlKey` union, `SERVICE_CONTROL_DEFAULTS`, และ `SERVICE_CONTROL_CATALOG` (group "บริการเสริม")
+2. `src/app/marketplace/page.tsx` — import `useServiceControls` + `ServiceDisabledNotice`, เรียก hook, เพิ่ม early return เมื่อ marketplace ถูกปิด
+
+**ผลลัพธ์**: Admin สามารถเปิด/ปิดโซนตลาดได้จากหน้า Service Controls — เมื่อปิด ผู้ใช้จะเห็นหน้า ServiceDisabledNotice แทนที่หน้ารายการสินค้า
+
+### ไฟล์ที่แก้ไข (2026-07-01 ต่อ 8)
+- `src/lib/serviceControls.ts`
+- `src/app/marketplace/page.tsx`
+
+---
+
 ## 2026-07-01 (ต่อ 7)
 
 ### เพิ่ม OG Tag (Open Graph / Twitter Card) สำหรับ Link Preview
