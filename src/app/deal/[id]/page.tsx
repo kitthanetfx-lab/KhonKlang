@@ -2775,7 +2775,7 @@ export default function DealRoom() {
             deal={deal!}
             myRole={myRole as 'buyer' | 'seller' | 'middleman'}
             headers={authHdrs}
-            onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); router.push('/'); }}
+            onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
             onRatedChange={setCompletionAllRated}
             onSubmitError={() => setCompletionSending(false)}
             externalSubmitTrigger={completionSubmitTrigger}

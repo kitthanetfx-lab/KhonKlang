@@ -1,5 +1,18 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-01 (ต่อ 5)
+
+### แก้บัค: เข้าดีลที่จบแล้วถูก redirect ออกทันที
+
+**สาเหตุ**: `ReviewPanel.tsx` บรรทัด 180 — `if (already) onReviewed?.()` เรียก callback ตอนโหลดหน้า ถ้ารีวิวแล้ว แต่ `onReviewed` ใน `renderWizardStep8()` (simple wizard) ยังมี `router.push('/')` หลงเหลืออยู่ → ทุกครั้งที่เปิดหน้าดีลที่จบแล้ว → auto-redirect กลับหน้าหลักทันที
+
+**แก้ไข**: ลบ `router.push('/')` ออกจาก `onReviewed` callback ใน `renderWizardStep8()` (บรรทัด 2778) → เหลือเพียง `setCompletionReviewed(true); setCompletionSending(false);` (เหมือนกับ regular wizard และ meetup wizard ที่แก้ไปแล้ว)
+
+### ไฟล์ที่แก้ไข (2026-07-01 ต่อ 5)
+- `src/app/deal/[id]/page.tsx`
+
+---
+
 ## 2026-07-01 (ต่อ 4)
 
 ### แก้ 500 error บน /api/upload-deal (Unauthorized)
