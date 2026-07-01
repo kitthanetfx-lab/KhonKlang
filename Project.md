@@ -1,5 +1,19 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-01 (ต่อ 7)
+
+### เพิ่ม OG Tag (Open Graph / Twitter Card) สำหรับ Link Preview
+
+- `metadataBase`: `https://glanghub.com`
+- `openGraph`: type=website, locale=th_TH, รูป `/og-tag.webp` (1200×630)
+- `twitter`: card=summary_large_image, รูปเดียวกัน
+- รองรับทุกแพลตฟอร์ม: Facebook, LINE, Twitter/X, Discord, Telegram ฯลฯ
+
+### ไฟล์ที่แก้ไข (2026-07-01 ต่อ 7)
+- `src/app/layout.tsx`
+
+---
+
 ## 2026-07-01 (ต่อ 6)
 
 ### แก้โปรโมชันฟรีค่าสมัคร — ซ่อน QR/บัญชีธนาคารเมื่อค่าสมัครเป็น ฿0

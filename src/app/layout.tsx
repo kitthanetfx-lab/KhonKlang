@@ -31,8 +31,31 @@ const monoFont = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://glanghub.com"),
   title: "กลางฮับ — คิดถึงคนกลาง คิดถึง Glanghub",
   description: "แพลตฟอร์มซื้อขายปลอดภัยด้วยระบบตัวกลางที่ผ่านการรับรอง พักเงินไว้กับระบบจนกว่าจะได้รับของจริง",
+  openGraph: {
+    type: "website",
+    locale: "th_TH",
+    url: "https://glanghub.com",
+    siteName: "กลางฮับ",
+    title: "กลางฮับ — คิดถึงคนกลาง คิดถึง Glanghub",
+    description: "แพลตฟอร์มซื้อขายปลอดภัยด้วยระบบตัวกลางที่ผ่านการรับรอง พักเงินไว้กับระบบจนกว่าจะได้รับของจริง",
+    images: [
+      {
+        url: "/og-tag.webp",
+        width: 1200,
+        height: 630,
+        alt: "กลางฮับ — แพลตฟอร์มซื้อขายปลอดภัย",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "กลางฮับ — คิดถึงคนกลาง คิดถึง Glanghub",
+    description: "แพลตฟอร์มซื้อขายปลอดภัยด้วยระบบตัวกลางที่ผ่านการรับรอง พักเงินไว้กับระบบจนกว่าจะได้รับของจริง",
+    images: ["/og-tag.webp"],
+  },
 };
 
 // interactive-widget=overlays-content: บนมือถือ คีย์บอร์ดจะ "ทับ" จอแทนที่จะดันเนื้อหาขึ้น (ทุกบริการ)
