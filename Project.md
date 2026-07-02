@@ -1,5 +1,18 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-02 (ต่อ 14)
+
+### แก้ chip.is-active มองไม่เห็นใน dark mode
+
+- `.chip.is-active` เปลี่ยน `background: var(--ink)` → `var(--accent)` (สีฟ้า) และ `border-color` เช่นเดียวกัน
+- dark mode: `var(--ink)` = `#f4f7ff` (ขาว) + `color:#fff` = ขาวบนขาว → มองไม่เห็น
+- แก้แล้ว: ใช้ accent (ฟ้า) เป็น active state ทำงานถูกต้องทั้ง light และ dark mode
+
+### ไฟล์ที่แก้ไข (2026-07-02 ต่อ 14)
+- `src/app/globals.css`
+
+---
+
 ## 2026-07-02 (ต่อ 13)
 
 ### ฟีเจอร์และแก้บัก 6 รายการ
