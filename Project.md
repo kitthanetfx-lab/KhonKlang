@@ -1,5 +1,20 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-02 (ต่อ 12)
+
+### แก้ browser warning — เพิ่ม id/name/htmlFor ให้ form inputs ครบ
+
+- `ConsentModal.tsx` → checkbox: `id="consent-check"` `name="consentCheck"`
+- `register/seller/page.tsx` → step 1: fullNameId, idNumber; step 3 (bank): bankAcct, bankName, bankOwner
+- `register/middleman/page.tsx` → step 1: fullNameId, idNumber; step 3 (bank): bankAcct, bankName, bankOwner
+
+### ไฟล์ที่แก้ไข (2026-07-02 ต่อ 12)
+- `src/components/ConsentModal.tsx`
+- `src/app/register/seller/page.tsx`
+- `src/app/register/middleman/page.tsx`
+
+---
+
 ## 2026-07-02 (ต่อ 11)
 
 ### ปรับ UI ConsentModal — ขนาดตัวอักษร + สีปุ่ม

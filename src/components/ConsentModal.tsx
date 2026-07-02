@@ -124,6 +124,8 @@ export function ConsentModal({ onAccept, onDecline }: ConsentModalProps) {
           }}>
             <input
               type="checkbox"
+              id="consent-check"
+              name="consentCheck"
               checked={checked}
               onChange={e => setChecked(e.target.checked)}
               style={{ marginTop: 3, width: 18, height: 18, accentColor: 'var(--green-600, #16a34a)', flexShrink: 0, cursor: 'pointer' }}

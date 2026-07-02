@@ -349,14 +349,14 @@ function MiddlemanForm() {
               )}
 
               <div>
-                <label className="block text-sm font-medium mb-1.5 opacity-75">ชื่อ-นามสกุล (ตรงตามบัตรประชาชน) <span className="text-red-500">*</span></label>
-                <input className={ic} value={fullNameId} onChange={e => setFullNameId(e.target.value)}
+                <label htmlFor="mm-full-name" className="block text-sm font-medium mb-1.5 opacity-75">ชื่อ-นามสกุล (ตรงตามบัตรประชาชน) <span className="text-red-500">*</span></label>
+                <input id="mm-full-name" name="fullNameId" className={ic} value={fullNameId} onChange={e => setFullNameId(e.target.value)}
                   placeholder="ชื่อ นามสกุล" />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5 opacity-75">เลขประจำตัวประชาชน <span className="text-red-500">*</span></label>
-                <input className={ic} value={idNumber} onChange={e => setIdNumber(e.target.value.replace(/\D/g, '').slice(0, 13))}
+                <label htmlFor="mm-id-number" className="block text-sm font-medium mb-1.5 opacity-75">เลขประจำตัวประชาชน <span className="text-red-500">*</span></label>
+                <input id="mm-id-number" name="idNumber" className={ic} value={idNumber} onChange={e => setIdNumber(e.target.value.replace(/\D/g, '').slice(0, 13))}
                   placeholder="1234567890123" maxLength={13} inputMode="numeric" />
                 <p className="text-xs text-gray-400 mt-1">ตัวเลข 13 หลัก ไม่ต้องใส่ขีด</p>
               </div>
@@ -465,21 +465,21 @@ function MiddlemanForm() {
                 <p className="text-sm font-semibold">บัญชีธนาคาร — สำหรับรับ-คืนเงินประกันและค่าบริการ</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 opacity-75">เลขที่บัญชี <span className="text-red-500">*</span></label>
-                    <input className={ic} value={bankAcct} onChange={e => setBankAcct(e.target.value)}
+                    <label htmlFor="mm-bank-acct" className="block text-sm font-medium mb-1.5 opacity-75">เลขที่บัญชี <span className="text-red-500">*</span></label>
+                    <input id="mm-bank-acct" name="bankAcct" className={ic} value={bankAcct} onChange={e => setBankAcct(e.target.value)}
                       placeholder="xxx-x-xxxxx-x" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 opacity-75">ธนาคาร <span className="text-red-500">*</span></label>
-                    <select className={ic} value={bankName} onChange={e => setBankName(e.target.value)}>
+                    <label htmlFor="mm-bank-name" className="block text-sm font-medium mb-1.5 opacity-75">ธนาคาร <span className="text-red-500">*</span></label>
+                    <select id="mm-bank-name" name="bankName" className={ic} value={bankName} onChange={e => setBankName(e.target.value)}>
                       <option value="">เลือกธนาคาร</option>
                       {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 opacity-75">ชื่อบัญชี (ต้องตรงกับบัตรประชาชน) <span className="text-red-500">*</span></label>
-                  <input className={ic} value={bankOwner} onChange={e => setBankOwner(e.target.value)}
+                  <label htmlFor="mm-bank-owner" className="block text-sm font-medium mb-1.5 opacity-75">ชื่อบัญชี (ต้องตรงกับบัตรประชาชน) <span className="text-red-500">*</span></label>
+                  <input id="mm-bank-owner" name="bankOwner" className={ic} value={bankOwner} onChange={e => setBankOwner(e.target.value)}
                     placeholder="ชื่อ นามสกุล" />
                 </div>
               </div>
