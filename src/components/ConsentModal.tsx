@@ -49,17 +49,17 @@ export function ConsentModal({ onAccept, onDecline }: ConsentModalProps) {
 
         {/* Scrollable body */}
         <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
-          <p style={{ fontSize: 14, color: 'var(--fg, #111)', lineHeight: 1.7, marginBottom: 16 }}>
+          <p style={{ fontSize: 15, color: 'var(--fg, #111)', lineHeight: 1.75, marginBottom: 16 }}>
             ทาง <strong>glanghub.com</strong> ให้ความสำคัญกับการคุ้มครองข้อมูลส่วนบุคคลของคุณเป็นอันดับหนึ่ง
             ข้อมูลที่คุณส่งให้เราจะถูกนำไปใช้ตามวัตถุประสงค์ที่จำกัดและปลอดภัยดังนี้:
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ background: 'var(--surface, #f9fafb)', borderRadius: 10, padding: '14px 16px' }}>
-              <p style={{ fontWeight: 700, fontSize: 13, color: 'var(--fg, #111)', marginBottom: 8 }}>
+              <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--fg, #111)', marginBottom: 8 }}>
                 📋 วัตถุประสงค์การเก็บข้อมูล
               </p>
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: 'var(--muted-fg, #374151)', lineHeight: 1.75, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 15, color: 'var(--muted-fg, #374151)', lineHeight: 1.8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <li>
                   <strong>ภาพถ่าย / เลขบัตรประชาชน:</strong> ใช้เพื่อยืนยันตัวตน (KYC)
                   เพื่อป้องกันมิจฉาชีพและการแอบอ้างสิทธิ์ในการซื้อขาย
@@ -73,10 +73,10 @@ export function ConsentModal({ onAccept, onDecline }: ConsentModalProps) {
             </div>
 
             <div style={{ background: 'var(--surface, #f9fafb)', borderRadius: 10, padding: '14px 16px' }}>
-              <p style={{ fontWeight: 700, fontSize: 13, color: 'var(--fg, #111)', marginBottom: 6 }}>
+              <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--fg, #111)', marginBottom: 6 }}>
                 🗂 ระยะเวลาการจัดเก็บ
               </p>
-              <p style={{ fontSize: 13, color: 'var(--muted-fg, #374151)', lineHeight: 1.7, margin: 0 }}>
+              <p style={{ fontSize: 15, color: 'var(--muted-fg, #374151)', lineHeight: 1.8, margin: 0 }}>
                 เราจะเก็บรักษาข้อมูลของคุณไว้ตลอดระยะเวลาที่ท่านยังคงเป็นสมาชิกในระบบ
                 และจะทำการลบทำลายข้อมูลทั้งหมดอย่างปลอดภัยภายใน 90 วัน
                 หลังจากที่ท่านยกเลิกการเป็นสมาชิก
@@ -84,10 +84,10 @@ export function ConsentModal({ onAccept, onDecline }: ConsentModalProps) {
             </div>
 
             <div style={{ background: 'var(--surface, #f9fafb)', borderRadius: 10, padding: '14px 16px' }}>
-              <p style={{ fontWeight: 700, fontSize: 13, color: 'var(--fg, #111)', marginBottom: 6 }}>
+              <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--fg, #111)', marginBottom: 6 }}>
                 🔒 การรักษาความปลอดภัย
               </p>
-              <p style={{ fontSize: 13, color: 'var(--muted-fg, #374151)', lineHeight: 1.7, margin: 0 }}>
+              <p style={{ fontSize: 15, color: 'var(--muted-fg, #374151)', lineHeight: 1.8, margin: 0 }}>
                 ข้อมูลบัตรประชาชนและเลขบัญชีจะถูกเก็บรักษาไว้ในระบบฐานข้อมูลที่มีการเข้ารหัสความปลอดภัย
                 ระดับมาตรฐาน และจะไม่มีการนำไปเผยแพร่ ขาย หรือส่งต่อให้แก่บุคคลภายนอกโดยเด็ดขาด
                 เว้นแต่เป็นการปฏิบัติตามกฎหมาย
@@ -95,10 +95,10 @@ export function ConsentModal({ onAccept, onDecline }: ConsentModalProps) {
             </div>
 
             <div style={{ background: 'var(--surface, #f9fafb)', borderRadius: 10, padding: '14px 16px' }}>
-              <p style={{ fontWeight: 700, fontSize: 13, color: 'var(--fg, #111)', marginBottom: 6 }}>
+              <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--fg, #111)', marginBottom: 6 }}>
                 ✅ สิทธิ์ของเจ้าของข้อมูล
               </p>
-              <p style={{ fontSize: 13, color: 'var(--muted-fg, #374151)', lineHeight: 1.7, margin: 0 }}>
+              <p style={{ fontSize: 15, color: 'var(--muted-fg, #374151)', lineHeight: 1.8, margin: 0 }}>
                 ท่านมีสิทธิ์ในการขอตรวจสอบ แก้ไข หรือขอให้ลบข้อมูลส่วนบุคคลของท่านออกจากระบบ
                 ได้ทุกเมื่อ โดยติดต่อแอดมินผ่านช่องทางบริการลูกค้า
               </p>
@@ -126,9 +126,9 @@ export function ConsentModal({ onAccept, onDecline }: ConsentModalProps) {
               type="checkbox"
               checked={checked}
               onChange={e => setChecked(e.target.checked)}
-              style={{ marginTop: 2, width: 17, height: 17, accentColor: 'var(--green-600, #16a34a)', flexShrink: 0, cursor: 'pointer' }}
+              style={{ marginTop: 3, width: 18, height: 18, accentColor: 'var(--green-600, #16a34a)', flexShrink: 0, cursor: 'pointer' }}
             />
-            <span style={{ fontSize: 13, color: 'var(--fg, #111)', lineHeight: 1.65 }}>
+            <span style={{ fontSize: 15, color: 'var(--fg, #111)', lineHeight: 1.7 }}>
               ฉันได้อ่านและยอมรับ{' '}
               <a href="/terms" target="_blank" style={{ color: 'var(--accent, #2f6bf0)', textDecoration: 'underline' }}>
                 เงื่อนไขการสมัคร
@@ -137,7 +137,7 @@ export function ConsentModal({ onAccept, onDecline }: ConsentModalProps) {
               <a href="/privacy" target="_blank" style={{ color: 'var(--accent, #2f6bf0)', textDecoration: 'underline' }}>
                 นโยบายความเป็นส่วนตัว
               </a>{' '}
-              นี้แล้ว <span style={{ color: 'var(--red-500, #ef4444)' }}>*</span>
+              นี้แล้ว <span style={{ color: '#ef4444' }}>*</span>
             </span>
           </label>
 
@@ -145,9 +145,11 @@ export function ConsentModal({ onAccept, onDecline }: ConsentModalProps) {
             <button
               onClick={onDecline}
               style={{
-                flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid var(--line-2, #e5e7eb)',
-                background: 'transparent', color: 'var(--muted, #6b7280)',
-                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                flex: 1, padding: '12px 0', borderRadius: 10,
+                border: '1.5px solid #ef4444',
+                background: '#fff', color: '#dc2626',
+                fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                transition: 'all 0.15s',
               }}
             >
               ไม่ยอมรับ / กลับ
@@ -156,10 +158,10 @@ export function ConsentModal({ onAccept, onDecline }: ConsentModalProps) {
               onClick={onAccept}
               disabled={!checked}
               style={{
-                flex: 2, padding: '11px 0', borderRadius: 10, border: 'none',
-                background: checked ? 'var(--green-600, #16a34a)' : 'var(--line-2, #e5e7eb)',
-                color: checked ? '#fff' : 'var(--muted, #9ca3af)',
-                fontSize: 14, fontWeight: 700, cursor: checked ? 'pointer' : 'not-allowed',
+                flex: 2, padding: '12px 0', borderRadius: 10, border: 'none',
+                background: checked ? '#16a34a' : '#d1d5db',
+                color: checked ? '#fff' : '#9ca3af',
+                fontSize: 15, fontWeight: 700, cursor: checked ? 'pointer' : 'not-allowed',
                 transition: 'all 0.15s',
               }}
             >
