@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { Suspense, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { HeaderAccountActions } from '@/components/HeaderAccountActions';
@@ -81,6 +81,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function ProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [prefs, setPrefs] = useState<Record<string, string>>({});
@@ -228,8 +229,10 @@ function ProfilePage() {
       const newPrefs = { ...prefs, first_name: editFirst, last_name: editLast, phone: editPhone, address, display_name: `${editFirst} ${editLast}`.trim(), bank_name: editBankName, bank_acct: editBankAcct, bank_owner: editBankOwner, bank_qr_file_id: editBankQr };
       setPrefs(newPrefs); setDisplayName(`${editFirst} ${editLast}`.trim()); setSaveOk(true);
       if (wasLocked) {
-        // กรอกข้อมูลบังคับครบแล้วเป็นครั้งแรก — ปลดล็อกให้เข้าใช้งานเว็บไซต์ส่วนอื่นได้
-        setTimeout(() => { router.replace('/'); }, 1200);
+        // กรอกข้อมูลบังคับครบแล้วเป็นครั้งแรก — ไปหน้าที่ตั้งใจไว้ หรือหน้าหลักถ้าไม่มี
+        const returnTo = searchParams.get('returnTo');
+        const dest = (returnTo && returnTo.startsWith('/')) ? returnTo : '/';
+        setTimeout(() => { router.replace(dest); }, 1200);
       } else {
         setTimeout(() => { setEditing(false); setSaveOk(false); }, 1200);
       }

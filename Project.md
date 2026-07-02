@@ -1,5 +1,24 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-02 (ต่อ 9)
+
+### เปลี่ยน Flow การสมัครสมาชิก — ไม่บังคับกรอกโปรไฟล์ทันที
+
+**เดิม:** `AuthGate` บังคับทุกหน้า (ยกเว้น `/profile`) ให้กรอกโปรไฟล์ครบก่อน
+
+**ใหม่:** ไม่บังคับทันทีหลังสมัคร — แต่ถ้าจะเข้า "หน้าบริการ" ใดๆ จะถูก redirect ไป `/profile?returnTo=<หน้าเดิม>` เพื่อกรอกให้ครบก่อน แล้วระบบพากลับหน้าเดิมโดยอัตโนมัติ
+
+**หน้าบริการที่บังคับโปรไฟล์:** `/deal`, `/register/seller`, `/register/middleman`, `/service`, `/dashboard`, `/onsite`, `/orders`, `/messages`, `/payment`, `/cart`, `/wanted`, `/admin`
+
+**หน้าที่ browse ได้ฟรีโดยไม่ต้องมีโปรไฟล์:** `/`, `/marketplace`, `/check-scam`, `/faq`, `/how-it-works`, `/fees`, `/terms`, `/privacy`, `/contact` ฯลฯ
+
+### ไฟล์ที่แก้ไข (2026-07-02 ต่อ 9)
+- `src/components/AuthGate.tsx` — เปลี่ยนจาก `isProfileExemptPath` เป็น `isProfileRequiredPath`, เพิ่ม `?returnTo=` param ใน redirect
+- `src/app/profile/page.tsx` — import `useSearchParams`, redirect ไป `returnTo` หลัง save สำเร็จ
+- `src/components/HomeButton.tsx` — ลบ `profileComplete` check (ผู้ใช้ navigate ได้อิสระแล้ว)
+
+---
+
 ## 2026-07-01 (ต่อ 8)
 
 ### เพิ่มปุ่มเปิด/ปิดโซนตลาด (Marketplace) ในหน้า Admin Service Controls

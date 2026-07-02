@@ -9,9 +9,10 @@ import { isProfileComplete, REQUIRED_PROFILE_FIELDS } from '@/lib/profileComplet
  * บังคับให้ต้องล็อกอินก่อนเข้าใช้งานเว็บไซต์ทุกหน้า (ยกเว้นหน้าที่อยู่ใน allowlist
  * ด้านล่าง เช่น หน้าล็อกอินเอง และหน้า bridge ของ OAuth ที่ยังไม่มี session ระหว่างขั้นตอน)
  *
- * นอกจากนี้ยังบังคับให้กรอกข้อมูลโปรไฟล์ที่จำเป็น (ชื่อ-นามสกุล-เบอร์โทร-บัญชีธนาคาร)
- * ให้ครบก่อนเข้าใช้งานหน้าอื่น ๆ ของเว็บไซต์ — ถ้ายังไม่ครบจะถูกบังคับไปหน้า /profile
- * เสมอไม่ว่าจะพยายามไปหน้าไหนก็ตาม (กดย้อนกลับ/พิมพ์ URL เองก็ไม่สามารถหลุดออกไปได้)
+ * โปรไฟล์ (ชื่อ-นามสกุล-เบอร์โทร-บัญชีธนาคาร) ไม่บังคับกรอกทันทีหลังสมัคร
+ * แต่ถ้าพยายามเข้า "หน้าบริการ" ใดๆ (สร้างดีล, สมัครผู้ขาย/คนกลาง, dashboard ฯลฯ)
+ * ก่อนกรอกโปรไฟล์ครบ จะถูก redirect ไป /profile?returnTo=<หน้าที่ตั้งใจไป>
+ * เพื่อให้กรอกข้อมูลให้ครบก่อน แล้วระบบจะพาไปหน้าเดิมโดยอัตโนมัติ
  *
  * หมายเหตุสถาปัตยกรรม: โปรเจกต์นี้ใช้ @supabase/supabase-js (ไม่ใช่ @supabase/ssr)
  * และเก็บ session ไว้ใน localStorage ของ browser เท่านั้น ไม่มี cookie ที่ middleware.ts
@@ -26,14 +27,27 @@ const PUBLIC_PATHS = [
   '/terms',
 ];
 
-// หน้าที่ยังเข้าได้แม้โปรไฟล์ยังไม่ครบ (หน้ากรอกโปรไฟล์เอง + หน้าออกจากระบบที่อาจอยู่ใน flow เดิม)
-const PROFILE_EXEMPT_PATHS = ['/profile'];
+// หน้าที่ต้องกรอกโปรไฟล์ครบก่อนถึงจะเข้าได้ — "หน้าบริการ" ทั้งหมด
+const PROFILE_REQUIRED_PATHS = [
+  '/deal',
+  '/register/seller',
+  '/register/middleman',
+  '/service',
+  '/dashboard',
+  '/onsite',
+  '/orders',
+  '/messages',
+  '/payment',
+  '/cart',
+  '/wanted',
+  '/admin',
+];
 
 function isPublicPath(path: string) {
   return PUBLIC_PATHS.some(p => path === p || path.startsWith(p + '/'));
 }
-function isProfileExemptPath(path: string) {
-  return PROFILE_EXEMPT_PATHS.some(p => path === p || path.startsWith(p + '/'));
+function isProfileRequiredPath(path: string) {
+  return PROFILE_REQUIRED_PATHS.some(p => path === p || path.startsWith(p + '/'));
 }
 
 interface GateState {
@@ -80,8 +94,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       const complete = isProfileComplete(profile as Record<string, unknown> | null);
       setProfileComplete(complete);
 
-      if (!complete && !isProfileExemptPath(pathname)) {
-        router.replace('/profile');
+      if (!complete && isProfileRequiredPath(pathname)) {
+        router.replace(`/profile?returnTo=${encodeURIComponent(pathname)}`);
         return;
       }
       setChecked(true);
