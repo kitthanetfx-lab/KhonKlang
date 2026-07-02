@@ -1,5 +1,21 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-02 (ต่อ 10)
+
+### เพิ่ม PDPA Consent Modal + re-apply หลัง git restore
+
+- สร้าง `ConsentModal.tsx` — modal บัง fullscreen ก่อนเริ่มฟอร์ม แสดงนโยบาย PDPA ครบ 4 หัวข้อ
+- ต้องติ๊ก checkbox ก่อนถึงจะกด "ยอมรับและดำเนินการต่อ" ได้
+- กด "ไม่ยอมรับ / กลับ" → redirect กลับ `/register`
+- เชื่อมกับ seller และ middleman pages
+
+### ไฟล์ที่แก้ไข (2026-07-02 ต่อ 10)
+- `src/components/ConsentModal.tsx` (ใหม่)
+- `src/app/register/seller/page.tsx`
+- `src/app/register/middleman/page.tsx`
+
+---
+
 ## 2026-07-02 (ต่อ 9)
 
 ### เปลี่ยน Flow การสมัครสมาชิก — ไม่บังคับกรอกโปรไฟล์ทันที

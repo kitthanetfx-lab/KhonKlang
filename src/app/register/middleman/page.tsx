@@ -13,6 +13,7 @@ import { uploadKycFiles } from '@/lib/uploadKyc';
 import { FileUpload } from '@/components/FileUpload';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { ConsentModal } from '@/components/ConsentModal';
 import { FEE_DEFAULTS, effectiveRegFee, isPromoActive, type FeeConfig } from '@/lib/fees';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
@@ -88,6 +89,7 @@ function MiddlemanForm() {
   const router = useRouter();
   const controls = useServiceControls();
 
+  const [consentShown, setConsentShown] = useState(false);
   const [step, setStep]       = useState(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -309,6 +311,13 @@ function MiddlemanForm() {
   }
 
   return (
+    <>
+    {!consentShown && (
+      <ConsentModal
+        onAccept={() => setConsentShown(true)}
+        onDecline={() => router.replace('/register')}
+      />
+    )}
     <div className="min-h-screen py-10 px-4 sm:px-6">
       <div className="max-w-xl mx-auto">
 
@@ -631,6 +640,7 @@ function MiddlemanForm() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
