@@ -199,6 +199,7 @@ interface DealPriceState {
   mm_deposit_held?: number;
   evidence_done_seller?: boolean; evidence_done_buyer?: boolean; evidence_done_middleman?: boolean;
   chat_done_seller?: boolean; chat_done_buyer?: boolean; chat_done_middleman?: boolean;
+  chat_back_req_seller?: boolean; chat_back_req_buyer?: boolean; chat_back_req_middleman?: boolean;
   seller_fee_slip?: string;
   payout_slip_file_id?: string; refund_slip_file_id?: string;
   // ค่าบริการที่คนกลางเสนอเอง
@@ -793,7 +794,7 @@ export default function DealRoom() {
     return () => window.clearTimeout(timer);
   }, [authHdrs, showSelectMM, loadMiddlemen]);
 
-  useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
+  useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'auto' }); }, [msgs]);
   useEffect(() => { fetch('/api/fees').then(r => r.json()).then(d => { if (d.fees) setFeeConfig(d.fees); }).catch(() => {}); }, []);
   useEffect(() => {
     const timer = window.setInterval(() => setNowTs(Date.now()), 15000);
@@ -931,6 +932,7 @@ export default function DealRoom() {
   const jitsiRoom = `khonklang-${dealId.slice(0, 10)}`;
   const isMeetup = deal.deal_type === 'meetup';
   const isSimple = deal.deal_type === 'simple';
+  const isAdminUser = user?.prefs?.role === 'admin';
   const myRole: DealRole = !deal || !myId
     ? (myId ? 'guest' : '')
     : deal.seller_id === myId
@@ -953,6 +955,91 @@ export default function DealRoom() {
   const stepIdx = STEP_ORDER.indexOf(deal.status);
   const pct = stepIdx >= 0 ? Math.round((stepIdx / (STEP_ORDER.length - 1)) * 100) : 0;
   const isFinished = ['completed', 'cancelled', 'disputed'].includes(deal.status);
+
+  // ─── Admin observer panel ───────────────────────────────────────────────
+  if (isAdminUser && (myRole === 'guest' || myRole === '')) {
+    const STAT_LABEL: Record<string, string> = {
+      buyer_joined: 'รอยอมรับเงื่อนไข', terms_pending: 'รอยอมรับเงื่อนไข',
+      payment_pending: 'คุย/เก็บหลักฐาน/ตกลงราคา', payment_uploaded: 'รอยืนยันสลิป',
+      packing: 'แพ็คของ', shipped_to_middleman: 'จัดส่งคนกลาง',
+      middleman_received: 'คนกลางรับของ', middleman_checking: 'คนกลางตรวจสอบ',
+      shipped_to_buyer: 'จัดส่งผู้ซื้อ', buyer_received: 'ผู้ซื้อยืนยันรับ',
+      completed: 'เสร็จสมบูรณ์', cancelled: 'ยกเลิก', disputed: 'ข้อพิพาท',
+    };
+    return (
+      <div className="dr-root">
+        <InAppBanner />
+        <header className="dr-header">
+          <Link href="/admin/deals" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
+          <div className="dr-header-info">
+            <div className="dr-htitle">{deal.title}</div>
+            <span style={{ fontSize: 11, background: '#fee2e2', color: '#991b1b', borderRadius: 4, padding: '2px 7px', fontWeight: 700 }}>🔍 Admin Observer</span>
+          </div>
+          <HeaderAccountActions />
+        </header>
+        <main style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 60px', display: 'flex', flexDirection: 'column', gap: 14, width: '100%' }}>
+          {/* Deal summary */}
+          <div className="dr-card">
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>{deal.title}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--green-600)', fontFamily: 'var(--font-display)', margin: '6px 0' }}>฿{deal.price.toLocaleString()}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
+              {deal.seller_name && <span>ผู้ขาย: <strong>{deal.seller_name}</strong></span>}
+              {deal.buyer_name && <span>ผู้ซื้อ: <strong>{deal.buyer_name}</strong></span>}
+              {deal.middleman_name && <span>คนกลาง: <strong>{deal.middleman_name}</strong></span>}
+            </div>
+            <div style={{ display: 'inline-block', background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 12px', fontSize: 13, fontWeight: 600 }}>
+              สถานะ: {STAT_LABEL[deal.status] || deal.status}
+            </div>
+          </div>
+          {/* Chat (read-only) */}
+          <div className="dr-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--line)', fontWeight: 700, fontSize: 13 }}>💬 แชท (อ่านอย่างเดียว)</div>
+            <div style={{ maxHeight: 380, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10, WebkitOverflowScrolling: 'touch' as const }}>
+              {msgs.filter(m => m.role !== 'system').length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>ยังไม่มีข้อความ</p>}
+              {msgs.map(m => {
+                if (m.role === 'system') return <div key={m.id} className="dr-sys-msg"><span>{m.content}</span></div>;
+                return (
+                  <div key={m.id} className="dr-bubble-row">
+                    <div className="dr-bubble-av" style={{ background: bubbleAvColor(m) }}>{(m.sender_name || '?').slice(0, 1)}</div>
+                    <div className="dr-bubble-col">
+                      <span className="dr-bubble-sender">{m.sender_name}</span>
+                      <div className={bubbleClass(m, false)}>
+                        {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 180, borderRadius: 8 }} /></a>
+                          : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>📎 {m.file_name}</a>
+                          : m.content}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* Evidence (read-only) */}
+          <div className="dr-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--line)', fontWeight: 700, fontSize: 13 }}>📁 หลักฐาน ({evidence.length} รายการ)</div>
+            {evidence.length === 0
+              ? <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0', fontSize: 13 }}>ยังไม่มีหลักฐาน</p>
+              : <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {evidence.map((item, i) => {
+                    const url = item.file_id ? fileUrl(item.file_id) : '';
+                    const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
+                    const isImg = item.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                    return (
+                      <div key={item.id || i} style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>
+                        <div style={{ marginBottom: 4 }}>{item.type}{item.uploader_name ? ` · ${item.uploader_name}` : ''}</div>
+                        {!item.file_id ? <div style={{ fontSize: 13, color: 'var(--ink)' }}>{item.content}</div>
+                          : isVid ? <video src={url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 8 }} />
+                          : isImg ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.file_name} style={{ maxWidth: '100%', maxHeight: 180, borderRadius: 8, objectFit: 'contain' }} /></a>
+                          : <a href={url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>📎 {item.file_name}</a>}
+                      </div>
+                    );
+                  })}
+                </div>}
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // ─── Guest / not-logged-in join panel ───────────────────────────────────
   if (myRole === 'guest' || myRole === '') {
@@ -1395,6 +1482,8 @@ export default function DealRoom() {
     const allDone = !!(pd.evidence_done_buyer && pd.evidence_done_seller && (!hasMm || pd.evidence_done_middleman));
     if (allDone) return null;
     const meDone = (myRole === 'seller' && pd.evidence_done_seller) || (myRole === 'buyer' && pd.evidence_done_buyer) || (myRole === 'middleman' && pd.evidence_done_middleman);
+    // สถานะขอกลับแชท
+    const myReqBack = (myRole === 'seller' && pd.chat_back_req_seller) || (myRole === 'buyer' && pd.chat_back_req_buyer) || (myRole === 'middleman' && pd.chat_back_req_middleman);
     return (
       <div className="dr-card">
         <div className="dr-card-title">📁 เก็บหลักฐานก่อนโอนเงิน</div>
@@ -1407,6 +1496,20 @@ export default function DealRoom() {
         {!meDone
           ? <AsyncButton className="btn btn-primary btn-block" onClick={() => doAction('evidence_done')}>✅ เก็บหลักฐานเสร็จสิ้น</AsyncButton>
           : <p style={{ fontSize: 13, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันแล้ว — รอฝ่ายอื่น</p>}
+        {/* ปุ่มกลับไปแชทใหม่ — ต้องทั้ง 2 ฝ่ายกดยินยอม */}
+        <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+            ↩️ ต้องการกลับไปคุยกันก่อน?
+            {(pd.chat_back_req_seller || pd.chat_back_req_buyer || pd.chat_back_req_middleman) && (
+              <span style={{ display: 'block', marginTop: 4, color: '#b45309' }}>
+                {[pd.chat_back_req_seller && 'ผู้ขาย', pd.chat_back_req_buyer && 'ผู้ซื้อ', pd.chat_back_req_middleman && 'คนกลาง'].filter(Boolean).join(', ')} ขอกลับแล้ว — รอฝ่ายอื่นกดยืนยัน
+              </span>
+            )}
+          </p>
+          {!myReqBack
+            ? <AsyncButton className="btn btn-ghost btn-block btn-sm" onClick={() => doAction('request_chat_back')}>↩️ ขอกลับไปหน้าแชทใหม่</AsyncButton>
+            : <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>✔ คุณขอกลับแล้ว — รอฝ่ายอื่น</p>}
+        </div>
       </div>
     );
   }
@@ -1670,7 +1773,7 @@ export default function DealRoom() {
             <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
             <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
             <button onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดวิดีโอก่อนแกะ</button>
-            <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
+            <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) await uploadFile(f, true, 'receive'); }} />
           </div>
         )}
         {canUp && (
@@ -1681,7 +1784,7 @@ export default function DealRoom() {
               {myRole === 'middleman' && <><option value="receive">วิดีโอรับสินค้า</option><option value="check">วิดีโอตรวจ</option></>}
             </select>
             <button onClick={() => evidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> เลือกไฟล์ (รูป/วิดีโอ)</button>
-            <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true); e.target.value = ''; }} />
+            <input ref={evidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) await uploadFile(f, true); }} />
           </div>
         )}
         {items.length === 0 && !canUp && <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '32px 0' }}>ยังไม่มีหลักฐาน</p>}
@@ -2197,7 +2300,7 @@ export default function DealRoom() {
           {renderChatPresenceBar()}
           <div style={{ display: 'flex', gap: 6, padding: '0 2px' }}>
             <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending || !chatIsOpen()}>🖼️</button>
-            <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; if (f.size > 10 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 10MB'); return; } await uploadFile(f); }} />
+            <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }} />
             <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={chatIsOpen() ? 'พิมพ์ข้อความ...' : 'รอบุคคลที่เกี่ยวข้องเข้าร่วมก่อน...'} disabled={!chatIsOpen()} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, minWidth: 0 }} />
             <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
           </div>
@@ -3309,7 +3412,7 @@ export default function DealRoom() {
             <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
             <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
             <button onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดวิดีโอก่อนแกะ</button>
-            <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
+            <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) await uploadFile(f, true, 'receive'); }} />
             {unboxEvidence.length > 0 && <><p style={{ fontSize: 12, color: 'var(--green-600)', marginTop: 8 }}>✅ อัปโหลดแล้ว {unboxEvidence.length} ไฟล์</p>{renderWizardEvidenceThumbs(unboxEvidence)}</>}
           </div>
           <div className="dr-card">
@@ -4043,8 +4146,8 @@ export default function DealRoom() {
               <button type="button" className="btn btn-soft btn-block btn-sm" onClick={() => meetupMeetEvidInputRef.current?.click()}>
                 <Icon name="upload" size={15} /> {meetEvidence.length > 0 ? 'เพิ่มหลักฐาน' : 'อัปโหลดรูป/วิดีโอหลักฐาน'}
               </button>
-              <input ref={meetupMeetEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }}
-                onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; await uploadFile(f, true, 'meet'); }} />
+              <input ref={meetupMeetEvidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }}
+                onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) await uploadFile(f, true, 'meet'); }} />
             </div>
             <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {!myDepartedAt && (
@@ -4440,7 +4543,7 @@ export default function DealRoom() {
               </div>
               <div style={{ display: 'flex', gap: 6, padding: 8, borderTop: '1px solid var(--line)' }}>
                 <button className="dr-attach" onClick={() => callFileInputRef.current?.click()} disabled={sending} title="ส่งรูป/ไฟล์">🖼️</button>
-                <input ref={callFileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; if (f.size > 10 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 10MB'); return; } await uploadFile(f); }} />
+                <input ref={callFileInputRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }} />
                 <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="พิมพ์ข้อความ..." onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) sendMsg(chatInput); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px', fontSize: 13, minWidth: 0 }} />
                 <button onClick={() => { if (chatInput.trim()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending} className="btn btn-primary btn-sm">ส่ง</button>
               </div>
@@ -4521,7 +4624,7 @@ export default function DealRoom() {
                 )}
                 <div className="dr-chat-bar">
                   <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending || !chatIsOpen()}>🖼️</button>
-                  <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; if (f.size > 10 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 10MB'); return; } await uploadFile(f); }} />
+                  <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }} />
                   <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={chatIsOpen() ? 'พิมพ์ข้อความ...' : 'รอบุคคลที่เกี่ยวข้องเข้าร่วมก่อน...'} disabled={!chatIsOpen()} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); } }} />
                   <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
                 </div>

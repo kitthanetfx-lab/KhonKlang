@@ -102,7 +102,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
 
     // โหลด deal_price_state / deal_meetup ตามต้องการ (เฉพาะ action ที่ใช้)
-    const needsPriceState = ['price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees'].includes(action);
+    const needsPriceState = ['price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back'].includes(action);
     const needsMeetup = action.startsWith('meetup_');
     const [pdRow, mdRow] = await Promise.all([
       needsPriceState ? db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data) : Promise.resolve(null),
@@ -541,6 +541,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const hasMm = !!deal.middleman_id;
         const allDone = sellerDone && buyerDone && (!hasMm || middlemanDone);
         systemMsg = allDone ? '📁 ทุกฝ่ายยืนยันเก็บหลักฐานเรียบร้อย — ไปตกลงราคาและค่าบริการต่อได้' : `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ยืนยันเก็บหลักฐานแล้ว — รอฝ่ายอื่น`;
+        break;
+      }
+      case 'request_chat_back': {
+        // ขอกลับไปหน้าแชท — ต้องให้ทั้งผู้ซื้อและผู้ขาย (และคนกลางถ้ามี) ยินยอมก่อน
+        if (!isSeller && !isBuyer && !isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const hasMm2 = !!deal.middleman_id;
+        const reqSeller = isSeller ? true : !!pd.chat_back_req_seller;
+        const reqBuyer  = isBuyer  ? true : !!pd.chat_back_req_buyer;
+        const reqMm     = isMiddleman ? true : !!pd.chat_back_req_middleman;
+        const allReq = reqSeller && reqBuyer && (!hasMm2 || reqMm);
+        if (allReq) {
+          // ทุกฝ่ายยินยอม → ล้าง evidence_done และ chat_back_req ทั้งหมด
+          priceUpdates = {
+            evidence_done_seller: false, evidence_done_buyer: false, evidence_done_middleman: false,
+            chat_back_req_seller: false, chat_back_req_buyer: false, chat_back_req_middleman: false,
+          };
+          systemMsg = '↩️ ทุกฝ่ายยินยอม — กลับสู่ขั้นตอนคุยกันและเก็บหลักฐานอีกครั้ง';
+        } else {
+          priceUpdates = {
+            chat_back_req_seller: reqSeller,
+            chat_back_req_buyer: reqBuyer,
+            chat_back_req_middleman: reqMm,
+          };
+          systemMsg = `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ขอกลับไปแชทใหม่ — รอฝ่ายอื่นยืนยัน`;
+        }
         break;
       }
       case 'seller_fee_paid': {

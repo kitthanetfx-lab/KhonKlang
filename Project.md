@@ -1,5 +1,23 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-02 (ต่อ 13)
+
+### ฟีเจอร์และแก้บัก 6 รายการ
+
+1. **Admin observer mode** — admin เข้าดูดีลได้ read-only (แชท + หลักฐาน) โดยไม่ต้องเป็นคู่สัญญา
+2. **ปุ่มกลับไปแชทจากหน้าหลักฐาน** — ต้องทั้ง 2 ฝ่ายกด "ขอกลับไปหน้าแชทใหม่" ก่อน จึงจะ reset evidence_done
+3. **แชท iOS scroll** — เปลี่ยน scrollIntoView behavior จาก 'smooth' → 'auto' + เพิ่ม `-webkit-overflow-scrolling: touch` และ `overscroll-behavior: contain` ให้ chat feed
+4. **แชท: เลือกหลายรูปพร้อมกัน + อัพโหลดวิดีโอ** — file inputs ในแชทเพิ่ม `multiple`, `accept="image/*,video/*,.pdf"`, handler loop หลายไฟล์, ขยาย limit จาก 10MB → 50MB ต่อไฟล์
+5. **หลักฐาน: ไม่จำกัดจำนวน + รองรับวิดีโอ** — evidence upload inputs เพิ่ม `multiple` และ handle หลายไฟล์พร้อมกัน (meetup, seller, buyer)
+6. **แก้ layout หลุดเฟรม portrait mobile** — เพิ่ม `overflow-x: hidden` ให้ `.dr-root`
+
+### ไฟล์ที่แก้ไข (2026-07-02 ต่อ 13)
+- `src/app/deal/[id]/page.tsx`
+- `src/app/api/deals/[id]/route.ts`
+- `src/app/globals.css`
+
+---
+
 ## 2026-07-02 (ต่อ 12)
 
 ### แก้ browser warning — เพิ่ม id/name/htmlFor ให้ form inputs ครบ
