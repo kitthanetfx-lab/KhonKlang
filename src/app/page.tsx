@@ -165,7 +165,7 @@ export default function HomePage() {
             <h2 style={{ fontSize: 'clamp(22px,3vw,30px)', color: '#fff' }}>{locale === 'th' ? 'สงสัยว่าจะโดนโกง? เช็คก่อนโอน' : 'Think it might be a scam? Check before you pay'}</h2>
             <p style={{ color: 'rgba(255,255,255,.78)', marginTop: 8, maxWidth: '52ch' }}>{locale === 'th' ? 'ค้นหาชื่อ เลขบัญชี หรือเบอร์โทรศัพท์จากฐานข้อมูลคนโกง เพื่อความปลอดภัยก่อนทำธุรกรรมทุกครั้ง' : 'Search names, bank accounts, or phone numbers against scam reports before every transaction.'}</p>
           </div>
-          <Link className="btn btn-lg" href="/check-scam" style={{ background: '#fff', color: 'var(--ink)' }}>{locale === 'th' ? 'ตรวจสอบเลย' : 'Check Now'} <Icon name="arrowRight" size={18} /></Link>
+          <Link className="btn btn-lg" href="/check-scam" style={{ background: '#fff', color: '#10224d' }}>{locale === 'th' ? 'ตรวจสอบเลย' : 'Check Now'} <Icon name="arrowRight" size={18} /></Link>
         </div>
       </section>
 

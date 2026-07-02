@@ -1,5 +1,19 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-02 (ต่อ 15)
+
+### แก้ dark mode contrast — homepage 3 จุด
+
+1. **ปุ่ม "ตรวจสอบเลย"** (`src/app/page.tsx` บรรทัด 168) — เปลี่ยน `color: 'var(--ink)'` → `color: '#10224d'` (hardcode dark blue) เพราะ dark mode `var(--ink)` = `#f4f7ff` (ขาว) บนพื้นขาว (`background:#fff`) มองไม่เห็น
+2. **`.ef-node-lb`** (`src/app/globals.css`) — เปลี่ยน `background: color-mix(in srgb, #fff 78%, transparent)` → `background: var(--surface)` ให้ label ผู้ซื้อ/คนกลาง/ผู้ขาย ปรับสีตาม theme
+3. **`.ef-float`** (`src/app/globals.css`) — เปลี่ยน `background: color-mix(in srgb, #fff 96%, transparent)` → `background: var(--surface)` ให้ป้าย "เข้ารหัสปลอดภัย" / "ยืนยันตัวตน KYC" ปรับสีตาม theme
+
+### ไฟล์ที่แก้ไข (2026-07-02 ต่อ 15)
+- `src/app/page.tsx`
+- `src/app/globals.css`
+
+---
+
 ## 2026-07-02 (ต่อ 14)
 
 ### แก้ chip.is-active มองไม่เห็นใน dark mode
