@@ -1,5 +1,24 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-03 (ต่อ 16)
+
+### ลดขนาด hero title + ปุ่ม "เริ่ม Deal" + หน้า /deal-all
+
+1. **ลดขนาด `.hero-title`** (`src/app/globals.css`) — `clamp(33px, 6.2vw, 58px)` → `clamp(26px, 4.8vw, 44px)`
+2. **เพิ่มปุ่ม "เริ่ม Deal"** (`src/app/page.tsx`) — ใต้ hero title ลิงก์ไป `/deal-all`
+3. **สร้างหน้า `/deal-all`** (`src/app/deal-all/page.tsx`) — grid 2×2 ขนาด 250×250 ต่อช่อง:
+   - `/Deal/trade-m.webp` → `/service/trade` (ซื้อขายผ่านกลาง)
+   - `/Deal/drive-m.webp` → `/service/meetup` (นัดรับผ่านกลาง)
+   - `/Deal/partner.webp` → `/service/consign` (ฝากขายผ่านกลาง)
+   - `/Deal/on-site.webp` → `/service/onsite` (ออนไซต์)
+
+### ไฟล์ที่แก้ไข (2026-07-03 ต่อ 16)
+- `src/app/globals.css`
+- `src/app/page.tsx`
+- `src/app/deal-all/page.tsx` (ไฟล์ใหม่)
+
+---
+
 ## 2026-07-02 (ต่อ 15)
 
 ### แก้ dark mode contrast — homepage 3 จุด

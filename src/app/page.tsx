@@ -104,6 +104,11 @@ function Hero({ stats, controls, locale }: { stats: SiteStats | null; controls: 
           <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
             {locale === 'th' ? <>จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span></> : <>Pay with confidence<br /><span className="gradient-text">Get the real item, avoid scams</span></>}
           </h1>
+          <div className="reveal" style={{ ['--d' as string]: '120ms', marginTop: 24 }}>
+            <Link className="btn btn-lg" href="/deal-all" style={{ background: 'var(--accent)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              {locale === 'th' ? 'เริ่ม Deal' : 'Start a Deal'} <Icon name="arrowRight" size={18} />
+            </Link>
+          </div>
         </div>
       </div>
     </header>
