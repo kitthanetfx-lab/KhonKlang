@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { ProfileConsentModal } from '@/components/ProfileConsentModal';
 import { Icon } from '@/components/Icon';
 import { THAI_BANKS } from '@/lib/banks';
 import { isProfileComplete } from '@/lib/profileComplete';
@@ -106,6 +107,15 @@ function ProfilePage() {
   const [loadingTamb, setLoadingTamb] = useState(false);
   const [wallet, setWallet] = useState<MiddlemanWallet | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [avatarUrl, setAvatarUrl] = useState('');
+  // ยอมรับเงื่อนไขการเก็บข้อมูลแล้วหรือยัง (จำไว้ต่อ session — ไม่เด้งซ้ำเมื่อ refresh)
+  const [consentOk, setConsentOk] = useState(() => {
+    try { return sessionStorage.getItem('kk.profile_consent') === '1'; } catch { return false; }
+  });
+  const acceptConsent = () => {
+    try { sessionStorage.setItem('kk.profile_consent', '1'); } catch { /* ignore */ }
+    setConsentOk(true);
+  };
 
   useEffect(() => {
     const r = document.documentElement;
@@ -121,7 +131,11 @@ function ProfilePage() {
         if (!user) { router.replace('/login'); return; }
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
         let p = (profile || {}) as Record<string, string>;
-        setDisplayName(p.display_name || '');
+        // ชื่อ/รูปจากแพลตฟอร์มที่ล็อกอิน (LINE: displayName+pictureUrl, Google: full_name+avatar_url)
+        const meta = (user.user_metadata || {}) as Record<string, string>;
+        const platformName = meta.displayName || meta.full_name || meta.name || '';
+        setAvatarUrl(meta.pictureUrl || meta.avatar_url || meta.picture || '');
+        setDisplayName(p.display_name || platformName || '');
         const em = (!user.email || user.email.includes('@line.khonklang.app')) ? '' : user.email;
         setEmail(em);
         setPrefs(p);
@@ -259,6 +273,10 @@ function ProfilePage() {
 
   return (
     <div className="sub-page">
+      {/* สมาชิกใหม่ที่ยังกรอกข้อมูลบังคับไม่ครบ — แจ้งเหตุผลการเก็บข้อมูลก่อนเข้าฟอร์มเสมอ */}
+      {locked && !consentOk && (
+        <ProfileConsentModal onAccept={acceptConsent} onDecline={() => router.replace('/')} />
+      )}
       <header className="sub-header">
         {locked
           ? <span style={{ width: 18, display: 'inline-block' }} />
@@ -277,7 +295,11 @@ function ProfilePage() {
 
       <div className="pf-inner">
         <div className="pf-hero">
-          <div className="pf-avatar">{initials}</div>
+          <div className="pf-avatar">
+            {avatarUrl
+              ? <img src={avatarUrl} alt={displayName || 'avatar'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} referrerPolicy="no-referrer" />
+              : initials}
+          </div>
           <div className="pf-hero-info">
             <div className="pf-name">{displayName || 'ผู้ใช้งาน'}</div>
             {email && <div style={{ fontSize: 13, color: 'var(--muted)' }}>{email}</div>}

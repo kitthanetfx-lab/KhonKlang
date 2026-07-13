@@ -31,6 +31,8 @@ export interface AppUser {
     linkedTo?: string;
     reviewScore?: string;
     reviewCount?: string;
+    /** รูปโปรไฟล์จากแพลตฟอร์มที่ล็อกอิน (LINE pictureUrl / Google avatar_url) */
+    avatarUrl?: string;
   };
 }
 
@@ -97,8 +99,19 @@ async function fetchProfile(): Promise<AppUser | null> {
   const authUser = session?.user ?? null;
   if (!authUser) return null;
 
+  // ชื่อ/รูปจากแพลตฟอร์มที่ล็อกอิน (LINE: displayName+pictureUrl, Google: full_name+avatar_url)
+  const meta = (authUser.user_metadata || {}) as Record<string, string | undefined>;
+  const platformName = meta.displayName || meta.full_name || meta.name || undefined;
+  const platformAvatar = meta.pictureUrl || meta.avatar_url || meta.picture || undefined;
+
   const profile = await fetchProfileRow(authUser.id);
-  if (profile) return toAppUser(profile);
+  if (profile) {
+    const u = toAppUser(profile);
+    // ยังไม่ได้ตั้งชื่อในระบบ → ใช้ชื่อจากแพลตฟอร์มเป็นค่าเริ่มต้น
+    if (!u.prefs.displayName && platformName) { u.prefs.displayName = platformName; u.name = platformName; }
+    u.prefs.avatarUrl = platformAvatar;
+    return u;
+  }
 
   // มี session แต่ยังไม่มีแถวใน profiles (เช่น login ครั้งแรกผ่าน LINE และ trigger
   // 0004_profile_on_signup ยังไม่ได้รันบน DB) → เรียก /api/profile/sync ซึ่งผ่าน
@@ -114,12 +127,11 @@ async function fetchProfile(): Promise<AppUser | null> {
 
   // fallback สุดท้าย: ยังไม่มีแถว profiles ก็ให้ถือว่าล็อกอินแล้ว โดยใช้ข้อมูลจาก session
   // เพื่อไม่ให้ header แสดงเหมือนไม่ได้ล็อกอินทั้งที่ session ใช้งานได้จริง
-  const displayName = (authUser.user_metadata?.displayName as string | undefined) || undefined;
   return {
     $id: authUser.id,
-    name: displayName || '',
+    name: platformName || '',
     email: authUser.email || '',
-    prefs: { displayName },
+    prefs: { displayName: platformName, avatarUrl: platformAvatar },
   };
 }
 

@@ -73,13 +73,21 @@ function Hero({ stats, controls, locale }: { stats: SiteStats | null; controls: 
       <div className="container hero-inner">
         <div className="hero-copy">
           <div className="hero-brand reveal">
+            {/* โลโก้สลับตามธีม — CSS ใน globals.css ซ่อน/แสดงตาม html[data-theme='dark'] */}
             <Image
               src="/logo.png"
-              alt="โลโก้คนกลาง"
+              alt="โลโก้กลางฮับ"
               width={520}
               height={520}
               priority
-              className="hero-brand-image"
+              className="hero-brand-image hero-logo-light"
+            />
+            <Image
+              src="/logo-dark.png"
+              alt="โลโก้กลางฮับ (dark)"
+              width={520}
+              height={520}
+              className="hero-brand-image hero-logo-dark"
             />
           </div>
           <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '140ms' }}>

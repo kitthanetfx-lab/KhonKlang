@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { displayName: profile.displayName },
+      user_metadata: { displayName: profile.displayName, pictureUrl: profile.pictureUrl || null },
     });
     if (createErr && !/already.*registered|already exists/i.test(createErr.message)) {
       throw new Error(`Create user: ${createErr.message}`);
@@ -75,7 +75,12 @@ export async function GET(request: NextRequest) {
     if (createErr) {
       // already exists — make sure the password still matches our deterministic
       // derivation (in case LINE_CHANNEL_SECRET ever rotates, this resyncs it)
-      await admin.auth.admin.updateUserById(userId, { password, email_confirm: true }).catch(() => {});
+      // + refresh ชื่อ/รูปโปรไฟล์ LINE ล่าสุดลง metadata ทุกครั้งที่ล็อกอิน
+      await admin.auth.admin.updateUserById(userId, {
+        password,
+        email_confirm: true,
+        user_metadata: { displayName: profile.displayName, pictureUrl: profile.pictureUrl || null },
+      }).catch(() => {});
     }
 
     // 6. Sign in as that user (anon-key client call) to mint a real session.

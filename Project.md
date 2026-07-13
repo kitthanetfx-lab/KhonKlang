@@ -1,5 +1,31 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-13 (23:42)
+
+### บังคับกรอกโปรไฟล์หลังล็อกอิน + consent popup + avatar/ชื่อจากแพลตฟอร์ม + โลโก้ dark theme
+
+1. **บังคับกรอกโปรไฟล์ทันทีหลังล็อกอิน** — bridge pages ทั้ง 2 (`auth/line/complete`, `auth/oauth/complete`) เช็คฟิลด์บังคับ (ชื่อ-นามสกุล, เบอร์โทร, บัญชีธนาคาร) ถ้าไม่ครบ → redirect ไป `/profile?returnTo=<หน้าเดิม>` ก่อนเสมอ
+2. **ProfileConsentModal** (ไฟล์ใหม่) — popup แจ้งเหตุผลการเก็บข้อมูลก่อนเข้าฟอร์มโปรไฟล์ (เลขบัญชี: ผู้ขาย/คนกลางรับเงินเมื่อดีลสำเร็จ, ผู้ซื้อรับเงินคืนเมื่อมีข้อพิพาท) รูปแบบเดียวกับ ConsentModal สมัครผู้ขาย/คนกลาง responsive ทุกอุปกรณ์ — แสดงเมื่อ `locked && !consentOk` (จำการยอมรับใน sessionStorage `kk.profile_consent`) กดไม่ยอมรับ → กลับหน้าหลัก
+3. **ชื่อ+รูปจากแพลตฟอร์ม** — LINE callback เก็บ `pictureUrl` ลง user_metadata (ทั้งสร้างใหม่และ refresh ตอน re-login); `useUser.ts` เพิ่ม `prefs.avatarUrl` + default displayName จาก metadata (displayName/full_name/name); Header แสดงรูป avatar แทนไอคอน; หน้าโปรไฟล์ pf-avatar แสดงรูป + displayName default จากแพลตฟอร์ม
+4. **Migration `0013_signup_platform_display_name.sql`** (ใหม่) — trigger สร้าง profiles อ่านชื่อจาก full_name/name (Google) เพิ่มจาก displayName (LINE) — **ต้องรันใน Supabase SQL Editor**
+5. **โลโก้หน้าแรกสลับตาม dark theme** — เพิ่ม `/logo-dark.png` (ตอนนี้เป็น copy ของ logo.png ชั่วคราว รอไฟล์จริง), hero render 2 รูป + CSS `.hero-logo-light/.hero-logo-dark` สลับตาม `html[data-theme='dark']`
+6. **ข้อ 4 (Google "ไปยัง supabase.co")** — ไม่ใช่โค้ด: ตั้ง Branding ใน Google Cloud OAuth consent screen (App name "กลางฮับ (Glanghub)" + โลโก้ + verify) — ผู้ใช้ดำเนินการเองแล้วบางส่วน
+
+### ไฟล์ที่แก้ไข (2026-07-13 23:42)
+- `src/app/auth/line/complete/page.tsx`
+- `src/app/auth/oauth/complete/page.tsx`
+- `src/components/ProfileConsentModal.tsx` (ใหม่)
+- `src/app/profile/page.tsx`
+- `src/app/api/auth/line/callback/route.ts`
+- `src/lib/useUser.ts`
+- `src/components/HeaderAccountActions.tsx`
+- `src/app/page.tsx`
+- `src/app/globals.css`
+- `supabase/migrations/0013_signup_platform_display_name.sql` (ใหม่)
+- `public/logo-dark.png` (ใหม่ — placeholder)
+
+---
+
 ## 2026-07-13 (22:31)
 
 ### แก้ header ไม่แสดงสถานะล็อกอินหลัง LINE login สำเร็จ
