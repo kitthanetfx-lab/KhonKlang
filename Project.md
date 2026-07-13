@@ -1,5 +1,17 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-14 (01:53)
+
+### เพิ่ม fb:app_id — ผูกเว็บกับ Meta App "Glanghub"
+
+- `src/app/layout.tsx` — เพิ่ม `facebook: { appId: "1054122313862171" }` ใน metadata (Next.js Metadata API render เป็น `<meta property="fb:app_id">`)
+- ฝั่ง Meta Developers: สร้างแอป "Glanghub" (ID 1054122313862171), ตั้ง Basic settings (domains, privacy/terms, data deletion URL, Website platform), เปิดโหมด Live — แก้คำเตือน "ไม่มี fb:app_id" ใน Facebook Sharing Debugger
+
+### ไฟล์ที่แก้ไข (2026-07-14 01:53)
+- `src/app/layout.tsx`
+
+---
+
 ## 2026-07-14 (01:07)
 
 ### แก้ og:url ชี้โดเมนผิด — Facebook Debugger เตือน redirect
