@@ -1,5 +1,25 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-13 (22:31)
+
+### แก้ header ไม่แสดงสถานะล็อกอินหลัง LINE login สำเร็จ
+
+**สาเหตุ**: `useUser.ts` → `fetchProfile()` คืน `null` ทันทีถ้าไม่มีแถวในตาราง `profiles` — ผู้ใช้ LINE ที่สร้างผ่าน `admin.createUser` อาจยังไม่มีแถว profiles (ถ้า trigger `0004_profile_on_signup.sql` ยังไม่ได้รันบน DB จริง) → มี session แต่ header แสดงเหมือนไม่ได้ล็อกอิน
+
+**แก้ไข** (`src/lib/useUser.ts`):
+1. แยก `fetchProfileRow()` helper + เปลี่ยน `.single()` → `.maybeSingle()`
+2. ถ้ามี session แต่ไม่มีแถว profiles → เรียก `POST /api/profile/sync` (ผ่าน `verifyUser` ฝั่ง server จะสร้างแถวให้อัตโนมัติ) แล้ว fetch ใหม่
+3. fallback สุดท้าย: คืน AppUser จากข้อมูล session (id, email, displayName จาก user_metadata) → สถานะล็อกอินแสดงเสมอเมื่อมี session
+
+**งานฝั่ง DB (ผู้ใช้ทำเอง)**: รัน `supabase/migrations/0004_profile_on_signup.sql` ใน Supabase SQL Editor เพื่อให้ trigger สร้างแถว profiles อัตโนมัติ (แก้ที่ต้นตอ)
+
+**ตั้งค่าที่ทำไปก่อนหน้าในวันเดียวกัน**: Vercel Domains ตั้ง `glanghub.com` → 307 redirect → `www.glanghub.com` (แก้ปัญหา session อยู่คนละ origin ระหว่าง www/non-www)
+
+### ไฟล์ที่แก้ไข (2026-07-13 22:31)
+- `src/lib/useUser.ts`
+
+---
+
 ## 2026-07-13 (21:45)
 
 ### แก้ LINE login ใช้งานไม่ได้ + เปลี่ยนชื่อหน้าล็อกอิน

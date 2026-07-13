@@ -83,17 +83,44 @@ function toAppUser(p: ProfileRow): AppUser {
   };
 }
 
+async function fetchProfileRow(userId: string): Promise<ProfileRow | null> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, email, first_name, last_name, display_name, phone, address, role, bank_name, bank_acct, bank_owner, bank_qr_file_id, seller_status, middleman_status, middleman_tier, middleman_tier_intent, linked_to, review_score, review_count')
+    .eq('id', userId)
+    .maybeSingle();
+  return (profile as ProfileRow | null) || null;
+}
+
 async function fetchProfile(): Promise<AppUser | null> {
   const { data: { session } } = await supabase.auth.getSession();
   const authUser = session?.user ?? null;
   if (!authUser) return null;
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, email, first_name, last_name, display_name, phone, address, role, bank_name, bank_acct, bank_owner, bank_qr_file_id, seller_status, middleman_status, middleman_tier, middleman_tier_intent, linked_to, review_score, review_count')
-    .eq('id', authUser.id)
-    .single();
-  if (!profile) return null;
-  return toAppUser(profile as ProfileRow);
+
+  const profile = await fetchProfileRow(authUser.id);
+  if (profile) return toAppUser(profile);
+
+  // มี session แต่ยังไม่มีแถวใน profiles (เช่น login ครั้งแรกผ่าน LINE และ trigger
+  // 0004_profile_on_signup ยังไม่ได้รันบน DB) → เรียก /api/profile/sync ซึ่งผ่าน
+  // verifyUser ฝั่ง server จะสร้างแถว profiles ให้อัตโนมัติ แล้วลองดึงใหม่
+  try {
+    const headers = await authHeaders();
+    if (headers.Authorization) {
+      await fetch('/api/profile/sync', { method: 'POST', headers });
+      const retry = await fetchProfileRow(authUser.id);
+      if (retry) return toAppUser(retry);
+    }
+  } catch { /* ใช้ fallback ด้านล่าง */ }
+
+  // fallback สุดท้าย: ยังไม่มีแถว profiles ก็ให้ถือว่าล็อกอินแล้ว โดยใช้ข้อมูลจาก session
+  // เพื่อไม่ให้ header แสดงเหมือนไม่ได้ล็อกอินทั้งที่ session ใช้งานได้จริง
+  const displayName = (authUser.user_metadata?.displayName as string | undefined) || undefined;
+  return {
+    $id: authUser.id,
+    name: displayName || '',
+    email: authUser.email || '',
+    prefs: { displayName },
+  };
 }
 
 export function useUser() {
