@@ -1,5 +1,26 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-14 (00:06)
+
+### แก้ dark mode contrast ใน consent modal ทั้ง 2 ตัว + โลโก้ dark ตัวจริง
+
+**สาเหตุ**: `ProfileConsentModal` และ `ConsentModal` ใช้ตัวแปร CSS ที่ไม่มีในโปรเจกต์ (`--fg`, `--muted-fg`, `--card`, `--green-50`) → fallback เป็นสีเข้ม (#111, #374151) บนพื้นเข้มของ dark theme ตัวอักษรจม/มองไม่เห็นทุกโซน + ปุ่ม "ไม่ยอมรับ" hardcode `background:#fff`
+
+**แก้ไข** (ทั้ง 2 ไฟล์ ใช้ตัวแปรธีมจริง ปรับตาม light/dark อัตโนมัติ):
+- พื้น modal → `var(--surface)` + ขอบ `var(--line)`, การ์ดย่อย → `var(--surface-2)`
+- หัวข้อ → `var(--ink)`, เนื้อหา → `var(--ink-2)`, รอง → `var(--muted)`
+- ปุ่ม "ไม่ยอมรับ" → พื้นโปร่งใส ขอบ/ตัวอักษรแดง #ef4444
+- ปุ่ม "ยอมรับ" disabled → `var(--line-2)` + `var(--faint)`
+- checkbox ติ๊กแล้ว → ไฮไลต์เขียว `color-mix(#16a34a 12%)` โปร่งแสง
+- `public/logo-dark.png` → แทนที่ placeholder ด้วยไฟล์จริงจากผู้ใช้
+
+### ไฟล์ที่แก้ไข (2026-07-14 00:06)
+- `src/components/ProfileConsentModal.tsx`
+- `src/components/ConsentModal.tsx`
+- `public/logo-dark.png` (ไฟล์จริง)
+
+---
+
 ## 2026-07-13 (23:42)
 
 ### บังคับกรอกโปรไฟล์หลังล็อกอิน + consent popup + avatar/ชื่อจากแพลตฟอร์ม + โลโก้ dark theme
