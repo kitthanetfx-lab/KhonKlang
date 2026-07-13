@@ -35,7 +35,7 @@ function LineCompleteInner() {
       document.cookie = 'line_session_pending=; max-age=0; path=/';
 
       try {
-        const { access_token, refresh_token } = JSON.parse(raw);
+        const { access_token, refresh_token } = JSON.parse(decodeURIComponent(raw));
         const { error } = await supabase.auth.setSession({ access_token, refresh_token });
         if (error) throw error;
         setStatus('กำลังโหลดข้อมูล...');

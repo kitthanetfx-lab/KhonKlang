@@ -63,7 +63,7 @@ function LoginForm() {
           </div>
         </div>
 
-        <h1 className="login-title">คนกลาง</h1>
+        <h1 className="login-title">กลางฮับ</h1>
         <p className="login-sub">ซื้อขายปลอดภัย ผ่านคนกลางที่เชื่อถือได้<br />ทุกดีลมีคนดูแล ทุกเงินมีระบบคุ้มครอง</p>
 
         <div className="login-btns">

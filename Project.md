@@ -1,5 +1,21 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-13 (21:45)
+
+### แก้ LINE login ใช้งานไม่ได้ + เปลี่ยนชื่อหน้าล็อกอิน
+
+1. **แก้บั๊ก LINE login** (`src/app/auth/line/complete/page.tsx` บรรทัด 38) — cookie `line_session_pending` ถูก Next.js URL-encode อัตโนมัติ แต่โค้ด `JSON.parse(raw)` โดยไม่ decode → error `Unexpected token '%' ... is not valid JSON` → แก้เป็น `JSON.parse(decodeURIComponent(raw))`
+2. **เปลี่ยนชื่อหน้าล็อกอิน** (`src/app/login/page.tsx` บรรทัด 66) — `login-title` จาก "คนกลาง" → "กลางฮับ"
+3. **ตั้งค่านอกโค้ดที่แก้ไปพร้อมกัน (บันทึกไว้อ้างอิง)**:
+   - Vercel: `NEXT_PUBLIC_APP_URL` เปลี่ยนจาก `https://khonklang.vercel.app` (deployment ตายแล้ว) → `https://www.glanghub.com` + redeploy
+   - LINE Developers Console (channel 2010302438): ลงทะเบียน Callback URL `https://www.glanghub.com/api/auth/line/callback` และ `https://glanghub.com/api/auth/line/callback`
+
+### ไฟล์ที่แก้ไข (2026-07-13)
+- `src/app/auth/line/complete/page.tsx`
+- `src/app/login/page.tsx`
+
+---
+
 ## 2026-07-03 (ต่อ 16)
 
 ### ลดขนาด hero title + ปุ่ม "เริ่ม Deal" + หน้า /deal-all
