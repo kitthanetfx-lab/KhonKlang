@@ -1,5 +1,21 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-14 (00:25)
+
+### แก้ dark mode ทั้งเว็บ — โซนพื้น var(--ink) พลิกเป็นขาว
+
+**สาเหตุ (anti-pattern เดียวกันทั้งเว็บ)**: โซน "แถบน้ำเงินเข้ม+ตัวอักษรขาว" ใช้ `var(--ink)` เป็นสีพื้นหลัง — dark mode `--ink` พลิกเป็น #f4f7ff (เกือบขาว) → พื้นขาว+อักษรขาว มองไม่เห็น
+
+**แก้ไข** (`src/app/globals.css`):
+1. เพิ่มตัวแปร `--navy-band: #10224d` — คงน้ำเงินเข้มทั้ง 2 ธีม พร้อมคอมเมนต์ห้ามใช้ var(--ink) เป็นพื้นหลัง
+2. เปลี่ยน 6 จุดจาก `var(--ink)` → `var(--navy-band)`: `.footer`, `.scam-band` (gradient), `.cc-banner` (แถบคุกกี้), `.btn-dark`, `.ss-arrow:hover`, `.rv-av.platform`
+3. `.rv-tag` / `.rv-comment` — พื้น `#fff` + ขอบ `#d9e2f2` hardcode → `var(--surface)` + `var(--line)` (เดิมใน dark เป็นอักษรอ่อนบนพื้นขาว)
+
+### ไฟล์ที่แก้ไข (2026-07-14 00:25)
+- `src/app/globals.css`
+
+---
+
 ## 2026-07-14 (00:06)
 
 ### แก้ dark mode contrast ใน consent modal ทั้ง 2 ตัว + โลโก้ dark ตัวจริง
