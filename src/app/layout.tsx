@@ -31,13 +31,13 @@ const monoFont = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://glanghub.com"),
+  metadataBase: new URL("https://www.glanghub.com"),
   title: "กลางฮับ — คิดถึงคนกลาง คิดถึง Glanghub",
   description: "แพลตฟอร์มซื้อขายปลอดภัยด้วยระบบตัวกลางที่ผ่านการรับรอง พักเงินไว้กับระบบจนกว่าจะได้รับของจริง",
   openGraph: {
     type: "website",
     locale: "th_TH",
-    url: "https://glanghub.com",
+    url: "https://www.glanghub.com",
     siteName: "กลางฮับ",
     title: "กลางฮับ — คิดถึงคนกลาง คิดถึง Glanghub",
     description: "แพลตฟอร์มซื้อขายปลอดภัยด้วยระบบตัวกลางที่ผ่านการรับรอง พักเงินไว้กับระบบจนกว่าจะได้รับของจริง",

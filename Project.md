@@ -1,5 +1,20 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-14 (01:07)
+
+### แก้ og:url ชี้โดเมนผิด — Facebook Debugger เตือน redirect
+
+**สาเหตุ**: `og:url`/`metadataBase` ใน `layout.tsx` ชี้ `https://glanghub.com` (ไม่มี www) แต่โดเมนหลักปัจจุบันคือ `www.glanghub.com` (non-www ถูก redirect) → Facebook ตาม og:url เจอ redirect วน
+
+**แก้ไข** (`src/app/layout.tsx`): `metadataBase` + `openGraph.url` → `https://www.glanghub.com`
+
+**งานฝั่งผู้ใช้**: Vercel → Domains → glanghub.com เปลี่ยน 307 → 308 Permanent Redirect, แล้วกด "Scrape Again" ใน Facebook Debugger หลัง deploy
+
+### ไฟล์ที่แก้ไข (2026-07-14 01:07)
+- `src/app/layout.tsx`
+
+---
+
 ## 2026-07-14 (00:25)
 
 ### แก้ dark mode ทั้งเว็บ — โซนพื้น var(--ink) พลิกเป็นขาว
