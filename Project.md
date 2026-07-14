@@ -1,5 +1,39 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-14 (18:52)
+
+### เปลี่ยนระบบโทรทั้งหมดจาก Jitsi/WebRTC เดิม → LiveKit (โฮสต์เองบน VPS)
+
+**ภาพรวม**: ระบบโทรใช้ LiveKit Server + Coturn บน VPS (โปรเจกต์ `glangCoturn` — deploy แยกต่างหาก) แทน meet.jit.si และ signaling ที่เขียนเองผ่านตาราง call_signals
+
+1. **ลบ Jitsi ออกจากหน้าดีล** — ลบ component `JitsiMeet` (โหลด external_api.js จาก meet.jit.si) และห้อง `khonklang-<dealId>` ที่เดาชื่อได้ (ช่องโหว่: ใครรู้ dealId ก็เข้าห้องได้)
+2. **`src/components/DealVideoCall.tsx`** (ใหม่) — วิดีโอคอลผ่าน LiveKit (`@livekit/components-react` + `VideoConference`) ขอ token จาก API ก่อนเข้าห้อง / แสดงข้อความ "ระบบโทรกำลังเตรียมการ" ถ้ายังไม่ตั้ง env
+3. **`/api/deals/[id]/call-token`** (ใหม่) — ออก token เฉพาะคู่ดีล (ผู้ขาย/ผู้ซื้อ/คนกลาง) และแอดมิน ห้อง `deal-<id>`
+4. **ปุ่มโทรคุยแสดงทุกขั้นตอนของดีล** — จากเดิมเฉพาะดีล regular → ทุกประเภท (regular/simple/meetup) เงื่อนไข: เป็นผู้เกี่ยวข้อง + มีคู่ดีลแล้ว (`buyer_id` ไม่ว่าง) + ดีลยังไม่จบ (ยังโทรได้ตอน disputed เพื่อคุยแก้ปัญหา) / rename `showJitsi` → `showCall`
+5. **`src/lib/callSession.ts`** — เขียนใหม่ทั้งไฟล์ด้วย livekit-client (public interface เดิม: start/setMuted/stop) → SupportWidget + /admin/support ใช้ได้โดยไม่ต้องแก้ / เลิกใช้ WebRTC + โพล call_signals ทุก 1.2 วิ
+6. **`/api/support/call-token` + `/api/admin/support/call-token`** (ใหม่) — token สายลูกค้า↔แอดมิน ห้อง `support-<callId>` ตรวจ call_id กับ thread ก่อนออก
+7. **`src/lib/livekit.ts`** (ใหม่) — helper ออก AccessToken (livekit-server-sdk)
+8. **package.json** — เพิ่ม livekit-client, @livekit/components-react, @livekit/components-styles, livekit-server-sdk
+
+**Env ใหม่ที่ต้องตั้งบน Vercel** (ค่าจาก `credentials.txt` หลังติดตั้ง VPS ตาม glangCoturn/deploy/README-ติดตั้ง.md):
+- `LIVEKIT_URL=wss://livekit.glanghub.com`
+- `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`
+- support-call เปิดใช้ด้วย `NEXT_PUBLIC_SUPPORT_CALLS_ENABLED=true` (ตัวเดิม)
+
+**หมายเหตุ**: `/api/support/ice`, `/api/support/signal`, `/api/admin/support/{ice,signal}` และตาราง `call_signals` ไม่ถูกเรียกใช้แล้ว (ยังไม่ลบ — รอยืนยันระบบใหม่นิ่งก่อน) / ต้องรัน `npm install` ก่อน push เพื่ออัปเดต package-lock.json / ตรวจแล้ว: tsc ผ่าน, eslint ไม่มี error ใหม่ (error 5 ตัวที่เหลือเป็นของเดิมก่อนแก้)
+
+### ไฟล์ที่แก้ไข (2026-07-14 18:52)
+- `src/app/deal/[id]/page.tsx`
+- `src/lib/callSession.ts`
+- `src/lib/livekit.ts` (ใหม่)
+- `src/components/DealVideoCall.tsx` (ใหม่)
+- `src/app/api/deals/[id]/call-token/route.ts` (ใหม่)
+- `src/app/api/support/call-token/route.ts` (ใหม่)
+- `src/app/api/admin/support/call-token/route.ts` (ใหม่)
+- `package.json`
+
+---
+
 ## 2026-07-14 (11:30)
 
 ### เพิ่ม meta tag ยืนยันโดเมนกับ Meta Business

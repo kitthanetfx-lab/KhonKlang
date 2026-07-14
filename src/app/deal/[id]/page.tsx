@@ -19,6 +19,7 @@ import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { useUser } from '@/lib/useUser';
+import DealVideoCall from '@/components/DealVideoCall';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -36,35 +37,6 @@ const SIMPLE_DEAL_STEP1_SLIDES = [
   '/Eazy/St1.webp',
   '/Eazy/St2.webp',
 ];
-
-// ─── Jitsi Meet via External API ─────────────────────────────────────────
-function JitsiMeet({ roomName, displayName }: { roomName: string; displayName: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const apiRef = useRef<any>(null);
-  useEffect(() => {
-    if (!containerRef.current || apiRef.current) return;
-    let api: any;
-    function initJitsi() {
-      if (!containerRef.current) return;
-      const h = Math.max(window.innerHeight - 120, 400);
-      api = new (window as any).JitsiMeetExternalAPI('meet.jit.si', {
-        roomName, parentNode: containerRef.current, width: '100%', height: h,
-        userInfo: { displayName },
-        configOverwrite: { startWithAudioMuted: false, startWithVideoMuted: false, disableDeepLinking: true, prejoinPageEnabled: false },
-        interfaceConfigOverwrite: { SHOW_JITSI_WATERMARK: false, SHOW_BRAND_WATERMARK: false, MOBILE_APP_PROMO: false, TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'tileview', 'raisehand'] },
-      });
-      apiRef.current = api;
-    }
-    if ((window as any).JitsiMeetExternalAPI) initJitsi();
-    else {
-      const script = document.createElement('script');
-      script.src = 'https://meet.jit.si/external_api.js'; script.async = true; script.onload = initJitsi;
-      document.head.appendChild(script);
-    }
-    return () => { try { apiRef.current?.dispose(); } catch {} apiRef.current = null; };
-  }, [roomName, displayName]);
-  return <div ref={containerRef} style={{ width: '100%', overflow: 'hidden' }} />;
-}
 
 // ─── บันทึกวิดีโอคอล (อัดหน้าจอ+เสียงแท็บ แล้วเซฟลงเครื่องเป็น .webm) ───────
 function CallRecorder({ dealId, onSaveEvidence }: { dealId: string; onSaveEvidence?: (blob: Blob) => Promise<void> }) {
@@ -339,13 +311,13 @@ export default function DealRoom() {
   const [showTrackingRequired, setShowTrackingRequired] = useState(false);
   const trackingInputRef = useRef<HTMLInputElement>(null);
   const trackingProviderRef = useRef<HTMLSelectElement>(null);
-  const [showJitsi, setShowJitsi] = useState(false);
+  const [showCall, setShowCall] = useState(false);
   // ข้อ3: ระหว่างวิดีโอคอล ซ่อนปุ่มลอย "กลับหน้าหลัก" + "บริการลูกค้า" (ผ่าน body.in-call)
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    document.body.classList.toggle('in-call', showJitsi);
+    document.body.classList.toggle('in-call', showCall);
     return () => { document.body.classList.remove('in-call'); };
-  }, [showJitsi]);
+  }, [showCall]);
   const [tab, setTab] = useState<DealTab>(readDealTab(requestedTab));
   const [evidenceType, setEvidenceType] = useState('packing');
   const [copied, setCopied] = useState(false);
@@ -521,7 +493,7 @@ export default function DealRoom() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setTab(readDealTab(requestedTab));
-      if (requestedCall && isDealParty(deal, myId)) setShowJitsi(true);
+      if (requestedCall && isDealParty(deal, myId)) setShowCall(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [deal, myId, requestedCall, requestedTab]);
@@ -726,7 +698,7 @@ export default function DealRoom() {
   // → ป้องกัน popup ยิงตอน reload แล้ว setWzViewStep(2) ทำให้ค้างที่ step 2 ถาวร
 
   useEffect(() => {
-    // poll chat เสมอสำหรับดีล meetup (แชทฝังใน wizard) หรือเมื่ออยู่ tab chat / jitsi
+    // poll chat เสมอสำหรับดีล meetup (แชทฝังใน wizard) หรือเมื่ออยู่ tab chat / วิดีโอคอล
     // รวมถึง simple deal ตอนอยู่ขั้นคุย/ตรวจหลักฐาน เพื่อให้อีกฝ่ายเห็นข้อความใหม่ทันที
     // หยุด poll เมื่ออยู่หน้าจบดีลแล้ว — ไม่จำเป็นต้องโหลดแชทต่อ
     const isMeetupDeal = deal?.deal_type === 'meetup' && deal?.status !== 'completed';
@@ -735,7 +707,7 @@ export default function DealRoom() {
     const simpleViewStep = isSimpleDeal ? Math.min(wzViewStep ?? simpleActualStep, simpleActualStep) : 0;
     const isSimpleChatStage = isSimpleDeal && (simpleViewStep === 2 || simpleViewStep === 3);
     if (!isDealParty(deal, myId)) return;
-    if (tab !== 'chat' && !showJitsi && !isMeetupDeal && !isSimpleChatStage) return;
+    if (tab !== 'chat' && !showCall && !isMeetupDeal && !isSimpleChatStage) return;
     let stopped = false;
     const poll = async () => {
       try {
@@ -744,13 +716,13 @@ export default function DealRoom() {
       } catch { /* เงียบ */ }
     };
     void poll();
-    const intervalMs = showJitsi ? 4000 : isSimpleChatStage ? 2500 : 5000;
+    const intervalMs = showCall ? 4000 : isSimpleChatStage ? 2500 : 5000;
     const timer = window.setInterval(() => { void poll(); }, intervalMs);
     return () => {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [deal, fetchMsgs, getAuthHeaders, myId, priceState, showJitsi, tab, wzViewStep]);
+  }, [deal, fetchMsgs, getAuthHeaders, myId, priceState, showCall, tab, wzViewStep]);
 
   // แจ้งผู้ร่วมดีลว่ามีคนเข้ามาดูห้องนี้ — ครั้งเดียวต่อ session ต่อดีล กันสแปม
   const visitSent = useRef(false);
@@ -812,7 +784,7 @@ export default function DealRoom() {
       if (r.ok) {
         // re-fetch ทั้งดีล+meetup+priceState+evidence ให้ตรงกัน (PATCH คืนแค่ deal row)
         const nextDeal = await fetchDeal(headers);
-        if ((tab === 'chat' || showJitsi) && isDealParty(nextDeal ?? deal, myId)) await fetchMsgs(headers, nextDeal ?? deal, myId);
+        if ((tab === 'chat' || showCall) && isDealParty(nextDeal ?? deal, myId)) await fetchMsgs(headers, nextDeal ?? deal, myId);
         return nextDeal;
       } else if (r.status === 401) {
         headersRef.current = {}; // ล้าง cache
@@ -896,8 +868,8 @@ export default function DealRoom() {
   /** เปิด/ปิดวิดีโอคอล — ตอนเปิดจะแจ้งเตือนทุกฝ่ายในดีล (กันสแปม: แจ้งซ้ำได้ทุก 2 นาที) */
   function toggleCall() {
     if (!isDealParty(deal, myId)) return;
-    const opening = !showJitsi;
-    setShowJitsi(opening);
+    const opening = !showCall;
+    setShowCall(opening);
     // แจ้งเตือนทุกครั้งที่มีคนล็อกอินเปิดคอล — รวมถึงผู้สนใจที่มาจากลิงก์แชร์ (guest ที่ล็อกอินแล้ว)
     if (opening && myId && Date.now() - callNotifyAt.current > 120000) {
       callNotifyAt.current = Date.now();
@@ -929,7 +901,6 @@ export default function DealRoom() {
     </div>
   );
 
-  const jitsiRoom = `khonklang-${dealId.slice(0, 10)}`;
   const isMeetup = deal.deal_type === 'meetup';
   const isSimple = deal.deal_type === 'simple';
   const isAdminUser = user?.prefs?.role === 'admin';
@@ -955,6 +926,8 @@ export default function DealRoom() {
   const stepIdx = STEP_ORDER.indexOf(deal.status);
   const pct = stepIdx >= 0 ? Math.round((stepIdx / (STEP_ORDER.length - 1)) * 100) : 0;
   const isFinished = ['completed', 'cancelled', 'disputed'].includes(deal.status);
+  // ปุ่มโทรคุย: แสดงทุกขั้นตอนตั้งแต่มีคู่ดีลเข้ามา จนดีลจบ (ยังโทรได้ตอน disputed เพื่อคุยแก้ปัญหา)
+  const canCall = isDealParty(deal, myId) && !!deal.buyer_id && !['completed', 'cancelled'].includes(deal.status);
 
   // ─── Admin observer panel ───────────────────────────────────────────────
   if (isAdminUser && (myRole === 'guest' || myRole === '')) {
@@ -4500,21 +4473,21 @@ export default function DealRoom() {
         <div className="dr-hctas">
           <HeaderAccountActions showNotify />
           <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
-          {/* ดีลแบบง่าย: ปุ่มวิดีโอคอลอยู่ในขั้นตอน "คุย/วิดีโอคอล" ของ wizard อยู่แล้ว ไม่ต้องมีซ้ำที่นี่ */}
-          {!isSimple && !isMeetup && <button className="dr-cta-green" onClick={toggleCall}>📹 Video</button>}
+          {/* ปุ่มโทรคุยแสดงทุกขั้นตอนของดีล (ทุกประเภท) — ขอแค่มีคู่ดีลเข้ามาแล้วและเป็นผู้เกี่ยวข้อง */}
+          {canCall && <button className="dr-cta-green" onClick={toggleCall}>📹 โทรคุย</button>}
         </div>
       </header>
 
-      {showJitsi ? (
+      {showCall ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0d1117', minHeight: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,.4)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>📹 วิดีโอคอล กำลังดำเนินการ...</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <CallRecorder dealId={dealId} onSaveEvidence={saveCallEvidence} />
-              <button onClick={() => setShowJitsi(false)} className="btn btn-danger btn-sm">✕ วางสาย</button>
+              <button onClick={() => setShowCall(false)} className="btn btn-danger btn-sm">✕ วางสาย</button>
             </div>
           </div>
-          <div style={{ flex: 1, minHeight: '60vh' }}><JitsiMeet roomName={jitsiRoom} displayName={myName || 'ผู้ใช้'} /></div>
+          <div style={{ flex: 1, minHeight: '60vh' }}><DealVideoCall dealId={dealId} getAuthHeaders={getAuthHeaders} onEnd={() => setShowCall(false)} /></div>
           {/* กล่องแชทลอยซ้อนบนวิดีโอคอล (ย่อ/ขยายได้) */}
           {callChatOpen ? (
             <div style={{ position: 'fixed', right: 16, bottom: 16, width: 320, maxWidth: '90vw', height: '55vh', maxHeight: 460, background: 'var(--surface)', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,.4)', display: 'flex', flexDirection: 'column', zIndex: 60, overflow: 'hidden' }}>

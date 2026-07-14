@@ -1,142 +1,133 @@
 'use client';
 
 /**
- * ตัวจัดการสายเสียง (WebRTC) ฝั่งไคลเอนต์ — ใช้ร่วมกันทั้งฝั่งลูกค้า (SupportWidget)
- * และฝั่งพนักงาน (/admin/support) สัญญาณ (offer/answer/ICE candidate) ส่งผ่าน
- * Appwrite Database โดยโพลทุก ๆ 1.2 วิ (รูปแบบเดียวกับการโพลแชท/แจ้งเตือนในโปรเจกต์นี้)
+ * ตัวจัดการสายเสียง (LiveKit) ฝั่งไคลเอนต์ — ใช้ร่วมกันทั้งฝั่งลูกค้า (SupportWidget)
+ * และฝั่งพนักงาน (/admin/support)
  *
- * หมายเหตุ: ใช้ STUN สาธารณะเท่านั้น (ไม่มี TURN) — เพียงพอกับเครือข่ายส่วนใหญ่
- * แต่บางเครือข่ายที่มี NAT/Firewall เข้มงวดอาจเชื่อมต่อเสียงไม่ได้
+ * เวอร์ชันนี้เปลี่ยนจาก WebRTC + โพลสัญญาณผ่านตาราง call_signals มาใช้ LiveKit Server
+ * ที่โฮสต์เองบน VPS (โปรเจกต์ glangCoturn) — เสถียรกว่า มี TURN ในตัวผ่าน Coturn
+ * ทะลุ NAT/Firewall เน็ตมือถือได้ และไม่ต้องโพลฐานข้อมูลทุก 1.2 วิอีกต่อไป
+ *
+ * public interface คงเดิมทุกอย่าง: new CallSession(opts) / start() / setMuted() / stop()
+ * (opts เดิมอย่าง signalUrl / getIceServers / isOfferer ยังรับได้แต่ไม่ใช้แล้ว)
  */
+
+import { Room, RoomEvent, RemoteTrack, Track } from 'livekit-client';
 
 export type CallRole = 'customer' | 'staff';
 export type CallSessionState = 'connecting' | 'active' | 'ended' | 'failed';
 
-interface SignalMsg { from_role: string; type: string; data: string; created_at: string }
-
 interface CallSessionOpts {
   role: CallRole;
-  isOfferer: boolean;
+  /** ไม่ใช้แล้ว (LiveKit ไม่มี offerer) — คงไว้เพื่อ compatibility */
+  isOfferer?: boolean;
   callId: string;
-  /** endpoint สำหรับโพล/ส่งสัญญาณ — '/api/support/signal' หรือ '/api/admin/support/signal' */
-  signalUrl: string;
+  /** ไม่ใช้แล้ว — signaling ทำผ่าน LiveKit ทั้งหมด */
+  signalUrl?: string;
   /** ต้องระบุเมื่อ role==='staff' เพื่อบอกว่ากำลังคุยกับลูกค้าคนไหน */
   customerId?: string;
   getAuthHeaders: () => Promise<Record<string, string>>;
+  /** ไม่ใช้แล้ว — TURN ถูกแจ้งให้ client โดย LiveKit Server อัตโนมัติ */
   getIceServers?: () => Promise<RTCIceServer[]>;
   onState?: (s: CallSessionState) => void;
   onRemoteStream?: (stream: MediaStream | null) => void;
 }
 
-const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-];
-
 export class CallSession {
-  private pc: RTCPeerConnection | null = null;
-  private localStream: MediaStream | null = null;
-  private pollTimer: number | null = null;
-  private since = '';
+  private room: Room | null = null;
   private ended = false;
   private opts: CallSessionOpts;
 
   constructor(opts: CallSessionOpts) { this.opts = opts; }
 
-  private async sendSignal(type: string, data: string) {
-    try {
-      const headers = await this.opts.getAuthHeaders();
-      await fetch(this.opts.signalUrl, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ callId: this.opts.callId, customerId: this.opts.customerId, type, data }),
+  private tokenUrl() {
+    return this.opts.role === 'staff' ? '/api/admin/support/call-token' : '/api/support/call-token';
+  }
+
+  /** รวมเสียงของผู้ร่วมสายทุกคน (ปกติมีฝ่ายเดียว) เป็น MediaStream เดียวส่งให้ <audio> */
+  private emitRemoteStream() {
+    if (!this.room || this.ended) return;
+    const tracks: MediaStreamTrack[] = [];
+    this.room.remoteParticipants.forEach(p => {
+      p.audioTrackPublications.forEach(pub => {
+        const t = pub.track?.mediaStreamTrack;
+        if (t) tracks.push(t);
       });
-    } catch { /* best-effort — สัญญาณหาย ผู้ใช้กดวางสาย/โทรใหม่ได้ */ }
-  }
-
-  private async pollSignals() {
-    if (this.ended) return;
-    try {
-      const headers = await this.opts.getAuthHeaders();
-      const url = `${this.opts.signalUrl}?callId=${encodeURIComponent(this.opts.callId)}&since=${encodeURIComponent(this.since)}`;
-      const r = await fetch(url, { headers });
-      if (r.ok) {
-        const d = await r.json();
-        const signals = (d.signals || []) as SignalMsg[];
-        for (const s of signals) {
-          this.since = s.created_at;
-          await this.handleSignal(s);
-        }
-      }
-    } catch { /* ลองใหม่รอบถัดไป */ }
-  }
-
-  private async handleSignal(s: SignalMsg) {
-    if (!this.pc || this.ended) return;
-    try {
-      if (s.type === 'offer') {
-        await this.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(s.data)));
-        const answer = await this.pc.createAnswer();
-        await this.pc.setLocalDescription(answer);
-        await this.sendSignal('answer', JSON.stringify(answer));
-      } else if (s.type === 'answer') {
-        await this.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(s.data)));
-      } else if (s.type === 'candidate') {
-        const c = JSON.parse(s.data);
-        if (c) await this.pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => null);
-      } else if (s.type === 'hangup') {
-        this.stop(false);
-        this.opts.onState?.('ended');
-      }
-    } catch { /* ข้ามสัญญาณที่ใช้ไม่ได้ */ }
+    });
+    this.opts.onRemoteStream?.(tracks.length ? new MediaStream(tracks) : null);
   }
 
   async start() {
     this.ended = false;
+    this.opts.onState?.('connecting');
+
+    // 1) ขอ token + url จาก backend (ออกให้เฉพาะสายที่ตัวเองมีสิทธิ์)
+    let token = '', url = '';
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const headers = await this.opts.getAuthHeaders();
+      const r = await fetch(this.tokenUrl(), {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ callId: this.opts.callId, customerId: this.opts.customerId }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.token || !d.url) throw new Error(d.error || 'token failed');
+      token = d.token; url = d.url;
     } catch {
       this.opts.onState?.('failed');
       return;
     }
-    const iceServers = await this.opts.getIceServers?.().catch(() => DEFAULT_ICE_SERVERS) || DEFAULT_ICE_SERVERS;
-    const pc = new RTCPeerConnection({ iceServers });
-    this.pc = pc;
-    this.localStream.getTracks().forEach(t => pc.addTrack(t, this.localStream!));
 
-    pc.onicecandidate = (e) => {
-      if (e.candidate) void this.sendSignal('candidate', JSON.stringify(e.candidate.toJSON()));
-    };
-    pc.ontrack = (e) => { this.opts.onRemoteStream?.(e.streams[0] || null); };
-    pc.oniceconnectionstatechange = () => {
-    };
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') this.opts.onState?.('active');
-      if (pc.connectionState === 'failed') this.opts.onState?.('failed');
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed') this.opts.onState?.('ended');
-    };
+    // 2) เชื่อมห้อง LiveKit + เปิดไมค์
+    const room = new Room();
+    this.room = room;
 
-    this.pollTimer = window.setInterval(() => { void this.pollSignals(); }, 1200);
+    room
+      .on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
+        if (track.kind === Track.Kind.Audio) {
+          this.emitRemoteStream();
+          this.opts.onState?.('active');
+        }
+      })
+      .on(RoomEvent.TrackUnsubscribed, () => this.emitRemoteStream())
+      .on(RoomEvent.ParticipantDisconnected, () => {
+        this.emitRemoteStream();
+        // อีกฝ่ายออกจากสาย → ถือว่าจบสาย (สถานะ thread จะถูกอัปเดตโดยปุ่มวางสาย/API อยู่แล้ว)
+        if (this.room && this.room.remoteParticipants.size === 0) {
+          this.opts.onState?.('ended');
+        }
+      })
+      .on(RoomEvent.Disconnected, () => {
+        if (!this.ended) this.opts.onState?.('ended');
+      });
 
-    if (this.opts.isOfferer) {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await this.sendSignal('offer', JSON.stringify(offer));
+    try {
+      await room.connect(url, token);
+      await room.localParticipant.setMicrophoneEnabled(true);
+    } catch {
+      this.opts.onState?.('failed');
+      this.stop(false);
+      return;
+    }
+
+    // อีกฝ่ายอยู่ในห้องแล้ว (เรามาทีหลัง) → active ทันที
+    if (room.remoteParticipants.size > 0) {
+      this.emitRemoteStream();
+      this.opts.onState?.('active');
     }
   }
 
   setMuted(muted: boolean) {
-    this.localStream?.getAudioTracks().forEach(t => { t.enabled = !muted; });
+    void this.room?.localParticipant.setMicrophoneEnabled(!muted);
   }
 
-  stop(notify = true) {
+  stop(_notify = true) {
     if (this.ended) return;
     this.ended = true;
-    if (notify) void this.sendSignal('hangup', '');
-    if (this.pollTimer) { window.clearInterval(this.pollTimer); this.pollTimer = null; }
-    this.localStream?.getTracks().forEach(t => t.stop());
-    this.localStream = null;
-    if (this.pc) { try { this.pc.close(); } catch { /* noop */ } this.pc = null; }
+    const room = this.room;
+    this.room = null;
+    if (room) { void room.disconnect(); }
     this.opts.onRemoteStream?.(null);
   }
 }
