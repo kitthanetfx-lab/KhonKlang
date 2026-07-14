@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Anuphan, IBM_Plex_Mono, IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { CookieConsent } from "@/components/CookieConsent";
+import { MetaPixel } from "@/components/MetaPixel";
 import { DialogProvider } from "@/components/Dialog";
 import { SupportWidget } from "@/components/SupportWidget";
 import { HomeButton } from "@/components/HomeButton";
@@ -81,6 +82,7 @@ export default function RootLayout({
               <HomeButton />
               <SupportWidget />
               <CookieConsent />
+              <MetaPixel />
             </AuthGate>
           </DialogProvider>
         </AppPreferencesProvider>

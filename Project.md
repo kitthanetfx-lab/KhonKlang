@@ -1,5 +1,22 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-14 (10:00)
+
+### ติดตั้ง Meta Pixel แบบ consent-gated (PDPA)
+
+1. **`src/components/MetaPixel.tsx`** (ใหม่) — โหลด Meta Pixel (ID 1540440747816037) เฉพาะเมื่อผู้ใช้กด "ยอมรับ" ที่แถบคุกกี้: เช็ค localStorage `kk.cookie.consent` ตอนเปิดเว็บ + ฟัง event `kk:cookie-consent` เพื่อเริ่มทันทีหลังกดยอมรับ (ไม่ใส่ noscript เพราะ consent ต้องใช้ JS)
+2. **`CookieConsent.tsx`** — ปุ่มยอมรับ dispatch event `kk:cookie-consent` + แก้ข้อความแบนเนอร์ (TH/EN) จาก "ไม่มีคุกกี้โฆษณา/ติดตาม" → แจ้งว่ามีคุกกี้วิเคราะห์/การตลาด (Meta Pixel) ที่ทำงานหลังกดยอมรับเท่านั้น
+3. **`layout.tsx`** — เพิ่ม `<MetaPixel />` ใน body
+4. **หน้า `/cookies`** — อัปเดตนโยบาย: เพิ่มรายการคุกกี้วิเคราะห์/การตลาด (Meta Pixel) แบบ consent-only + ปรับหัวข้อ "สิ่งที่เราไม่ทำ" ให้ตรงความจริง
+
+### ไฟล์ที่แก้ไข (2026-07-14 10:00)
+- `src/components/MetaPixel.tsx` (ใหม่)
+- `src/components/CookieConsent.tsx`
+- `src/app/layout.tsx`
+- `src/app/cookies/page.tsx`
+
+---
+
 ## 2026-07-14 (01:53)
 
 ### เพิ่ม fb:app_id — ผูกเว็บกับ Meta App "Glanghub"

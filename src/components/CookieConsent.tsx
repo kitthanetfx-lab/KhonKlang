@@ -17,6 +17,8 @@ export function CookieConsent() {
 
   function accept() {
     try { localStorage.setItem('kk.cookie.consent', new Date().toISOString()); } catch {}
+    // แจ้ง MetaPixel ให้เริ่มทำงานทันทีหลังได้รับความยินยอม (ไม่ต้องรอ reload)
+    try { window.dispatchEvent(new Event('kk:cookie-consent')); } catch {}
     setShow(false);
   }
 
@@ -25,8 +27,8 @@ export function CookieConsent() {
     <div className="cc-banner" role="dialog" aria-label={locale === 'th' ? 'การใช้คุกกี้' : 'Cookie usage'}>
       <span className="cc-tx">
         {locale === 'th'
-          ? <>🍪 เราใช้คุกกี้ที่จำเป็นเพื่อให้ระบบเข้าสู่ระบบและใช้งานได้ — ไม่มีคุกกี้โฆษณา/ติดตาม อ่าน<Link href="/cookies">นโยบายคุกกี้</Link>และ<Link href="/privacy">ความเป็นส่วนตัว</Link></>
-          : <>🍪 We only use essential cookies so login and core features work properly. No advertising or tracking cookies. Read our<Link href="/cookies">Cookie Policy</Link>and<Link href="/privacy">Privacy Policy</Link></>}
+          ? <>🍪 เราใช้คุกกี้จำเป็นสำหรับการเข้าสู่ระบบ และคุกกี้วิเคราะห์/การตลาด (Meta Pixel) เพื่อพัฒนาบริการ — คุกกี้การตลาดจะทำงานเมื่อคุณกดยอมรับเท่านั้น อ่าน<Link href="/cookies">นโยบายคุกกี้</Link>และ<Link href="/privacy">ความเป็นส่วนตัว</Link></>
+          : <>🍪 We use essential cookies for login, plus analytics/marketing cookies (Meta Pixel) to improve our service — marketing cookies run only after you accept. Read our<Link href="/cookies">Cookie Policy</Link>and<Link href="/privacy">Privacy Policy</Link></>}
       </span>
       <button type="button" className="cc-btn" onClick={accept}>{locale === 'th' ? 'ยอมรับ' : 'Accept'}</button>
     </div>
