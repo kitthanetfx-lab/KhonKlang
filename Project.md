@@ -1,5 +1,17 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-14 (11:30)
+
+### เพิ่ม meta tag ยืนยันโดเมนกับ Meta Business
+
+- `src/app/layout.tsx` — เพิ่ม `other: { "facebook-domain-verification": "6y3aq4aeheh9zhvu1lifxznie35f62" }` สำหรับ Domain Verification ใน Meta Business Suite (Brand Safety → Domains → glanghub.com)
+- หลัง deploy: กด "ตรวจสอบยืนยันโดเมน" ใน Business Settings (อาจต้องรอ Facebook เจอแท็ก สูงสุด 72 ชม.)
+
+### ไฟล์ที่แก้ไข (2026-07-14 11:30)
+- `src/app/layout.tsx`
+
+---
+
 ## 2026-07-14 (10:00)
 
 ### ติดตั้ง Meta Pixel แบบ consent-gated (PDPA)

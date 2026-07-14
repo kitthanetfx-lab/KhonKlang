@@ -35,6 +35,8 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.glanghub.com"),
   // Meta App "Glanghub" — สำหรับ Facebook Insights / Sharing Debugger
   facebook: { appId: "1054122313862171" },
+  // ยืนยันความเป็นเจ้าของโดเมนกับ Meta Business (Brand Safety → Domains)
+  other: { "facebook-domain-verification": "6y3aq4aeheh9zhvu1lifxznie35f62" },
   title: "กลางฮับ — คิดถึงคนกลาง คิดถึง Glanghub",
   description: "แพลตฟอร์มซื้อขายปลอดภัยด้วยระบบตัวกลางที่ผ่านการรับรอง พักเงินไว้กับระบบจนกว่าจะได้รับของจริง",
   openGraph: {
