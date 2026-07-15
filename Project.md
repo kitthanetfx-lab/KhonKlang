@@ -1,5 +1,44 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-15 (18:01)
+
+### แก้บั๊กแอปมือถือเปิดเว็บไม่ได้ (intent:// ERR_UNKNOWN_URL_SCHEME) + ย้าย capacitor-app → glangApp
+
+1. **`src/lib/inApp.ts`** — `detectInApp()` มองแอปมือถือกลางฮับ (Capacitor WebView, UA มี `; wv)`) เป็น in-app browser แล้ว `tryAutoEscape()` ดีดออกด้วย `intent://` → WebView ไม่รู้จัก scheme ขึ้น "Webpage not available" → เพิ่มเช็คบรรทัดแรก: UA มี `GlanghubApp` (ตั้งจาก `appendUserAgent` ใน capacitor.config.ts) → return `''` ไม่ถือเป็น in-app browser / พฤติกรรมเดิมกับ LINE/Messenger/Telegram คงเดิมทุกอย่าง
+2. **ย้ายโปรเจกต์แอป**: `Khonklang/capacitor-app/` → `../glangApp/` (ระดับเดียวกับ Khonklang และ glangCoturn) — เป็นโปรเจกต์เกี่ยวเนื่องแยก repo ไม่ push ขึ้น GitHub ของเว็บ / ทดสอบใน Android Studio + emulator Pixel 8 แล้ว: build ผ่าน (หลังแก้ locale ไทยใน gradle.properties: เพิ่ม `-Duser.language=en -Duser.country=US` แก้ VerifyException ปี พ.ศ. เกินช่วง zip format) เหลือรอ deploy แก้ข้อ 1 แล้วแอปจะแสดงเว็บได้
+
+**หมายเหตุ**: แอปเป็นแบบ Remote URL — แก้ข้อ 1 มีผลเมื่อ Vercel deploy เสร็จ ปิด-เปิดแอปใหม่ ไม่ต้อง build แอปใหม่
+
+### ไฟล์ที่แก้ไข (2026-07-15 18:01)
+- `src/lib/inApp.ts`
+- (นอก repo) `glangApp/android/gradle.properties`
+
+---
+
+## 2026-07-15 (15:46)
+
+### สร้างโฟลเดอร์ `capacitor-app/` — วิเคราะห์ + scaffold แอปมือถือ (Capacitor, Remote URL)
+
+**ภาพรวม**: แปลงเว็บ www.glanghub.com เป็นแอป Android/iOS แบบ Remote URL (แอปเป็นเปลือก native, WebView โหลดเว็บสดจาก production — อัปเดตเว็บแล้วแอปได้ของใหม่ทันที ไม่ต้อง build ใหม่) **ไม่แตะโค้ดเว็บเดิมเลย** — ทุกอย่างอยู่ในโฟลเดอร์แยก `capacitor-app/`
+
+1. **เอกสารวิเคราะห์** (`capacitor-app/docs/`):
+   - `01-mind-map.mermaid` — mind map ภาพรวมทั้งระบบ (สถาปัตยกรรม, login, push, เสียงเรียกเข้า, store)
+   - `02-mapping-tree.md` — โครงสร้างโปรเจกต์ + mapping ฟีเจอร์เว็บเดิม → พฤติกรรมในแอป + จุดที่ต้องเพิ่มในโค้ดเว็บเฟสแจ้งเตือน
+   - `03-กระบวนการสร้าง.md` — ขั้นตอน Phase 0–6 (เตรียมเครื่องมือ → scaffold → Android → iOS → push → เสียงเรียกเข้า → ขึ้น store) พร้อม checklist ทดสอบ
+   - `04-แจ้งเตือนและเสียงเรียกเข้า.md` — สถาปัตยกรรม FCM/APNs, ตาราง device_tokens, จุด hook event ในโค้ดเดิม, full-screen intent (Android) / PushKit+CallKit (iOS)
+   - `05-ขึ้นสโตร์-ค่าใช้จ่าย-ความเสี่ยง.md` — Play Store/App Store, ค่าใช้จ่าย, ตารางความเสี่ยง (จุดใหญ่: Google OAuth ใน WebView, กฎ Apple 4.2)
+2. **Scaffold โปรเจกต์จริง**: `package.json` (Capacitor 7 + typescript), `capacitor.config.ts` (appId `com.glanghub.app`, ชื่อแอป "กลางฮับ", server.url → https://www.glanghub.com + allowNavigation ครอบ Supabase/LiveKit/LINE/Google), `www/index.html` (หน้า offline fallback), `.gitignore`
+3. **ทดสอบแล้วใน sandbox**: `npm install` (94 packages) + `npx cap add android` + `npx cap sync` ผ่านทั้งหมด → โฟลเดอร์ `android/` (Gradle project, applicationId ถูกต้อง, ชื่อแอปภาษาไทยถูกต้อง) และ `package-lock.json` ถูก commit เข้า repo
+
+**ขั้นถัดไป (ฝั่งผู้ใช้)**: ติดตั้ง Android Studio → `cd capacitor-app && npm install && npx cap open android` → Run ลง emulator/มือถือจริง → ทดสอบตาม checklist ใน docs/03 Phase 2 / iOS ต้องทำบน Mac
+
+### ไฟล์ที่สร้าง (2026-07-15 15:46)
+- `capacitor-app/` ทั้งโฟลเดอร์ (README, docs 5 ไฟล์, package.json, capacitor.config.ts, www/, android/, .gitignore)
+
+**อัปเดต (2026-07-15 16:35)**: ผู้ใช้ตัดสินใจ **แยก capacitor-app ออกจาก repo Khonklang** — ย้ายไปเป็นโฟลเดอร์พี่น้องระดับเดียวกับ Khonklang/glangCoturn ที่ `../glangApp/` (ไม่ push ขึ้น GitHub ของเว็บ) ถือเป็นโปรเจกต์เกี่ยวเนื่องเช่นเดียวกับ glangCoturn — README ของโปรเจกต์แอประบุความสัมพันธ์ไว้แล้ว / งานฝั่งเว็บที่จะรองรับแอปในอนาคต (API push, ตาราง device_tokens) ยังทำในโปรเจกต์ Khonklang ตามเดิม
+
+---
+
 ## 2026-07-14 (18:52)
 
 ### เปลี่ยนระบบโทรทั้งหมดจาก Jitsi/WebRTC เดิม → LiveKit (โฮสต์เองบน VPS)

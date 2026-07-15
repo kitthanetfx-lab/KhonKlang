@@ -7,6 +7,8 @@ export type InAppKind = '' | 'line' | 'messenger' | 'facebook' | 'instagram' | '
 export function detectInApp(): InAppKind {
   if (typeof navigator === 'undefined') return '';
   const ua = navigator.userAgent || '';
+  // แอปมือถือกลางฮับ (Capacitor — ตั้ง appendUserAgent: 'GlanghubApp' ไว้) — ไม่ใช่ in-app browser ห้ามดีดออก
+  if (/GlanghubApp/i.test(ua)) return '';
   if (/Line\//i.test(ua)) return 'line';
   if (/FB_IAB|FBAN|FBAV/i.test(ua)) return /Messenger/i.test(ua) ? 'messenger' : 'facebook';
   if (/Instagram/i.test(ua)) return 'instagram';
