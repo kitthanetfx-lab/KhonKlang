@@ -17,7 +17,7 @@ type SocialLoginPlugin = {
   initialize(opts: { google: { webClientId: string } }): Promise<void>;
   login(opts: {
     provider: 'google';
-    options?: { scopes?: string[] };
+    options?: Record<string, never>;
   }): Promise<{ provider: string; result: { idToken?: string | null } }>;
 };
 
@@ -50,7 +50,9 @@ export async function nativeGoogleIdToken(): Promise<string> {
     googleInitialized = true;
   }
 
-  const res = await plugin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+  // หมายเหตุ: ห้ามส่ง scopes — plugin จะ throw "You CANNOT use scopes without modifying the main activity"
+  // (ID token มี email/ชื่อ/รูปโปรไฟล์ครบอยู่แล้วโดยไม่ต้องขอ scopes เพิ่ม)
+  const res = await plugin.login({ provider: 'google', options: {} });
   const idToken = res?.result?.idToken;
   if (!idToken) throw new Error('no_id_token');
   return idToken;
