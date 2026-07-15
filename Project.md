@@ -1,5 +1,30 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-15 (21:21)
+
+### แอปมือถือ (glangApp — นอก repo): แก้ปุ่มบน-ล่างโดนแถบระบบทับ (edge-to-edge)
+
+- `capacitor.config.ts` → android: เพิ่ม `adjustMarginsForEdgeToEdge: 'force'` — Android 15+ บังคับวาดเต็มจอใต้ status bar/แถบ gesture ทำให้แถบเมนูบนสุดกดไม่ได้และปุ่มล่างโดนทับ → เว้นระยะ WebView ให้พอดีระหว่างแถบระบบ / ต้องรัน `npx cap sync android` + build ใหม่ (sandbox sync ไม่ได้ติด EPERM — ผู้ใช้รันเอง)
+
+---
+
+## 2026-07-15 (20:37)
+
+### แอปมือถือ (glangApp — นอก repo): วิดีโอ intro ตอนเปิดแอป + แก้ native Google login
+
+1. **วิดีโอ intro เต็มจอตอนเปิดแอป** — `MainActivity.java`: เล่น `res/raw/openapp.mp4` (720×1280, 10 วิ, มีเสียง) ทับหน้าจอทุกครั้งที่ cold start, แตะจอเพื่อข้ามได้, เล่นจบ/error → เผยหน้าเว็บ (WebView โหลดเบื้องหลังระหว่างเล่น) / ไฟล์วิดีโอผู้ใช้ต้องย้ายเข้า `android/app/src/main/res/raw/` เอง (sandbox เขียนไม่ได้)
+2. **แก้ build fail หลังติดตั้ง plugin social login** — `android/build.gradle`: force `androidx.browser:1.8.0` (plugin ดึง 1.9.0 ที่ต้องใช้ SDK 36/AGP 8.9.1 — เราใช้ SDK 35/AGP 8.7.2, ไลบรารีนี้ใช้เฉพาะ FB/Apple login ที่เราไม่ใช้)
+3. **แก้ native Google login error** — (ฝั่งเว็บ `src/lib/nativeAuth.ts` commit ก่อนหน้า) ตัด `scopes` ออกจาก `SocialLogin.login()` — plugin throw "You CANNOT use scopes without modifying the main activity" / debug ผ่าน chrome://inspect ยืนยัน initialize + plugin + env NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID ทำงานครบ
+4. **ฝั่ง Google Cloud (ผู้ใช้ทำแล้ว)**: สร้าง OAuth Client แบบ Android (package com.glanghub.app + SHA-1 debug keystore) ในโปรเจกต์เดิม
+
+### ไฟล์ที่แก้ไข (2026-07-15 20:37)
+- (นอก repo) `glangApp/android/app/src/main/java/com/glanghub/app/MainActivity.java`
+- (นอก repo) `glangApp/android/build.gradle`
+- (นอก repo) `glangApp/android/app/src/main/res/raw/openapp.mp4` (รอผู้ใช้ย้ายไฟล์)
+- `src/lib/nativeAuth.ts` (commit แยกก่อนหน้า)
+
+---
+
 ## 2026-07-15 (18:59)
 
 ### Native Google Sign-In ในแอปมือถือ — แก้ Error 403: disallowed_useragent
