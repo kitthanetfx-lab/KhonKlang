@@ -1,5 +1,25 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-15 (18:59)
+
+### Native Google Sign-In ในแอปมือถือ — แก้ Error 403: disallowed_useragent
+
+**ปัญหา**: Google ห้าม OAuth ผ่าน WebView ทุกแอป → กดปุ่ม Google ในแอปแล้วเจอ "Access blocked" / ผู้ใช้ต้องการให้ login จบในแอปไม่เด้งออกเบราว์เซอร์ → ใช้ Native Google Sign-In (ตัวเลือกบัญชีแบบ native ของเครื่อง) แล้ว login Supabase ด้วย `signInWithIdToken()`
+
+1. **`src/lib/nativeAuth.ts`** (ใหม่) — `isGlanghubApp()` (เช็ค UA GlanghubApp), `nativeGoogleIdToken()` (เรียก plugin ผ่าน bridge `window.Capacitor.Plugins.SocialLogin` — เว็บไม่ต้องติดตั้ง npm ของ plugin), `isUserCancelled()` / ใช้ env ใหม่ `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`
+2. **`src/app/login/page.tsx`** — `handleLogin('google')`: ถ้ารันในแอป → native sign-in → `signInWithIdToken` → ไป `/auth/oauth/complete?returnTo=...` (ใช้ flow เช็คโปรไฟล์เดิม) / ผู้ใช้กดยกเลิกไม่แสดง error / นอกแอปพฤติกรรมเดิมทุกอย่าง
+3. **ฝั่งแอป (glangApp — นอก repo)**: เพิ่ม `@capgo/capacitor-social-login@^7.20.0` ใน package.json (npm install แล้ว, `npx cap sync android` ต้องรันบนเครื่องผู้ใช้)
+4. **ตรวจแล้ว**: tsc ไม่มี error ใหม่ในไฟล์ที่แก้ (error .webp เป็นของเดิมจาก raw tsc)
+
+**งานฝั่งผู้ใช้ (ยังไม่เสร็จ — ทำตามขั้นตอนที่ Claude สรุปให้)**: (1) Google Cloud Console สร้าง OAuth Client แบบ Android (package `com.glanghub.app` + SHA-1 debug) (2) Supabase → Auth → Google → เพิ่ม Web Client ID ใน Authorized Client IDs (ถ้ายังไม่มี) (3) Vercel เพิ่ม env `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + redeploy (4) `npx cap sync android` ใน glangApp แล้ว Run ใหม่
+
+### ไฟล์ที่แก้ไข (2026-07-15 18:59)
+- `src/lib/nativeAuth.ts` (ใหม่)
+- `src/app/login/page.tsx`
+- (นอก repo) `glangApp/package.json`
+
+---
+
 ## 2026-07-15 (18:01)
 
 ### แก้บั๊กแอปมือถือเปิดเว็บไม่ได้ (intent:// ERR_UNKNOWN_URL_SCHEME) + ย้าย capacitor-app → glangApp
