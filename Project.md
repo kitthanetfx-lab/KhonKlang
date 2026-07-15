@@ -1,5 +1,17 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-15 (21:57)
+
+### ย้ายแถบเมนูบริการมือถือจากขอบบน → bottom tab bar ขอบล่าง (ทุกจอมือถือ ทั้งเว็บ+แอป)
+
+- **`src/app/globals.css`** — `.mobile-service-tabs`: `top:0` → `bottom:0`, border/เงา พลิกด้าน, เพิ่ม `padding-bottom: env(safe-area-inset-bottom)` / media query มือถือ: ลบ `.nav { top:56px }` + spacer + logo transform (nav กลับไปชิดบนปกติ), เพิ่ม `body padding-bottom` กันเนื้อหาโดนแถบบัง, ยก `.home-fab` `.sw-wrap` `.cc-banner` ขึ้นเหนือแถบ / `.mst-item` active indicator: border-bottom → border-top
+- markup ใน `Site.tsx` ไม่ต้องแก้ (`.mobile-tab-spacer` เหลือ display:none)
+
+### ไฟล์ที่แก้ไข (2026-07-15 21:57)
+- `src/app/globals.css`
+
+---
+
 ## 2026-07-15 (21:21)
 
 ### แอปมือถือ (glangApp — นอก repo): แก้ปุ่มบน-ล่างโดนแถบระบบทับ (edge-to-edge)
