@@ -10,6 +10,9 @@
 -- ตรรกะข้างในเหมือนเดิมทุกประการ — แค่ create or replace ทับของเดิม
 -- ============================================================================
 
+-- create or replace เปลี่ยนชื่อพารามิเตอร์ตรงๆ ไม่ได้ (Postgres error 42P13) ต้อง drop ก่อนเสมอ
+drop function if exists delete_account_history(uuid);
+
 create or replace function delete_account_history(p_user_id uuid) returns void as $$
 begin
   delete from support_threads where customer_id = p_user_id;     -- cascades: support_messages, call_signals

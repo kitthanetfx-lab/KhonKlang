@@ -222,7 +222,10 @@ export function Nav({ active }: { active?: string }) {
                 onMouseLeave={closeProfileDelayed}
               >
                 <button type="button" className="btn btn-ghost btn-sm profile-trigger" aria-haspopup="true" aria-expanded={profileOpen} onClick={() => setProfileOpen(v => !v)}>
-                  <Icon name="user" size={16} /> {shortName} <Icon name="chevronDown" size={16} />
+                  {user.prefs?.avatarUrl
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={user.prefs.avatarUrl} alt="" referrerPolicy="no-referrer" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                    : <Icon name="user" size={16} />} {shortName} <Icon name="chevronDown" size={16} />
                 </button>
                 <div className="dropdown-menu dropdown-menu-right">
                   {profileItems.map(it => <DropItem key={it.href} it={it} />)}

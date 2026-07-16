@@ -1,5 +1,18 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-16 (17:15)
+
+### แก้บั๊ก delete_account_history 42P13 + รูปโปรไฟล์ไม่ขึ้นที่หน้าแรก
+
+1. **Postgres error 42P13** (`cannot change name of input parameter`) — `create or replace function` เปลี่ยนชื่อพารามิเตอร์ตรงๆ ไม่ได้ ต้อง `drop function` ก่อน → เพิ่ม `drop function if exists delete_account_history(uuid);` นำหน้าใน `supabase/migrations/0015_fix_delete_account_history.sql`
+2. **รูปโปรไฟล์ไม่ขึ้นที่ header หน้าแรก** — `src/components/Site.tsx` ปุ่มโปรไฟล์ใน `Nav` (ใช้เฉพาะหน้า `/`) ใช้ไอคอนคนทั่วไปตายตัวเสมอ ไม่เคยเช็ค `user.prefs.avatarUrl` เลย ต่างจาก `HeaderAccountActions.tsx` (หน้าอื่นๆ) ที่โชว์รูปจริงถ้ามี — แก้ให้ตรวจ `avatarUrl` เหมือนกันแล้ว
+
+### ไฟล์ที่แก้ไข (2026-07-16 17:15)
+- `supabase/migrations/0015_fix_delete_account_history.sql`
+- `src/components/Site.tsx`
+
+---
+
 ## 2026-07-16 (14:56)
 
 ### แก้บั๊กลบบัญชีจริง: "column reference target_id is ambiguous"
