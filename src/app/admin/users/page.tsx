@@ -79,6 +79,20 @@ function ActionMenu({ user, onRefresh }: { user: AppUser; onRefresh: () => void 
   const toggleBlock = () =>
     call({ userId: user.id, action: user.active ? 'block' : 'unblock' });
 
+  const deleteAccount = () => {
+    const name = user.display_name || user.first_name || user.email || 'บัญชีนี้';
+    const ok = window.confirm(
+      `ลบบัญชี "${name}" ถาวร?\n\n` +
+      `• ข้อมูลส่วนตัว (ชื่อ เบอร์ ที่อยู่ บัญชีธนาคาร), ประกาศหาสินค้า, ข้อความส่วนตัว, ` +
+      `ใบสมัครผู้ขาย/คนกลาง, การแจ้งเตือน และประวัติแชทซัพพอร์ต จะถูกลบทั้งหมด\n` +
+      `• ดีล, งานนัดออนไซต์, ประวัติการเงิน และรีวิวที่เคยได้รับ จะยังอยู่ครบ (แสดงชื่อ ณ ขณะนั้น)\n` +
+      `• อีเมล/LINE/Google นี้จะสมัครสมาชิกใหม่ได้อีกในฐานะบัญชีใหม่\n\n` +
+      `การลบนี้ย้อนกลับไม่ได้ ยืนยันหรือไม่?`
+    );
+    if (!ok) return;
+    call({ userId: user.id, action: 'delete_account' });
+  };
+
   const currentRole = user.role || 'user';
 
   return (
@@ -119,6 +133,17 @@ function ActionMenu({ user, onRefresh }: { user: AppUser; onRefresh: () => void 
                     ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
                     : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'}`}>
                 {user.active ? '🚫 ระงับบัญชี' : '✅ ยกเลิกการระงับ'}
+              </button>
+            </div>
+            <div className="border-t border-gray-100 dark:border-gray-700">
+              <button onClick={deleteAccount}
+                disabled={currentRole === 'admin'}
+                title={currentRole === 'admin' ? 'เปลี่ยน role ออกจาก Admin ก่อนถึงจะลบได้' : undefined}
+                className={`w-full text-left px-4 py-2.5 text-sm transition-colors
+                  ${currentRole === 'admin'
+                    ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                    : 'text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium'}`}>
+                🗑️ ลบบัญชีนี้
               </button>
             </div>
           </div>

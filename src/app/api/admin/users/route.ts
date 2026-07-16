@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    await verifyAdmin(req);
+    const adminId = await verifyAdmin(req);
     const db = getAdminClient();
     const { userId, action, role } = await req.json();
     if (!userId || !action) return NextResponse.json({ error: 'missing params' }, { status: 400 });
@@ -40,6 +40,25 @@ export async function PATCH(req: NextRequest) {
     } else if (action === 'unblock') {
       const { error } = await db.auth.admin.updateUserById(userId, { ban_duration: 'none' });
       if (error) throw new Error(error.message);
+    } else if (action === 'delete_account') {
+      if (userId === adminId) {
+        return NextResponse.json({ error: 'ลบบัญชีของตัวเองไม่ได้' }, { status: 400 });
+      }
+      const { data: target, error: fetchErr } = await db.from('profiles').select('role').eq('id', userId).maybeSingle();
+      if (fetchErr) throw new Error(fetchErr.message);
+      if (!target) return NextResponse.json({ error: 'ไม่พบบัญชีนี้' }, { status: 404 });
+      if (target.role === 'admin') {
+        return NextResponse.json({ error: 'เปลี่ยน role ออกจาก Admin ก่อน ถึงจะลบบัญชีนี้ได้' }, { status: 400 });
+      }
+
+      // ลบ "ประวัติที่ไม่ใช่การเงิน/ดีล" ก่อน (transaction เดียวฝั่ง DB — ดู migration 0014_account_deletion.sql)
+      const { error: historyErr } = await db.rpc('delete_account_history', { target_id: userId });
+      if (historyErr) throw new Error(historyErr.message);
+
+      // ลบบัญชีล็อกอินจริง — cascade ลบ profiles ตามไปด้วย ส่วนดีล/การเงิน/onsite/กระเป๋าเงินคนกลาง
+      // ยังอยู่ครบ (คอลัมน์อ้างอิงกลายเป็น NULL อัตโนมัติ ตามที่ตั้งไว้ใน migration 0014)
+      const { error: deleteErr } = await db.auth.admin.deleteUser(userId);
+      if (deleteErr) throw new Error(deleteErr.message);
     } else {
       return NextResponse.json({ error: 'unknown action' }, { status: 400 });
     }

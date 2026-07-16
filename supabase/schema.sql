@@ -150,11 +150,13 @@ create table deals (
                                                       -- from the old dealCode(appwriteId) during data migration,
                                                       -- not regenerated, or every existing deal's visible code changes.
 
-  seller_id                 uuid references profiles(id),
+  -- on delete set null: ลบบัญชีผู้ใช้แล้วดีลยังอยู่ครบ (ดู migration 0014_account_deletion.sql)
+  -- ชื่อ ณ ขณะทำดีล (seller_name/middleman_name/buyer_name) เป็น text แยก ไม่หายไปด้วย
+  seller_id                 uuid references profiles(id) on delete set null,
   seller_name                text,
-  middleman_id              uuid references profiles(id),
+  middleman_id              uuid references profiles(id) on delete set null,
   middleman_name             text,
-  buyer_id                  uuid references profiles(id),
+  buyer_id                  uuid references profiles(id) on delete set null,
   buyer_name                 text,
 
   title                     text not null,
@@ -277,7 +279,7 @@ create table deal_evidence (
   file_id         text,
   file_name       text,
   content         text,
-  uploaded_by     uuid references profiles(id),
+  uploaded_by     uuid references profiles(id) on delete set null,
   uploader_name   text,
   created_at      timestamptz not null default now()
 );
@@ -289,7 +291,7 @@ create index idx_deal_evidence_deal on deal_evidence(deal_id, created_at);
 create table messages (
   id          uuid primary key default gen_random_uuid(),
   deal_id     uuid not null references deals(id) on delete cascade,
-  sender_id   uuid references profiles(id),     -- null for system messages
+  sender_id   uuid references profiles(id) on delete set null,     -- null for system messages, หรือหลังลบบัญชีผู้ส่ง
   sender_name text,
   role        message_role not null default 'user',
   type        message_type not null default 'text',
@@ -326,7 +328,7 @@ create table finance_ledger (
   deal_number         text,
   owner_type          ledger_owner_type not null,   -- NOTE: always set this. Appwrite version declared but
                                                       -- never wrote this field — fix carried into this schema.
-  owner_id            uuid references profiles(id), -- null when owner_type in ('platform','system')
+  owner_id            uuid references profiles(id) on delete set null, -- null when owner_type in ('platform','system') หรือหลังลบบัญชีเจ้าของ
   owner_name          text,
   entry_type          ledger_entry_type not null,
   direction           ledger_direction not null,
@@ -352,7 +354,8 @@ create trigger trg_finance_ledger_updated_at before update on finance_ledger
   for each row execute function set_updated_at();
 
 create table middleman_wallets (
-  middleman_id        uuid primary key references profiles(id),
+  -- ไม่ใส่ FK ไป profiles(id) โดยตั้งใจ — เป็นแถวการเงิน ต้องอยู่ถาวรแม้บัญชีถูกลบ (ดู migration 0014)
+  middleman_id        uuid primary key,
   middleman_name      text,
   tier                middleman_tier not null default 'Bronze',
   credit_limit        integer not null default 0,
@@ -422,7 +425,7 @@ create index idx_mm_apps_status on middleman_applications(status);
 -- ============================================================================
 create table onsite_jobs (
   id                  uuid primary key default gen_random_uuid(),
-  buyer_id            uuid not null references profiles(id),
+  buyer_id            uuid references profiles(id) on delete set null,   -- ดีลออนไซต์ต้องอยู่ครบแม้ลบบัญชีผู้ซื้อ (ดู migration 0014)
   buyer_name          text,
   item_description    text not null,
   item_price          integer not null default 0,   -- fixed: was numeric-as-string in Appwrite
@@ -431,7 +434,7 @@ create table onsite_jobs (
   seller_contact      text,
   max_budget          integer not null default 0,
   status              onsite_status not null default 'open',
-  middleman_id        uuid references profiles(id),
+  middleman_id        uuid references profiles(id) on delete set null,
   middleman_name      text,
   middleman_tier      middleman_tier,
   middleman_deposit   integer not null default 0,
@@ -589,7 +592,7 @@ create index idx_notifications_user on notifications(user_id, created_at desc);
 -- ============================================================================
 create table scam_reports (
   id                uuid primary key default gen_random_uuid(),
-  reporter_id       uuid references profiles(id),
+  reporter_id       uuid references profiles(id) on delete set null,  -- เก็บรายงานไว้เพื่อความปลอดภัยผู้อื่น แม้ผู้รายงานลบบัญชี
   first_name        text not null,
   last_name         text,
   id_card           text,
@@ -624,7 +627,7 @@ create table reviews (
   reviewer_id     uuid not null references profiles(id),
   reviewer_name   text,
   reviewer_role   review_role not null,
-  target_id       uuid references profiles(id),
+  target_id       uuid references profiles(id) on delete set null,  -- รีวิวที่ผู้ถูกลบบัญชีเป็นฝ่ายได้รับยังอยู่ (หลักฐานดีล)
   target_role     review_role not null,
   rating          smallint not null check (rating between 1 and 5),
   tags            text[] not null default '{}' check (array_length(tags, 1) is null or array_length(tags, 1) <= 6),
@@ -657,6 +660,26 @@ create trigger trg_reviews_stats_upd after update on reviews
   for each row execute function recompute_review_stats();
 create trigger trg_reviews_stats_del after delete on reviews
   for each row execute function recompute_review_stats();
+
+-- ============================================================================
+-- 13a. ลบบัญชีผู้ใช้ (แอดมิน) — ดู migration 0014_account_deletion.sql สำหรับ
+-- คำอธิบายเต็ม: ลบ "ประวัติที่ไม่ใช่การเงิน/ดีล" แบบ transaction เดียว ก่อนที่
+-- ฝั่ง API จะเรียก auth.admin.deleteUser() ต่อ (ลบ auth.users → cascade ลบ
+-- profiles → deals/finance_ledger/onsite_jobs/messages/deal_evidence/
+-- reviews.target_id/scam_reports.reporter_id กลายเป็น NULL อัตโนมัติ ตัวแถว
+-- ไม่หาย เพราะทุกคอลัมน์ข้างบนตั้งเป็น ON DELETE SET NULL แล้ว)
+-- ============================================================================
+create or replace function delete_account_history(target_id uuid) returns void as $$
+begin
+  delete from support_threads where customer_id = target_id;     -- cascades: support_messages, call_signals
+  delete from notifications   where user_id = target_id;
+  delete from dm_messages     where from_id = target_id or to_id = target_id;
+  delete from wanted_posts    where user_id = target_id;
+  delete from seller_applications    where user_id = target_id;
+  delete from middleman_applications where user_id = target_id;
+  delete from reviews         where reviewer_id = target_id;      -- รีวิวที่เขาเป็นคนเขียนเอง (target ฝั่งถูกรีวิวเก็บไว้)
+end;
+$$ language plpgsql security definer;
 
 -- ============================================================================
 -- 14. ROW LEVEL SECURITY

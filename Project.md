@@ -1,5 +1,31 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-16 (12:56)
+
+### เพิ่ม "ลบบัญชีนี้" ในเมนู Role หน้าแอดมินผู้ใช้ — เก็บดีล/การเงินไว้ ลบประวัติอื่นทั้งหมด
+
+**โจทย์**: ลบบัญชีผู้ใช้ถาวร (สมัครใหม่ด้วยอีเมล/LINE/Google เดิมได้ในฐานะคนใหม่) แต่ดีลกับประวัติการเงินต้องอยู่ครบ
+
+**ปัญหาทางเทคนิคที่เจอ**: `profiles.id` อ้างอิง `auth.users(id) on delete cascade` อยู่แล้ว (ลบ auth user → profiles หายตาม) แต่ตาราง deals/finance_ledger/onsite_jobs/messages/reviews/scam_reports ที่อ้างถึง profiles(id) เดิมไม่มี ON DELETE ระบุ (default บล็อกการลบทันทีถ้ายังมีดีล/ธุรกรรมอ้างอิงอยู่) และ `middleman_wallets.middleman_id` เป็น primary key เอง (set null ไม่ได้เลย)
+
+**แก้ไข**:
+1. **`supabase/migrations/0014_account_deletion.sql`** (ใหม่ — ต้องรันใน Supabase SQL Editor) — เปลี่ยน FK ที่ต้อง "เก็บข้อมูลไว้" เป็น `ON DELETE SET NULL` (deals.seller_id/buyer_id/middleman_id, finance_ledger.owner_id, onsite_jobs.buyer_id+middleman_id, messages.sender_id, deal_evidence.uploaded_by, reviews.target_id, scam_reports.reporter_id — ชื่อ ณ ขณะนั้นยังโชว์ได้เพราะมีคอลัมน์ text แยกต่างหากอยู่แล้วทุกตาราง) / ถอด FK ออกจาก `middleman_wallets.middleman_id` ทั้งหมด (แถวการเงินอยู่ถาวรไม่ผูกกับ profiles) / เพิ่มฟังก์ชัน `delete_account_history(target_id)` — ลบ support_threads(+ลูก), notifications, dm_messages, wanted_posts, seller/middleman_applications, reviews ที่เขาเขียนเอง แบบ transaction เดียว
+2. **`supabase/schema.sql`** — อัปเดตให้ตรงกับ migration (ติดตั้งใหม่ได้ผลเดียวกัน)
+3. **`src/app/api/admin/users/route.ts`** — action ใหม่ `delete_account`: กันลบบัญชีตัวเอง, กันลบบัญชี role=admin (ต้องถอด role ก่อน), เรียก RPC `delete_account_history` แล้วค่อย `auth.admin.deleteUser()` (cascade ลบ profiles + auth identities → สมัครใหม่ได้จริง)
+4. **`src/app/admin/users/page.tsx`** — เมนู role เพิ่มปุ่ม "🗑️ ลบบัญชีนี้" (แดง, ปิดใช้งานถ้า role เป็น admin) พร้อม `confirm()` อธิบายผลกระทบก่อนลบจริง
+
+**ตรวจแล้ว**: tsc ไม่มี error ใหม่ในไฟล์ที่แก้ (10 บรรทัด error เดิมเรื่อง .webp เท่าเดิม)
+
+**งานฝั่งผู้ใช้ (สำคัญ ต้องทำก่อนใช้ฟีเจอร์นี้ได้)**: รัน `supabase/migrations/0014_account_deletion.sql` ใน Supabase SQL Editor
+
+### ไฟล์ที่แก้ไข (2026-07-16 12:56)
+- `supabase/migrations/0014_account_deletion.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/app/api/admin/users/route.ts`
+- `src/app/admin/users/page.tsx`
+
+---
+
 ## 2026-07-16 (10:45)
 
 ### เปลี่ยนลำดับกรอกโปรไฟล์: จาก "บังคับทันทีหลังล็อกอิน" → "บังคับเมื่อเข้าหน้าบริการ"
