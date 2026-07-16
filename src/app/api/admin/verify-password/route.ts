@@ -14,13 +14,14 @@ export async function POST(req: NextRequest) {
   try {
     await verifyAdmin(req);
     const { password } = await req.json();
-    const expected = process.env.ADMIN_PANEL_PASSWORD;
+    // trim ทั้งสองฝั่ง — กันเคสวางค่าใน Vercel แล้วมีช่องว่าง/ขึ้นบรรทัดใหม่ติดท้ายมาโดยไม่รู้ตัว
+    const expected = (process.env.ADMIN_PANEL_PASSWORD || '').trim();
 
     if (!expected) {
       // ยังไม่ได้ตั้งค่า env — ไม่บล็อกแอดมินออกจากระบบตัวเอง แต่แจ้งเตือนชัดเจน
       return NextResponse.json({ error: 'ยังไม่ได้ตั้งค่า ADMIN_PANEL_PASSWORD บนเซิร์ฟเวอร์' }, { status: 500 });
     }
-    if (typeof password !== 'string' || password !== expected) {
+    if (typeof password !== 'string' || password.trim() !== expected) {
       return NextResponse.json({ error: 'รหัสผ่านไม่ถูกต้อง' }, { status: 401 });
     }
     return NextResponse.json({ ok: true });
