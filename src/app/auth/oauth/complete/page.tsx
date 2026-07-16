@@ -3,7 +3,6 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { isProfileComplete, REQUIRED_PROFILE_FIELDS } from '@/lib/profileComplete';
 
 /**
  * หน้ารับ callback จาก Google/Facebook OAuth.
@@ -27,19 +26,9 @@ function OAuthCompleteInner() {
 
         setStatus('เข้าสู่ระบบสำเร็จ...');
         const safeReturn = returnTo.startsWith('/') ? returnTo : '/register';
-        // สมาชิกที่ยังกรอกข้อมูลบังคับไม่ครบ (ชื่อ-นามสกุล, เบอร์โทร, บัญชีธนาคาร)
-        // → พาไปกรอกโปรไฟล์ก่อนเสมอ กรอกเสร็จระบบพากลับหน้าเดิมอัตโนมัติ
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select(REQUIRED_PROFILE_FIELDS.join(','))
-            .eq('id', data.session.user.id)
-            .maybeSingle();
-          if (!isProfileComplete(profile as Record<string, unknown> | null)) {
-            router.replace(`/profile?returnTo=${encodeURIComponent(safeReturn)}`);
-            return;
-          }
-        } catch { /* เช็คไม่ได้ → ไปหน้าเดิมตามปกติ (AuthGate จะดักซ้ำอีกชั้น) */ }
+        // ไม่บังคับกรอกโปรไฟล์ทันทีหลังล็อกอิน — พาไปหน้าที่ตั้งใจจะไปเลย
+        // AuthGate จะเป็นคนเด้งไป /profile เองเฉพาะตอนเข้า "หน้าบริการ" ที่ต้องใช้ข้อมูลโปรไฟล์
+        // (ซื้อขาย, นัดรับ, ตลาด/หาสินค้า, สมัครผู้ขาย/คนกลาง ฯลฯ — ดู PROFILE_REQUIRED_PATHS ใน AuthGate.tsx)
         router.replace(safeReturn);
       } catch (err: unknown) {
         console.error('OAuth complete error:', err);
