@@ -1,5 +1,29 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-16 (14:56)
+
+### แก้บั๊กลบบัญชีจริง: "column reference target_id is ambiguous"
+
+**สาเหตุ**: ฟังก์ชัน `delete_account_history(target_id uuid)` ใน migration 0014 ตั้งชื่อพารามิเตอร์ว่า `target_id` ซึ่งชนกับคอลัมน์ `reviews.target_id` (ตาราง reviews มีทั้ง reviewer_id และ target_id) → Postgres แยกไม่ออกตอนรัน `delete from reviews where reviewer_id = target_id` ว่า `target_id` หมายถึงคอลัมน์หรือพารามิเตอร์ → error ทุกครั้งที่กดลบบัญชี (ยืนยันจาก response จริงที่ผู้ใช้แคปมา)
+
+**แก้ไข**:
+1. **`supabase/migrations/0015_fix_delete_account_history.sql`** (ใหม่ — ต้องรันใน Supabase SQL Editor) — `create or replace function` ทับของเดิม เปลี่ยนชื่อพารามิเตอร์เป็น `p_user_id` (ไม่ชนคอลัมน์ไหน) ตรรกะเดิมทุกอย่าง
+2. **`supabase/schema.sql`** — อัปเดตให้ตรงกับฟังก์ชันที่แก้แล้ว
+3. **`src/app/api/admin/users/route.ts`** — เปลี่ยนชื่อ key ที่ส่งให้ RPC จาก `target_id` → `p_user_id` ให้ตรงกับพารามิเตอร์ใหม่
+
+**หมายเหตุอื่น**: error 500 ของหน้ารายชื่อผู้ใช้ (GET) ที่เจอก่อนหน้านี้หายเองแล้วหลัง Vercel redeploy — ไม่ใช่ปัญหาโควตา Supabase อย่างที่สงสัยไว้
+
+**ตรวจแล้ว**: tsc ไม่มี error ใหม่
+
+**งานฝั่งผู้ใช้ (ต้องทำก่อนกดลบบัญชีได้จริง)**: รัน `supabase/migrations/0015_fix_delete_account_history.sql` ใน Supabase SQL Editor
+
+### ไฟล์ที่แก้ไข (2026-07-16 14:56)
+- `supabase/migrations/0015_fix_delete_account_history.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/app/api/admin/users/route.ts`
+
+---
+
 ## 2026-07-16 (14:15)
 
 ### แก้รหัสผ่านแอดมินขึ้น "ไม่ถูกต้อง" ทั้งที่พิมพ์ถูก — เหตุช่องว่างติดท้ายจาก Vercel

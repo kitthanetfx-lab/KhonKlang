@@ -51,8 +51,8 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'เปลี่ยน role ออกจาก Admin ก่อน ถึงจะลบบัญชีนี้ได้' }, { status: 400 });
       }
 
-      // ลบ "ประวัติที่ไม่ใช่การเงิน/ดีล" ก่อน (transaction เดียวฝั่ง DB — ดู migration 0014_account_deletion.sql)
-      const { error: historyErr } = await db.rpc('delete_account_history', { target_id: userId });
+      // ลบ "ประวัติที่ไม่ใช่การเงิน/ดีล" ก่อน (transaction เดียวฝั่ง DB — ดู migration 0014/0015_*.sql)
+      const { error: historyErr } = await db.rpc('delete_account_history', { p_user_id: userId });
       if (historyErr) throw new Error(historyErr.message);
 
       // ลบบัญชีล็อกอินจริง — cascade ลบ profiles ตามไปด้วย ส่วนดีล/การเงิน/onsite/กระเป๋าเงินคนกลาง
