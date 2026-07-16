@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { supabase, authHeaders } from '@/lib/supabase';
 import { useAppPreferences } from '@/components/AppPreferences';
 import {
   LayoutDashboard, Store, Shield, Users, Settings, SlidersHorizontal,
@@ -53,6 +53,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [checking, setChecking]   = useState(() => pathname !== '/admin/setup');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // ชั้นความปลอดภัยที่ 2 — ต้องกรอกรหัสผ่านหน้าแอดมินทุกครั้งที่เข้ามาใหม่ (ไม่เก็บสถานะไว้ที่ไหน
+  // รีเฟรชหรือกลับเข้ามาใหม่ต้องกรอกอีก) นอกเหนือจากล็อกอิน + role admin ตามปกติ
+  const [pwVerified, setPwVerified] = useState(false);
+  const [pwInput, setPwInput]       = useState('');
+  const [pwChecking, setPwChecking] = useState(false);
+  const [pwError, setPwError]       = useState('');
+
+  async function submitAdminPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwChecking(true); setPwError('');
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/admin/verify-password', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwInput }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setPwError(d.error || 'รหัสผ่านไม่ถูกต้อง'); return; }
+      setPwVerified(true);
+    } catch {
+      setPwError('เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setPwChecking(false);
+    }
+  }
+
   useEffect(() => {
     if (pathname === '/admin/setup') return;
     (async () => {
@@ -73,6 +100,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <p className="text-gray-500 animate-pulse text-base font-medium">{locale === 'th' ? 'กำลังตรวจสอบสิทธิ์...' : 'Checking access...'}</p>
+      </div>
+    );
+  }
+
+  if (pathname !== '/admin/setup' && !pwVerified) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
+        <form onSubmit={submitAdminPassword}
+          className="w-full max-w-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-4 shadow-lg">
+          <div className="text-center space-y-1">
+            <div className="text-3xl">🔒</div>
+            <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+              {locale === 'th' ? 'ยืนยันรหัสผ่านแอดมิน' : 'Admin password required'}
+            </h1>
+            <p className="text-sm text-gray-500">
+              {locale === 'th' ? 'กรอกรหัสผ่านชั้นที่ 2 เพื่อเข้าหน้าแอดมิน' : 'Enter the second-factor password to continue'}
+            </p>
+          </div>
+          <input
+            type="password"
+            autoFocus
+            value={pwInput}
+            onChange={e => setPwInput(e.target.value)}
+            placeholder={locale === 'th' ? 'รหัสผ่านแอดมิน' : 'Admin password'}
+            className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-950"
+          />
+          {pwError && <p className="text-sm text-red-500 text-center">{pwError}</p>}
+          <button type="submit" disabled={pwChecking || !pwInput}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            {pwChecking ? (locale === 'th' ? 'กำลังตรวจสอบ...' : 'Checking...') : (locale === 'th' ? 'เข้าสู่ระบบแอดมิน' : 'Continue')}
+          </button>
+        </form>
       </div>
     );
   }
