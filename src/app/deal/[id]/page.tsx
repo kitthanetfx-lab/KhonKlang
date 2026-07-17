@@ -1,6 +1,6 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, type RefObject } from 'react';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -37,6 +37,8 @@ const SIMPLE_DEAL_STEP1_SLIDES = [
   '/Eazy/St1.webp',
   '/Eazy/St2.webp',
 ];
+
+interface Msg { id: string; sender_id: string; sender_name: string; role: string; type: string; content: string; file_id: string; file_name: string; created_at: string; }
 
 // ─── บันทึกวิดีโอคอล (อัดหน้าจอ+เสียงแท็บ แล้วเซฟลงเครื่องเป็น .webm) ───────
 function CallRecorder({ dealId, onSaveEvidence }: { dealId: string; onSaveEvidence?: (blob: Blob) => Promise<void> }) {
@@ -128,6 +130,64 @@ function CallRecorder({ dealId, onSaveEvidence }: { dealId: string; onSaveEviden
   );
 }
 
+// ─── กล่องแชทลอย (เรียกจากปุ่ม 💬 ในแถบปุ่มลอยด้านล่าง) — ใช้ได้ทั้งตอนคอลและตอนปกติ ───
+interface FloatingChatBoxProps {
+  msgs: Msg[];
+  myId: string;
+  chatInput: string;
+  setChatInput: (v: string) => void;
+  sending: boolean;
+  acting: boolean;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  onSend: () => void;
+  onUpload: (files: File[]) => Promise<void>;
+  onClose: () => void;
+  onPin: (m: Msg) => Promise<void>;
+  onAutoScroll: () => void;
+  title: string;
+  closedHint?: string;
+}
+function FloatingChatBox({ msgs, myId, chatInput, setChatInput, sending, acting, fileInputRef, onSend, onUpload, onClose, onPin, onAutoScroll, title, closedHint }: FloatingChatBoxProps) {
+  const list = msgs.filter(m => m.role !== 'system');
+  useEffect(() => { onAutoScroll(); }, [msgs, onAutoScroll]);
+  return (
+    <div style={{ position: 'fixed', right: 16, bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))', width: 320, maxWidth: '90vw', height: 'min(55vh, 460px)', background: 'var(--surface)', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,.4)', display: 'flex', flexDirection: 'column', zIndex: 134, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--accent)', color: '#fff' }}>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>{title} ({list.length})</span>
+        <button onClick={onClose} title="ปิด" style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>✕</button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {list.length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12, marginTop: 12 }}>ยังไม่มีข้อความ</p>}
+        {list.map(m => {
+          const isMe = m.sender_id === myId;
+          return (
+            <div key={m.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
+              {!isMe && <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2 }}>{m.sender_name}</div>}
+              <div style={{ background: isMe ? 'var(--accent)' : 'var(--surface-2)', color: isMe ? '#fff' : 'var(--ink)', padding: '6px 10px', borderRadius: 10, fontSize: 13, wordBreak: 'break-word' }}>
+                {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 160, borderRadius: 8 }} /></a>
+                  : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.file_name}</a>
+                  : m.content}
+              </div>
+              {(m.content || m.file_id) && (
+                <button onClick={() => onPin(m)} disabled={acting} style={{ fontSize: 10, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2 }}>📌 เก็บเป็นหลักฐาน</button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {closedHint && (
+        <div style={{ padding: '6px 10px', background: '#fff8ef', borderTop: '1px solid #ffe0b2', fontSize: 11, color: '#8a5a00', textAlign: 'center' }}>{closedHint}</div>
+      )}
+      <div style={{ display: 'flex', gap: 6, padding: 8, borderTop: '1px solid var(--line)' }}>
+        <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending} title="ส่งรูป/ไฟล์">🖼️</button>
+        <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; await onUpload(files); }} />
+        <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="พิมพ์ข้อความ..." onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px', fontSize: 13, minWidth: 0 }} />
+        <button onClick={onSend} disabled={!chatInput.trim() || sending} className="btn btn-primary btn-sm">ส่ง</button>
+      </div>
+    </div>
+  );
+}
+
 interface Deal {
   id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
   buyer_id: string; buyer_name: string; title: string; description: string; price: number; category: string;
@@ -179,7 +239,6 @@ interface DealPriceState {
   mm_fee_accepted_seller?: boolean; mm_fee_accepted_buyer?: boolean;
 }
 interface EvidenceItem { id: string; deal_id: string; type: string; file_id: string; file_name: string; content?: string; uploaded_by?: string; uploader_name?: string; created_at: string; }
-interface Msg { id: string; sender_id: string; sender_name: string; role: string; type: string; content: string; file_id: string; file_name: string; created_at: string; }
 interface Middleman { userId: string; code: string; name: string; tier: string; workProvince: string; phone: string; categories?: string; reviewScore: number; reviewCount: number; }
 
 function fileUrl(id: string) { return fileViewUrl(DEAL_BUCKET, id); }
@@ -312,6 +371,12 @@ export default function DealRoom() {
   const trackingInputRef = useRef<HTMLInputElement>(null);
   const trackingProviderRef = useRef<HTMLSelectElement>(null);
   const [showCall, setShowCall] = useState(false);
+  // โหมดคอล: null=ปิด, 'voice'=โทรเสียงล้วน, 'video'=วิดีโอคอล (showCall เปิดเมื่อ callMode !== null)
+  const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
+  // แจ้งเตือนเมื่อคอลหมดเวลา 10 นาที (กดโทรใหม่เพื่อคุยต่อ)
+  const [callTimedOut, setCallTimedOut] = useState(false);
+  // กล่องแชทลอยที่เรียกจากปุ่มลอย (แสดงทั้งตอนคอลและไม่คอล)
+  const [floatChatOpen, setFloatChatOpen] = useState(false);
   // ข้อ3: ระหว่างวิดีโอคอล ซ่อนปุ่มลอย "กลับหน้าหลัก" + "บริการลูกค้า" (ผ่าน body.in-call)
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -391,7 +456,6 @@ export default function DealRoom() {
   const sellerFeeInputRef = useRef<HTMLInputElement>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showStep3Warning, setShowStep3Warning] = useState(false);
-  const [callChatOpen, setCallChatOpen] = useState(true);
   const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
   const [priceInput, setPriceInput] = useState('');
   const [feePayerInput, setFeePayerInput] = useState<'buyer' | 'seller' | 'split' | ''>('');
@@ -548,7 +612,7 @@ export default function DealRoom() {
       setMyName(nextMyName);
       const headers = await getAuthHeaders();
       if (!active) return;
-      if ((readDealTab(requestedTab) === 'chat' || requestedCall) && isDealParty(deal, nextMyId)) {
+      if ((requestedCall) && isDealParty(deal, nextMyId)) {
         await fetchMsgs(headers, deal, nextMyId);
       }
     })();
@@ -865,13 +929,14 @@ export default function DealRoom() {
   // ลิงก์แชร์พ่วง openExternalBrowser=1 — ผู้รับที่เปิดจาก LINE จะเด้งไปเบราว์เซอร์หลักอัตโนมัติ
   async function copyLink() { await navigator.clipboard.writeText(withExternalBrowserParam(window.location.href)).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000); }
 
-  /** เปิด/ปิดวิดีโอคอล — ตอนเปิดจะแจ้งเตือนทุกฝ่ายในดีล (กันสแปม: แจ้งซ้ำได้ทุก 2 นาที) */
-  function toggleCall() {
+  /** เริ่มคอลในโหมดที่เลือก ('voice' | 'video') — แจ้งเตือนทุกฝ่ายในดีล (กันสแปม: แจ้งซ้ำได้ทุก 2 นาที) */
+  function startCall(mode: 'voice' | 'video') {
     if (!isDealParty(deal, myId)) return;
-    const opening = !showCall;
-    setShowCall(opening);
+    setCallMode(mode);
+    setShowCall(true);
+    setCallTimedOut(false);
     // แจ้งเตือนทุกครั้งที่มีคนล็อกอินเปิดคอล — รวมถึงผู้สนใจที่มาจากลิงก์แชร์ (guest ที่ล็อกอินแล้ว)
-    if (opening && myId && Date.now() - callNotifyAt.current > 120000) {
+    if (myId && Date.now() - callNotifyAt.current > 120000) {
       callNotifyAt.current = Date.now();
       (async () => {
         try {
@@ -885,6 +950,12 @@ export default function DealRoom() {
         } catch { /* แจ้งเตือนไม่สำเร็จ ไม่กระทบการเข้าคอล */ }
       })();
     }
+  }
+
+  /** วางสาย/ปิดคอล */
+  function endCall() {
+    setCallMode(null);
+    setShowCall(false);
   }
 
   if (loading || authLoading) return (
@@ -2224,7 +2295,6 @@ export default function DealRoom() {
 
   // ─── ขั้น 3: คุย/วิดีโอคอลรายละเอียดสินค้า ────────────────────────────────
   function renderWizardStepChat(nextStep = 4) {
-    const chatMsgs = msgs.filter(m => m.role !== 'system').slice(-30);
     const pd: DealPriceState = priceState || {};
     // ใช้ chat_done_* จาก priceState แทน hasProgressPing (system message เก่าค้างใน DB ทำให้ step ขึ้นเอง)
     const sellerChatReady = !!pd.chat_done_seller || (myRole === 'seller' && chatReviewReady);
@@ -2234,49 +2304,50 @@ export default function DealRoom() {
     const hasMm = !!deal!.middleman_id;
     const meChatReady = myRole === 'seller' ? sellerChatReady : myRole === 'buyer' ? buyerChatReady : myRole === 'middleman' ? middlemanChatReady : false;
     const allChatReady = sellerChatReady && buyerChatReady && (!isRegularDeal || !hasMm || middlemanChatReady);
+    // หลักฐานที่ฝ่ายตัวเองอัพโหลดในขั้นนี้ (type chat/chat_text/call จากทุกฝ่าย + รูป/วิดีโอที่ตัวเองอัพ)
+    const myEvidence = evidence.filter(e => e.type === 'chat' || e.type === 'chat_text' || e.type === 'call' || e.uploaded_by === myId);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
           <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6 }}>
             {isRegularDeal
-              ? '💬 คุยรายละเอียดสินค้าแบบ 3 ฝ่าย ส่งรูปหรือเริ่มวิดีโอคอลให้ทุกฝ่ายเข้าใจตรงกัน แล้วกด "คุยกันจบแล้ว" เพื่อไปตรวจหลักฐาน'
-              : '💬 คุยรายละเอียดสินค้า ส่งรูปหรือเริ่มวิดีโอคอลให้พอใจทั้งสองฝ่าย (วิดีโอคอลถูกบันทึกเป็นหลักฐานได้) แล้วกด "คุยกันจบแล้ว" ด้านล่างเพื่อไปตรวจหลักฐานและยืนยัน'}
+              ? '💬 ใช้ปุ่ม แชท / โทร / วิดีโอ ด้านล่างจอ คุยรายละเอียดสินค้าแบบ 3 ฝ่าย แล้วอัปโหลดรูป/วิดีโอหลักฐานด้านล่างนี้ — พอครบแล้วกด "แนบหลักฐานครบแล้ว" เพื่อไปตรวจหลักฐาน'
+              : '💬 ใช้ปุ่ม แชท / โทร / วิดีโอ ด้านล่างจอ คุยรายละเอียดสินค้า แล้วอัปโหลดรูป/วิดีโอหลักฐานด้านล่างนี้ — พอครบแล้วกด "แนบหลักฐานครบแล้ว" เพื่อไปตรวจหลักฐานและยืนยัน'}
           </div>
         </div>
+        {/* พื้นที่อัปโหลดรูป/วิดีโอหลักฐาน (แทนกล่องแชทเดิม) */}
         <div className="dr-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div className="dr-card-title" style={{ margin: 0 }}>💬 แชทคุยกัน</div>
-            <button type="button" className="btn btn-green btn-sm" onClick={toggleCall}>📹 เริ่มวิดีโอคอล</button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto', marginBottom: 10, padding: '4px 2px' }}>
-            {chatMsgs.length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12.5, padding: '14px 0' }}>{isRegularDeal && hasMm ? 'ยังไม่มีข้อความ — เริ่มคุยกันทั้ง 3 ฝ่ายได้เลย' : 'ยังไม่มีข้อความ — เริ่มคุยกับอีกฝ่ายได้เลย'}</p>}
-            {chatMsgs.map(m => {
-              const isMe = m.sender_id === myId;
-              const isMedia = m.type === 'image' || m.type === 'file';
-              return (
-                <div key={m.id} className={`dr-bubble-row${isMe ? ' mine' : ''}`}>
-                  {!isMe && <div className="dr-bubble-av" style={{ background: bubbleAvColor(m) }}>{(m.sender_name || '?').slice(0, 1)}</div>}
-                  <div className="dr-bubble-col">
-                    {!isMe && <span className="dr-bubble-sender">{m.sender_name}</span>}
-                    <div className={bubbleClass(m, isMe)}>
-                      {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 180, borderRadius: 8 }} /></a>
-                        : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.file_name}</a>
-                        : m.content}
+          <div className="dr-card-title">📸 อัปโหลดรูป/วิดีโอหลักฐาน</div>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.5 }}>
+            ถ่ายรูป/วิดีโอสภาพสินค้า จุดสำคัญ (Serial Number, รอย, อุปกรณ์ครบกล่อง) เพื่อใช้ตัดสินกรณีมีปัญหา
+          </p>
+          <button onClick={() => evidInputRef.current?.click()} className="btn btn-soft btn-block" style={{ marginBottom: 10 }}>
+            <Icon name="upload" size={16} /> เลือกรูป/วิดีโอหลักฐาน
+          </button>
+          <input ref={evidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f, true, 'chat'); } }} />
+          {myEvidence.length > 0 ? (
+            <div className="dr-evid-list">
+              {myEvidence.map((item, i) => {
+                const url = item.file_id ? fileUrl(item.file_id) : '';
+                const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
+                const isImg = item.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                return (
+                  <div key={item.id || i} className="dr-card" style={{ padding: 12 }}>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+                      {item.type === 'chat' ? '💬 หลักฐานจากแชท' : item.type === 'chat_text' ? '💬 ข้อความแชท' : item.type === 'call' ? '📹 วิดีโอคอล' : '📸 หลักฐาน'}{item.uploader_name ? ` · ${item.uploader_name}` : ''}
                     </div>
-                    {isMedia && !isMe && <span style={{ marginLeft: 0 }}>{pinBtn(m, true)}</span>}
+                    {!item.file_id
+                      ? <div style={{ fontSize: 14, color: 'var(--ink)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.content || '(ไม่มีข้อความ)'}</div>
+                      : isVid ? <video src={url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 'var(--r-md)', background: '#000' }} />
+                      : isImg ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.file_name} style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 'var(--r-md)' }} /></a>
+                      : <a href={url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', fontSize: 14 }}>📎 {item.file_name || 'เปิดไฟล์'}</a>}
                   </div>
-                </div>
-              );
-            })}
-            <div ref={chatBottomRef} />
-          </div>
-          {renderChatPresenceBar()}
-          <div style={{ display: 'flex', gap: 6, padding: '0 2px' }}>
-            <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending || !chatIsOpen()}>🖼️</button>
-            <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }} />
-            <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={chatIsOpen() ? 'พิมพ์ข้อความ...' : 'รอบุคคลที่เกี่ยวข้องเข้าร่วมก่อน...'} disabled={!chatIsOpen()} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, minWidth: 0 }} />
-            <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p style={{ textAlign: 'center', color: 'var(--faint)', fontSize: 12.5, padding: '14px 0' }}>ยังไม่มีหลักฐาน — แตะปุ่มด้านบนเพื่อเพิ่ม</p>
+          )}
         </div>
         <div className="dr-card">
           {renderParticipantStatusRows([
@@ -2299,7 +2370,7 @@ export default function DealRoom() {
               setChatReviewReady(true);
               // ไม่ setWzViewStep ทันที — รออีกฝ่ายกดยืนยันก่อน
               // เมื่อทั้งคู่กดแล้ว getSimpleStep() จะ return step 3 อัตโนมัติ
-            }}>✅ คุยกันจบแล้ว — ไปตรวจหลักฐาน</AsyncButton>
+            }}>✅ แนบหลักฐานครบแล้ว — ไปตรวจหลักฐาน</AsyncButton>
           ) : allChatReady ? (
             <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ไปขั้นถัดไป</button>
           ) : (
@@ -4473,56 +4544,45 @@ export default function DealRoom() {
         <div className="dr-hctas">
           <HeaderAccountActions showNotify />
           <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
-          {/* ปุ่มโทรคุยแสดงทุกขั้นตอนของดีล (ทุกประเภท) — ขอแค่มีคู่ดีลเข้ามาแล้วและเป็นผู้เกี่ยวข้อง */}
-          {canCall && <button className="dr-cta-green" onClick={toggleCall}>📹 โทรคุย</button>}
+          {/* ปุ่มโทรคุย/วิดีโอคอล/แชท ย้ายไปเป็นแถบลอยด้านล่าง (.dr-floatbar) แสดงตลอดทุกขั้นตอน */}
         </div>
       </header>
 
       {showCall ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0d1117', minHeight: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,.4)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>📹 วิดีโอคอล กำลังดำเนินการ...</span>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>{callMode === 'voice' ? '📞 โทรเสียง' : '📹 วิดีโอคอล'} กำลังดำเนินการ… (จำกัด 10 นาทีต่อครั้ง)</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <CallRecorder dealId={dealId} onSaveEvidence={saveCallEvidence} />
-              <button onClick={() => setShowCall(false)} className="btn btn-danger btn-sm">✕ วางสาย</button>
+              {callMode === 'video' && <CallRecorder dealId={dealId} onSaveEvidence={saveCallEvidence} />}
+              <button onClick={endCall} className="btn btn-danger btn-sm">✕ วางสาย</button>
             </div>
           </div>
-          <div style={{ flex: 1, minHeight: '60vh' }}><DealVideoCall dealId={dealId} getAuthHeaders={getAuthHeaders} onEnd={() => setShowCall(false)} /></div>
-          {/* กล่องแชทลอยซ้อนบนวิดีโอคอล (ย่อ/ขยายได้) */}
-          {callChatOpen ? (
-            <div style={{ position: 'fixed', right: 16, bottom: 16, width: 320, maxWidth: '90vw', height: '55vh', maxHeight: 460, background: 'var(--surface)', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,.4)', display: 'flex', flexDirection: 'column', zIndex: 60, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--accent)', color: '#fff' }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>💬 แชทระหว่างคอล</span>
-                <button onClick={() => setCallChatOpen(false)} title="ย่อ" style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>—</button>
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {msgs.filter(m => m.role !== 'system').length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12, marginTop: 12 }}>ยังไม่มีข้อความ</p>}
-                {msgs.filter(m => m.role !== 'system').map(m => {
-                  const isMe = m.sender_id === myId;
-                  return (
-                    <div key={m.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
-                      {!isMe && <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2 }}>{m.sender_name}</div>}
-                      <div style={{ background: isMe ? 'var(--accent)' : 'var(--surface-2)', color: isMe ? '#fff' : 'var(--ink)', padding: '6px 10px', borderRadius: 10, fontSize: 13, wordBreak: 'break-word' }}>
-                        {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 160, borderRadius: 8 }} /></a>
-                          : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.file_name}</a>
-                          : m.content}
-                      </div>
-                      {(m.content || m.file_id) && (
-                        <button onClick={() => saveMsgEvidence(m)} disabled={acting} style={{ fontSize: 10, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2 }}>📌 เก็บเป็นหลักฐาน</button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ display: 'flex', gap: 6, padding: 8, borderTop: '1px solid var(--line)' }}>
-                <button className="dr-attach" onClick={() => callFileInputRef.current?.click()} disabled={sending} title="ส่งรูป/ไฟล์">🖼️</button>
-                <input ref={callFileInputRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }} />
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="พิมพ์ข้อความ..." onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) sendMsg(chatInput); } }} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px', fontSize: 13, minWidth: 0 }} />
-                <button onClick={() => { if (chatInput.trim()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending} className="btn btn-primary btn-sm">ส่ง</button>
-              </div>
-            </div>
-          ) : (
-            <button onClick={() => setCallChatOpen(true)} style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 60, borderRadius: 24, padding: '10px 16px', background: 'var(--accent)', color: '#fff', border: 'none', boxShadow: '0 6px 20px rgba(0,0,0,.4)', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>💬 แชท ({msgs.filter(m => m.role !== 'system').length})</button>
+          <div style={{ flex: 1, minHeight: '60vh' }}>
+            <DealVideoCall
+              dealId={dealId}
+              getAuthHeaders={getAuthHeaders}
+              onEnd={endCall}
+              mode={callMode === 'voice' ? 'voice' : 'video'}
+              onTimeout={() => { setCallTimedOut(true); endCall(); }}
+            />
+          </div>
+          {/* กล่องแชทลอยซ้อนบนคอล — เรียกจากปุ่ม 💬 ในแถบลอยด้านล่าง (floatChatOpen) */}
+          {floatChatOpen && (
+            <FloatingChatBox
+              msgs={msgs}
+              myId={myId}
+              chatInput={chatInput}
+              setChatInput={setChatInput}
+              sending={sending}
+              acting={acting}
+              fileInputRef={callFileInputRef}
+              onSend={() => { if (chatInput.trim()) sendMsg(chatInput); }}
+              onUpload={async (files) => { for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
+              onClose={() => setFloatChatOpen(false)}
+              onPin={saveMsgEvidence}
+              onAutoScroll={() => chatBottomRef.current?.scrollIntoView({ behavior: 'auto' })}
+              title="💬 แชทระหว่างคอล"
+            />
           )}
         </div>
       ) : (
@@ -4531,17 +4591,17 @@ export default function DealRoom() {
             <div className="dr-call-banner" role="status">
               <span className="dr-call-dot" />
               <span className="dr-call-tx">📹 มีวิดีโอคอลกำลังดำเนินอยู่ในดีลนี้</span>
-              <button type="button" onClick={toggleCall}>เข้าร่วมเลย</button>
+              <button type="button" onClick={() => startCall('video')}>เข้าร่วมเลย</button>
             </div>
           )}
           {/* regular + simple: wizard มี progress bar ของตัวเองแล้ว — ไม่ต้องแสดง progress bar แยก */}
 
-          {/* ดีลแบบง่าย + ดีล regular: แชทและหลักฐานถูกฝังอยู่ใน wizard แล้ว ไม่ต้องมีแท็บแยก */}
+          {/* แชทย้ายไปปุ่มลอยด้านล่างแล้ว — เหลือเฉพาะแท็บ ขั้นตอน/หลักฐาน (meetup) */}
           {isMeetup && (
           <nav className="dr-tabs">
-            {(['steps', 'chat', 'evidence'] as const).map(k => (
+            {(['steps', 'evidence'] as const).map(k => (
               <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
-                {k === 'steps' ? 'ขั้นตอน' : k === 'chat' ? `แชท (${msgs.filter(m => m.role !== 'system').length})` : 'หลักฐาน'}
+                {k === 'steps' ? 'ขั้นตอน' : 'หลักฐาน'}
               </button>
             ))}
           </nav>
@@ -4549,9 +4609,9 @@ export default function DealRoom() {
           {/* Regular deal: แถบแชท + หลักฐาน ซ่อนในโหมด wizard แต่ยังเข้าถึงได้ผ่านปุ่มลิงก์ */}
           {!isSimple && !isMeetup && (
           <nav className="dr-tabs" style={{ display: 'none' }}>
-            {(['steps', 'chat', 'evidence'] as const).map(k => (
+            {(['steps', 'evidence'] as const).map(k => (
               <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
-                {k === 'steps' ? 'ขั้นตอน' : k === 'chat' ? `แชท (${msgs.filter(m => m.role !== 'system').length})` : 'หลักฐาน'}
+                {k === 'steps' ? 'ขั้นตอน' : 'หลักฐาน'}
               </button>
             ))}
           </nav>
@@ -4562,51 +4622,58 @@ export default function DealRoom() {
             {tab === 'steps' && isMeetup && renderMeetupWizard()}
             {tab === 'steps' && !isSimple && !isMeetup && renderRegularWizard()}
 
-            {tab === 'chat' && (
-              <div className="dr-chat-root">
-                <div className="dr-chat-feed">
-                  {msgs.length === 0 && <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '32px 0', fontSize: 14 }}>ยังไม่มีข้อความ</p>}
-                  {msgs.map(m => {
-                    if (m.role === 'system') return <div key={m.id} className="dr-sys-msg"><span>{m.content}</span></div>;
-                    const isMe = m.sender_id === myId;
-                    return (
-                      <div key={m.id} className={`dr-bubble-row${isMe ? ' mine' : ''}`}>
-                        {!isMe && <div className="dr-bubble-av" style={{ background: bubbleAvColor(m) }}>{(m.sender_name || '?').slice(0, 1)}</div>}
-                        <div className="dr-bubble-col">
-                          {!isMe && <span className="dr-bubble-sender">{m.sender_name}</span>}
-                          <div className={bubbleClass(m, isMe)}>
-                            {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 200, borderRadius: 10 }} /></a>
-                              : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', fontSize: 14 }}>📎 {m.file_name}</a>
-                                : m.content}
-                          </div>
-                          <span className="dr-bubble-t">
-                            {new Date(m.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                            {!isMe && <span style={{ marginLeft: 8 }}>{pinBtn(m)}</span>}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div ref={chatBottomRef} />
-                </div>
-                {renderChatPresenceBar()}
-                {!chatIsOpen() && (
-                  <div style={{ padding: '10px 16px', background: '#fff8ef', borderBottom: '1px solid #ffe0b2', fontSize: 12.5, color: '#8a5a00', textAlign: 'center' }}>
-                    ⏳ รอบุคคลที่เกี่ยวข้องเข้าร่วมดีลก่อนจึงจะแชทได้
-                  </div>
-                )}
-                <div className="dr-chat-bar">
-                  <button className="dr-attach" onClick={() => fileInputRef.current?.click()} disabled={sending || !chatIsOpen()}>🖼️</button>
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }} />
-                  <input className="dr-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={chatIsOpen() ? 'พิมพ์ข้อความ...' : 'รอบุคคลที่เกี่ยวข้องเข้าร่วมก่อน...'} disabled={!chatIsOpen()} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); } }} />
-                  <button className="dr-chat-send" onClick={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }} disabled={!chatInput.trim() || sending || !chatIsOpen()}><Icon name="arrowRight" size={16} /></button>
-                </div>
-              </div>
+            {/* กล่องแชทลอย — เรียกจากปุ่ม 💬 ในแถบลอยด้านล่าง (floatChatOpen) */}
+            {floatChatOpen && (
+              <FloatingChatBox
+                msgs={msgs}
+                myId={myId}
+                chatInput={chatInput}
+                setChatInput={setChatInput}
+                sending={sending}
+                acting={acting}
+                fileInputRef={callFileInputRef}
+                onSend={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }}
+                onUpload={async (files) => { for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
+                onClose={() => setFloatChatOpen(false)}
+                onPin={saveMsgEvidence}
+                onAutoScroll={() => chatBottomRef.current?.scrollIntoView({ behavior: 'auto' })}
+                title="💬 แชทดีล"
+                closedHint={!chatIsOpen() ? '⏳ รอบุคคลที่เกี่ยวข้องเข้าร่วมดีลก่อนจึงจะแชทได้' : undefined}
+              />
             )}
 
             {tab === 'evidence' && renderEvidencePanel()}
           </main>
         </>
+      )}
+      {/* แถบปุ่มลอย (💬 แชท / 📞 โทร / 📹 วิดีโอ) — แสดงตลอดทุกขั้นตอนของดีล ตั้งแต่มีคู่ดีลเข้ามาจนจบ
+          ตอนคอลอยู่จะเหลือเฉพาะปุ่มแชท (กดเรียกกล่องแชทซ้อนบนคอล) ส่วนปุ่มโทร/วิดีโอซ่อนไป */}
+      {canCall && (
+        <div className="dr-floatbar" role="toolbar" aria-label="การสื่อสารในดีล">
+          <button type="button" className={`dr-floatbar-btn ${floatChatOpen ? 'active' : ''}`} onClick={() => setFloatChatOpen(v => !v)} title="แชท">
+            <span className="ic">💬</span><span>แชท</span>
+            {(() => { const n = msgs.filter(m => m.role !== 'system').length; return n > 0 && !floatChatOpen ? <span className="dr-floatbar-badge">{n > 99 ? '99+' : n}</span> : null; })()}
+          </button>
+          {!showCall && (
+            <>
+              <button type="button" className="dr-floatbar-btn voice" onClick={() => startCall('voice')} title="โทรเสียง">
+                <span className="ic">📞</span><span>โทร</span>
+              </button>
+              <button type="button" className="dr-floatbar-btn video" onClick={() => startCall('video')} title="วิดีโอคอล">
+                <span className="ic">📹</span><span>วิดีโอ</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {/* แจ้งเตือนเมื่อคอลหมดเวลา 10 นาที */}
+      {callTimedOut && (
+        <div className="dr-call-timeout-toast" role="status">
+          <div style={{ fontSize: 22, marginBottom: 6 }}>⏰</div>
+          <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--ink)', marginBottom: 4 }}>หมดเวลาคุย 10 นาที</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12 }}>แตะปุ่ม โทร หรือ วิดีโอ ด้านล่างเพื่อเริ่มคุยใหม่ได้เลย</div>
+          <button className="btn btn-primary btn-sm btn-block" onClick={() => setCallTimedOut(false)}>รับทราบ</button>
+        </div>
       )}
       {showTerms && (() => { const t = termsFor(deal.deal_type); return (
         <div onClick={() => setShowTerms(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 100 }}>
@@ -4637,7 +4704,7 @@ export default function DealRoom() {
 
             ); })()}
             <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 18 }}>
-              📹 สำคัญ: โปรดเข้าหน้าแชทและวิดีโอคอล เพื่อพูดคุย ดูสภาพสินค้า และตกลงรายละเอียดให้เรียบร้อยก่อน — บันทึกบทสนทนา / วิดีโอคอล / รูปภาพไว้เป็นหลักฐาน โดยกดปุ่ม "📌 เก็บเป็นหลักฐาน" ที่แต่ละข้อความ
+              📹 สำคัญ: โปรดใช้ปุ่ม แชท / โทร / วิดีโอ ด้านล่างจอ เพื่อพูดคุย ดูสภาพสินค้า และตกลงรายละเอียดให้เรียบร้อยก่อน — แล้วอัปโหลดรูป/วิดีโอหลักฐานในขั้นตอนต่อไปเพื่อใช้ยืนยันกรณีมีปัญหา
             </div>
             <button className="btn btn-primary btn-block" onClick={() => { setShowTerms(false); setTab('chat'); doAction('accept_terms'); }}>✅ ยอมรับข้อตกลงและดำเนินการต่อ</button>
             <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => setShowTerms(false)}>ยกเลิก</button>

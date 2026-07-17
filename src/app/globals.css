@@ -2554,6 +2554,130 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .rec-btn:hover { background: rgba(255,255,255,.18); }
 .rec-btn.on { background: var(--rose-500); border-color: var(--rose-500); }
 .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: efPulse 1.4s infinite; }
+
+/* ============================================================
+   แถบปุ่มลอยด้านล่าง (แชท / โทรเสียง / วิดีโอคอล) — แสดงตลอดทุกขั้นตอนของดีล
+   ============================================================ */
+.dr-floatbar {
+  position: fixed; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%); z-index: 135;
+  display: flex; gap: 4px; padding: 6px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  box-shadow: var(--sh-md);
+}
+/* แถบนี้ต้องแสดงทั้งตอนคอลและไม่คอล — ไม่ซ่อนตาม body.in-call เหมือน FAB อื่น */
+body.in-call .dr-floatbar { display: flex; }
+.dr-floatbar-btn {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-width: 64px; padding: 8px 14px; border: none; background: transparent;
+  color: var(--ink-2); font-family: var(--font-display); font-weight: 600; font-size: 11.5px;
+  cursor: pointer; border-radius: var(--r-pill); transition: background .15s, color .15s; white-space: nowrap;
+}
+.dr-floatbar-btn .ic { font-size: 18px; line-height: 1; }
+.dr-floatbar-btn:hover { background: var(--surface-2); color: var(--ink); }
+.dr-floatbar-btn.active { background: var(--accent-soft); color: var(--accent); }
+.dr-floatbar-btn.voice { color: var(--green-600); }
+.dr-floatbar-btn.voice:hover { background: color-mix(in srgb, var(--green-500) 10%, transparent); }
+.dr-floatbar-btn.video { color: var(--accent); }
+.dr-floatbar-btn.video:hover { background: var(--accent-soft); }
+.dr-floatbar-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* จุดแจ้งจำนวนข้อความใหม่ */
+.dr-floatbar-badge {
+  position: absolute; top: 2px; right: 8px; min-width: 16px; height: 16px; padding: 0 4px;
+  background: var(--rose-500); color: #fff; border-radius: var(--r-pill);
+  font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
+  border: 1.5px solid var(--surface);
+}
+/* toast แจ้งหมดเวลาคอล */
+.dr-call-timeout-toast {
+  position: fixed; left: 50%; top: 78px; transform: translateX(-50%); z-index: 145;
+  background: var(--surface); border: 1px solid var(--amber-400); border-radius: var(--r-md);
+  box-shadow: var(--sh-lg); padding: 14px 18px; max-width: min(92vw, 380px); text-align: center;
+  animation: drToastIn .25s var(--ease-out);
+}
+@keyframes drToastIn { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ============================================================
+   Custom LiveKit split layout (responsive: มือถือ=บน/ล่าง, คอม/แท็บเล็ต=ซ้าย/ขวา)
+   แทน VideoConference ดั้งเดิม — tile แนวตั้ง กันหลุดเฟรม/เบลอ
+   ============================================================ */
+.lk-room { height: 100%; width: 100%; display: flex; flex-direction: column; background: #000; position: relative; overflow: hidden; }
+.lk-split { flex: 1; display: flex; min-height: 0; gap: 2px; padding: 2px; }
+/* มือถือ: แบ่งบน/ล่าง (column) */
+@media (max-width: 720px) {
+  .lk-split { flex-direction: column; }
+  .lk-tile { flex: 1 1 0; min-height: 0; }
+}
+/* แท็บเล็ต/คอม: แบ่งซ้าย/ขวา (row) */
+@media (min-width: 721px) {
+  .lk-split { flex-direction: row; }
+  .lk-tile { flex: 1 1 0; min-width: 0; }
+}
+.lk-tile {
+  position: relative; background: #111; overflow: hidden;
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+}
+/* เน้นแนวตั้ง — ใช้ object-fit:cover เติมเต็ม tile เพื่อกันขอบดำ/หลุดเฟรม */
+.lk-tile video {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  background: #111;
+}
+/* เครื่องหมายว่าง (ไม่มีวิดีโอ) ตรงกลาง tile */
+.lk-tile-placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  color: rgba(255,255,255,.5); font-family: var(--font-display); font-size: 13px;
+}
+.lk-tile-avatar {
+  width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: #fff; font-size: 28px; font-weight: 700; font-family: var(--font-display);
+}
+/* แถบข้อมูลผู้ใช้ทับมุมล่าง tile */
+.lk-tile-info {
+  position: absolute; bottom: 8px; left: 8px; right: 8px;
+  display: flex; align-items: center; gap: 8px;
+  color: #fff; font-size: 12.5px; font-weight: 600; font-family: var(--font-display);
+  text-shadow: 0 1px 3px rgba(0,0,0,.6);
+}
+.lk-tile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lk-tile-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 600;
+}
+.lk-tile-badge.off { background: rgba(180,40,60,.85); }
+/* PiP tile ของคนที่ 3 (คนกลาง) — มุมขวาบนของ tile หลัก */
+.lk-pip {
+  position: absolute; top: 8px; right: 8px;
+  width: 28%; max-width: 120px; aspect-ratio: 9 / 16;
+  border-radius: 8px; overflow: hidden; border: 2px solid rgba(255,255,255,.4);
+  background: #111; z-index: 2;
+}
+.lk-pip video { width: 100%; height: 100%; object-fit: cover; }
+.lk-pip .lk-pip-info {
+  position: absolute; bottom: 4px; left: 4px; right: 4px;
+  color: #fff; font-size: 10px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,.7);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* ตัวจับเวลา 10 นาที — มุมบนกลาง */
+.lk-timer {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(0,0,0,.6); color: #fff; padding: 4px 12px; border-radius: var(--r-pill);
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700; letter-spacing: .03em;
+  border: 1px solid rgba(255,255,255,.15);
+}
+.lk-timer.warn { background: rgba(180,40,60,.9); border-color: rgba(255,255,255,.4); animation: efPulse 1.2s infinite; }
+.lk-timer .lk-timer-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green-400); }
+.lk-timer.warn .lk-timer-dot { background: #fff; }
+/* สถานะกำลังเชื่อมต่อ */
+.lk-connecting {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  color: rgba(255,255,255,.7); font-size: 13px; font-family: var(--font-display);
+  background: #0d1117; z-index: 4;
+}
+
 /* ============================================================
    Direct messages (กล่องข้อความแบบ Messenger)
    ============================================================ */
