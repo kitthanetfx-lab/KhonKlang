@@ -2645,24 +2645,29 @@ body.in-call .dr-floatbar { display: flex; }
    แทน VideoConference ดั้งเดิม — tile แนวตั้ง กันหลุดเฟรม/เบลอ
    ============================================================ */
 .lk-room { height: 100%; width: 100%; display: flex; flex-direction: column; background: #000; position: relative; overflow: hidden; }
-.lk-split { flex: 1; display: flex; min-height: 0; gap: 2px; padding: 2px; }
-/* มือถือ: แบ่งบน/ล่าง (column) */
-@media (max-width: 720px) {
-  .lk-split { flex-direction: column; }
-  .lk-tile { flex: 1 1 0; min-height: 0; }
+/* container จำกัดความกว้าง + จัดกลาง — กัน tile บานใหญ่เกินจอคอม */
+.lk-split {
+  flex: 1; display: flex; min-height: 0; gap: 2px; padding: 2px;
+  justify-content: center; align-items: center;
+  max-width: 760px; max-height: 100%; margin: 0 auto; width: 100%;
 }
-/* แท็บเล็ต/คอม: แบ่งซ้าย/ขวา (row) */
+/* มือถือ: แบ่งบน/ล่าง (column) — tile สูงสุด 70vh เว้นที่ให้เมนู controls ด้านล่าง */
+@media (max-width: 720px) {
+  .lk-split { flex-direction: column; max-width: 100%; }
+  .lk-tile { flex: 1 1 0; min-height: 0; max-height: 70vh; }
+}
+/* แท็บเล็ต/คอม: แบ่งซ้าย/ขวา (row) — tile ไม่เกิน 360px ต่ออัน (2 tile = 720px กลางจอ) */
 @media (min-width: 721px) {
   .lk-split { flex-direction: row; }
-  .lk-tile { flex: 1 1 0; min-width: 0; }
+  .lk-tile { flex: 1 1 0; min-width: 0; max-width: 360px; aspect-ratio: 9 / 16; max-height: 85vh; }
 }
 .lk-tile {
   position: relative; background: #111; overflow: hidden;
   border-radius: 8px; display: flex; align-items: center; justify-content: center;
 }
-/* เน้นแนวตั้ง — ใช้ object-fit:cover เติมเต็ม tile เพื่อกันขอบดำ/หลุดเฟรม */
+/* เน้นแนวตั้ง — ใช้ object-fit: contain กันตัดหน้า ถ้าสัดส่วนไม่ตรงจะมีขอบดำเล็กน้อยแต่ปลอดภัยกว่า cover */
 .lk-tile video {
-  width: 100%; height: 100%; object-fit: cover; display: block;
+  width: 100%; height: 100%; object-fit: contain; display: block;
   background: #111;
 }
 /* เครื่องหมายว่าง (ไม่มีวิดีโอ) ตรงกลาง tile */
@@ -2717,6 +2722,65 @@ body.in-call .dr-floatbar { display: flex; }
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
   color: rgba(255,255,255,.7); font-size: 13px; font-family: var(--font-display);
   background: #0d1117; z-index: 4;
+}
+
+/* ─── เมนูคุมสาย (แถบปุ่มก้นจอคอล) ─── */
+.lk-controls {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 10px; padding: 10px 14px;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--r-pill); z-index: 6;
+}
+.lk-controls button {
+  width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(255,255,255,.18); color: #fff;
+  display: grid; place-items: center; transition: background .15s, transform .1s;
+  font-size: 19px; line-height: 1;
+}
+.lk-controls button:hover { background: rgba(255,255,255,.3); }
+.lk-controls button:active { transform: scale(.94); }
+.lk-controls button.off { background: #fff; color: var(--ink); }
+.lk-controls button.hangup { background: var(--rose-500); width: 52px; height: 52px; }
+.lk-controls button.hangup:hover { background: var(--rose-600); }
+
+/* ─── หน้าจอ ringing (ผู้โทรรอสาย) ─── */
+.lk-ringing-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  background: linear-gradient(180deg, #0d1117, #1a1f2e); color: #fff;
+}
+.lk-ringing-avatar {
+  width: 120px; height: 120px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: #fff; font-size: 48px; font-weight: 700; font-family: var(--font-display);
+  box-shadow: 0 0 0 0 rgba(99,102,241,.5); animation: ringPulse 2s infinite;
+}
+@keyframes ringPulse {
+  0% { box-shadow: 0 0 0 0 rgba(99,102,241,.6); }
+  70% { box-shadow: 0 0 0 30px rgba(99,102,241,0); }
+  100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); }
+}
+.lk-ringing-name { font-family: var(--font-display); font-size: 24px; font-weight: 700; }
+.lk-ringing-status { font-size: 14px; color: rgba(255,255,255,.7); display: flex; align-items: center; gap: 6px; }
+.lk-ringing-dots { display: inline-flex; gap: 4px; }
+.lk-ringing-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.6); animation: ringDot 1.4s infinite; }
+.lk-ringing-dots span:nth-child(2) { animation-delay: .2s; }
+.lk-ringing-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes ringDot { 0%,80%,100% { opacity: .3; } 40% { opacity: 1; } }
+.lk-ringing-hangup {
+  margin-top: 24px; width: 64px; height: 64px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--rose-500); color: #fff; font-size: 24px;
+  display: grid; place-items: center; transition: transform .1s;
+  box-shadow: 0 8px 24px rgba(244,63,94,.4);
+}
+.lk-ringing-hangup:hover { background: var(--rose-600); }
+.lk-ringing-hangup:active { transform: scale(.94); }
+
+/* ─── media query: ลดขนาดปุ่ม floatbar 20% เฉพาะมือถือ ─── */
+@media (max-width: 720px) {
+  .dr-floatbar { gap: 2px; padding: 4px; }
+  .dr-floatbar-btn { min-width: 52px; padding: 6px 10px; font-size: 10px; }
+  .dr-floatbar-btn .ic { font-size: 15px; }
+  .dr-floatbar-btn.voice-active .dur { font-size: 12px; }
 }
 
 /* ============================================================

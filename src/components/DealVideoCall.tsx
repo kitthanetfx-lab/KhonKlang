@@ -19,8 +19,10 @@ import {
   AudioTrack,
   useTracks,
   useConnectionState,
+  useRemoteParticipants,
+  useLocalParticipant,
 } from '@livekit/components-react';
-import { Track, AudioPresets, type Participant } from 'livekit-client';
+import { Track, AudioPresets, type Participant, type RemoteParticipant } from 'livekit-client';
 
 interface Props {
   dealId: string;
@@ -40,6 +42,8 @@ interface Props {
   background?: boolean;
   /** ถูกเรียกเมื่อเชื่อมต่อสำเร็จ (ใช้ sync ตัวนับเวลาฝั่ง parent ตอน voice background) */
   onConnected?: () => void;
+  /** ถูกเรียกเมื่ออีกฝ่ายเข้าร่วมห้อง (= รับสายแล้ว) — parent เปลี่ยนจาก outgoing → active */
+  onAnswered?: () => void;
 }
 
 const CALL_LIMIT_SECONDS = 10 * 60; // 10 นาทีต่อครั้ง ตาม requirement
@@ -57,6 +61,7 @@ function initialOf(name?: string): string {
 
 // Latency tuning — ลดดีเลย์: h264 decode เร็ว, adaptiveStream/dynacast ลด bandwidth, speech preset ลด audio latency
 // (ค่าคงที่ ไม่ขึ้นกับ props — ยกขึ้นเป็น module-level เพื่อกัน useMemo หลัง early return ซึ่งผิด rules-of-hooks)
+// ปรับค่าลงเพื่อลดดีเลย์/แล็ก: 540x960 (ใกล้ h540 preset) + 800kbps — adaptiveStream จะปรับ quality ตามขนาด tile/เน็ต
 const ROOM_OPTIONS = {
   adaptiveStream: true,
   dynacast: true,
@@ -65,16 +70,16 @@ const ROOM_OPTIONS = {
     dtx: false,            // ปิด DTX เพื่อเสียงต่อเนื่อง ไม่มีช่วงเงียบกระตุก
     red: true,             // redundancy เสียง ทน packet loss
     audioPreset: AudioPresets.speech,
-    videoEncoding: { maxBitrate: 1_500_000, maxFramerate: 30 },
+    videoEncoding: { maxBitrate: 800_000, maxFramerate: 24 },
     simulcast: true,
   },
-  // กล้องแนวตั้ง 720x1280 — เหมาะกับ tile แนวตั้ง กัน letterbox และลด bandwidth เทียบ 1080p
-  videoCaptureDefaults: { resolution: { width: 720, height: 1280, frameRate: 30 } },
+  // กล้องแนวตั้ง 540x960 — เล็กลงจาก 720x1280 เพื่อลด bandwidth + CPU encode/decode → ลดแล็ก
+  videoCaptureDefaults: { resolution: { width: 540, height: 960, frameRate: 24 } },
   audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   disconnectOnPageLeft: true,
 };
 
-export default function DealVideoCall({ dealId, getAuthHeaders, onEnd, mode = 'video', onTimeout, maxSeconds = CALL_LIMIT_SECONDS, background = false, onConnected }: Props) {
+export default function DealVideoCall({ dealId, getAuthHeaders, onEnd, mode = 'video', onTimeout, maxSeconds = CALL_LIMIT_SECONDS, background = false, onConnected, onAnswered }: Props) {
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
   const [err, setErr] = useState('');
 
@@ -118,7 +123,7 @@ export default function DealVideoCall({ dealId, getAuthHeaders, onEnd, mode = 'v
       onDisconnected={onEnd}
       style={{ height: '100%', width: '100%' }}
     >
-      <CallStage isVideo={isVideo} maxSeconds={maxSeconds} onTimeout={onTimeout} background={background} onConnected={onConnected} />
+      <CallStage isVideo={isVideo} maxSeconds={maxSeconds} onTimeout={onTimeout} background={background} onConnected={onConnected} onAnswered={onAnswered} onEnd={onEnd} />
     </LiveKitRoom>
   );
 }
@@ -130,16 +135,33 @@ interface StageProps {
   onTimeout?: () => void;
   background?: boolean;
   onConnected?: () => void;
+  onAnswered?: () => void;
+  onEnd?: () => void;
 }
 
-function CallStage({ isVideo, maxSeconds, onTimeout, background = false, onConnected }: StageProps) {
+function CallStage({ isVideo, maxSeconds, onTimeout, background = false, onConnected, onAnswered, onEnd }: StageProps) {
   const connState = useConnectionState();
   const [remaining, setRemaining] = useState(maxSeconds);
   const startedAtRef = useRef<number | null>(null);
+  const answeredRef = useRef(false);
 
   // ดึง track refs ที่ถูกต้องตาม type — useTracks ส่งกลับ TrackReference[] (มี publication จริง)
   const cameraTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const micTracks = useTracks([Track.Source.Microphone], { onlySubscribed: false });
+  // ดึง remote participants โดยตรง — ใช้ตรวจจับ "อีกฝ่ายรับสายแล้ว" (length 0 → 1)
+  const remoteParticipants = useRemoteParticipants();
+  // ดึง local participant สำหรับคุมไมค์/กล้อง
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const [speakerMuted, setSpeakerMuted] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+
+  // ตรวจจับ "อีกฝ่ายรับสาย" — เมื่อมี remote participant เข้ามาครั้งแรก → เรียก onAnswered (ครั้งเดียว)
+  useEffect(() => {
+    if (!answeredRef.current && remoteParticipants.length > 0) {
+      answeredRef.current = true;
+      onAnswered?.();
+    }
+  }, [remoteParticipants.length, onAnswered]);
 
   // เริ่มนับถอยหลังเมื่อเชื่อมต่อสำเร็จ — setState ทั้งหมดอยู่ใน callback (interval) ไม่ใช่ใน body ของ effect
   useEffect(() => {
@@ -173,6 +195,30 @@ function CallStage({ isVideo, maxSeconds, onTimeout, background = false, onConne
 
   const connecting = connState !== 'connected';
 
+  // ─── call controls (เปิด/ปิด ไมค์ กล้อง ลำโพง สลับกล้อง วางสาย) ───
+  const toggleMic = useCallback(async () => {
+    try { await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled); } catch { /* ignore */ }
+  }, [localParticipant, isMicrophoneEnabled]);
+
+  const toggleCam = useCallback(async () => {
+    try { await localParticipant.setCameraEnabled(!isCameraEnabled); } catch { /* ignore */ }
+  }, [localParticipant, isCameraEnabled]);
+
+  const toggleSpeaker = useCallback(() => setSpeakerMuted(m => !m), []);
+
+  const flipCamera = useCallback(async () => {
+    // สลับกล้องหน้า/หลัง — ส่ง facingMode ใหม่ให้ capture options แล้ว restart track
+    try {
+      const next = facingMode === 'user' ? 'environment' : 'user';
+      setFacingMode(next);
+      await localParticipant.setCameraEnabled(true, { facingMode: next } as never);
+    } catch { /* อุปกรณ์ไม่รองรับ หรือเป็นคอม → เงียบ */ }
+  }, [localParticipant, facingMode]);
+
+  // ปรับ volume ลำโพง — ทำผ่าน audio element ของแต่ละ remote track (track ไหนอยู่ก็ mute ได้)
+  // วิธีง่าย: เก็บไว้ใน ref แล้ว set muted ตอน render AudioTrack
+  const speakerVolume = speakerMuted ? 0 : 1;
+
   // background mode (voice call ทำงานเป็น background) — mount เฉพาะ audio tracks
   // เพื่อให้ยังได้ยินเสียงสนทนาโดยไม่ render video tile ใดๆ (ประหยัด CPU/GPU)
   if (background) {
@@ -180,7 +226,7 @@ function CallStage({ isVideo, maxSeconds, onTimeout, background = false, onConne
       <div className="lk-room" aria-hidden="true">
         {/* audio ของทุก remote participant ที่มีไมค์ */}
         {micTracks.filter(tr => !tr.participant.isLocal).map(tr => (
-          <AudioTrack key={tr.participant.identity} trackRef={tr} />
+          <AudioTrack key={tr.participant.identity} trackRef={tr} volume={speakerVolume} />
         ))}
       </div>
     );
@@ -222,6 +268,7 @@ function CallStage({ isVideo, maxSeconds, onTimeout, background = false, onConne
                 cameraRef={cameraOf(p)}
                 micRef={micOf(p)}
                 pip={false}
+                speakerVolume={speakerVolume}
               />
             ))}
             {participants.slice(2).map((p) => (
@@ -232,10 +279,34 @@ function CallStage({ isVideo, maxSeconds, onTimeout, background = false, onConne
                 cameraRef={cameraOf(p)}
                 micRef={micOf(p)}
                 pip
+                speakerVolume={speakerVolume}
               />
             ))}
           </>
         )}
+      </div>
+
+      {/* เมนูคุมสาย — แถบปุ่มก้นจอ */}
+      <div className="lk-controls" role="toolbar" aria-label="คุมสาย">
+        <button type="button" onClick={toggleMic} title={isMicrophoneEnabled ? 'ปิดไมค์' : 'เปิดไมค์'} className={isMicrophoneEnabled ? '' : 'off'}>
+          {isMicrophoneEnabled ? '🎙️' : '🔇'}
+        </button>
+        {isVideo && (
+          <button type="button" onClick={toggleCam} title={isCameraEnabled ? 'ปิดกล้อง' : 'เปิดกล้อง'} className={isCameraEnabled ? '' : 'off'}>
+            {isCameraEnabled ? '📹' : '🚫'}
+          </button>
+        )}
+        {isVideo && (
+          <button type="button" onClick={flipCamera} title="สลับกล้องหน้า/หลัง">
+            🔄
+          </button>
+        )}
+        <button type="button" onClick={toggleSpeaker} title={speakerMuted ? 'เปิดเสียงลำโพง' : 'ปิดเสียงลำโพง'} className={speakerMuted ? 'off' : ''}>
+          {speakerMuted ? '🔈' : '🔊'}
+        </button>
+        <button type="button" className="hangup" onClick={onEnd} title="วางสาย">
+          ✕
+        </button>
       </div>
     </div>
   );
@@ -248,9 +319,10 @@ interface TileProps {
   cameraRef?: TrackReference;
   micRef?: TrackReference;
   pip: boolean;
+  speakerVolume?: number;
 }
 
-function ParticipantTile({ participant, isVideo, cameraRef, micRef, pip }: TileProps) {
+function ParticipantTile({ participant, isVideo, cameraRef, micRef, pip, speakerVolume = 1 }: TileProps) {
   const isLocal = participant.isLocal;
   const name = participant.name || participant.identity || 'ผู้ใช้';
   const muted = !!micRef?.publication?.isMuted;
@@ -260,7 +332,7 @@ function ParticipantTile({ participant, isVideo, cameraRef, micRef, pip }: TileP
   const inner = (
     <>
       {/* audio ของ remote — local ไม่ต้อง (ไม่ต้องได้ยินเสียงตัวเอง) */}
-      {!isLocal && micRef && <AudioTrack trackRef={micRef} />}
+      {!isLocal && micRef && <AudioTrack trackRef={micRef} volume={speakerVolume} />}
       {hasVideo && cameraRef ? (
         <VideoTrack trackRef={cameraRef} />
       ) : (

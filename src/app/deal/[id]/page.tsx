@@ -412,30 +412,41 @@ export default function DealRoom() {
   const [showTrackingRequired, setShowTrackingRequired] = useState(false);
   const trackingInputRef = useRef<HTMLInputElement>(null);
   const trackingProviderRef = useRef<HTMLSelectElement>(null);
-  const [showCall, setShowCall] = useState(false);
-  // โหมดคอล: null=ปิด, 'voice'=โทรเสียงล้วน, 'video'=วิดีโอคอล (showCall เปิดเมื่อ callMode !== null)
-  const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
+  // ─── State machine การโทร (ครอบคลุมทุกสถานะ: idle/outgoing/incoming/connecting/active/ended) ───
+  // เปลี่ยนจาก state กระจัดกระจาย → state เดียวเพื่อ flow ที่ถูกต้อง (ต้องรอรับสายก่อนถึงจะ active)
+  type CallStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'active' | 'ended';
+  const [callStatus, setCallStatus] = useState<CallStatus>('idle');
+  // mode ของคอลปัจจุบัน ('voice' | 'video') — ใช้ตอน mount DealVideoCall
+  const [callMode, setCallMode] = useState<'voice' | 'video'>('video');
+  // message id ของสายปัจจุบัน (เพื่อ track ว่าอยู่ในคอล msg ไหน + detect end) — state เพื่อ trigger render
+  const [activeCallMsgId, setActiveCallMsgId] = useState<string | null>(null);
+  // วินาทีที่คุยไป (เริ่มนับหลัง active เท่านั้น) — สำหรับแสดงตัวนับเวลา
+  const [callSeconds, setCallSeconds] = useState(0);
   // แจ้งเตือนเมื่อคอลหมดเวลา 10 นาที (กดโทรใหม่เพื่อคุยต่อ)
   const [callTimedOut, setCallTimedOut] = useState(false);
+  // แจ้งเตือนเมื่อสายไม่รับ / อีกฝ่ายวางสาย
+  const [callEndedReason, setCallEndedReason] = useState<{ title: string; sub: string } | null>(null);
   // กล่องแชทลอยที่เรียกจากปุ่มลอย (แสดงทั้งตอนคอลและไม่คอล)
   const [floatChatOpen, setFloatChatOpen] = useState(false);
   // สายเรียกเข้า — derived value คำนวณจาก msgs ไม่ใช้ setState ใน effect (กัน cascading render)
   // (incomingCall ถูกประกาศเป็น useMemo ด้านล่าง — ต้องมี dismissedCallIds เพื่อ track ว่าเราเคยปฏิเสธ/รับ msg id นี้แล้ว)
   const [dismissedCallIds, setDismissedCallIds] = useState<Set<string>>(new Set());
-  // voice call กำลังทำงานเป็น background (เสียงคุยได้ยิน แต่ไม่ทับหน้าจอหลัก)
-  const [voiceBgActive, setVoiceBgActive] = useState(false);
-  // วินาทีที่ voice call background คุยไป (สำหรับแสดงตัวนับเวลาบนปุ่ม)
-  const [voiceBgSeconds, setVoiceBgSeconds] = useState(0);
-  // track message id สายปัจจุบันที่เรากำลังคุยอยู่ (เพื่อแยกจากสายเรียกเข้าใหม่)
-  const activeCallMsgIdRef = useRef<string | null>(null);
-  // AudioContext สำหรับเล่นเสียงปี๊ดสายเรียกเข้า (ปลดล็อกตอน user แตะครั้งแรก)
+  // AudioContext สำหรับเล่นเสียงสายเรียกเข้า/ดองดึ๊ด (ปลดล็อกตอน user แตะครั้งแรก)
   const audioCtxRef = useRef<AudioContext | null>(null);
+  // ─── เก็บค่า derived จาก callStatus เพื่อใช้ทั่วโค้ด (backward compat) ───
+  const isActiveCall = callStatus === 'active';
+  const isInCall = callStatus === 'outgoing' || callStatus === 'connecting' || callStatus === 'active';
+  const showCall = isActiveCall && callMode === 'video'; // เปิดเต็มจอเฉพาะ video ตอน active
+  const voiceBgActive = isActiveCall && callMode === 'voice'; // background เฉพาะ voice ตอน active
+  const voiceBgSeconds = callSeconds; // alias สำหรับโค้ดเดิม
+  // track message id ของสายที่กำลังคุย — ref สำหรับใช้ใน polling/memo (คู่กับ state)
+  const activeCallMsgIdRef = useRef<string | null>(null);
   // ข้อ3: ระหว่างวิดีโอคอล ซ่อนปุ่มลอย "กลับหน้าหลัก" + "บริการลูกค้า" (ผ่าน body.in-call)
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    document.body.classList.toggle('in-call', showCall);
+    document.body.classList.toggle('in-call', isInCall);
     return () => { document.body.classList.remove('in-call'); };
-  }, [showCall]);
+  }, [isInCall]);
   const [tab, setTab] = useState<DealTab>(readDealTab(requestedTab));
   const [evidenceType, setEvidenceType] = useState('packing');
   const [copied, setCopied] = useState(false);
@@ -610,9 +621,11 @@ export default function DealRoom() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setTab(readDealTab(requestedTab));
-      if (requestedCall && isDealParty(deal, myId)) setShowCall(true);
+      // เข้าหน้าดีลด้วย ?call=1 (จาก push notification) → เริ่มวิดีโอคอลเป็น outgoing (รอรับสาย)
+      if (requestedCall && isDealParty(deal, myId)) startCall('video');
     }, 0);
     return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deal, myId, requestedCall, requestedTab]);
 
   const fetchDeal = useCallback(async (headers: Record<string, string> = {}) => {
@@ -827,7 +840,7 @@ export default function DealRoom() {
     // canCall = เป็นคู่ดีล มี buyer เข้าแล้ว และดีลยังไม่จบ → poll เพื่อรอสายเรียกเข้า
     const canCallCheck = isDealParty(deal, myId) && !!deal?.buyer_id && !['completed', 'cancelled'].includes(deal?.status || '');
     if (!isDealParty(deal, myId)) return;
-    if (tab !== 'chat' && !showCall && !voiceBgActive && !isMeetupDeal && !isSimpleChatStage && !canCallCheck) return;
+    if (tab !== 'chat' && !isInCall && !isMeetupDeal && !isSimpleChatStage && !canCallCheck) return;
     let stopped = false;
     const poll = async () => {
       try {
@@ -837,13 +850,13 @@ export default function DealRoom() {
     };
     void poll();
     // ตอนอยู่ในคอล/คุยเร็วหน่อย, ตอนรอสายเรียกเข้า (ยังไม่ได้คุย) ใช้ 3 วิเพื่อตอบสนองเร็ว
-    const intervalMs = (showCall || voiceBgActive) ? 4000 : (isSimpleChatStage ? 2500 : canCallCheck ? 3000 : 5000);
+    const intervalMs = isInCall ? 4000 : (isSimpleChatStage ? 2500 : canCallCheck ? 3000 : 5000);
     const timer = window.setInterval(() => { void poll(); }, intervalMs);
     return () => {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [deal, fetchMsgs, getAuthHeaders, myId, priceState, showCall, voiceBgActive, tab, wzViewStep]);
+  }, [deal, fetchMsgs, getAuthHeaders, myId, priceState, isInCall, tab, wzViewStep]);
 
   // แจ้งผู้ร่วมดีลว่ามีคนเข้ามาดูห้องนี้ — ครั้งเดียวต่อ session ต่อดีล กันสแปม
   const visitSent = useRef(false);
@@ -915,10 +928,10 @@ export default function DealRoom() {
     if (parsed.callerId === myId) return null; // เราเป็นคนโทรเอง
     if (activeCallMsgIdRef.current === latestStart.id) return null; // คอลที่เรากำลังคุย
     if (dismissedCallIds.has(latestStart.id)) return null; // เราเคยปฏิเสธ/รับ msg นี้แล้ว
-    if (voiceBgActive || showCall) return null; // เรากำลังอยู่ในคอลอื่น
+    if (isInCall) return null; // เรากำลังอยู่ในคอลอื่น (outgoing/connecting/active)
     const callerName = (parsed.text || '').replace(/\s*เริ่ม.*$/, '').replace(/\s*\(ผู้สนใจ.*\)$/, '').trim() || 'อีกฝ่าย';
     return { callerId: parsed.callerId || '', callerName, mode: parsed.mode || 'video', msgId: latestStart.id };
-  }, [msgs, myId, deal, nowTs, voiceBgActive, showCall, dismissedCallIds]);
+  }, [msgs, myId, deal, nowTs, isInCall, dismissedCallIds]);
 
   // เล่นเสียงปี๊ดสายเรียกเข้าซ้ำทุก 2.5 วินาที นาน 30 วินาที แล้วเคลียร์ incomingCall (เหมือนไม่รับสาย)
   useEffect(() => {
@@ -932,12 +945,47 @@ export default function DealRoom() {
     return () => { window.clearInterval(ringIv); window.clearTimeout(stopTimeout); };
   }, [incomingCall]);
 
-  // นับเวลา voice call background (อัพเดตทุกวินาที สำหรับแสดงตัวนับเวลาบนปุ่ม 📞)
+  // ─── ผู้โทรรอสาย (outgoing) — เล่นเสียงดองดึ๊ดทุก 6 วิ + หมดเวลา 30 วิ = ไม่รับสาย ───
   useEffect(() => {
-    if (!voiceBgActive) return;
-    const iv = window.setInterval(() => setVoiceBgSeconds(s => s + 1), 1000);
+    if (callStatus !== 'outgoing') return;
+    playRingback();
+    // จังหวะดองดึ๊ดมาตรฐาน: เล่น 2 วิ หยุด 4 วิ → รวม 6 วิ/รอบ
+    const ringIv = window.setInterval(playRingback, 6000);
+    const stopTimeout = window.setTimeout(() => {
+      // รอ 30 วิ ไม่มีคนรับ → สายไม่รับ
+      onCallMissed();
+    }, 30000);
+    return () => { window.clearInterval(ringIv); window.clearTimeout(stopTimeout); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callStatus]);
+
+  // ─── นับเวลาตอน active (ทั้ง voice + video) — ใช้ callSeconds ───
+  useEffect(() => {
+    if (!isActiveCall) return;
+    const iv = window.setInterval(() => setCallSeconds(s => s + 1), 1000);
     return () => window.clearInterval(iv);
-  }, [voiceBgActive]);
+  }, [isActiveCall]);
+
+  // ─── ตรวจจับ "อีกฝ่ายวางสาย" — เมื่อเห็น message 📞|end ใหม่ขณะอยู่ในคอล ───
+  useEffect(() => {
+    if (!isActiveCall || !activeCallMsgId) return;
+    // ค้นหา end message ที่เกิดหลังจาก start message ของคอลปัจจุบัน
+    const startIdx = msgs.findIndex(m => m.id === activeCallMsgId);
+    if (startIdx < 0) return;
+    for (let i = startIdx + 1; i < msgs.length; i += 1) {
+      const m = msgs[i];
+      if (m.role === 'system' && m.content.startsWith('📞|end')) {
+        // อีกฝ่ายวางสาย → แจ้งและคืน idle
+        setCallEndedReason({ title: '📞 วางสายแล้ว', sub: 'อีกฝ่ายวางสาย' });
+        setCallStatus('idle');
+        setCallSeconds(0);
+        setCallMode('video');
+        activeCallMsgIdRef.current = null;
+        setActiveCallMsgId(null);
+        return;
+      }
+    }
+  }, [msgs, isActiveCall, activeCallMsgId]);
 
   // ปลดล็อก AudioContext ตอน user แตะหน้าจอครั้งแรก (เบราว์เซอร์บล็อกเสียงที่ไม่ได้เริ่มจาก gesture)
   // จำเป็นเพื่อให้เสียงปี๊ดสายเรียกเข้าเล่นได้ในภายหลัง
@@ -959,7 +1007,7 @@ export default function DealRoom() {
       if (r.ok) {
         // re-fetch ทั้งดีล+meetup+priceState+evidence ให้ตรงกัน (PATCH คืนแค่ deal row)
         const nextDeal = await fetchDeal(headers);
-        if ((tab === 'chat' || showCall) && isDealParty(nextDeal ?? deal, myId)) await fetchMsgs(headers, nextDeal ?? deal, myId);
+        if ((tab === 'chat' || isInCall) && isDealParty(nextDeal ?? deal, myId)) await fetchMsgs(headers, nextDeal ?? deal, myId);
         return nextDeal;
       } else if (r.status === 401) {
         headersRef.current = {}; // ล้าง cache
@@ -1047,22 +1095,16 @@ export default function DealRoom() {
    */
   function startCall(mode: 'voice' | 'video') {
     if (!isDealParty(deal, myId)) return;
+    // State machine: idle → outgoing (ยังไม่ active — รออีกฝ่ายรับสาย)
     setCallMode(mode);
+    setCallStatus('outgoing');
+    setCallSeconds(0);
     setCallTimedOut(false);
-    if (mode === 'voice') {
-      // voice: ทำงานเป็น background — ไม่ทับหน้าจอหลัก
-      setShowCall(false);
-      setVoiceBgActive(true);
-      setVoiceBgSeconds(0);
-    } else {
-      // video: เปิดเต็มจอ
-      setShowCall(true);
-      setVoiceBgActive(false);
-    }
-    // ปลดล็อก AudioContext ทันทีที่ผู้ใช้กด (เผื่อเอาไว้สำหรับเสียงสายเรียกเข้าในอนาคต)
+    setCallEndedReason(null);
+    // ปลดล็อก AudioContext ทันทีที่ผู้ใช้กด (user gesture) — เพื่อเล่นเสียงดองดึ๊ดได้
     unlockAudio();
-    // แจ้งเตือนทุกครั้งที่มีคนล็อกอินเปิดคอล — รวมถึงผู้สนใจที่มาจากลิงก์แชร์ (guest ที่ล็อกอินแล้ว)
-    if (myId && Date.now() - callNotifyAt.current > 120000) {
+    // แจ้งเตือนอีกฝ่าย — ลด throttle เป็น 5 วิ (รองรับกดโทรใหม่รวด ๆ ได้ตาม requirement "ต่อสายได้เสมอ")
+    if (myId && Date.now() - callNotifyAt.current > 5000) {
       callNotifyAt.current = Date.now();
       (async () => {
         try {
@@ -1077,7 +1119,10 @@ export default function DealRoom() {
             const fresh = await fetch(`/api/messages?dealId=${dealId}`, { headers, cache: 'no-store' }).then(x => x.json()).catch(() => null);
             const sysMsgs = (fresh?.messages || []).filter((m: Msg) => m.role === 'system' && m.content?.startsWith('📞|') && !m.content.startsWith('📞|end'));
             const latest = sysMsgs[sysMsgs.length - 1];
-            if (latest) activeCallMsgIdRef.current = latest.id;
+            if (latest) {
+              activeCallMsgIdRef.current = latest.id;
+              setActiveCallMsgId(latest.id);
+            }
             setMsgs(fresh?.messages || []);
           }
         } catch { /* แจ้งเตือนไม่สำเร็จ ไม่กระทบการเข้าคอล */ }
@@ -1085,14 +1130,14 @@ export default function DealRoom() {
     }
   }
 
-  /** วางสาย/ปิดคอล — ส่ง end_call ให้อีกฝ่ายรู้ว่าวางสายแล้ว (ไม่ throttle) */
+  /** วางสาย — ส่ง end_call ให้อีกฝ่ายรู้ แล้วคืนสู่ idle (ไม่ throttle) */
   function endCall() {
-    const wasInCall = callMode !== null || voiceBgActive;
-    setCallMode(null);
-    setShowCall(false);
-    setVoiceBgActive(false);
-    setVoiceBgSeconds(0);
+    const wasInCall = callStatus !== 'idle';
+    setCallStatus('idle');
+    setCallSeconds(0);
+    setCallMode('video');
     activeCallMsgIdRef.current = null;
+    setActiveCallMsgId(null);
     if (wasInCall && myId) {
       (async () => {
         try {
@@ -1108,27 +1153,45 @@ export default function DealRoom() {
     }
   }
 
-  /** รับสายเรียกเข้า — เข้าคอลตาม mode ที่อีกฝ่ายเริ่ม */
+  /** อีกฝ่ายรับสายแล้ว — เปลี่ยนจาก outgoing → active (เริ่มนับเวลา + หยุดเสียงดองดึ๊ด) */
+  function onCallAnswered() {
+    if (callStatus === 'outgoing' || callStatus === 'connecting') {
+      setCallStatus('active');
+      setCallSeconds(0);
+    }
+  }
+
+  /** หมดเวลารอสาย (30 วิ) — สายไม่รับ */
+  function onCallMissed() {
+    const callerName = dealTitle();
+    setCallEndedReason({ title: '📞 ไม่รับสาย', sub: `${callerName} ไม่รับสายในขณะนี้` });
+    endCall();
+  }
+
+  /** รับสายเรียกเข้า — เข้าสถานะ connecting (รอ LiveKit เชื่อมต่อ → onConnected เปลี่ยน active) */
   function acceptIncomingCall() {
     if (!incomingCall) return;
     setDismissedCallIds(prev => new Set(prev).add(incomingCall.msgId));
     activeCallMsgIdRef.current = incomingCall.msgId;
+    setActiveCallMsgId(incomingCall.msgId);
     unlockAudio();
-    if (incomingCall.mode === 'voice') {
-      setCallMode('voice');
-      setShowCall(false);
-      setVoiceBgActive(true);
-      setVoiceBgSeconds(0);
-    } else {
-      setCallMode('video');
-      setShowCall(true);
-      setVoiceBgActive(false);
-    }
+    setCallMode(incomingCall.mode);
+    // ฝั่งรับสายเชื่อมต่อ LiveKit แล้ว remoteParticipants จะเห็น caller → เปลี่ยน active ผ่าน onAnswered
+    setCallStatus('connecting');
   }
 
-  /** ปฏิเสธสายเรียกเข้า — mark msg id ว่าปฏิเสธแล้ว (ฝั่งโทรจะเห็นว่าไม่มีคนเข้าร่วมใน LiveKit) */
+  /** ปฏิเสธสายเรียกเข้า — mark msg id ว่าปฏิเสธแล้ว (ฝั่งโทรจะเห็นว่าไม่มีคนเข้าร่วม → หมดเวลาเอง) */
   function declineIncomingCall() {
     if (incomingCall) setDismissedCallIds(prev => new Set(prev).add(incomingCall.msgId));
+  }
+
+  /** ชื่อคู่สาย (ใช้ในหน้า ringing) — ดึงจากฝ่ายตรงข้ามในดีล */
+  function dealTitle(): string {
+    if (!deal) return 'อีกฝ่าย';
+    // ถ้าเราเป็น buyer → คู่สายคือ seller, ฯลฯ
+    if (myRole === 'buyer') return deal.seller_name || 'ผู้ขาย';
+    if (myRole === 'seller') return deal.buyer_name || 'ผู้ซื้อ';
+    return deal.buyer_name || deal.seller_name || 'อีกฝ่าย';
   }
 
   /** ปลดล็อก AudioContext ตอน user แตะ (เบราว์เซอร์บล็อกเสียงที่ไม่ได้เริ่มจาก gesture) */
@@ -1157,6 +1220,29 @@ export default function DealRoom() {
       osc.connect(gain).connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.45);
+    } catch { /* เงียบ */ }
+  }
+
+  /** เล่นเสียงดองดึ๊ด (ringback tone) 1 จังหวะ — 2 tone 440Hz+480Hz พร้อมกัน 2 วิ (ตามมาตรฐานสากล) */
+  function playRingback() {
+    try {
+      const ctx = audioCtxRef.current;
+      if (!ctx || ctx.state !== 'running') return;
+      const now = ctx.currentTime;
+      // 2 oscillators (440 + 480 Hz) เล่นพร้อมกัน = ringback tone อเมริกัน/ไทย
+      [440, 480].forEach(freq => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.15, now + 0.05);
+        gain.gain.setValueAtTime(0.15, now + 2.0);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.05);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 2.1);
+      });
     } catch { /* เงียบ */ }
   }
 
@@ -4741,22 +4827,24 @@ export default function DealRoom() {
         </div>
       </header>
 
-      {showCall ? (
+      {/* ─── โหมดคอล (outgoing/connecting/active) — เปิดเต็มจอเฉพาะ video ตอน active ─── */}
+      {isInCall && callMode === 'video' ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0d1117', minHeight: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,.4)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>{callMode === 'voice' ? '📞 โทรเสียง' : '📹 วิดีโอคอล'} กำลังดำเนินการ… (จำกัด 10 นาทีต่อครั้ง)</span>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {callMode === 'video' && <CallRecorder dealId={dealId} onSaveEvidence={saveCallEvidence} />}
-              <button onClick={endCall} className="btn btn-danger btn-sm">✕ วางสาย</button>
-            </div>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>
+              {callStatus === 'outgoing' ? '📞 กำลังโทร…' : callStatus === 'connecting' ? '🔗 กำลังเชื่อมต่อ…' : '📹 วิดีโอคอล'} (จำกัด 10 นาทีต่อครั้ง)
+            </span>
+            {isActiveCall && <CallRecorder dealId={dealId} onSaveEvidence={saveCallEvidence} />}
           </div>
           <div style={{ flex: 1, minHeight: '60vh' }}>
             <DealVideoCall
               dealId={dealId}
               getAuthHeaders={getAuthHeaders}
               onEnd={endCall}
-              mode={callMode === 'voice' ? 'voice' : 'video'}
+              mode="video"
               onTimeout={() => { setCallTimedOut(true); endCall(); }}
+              onConnected={() => { if (callStatus === 'connecting') setCallStatus('active'); }}
+              onAnswered={onCallAnswered}
             />
           </div>
           {/* กล่องแชทลอยซ้อนบนคอล — เรียกจากปุ่ม 💬 ในแถบลอยด้านล่าง (floatChatOpen) */}
@@ -4835,7 +4923,7 @@ export default function DealRoom() {
         </>
       )}
       {/* แถบปุ่มลอย (💬 แชท / 📞 โทร / 📹 วิดีโอ) — แสดงตลอดทุกขั้นตอนของดีล ตั้งแต่มีคู่ดีลเข้ามาจนจบ
-          สถานะปุ่ม 📞: ปกติ=กดโทร, กำลังคุย voice bg=แสดงตัวนับเวลาแดงกดเพื่อวางสาย, มีสายเข้า=กระพริบ */}
+          สถานะปุ่ม 📞: ปกติ=กดโทร, กำลังคุย voice bg=ตัวนับเวลาแดงกดเพื่อวางสาย, มีสายเข้า=กระพริบ */}
       {canCall && (
         <div className="dr-floatbar" role="toolbar" aria-label="การสื่อสารในดีล">
           <button type="button" className={`dr-floatbar-btn ${floatChatOpen ? 'active' : ''}`} onClick={() => setFloatChatOpen(v => !v)} title="แชท">
@@ -4845,36 +4933,54 @@ export default function DealRoom() {
           {/* ปุ่มโทรเสียง — เปลี่ยนตามสถานะ */}
           {voiceBgActive ? (
             <button type="button" className="dr-floatbar-btn voice-active" onClick={endCall} title="วางสาย">
-              <span className="ic">📞</span><span className="dur">{fmtVoiceDur(voiceBgSeconds)}</span>
+              <span className="ic">📞</span><span className="dur">{fmtVoiceDur(callSeconds)}</span>
             </button>
           ) : incomingCall ? (
             <button type="button" className="dr-floatbar-btn ringing" onClick={acceptIncomingCall} title="รับสายเรียกเข้า">
               <span className="ic">📞</span><span>รับสาย</span>
             </button>
-          ) : !showCall ? (
+          ) : callStatus === 'idle' ? (
             <button type="button" className="dr-floatbar-btn voice" onClick={() => startCall('voice')} title="โทรเสียง">
               <span className="ic">📞</span><span>โทร</span>
             </button>
           ) : null}
-          {/* ปุ่มวิดีโอคอล — ซ่อนตอนอยู่ในคอล/voice bg/มีสายเข้า */}
-          {!showCall && !voiceBgActive && !incomingCall && (
+          {/* ปุ่มวิดีโอคอล — ซ่อนตอนอยู่ในคอล/มีสายเข้า/กำลังโทร */}
+          {callStatus === 'idle' && !incomingCall && (
             <button type="button" className="dr-floatbar-btn video" onClick={() => startCall('video')} title="วิดีโอคอล">
               <span className="ic">📹</span><span>วิดีโอ</span>
             </button>
           )}
         </div>
       )}
-      {/* voice call background — mount DealVideoCall แบบซ่อน เพื่อให้เสียงสนทนาทำงานขณะใช้หน้าจอหลัก */}
-      {voiceBgActive && (
+      {/* voice call background — mount DealVideoCall แบบซ่อน
+          ครอบ outgoing/connecting/active เพื่อให้ useRemoteParticipants detect รับสายได้ตลอด
+          (เสียงทำงานตลอด, แสดง tile เฉพาะตอน active) */}
+      {(callStatus === 'outgoing' || callStatus === 'connecting' || voiceBgActive) && callMode === 'voice' && (
         <div className="dr-voice-bg">
           <DealVideoCall
             dealId={dealId}
             getAuthHeaders={getAuthHeaders}
             onEnd={endCall}
             mode="voice"
-            background
+            background={!voiceBgActive}
             onTimeout={() => { setCallTimedOut(true); endCall(); }}
+            onConnected={() => { if (callStatus === 'connecting') setCallStatus('active'); }}
+            onAnswered={onCallAnswered}
           />
+        </div>
+      )}
+      {/* ─── ringing overlay (ผู้โทรรอสาย — ทั้ง voice/video) ─── */}
+      {callStatus === 'outgoing' && (
+        <div className="lk-ringing-overlay" role="status" aria-label="กำลังโทร">
+          <div className="lk-ringing-avatar">{dealTitle().charAt(0) || '?'}</div>
+          <div className="lk-ringing-name">{dealTitle()}</div>
+          <div className="lk-ringing-status">
+            กำลัง{callMode === 'voice' ? 'โทร' : 'วิดีโอคอล'}
+            <span className="lk-ringing-dots"><span /><span /><span /></span>
+          </div>
+          <button type="button" className="lk-ringing-hangup" onClick={endCall} title="วางสาย" aria-label="วางสาย">
+            ✕
+          </button>
         </div>
       )}
       {/* popup รับสายเรียกเข้า — ลอยกลางล่าง */}
@@ -4887,6 +4993,15 @@ export default function DealRoom() {
             <button type="button" className="dr-incoming-call-accept" onClick={acceptIncomingCall}>✅ รับสาย</button>
             <button type="button" className="dr-incoming-call-decline" onClick={declineIncomingCall}>✕ ปฏิเสธ</button>
           </div>
+        </div>
+      )}
+      {/* แจ้งเตือนเมื่อสายไม่รับ / อีกฝ่ายวางสาย */}
+      {callEndedReason && (
+        <div className="dr-call-timeout-toast" role="status">
+          <div style={{ fontSize: 22, marginBottom: 6 }}>{callEndedReason.title.charAt(0)}</div>
+          <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--ink)', marginBottom: 4 }}>{callEndedReason.title.slice(2)}</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12 }}>{callEndedReason.sub}</div>
+          <button className="btn btn-primary btn-sm btn-block" onClick={() => setCallEndedReason(null)}>รับทราบ</button>
         </div>
       )}
       {/* แจ้งเตือนเมื่อคอลหมดเวลา 10 นาที */}
