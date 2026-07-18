@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
+import { notifyUsers } from '../_lib/notify';
 
 const pairKeyOf = (a: string, b: string) => [a, b].sort().join('_');
 
@@ -95,6 +96,14 @@ export async function POST(req: NextRequest) {
       read: false,
     }).select().single();
     if (error) throw new Error(error.message);
+
+    // แจ้งเตือน (in-app + push) ผู้รับ — ระบบเดิมไม่มี notifyUsers ตรงนี้ → เพิ่มเพื่อให้ DM ใหม่ได้รับ push
+    await notifyUsers(db, [toId], {
+      title: `💬 ${myProfile?.display_name || 'สมาชิก'}`,
+      body: content.slice(0, 100),
+      link: '/messages',
+    });
+
     return NextResponse.json({ message: doc });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;

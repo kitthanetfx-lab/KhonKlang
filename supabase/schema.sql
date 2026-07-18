@@ -588,6 +588,21 @@ create table notifications (
 create index idx_notifications_user on notifications(user_id, created_at desc);
 
 -- ============================================================================
+-- 11.5. DEVICE TOKENS (FCM/APNs — push notification สำหรับแอปมือถือ)
+-- ============================================================================
+-- เก็บ token ที่แอป (Capacitor) ขอจาก FCM/APNs แล้วยิง POST /api/push/register มา
+-- 1 user สามารถมีหลายเครื่อง → เก็บหลาย token ได้ (unique ที่ user_id+token)
+create table device_tokens (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references profiles(id) on delete cascade,
+  token      text not null,
+  platform   text check (platform in ('android','ios','web')) not null,
+  updated_at timestamptz not null default now(),
+  unique (user_id, token)
+);
+create index idx_device_tokens_user on device_tokens(user_id);
+
+-- ============================================================================
 -- 12. SCAM REPORTS
 -- ============================================================================
 create table scam_reports (

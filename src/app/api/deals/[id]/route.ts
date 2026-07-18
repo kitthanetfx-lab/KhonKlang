@@ -644,15 +644,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         .filter((x): x is string => typeof x === 'string' && !!x && x !== me.id)
         .filter(x => !(action === 'select_middleman' && x === updated.middleman_id));
       if (recipients.length) {
-        const title =
-          action === 'start_call' ? `📞 สายเรียกเข้า: ${updated.title || 'ดีล'}` :
-          action === 'visit' ? `👀 มีคนเข้ามาดูห้องดีล: ${updated.title || ''}` :
-          `ดีล: ${updated.title || 'ไม่มีชื่อ'}`;
-        await notifyUsers(db, recipients, {
-          title,
-          body: systemMsg,
-          link: action === 'start_call' ? `/deal/${id}?call=1` : `/deal/${id}`,
-        });
+        if (action === 'start_call') {
+          // สายเรียกเข้า → high-priority push + VoIP (iOS) + full-screen intent (Android)
+          // ฝั่ง native ใช้ data payload (type/dealId/mode/callerName) สร้างหน้าจอรับสายเต็มจอ
+          const callMode = body.mode === 'voice' ? 'voice' : 'video';
+          await notifyUsers(db, recipients, {
+            title: `📞 สายเรียกเข้า: ${updated.title || 'ดีล'}`,
+            body: systemMsg,
+            link: `/deal/${id}?call=1`,
+            kind: 'call',
+            data: { type: 'incoming_call', dealId: id, mode: callMode, callerName: myName || 'ผู้ใช้' },
+          });
+        } else {
+          const title =
+            action === 'visit' ? `👀 มีคนเข้ามาดูห้องดีล: ${updated.title || ''}` :
+            `ดีล: ${updated.title || 'ไม่มีชื่อ'}`;
+          await notifyUsers(db, recipients, {
+            title,
+            body: systemMsg,
+            link: `/deal/${id}`,
+          });
+        }
       }
 
       // แจ้งคนกลางแบบเจาะจงเมื่อถูกเลือก

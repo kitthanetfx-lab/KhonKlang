@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
+import { notifyUsers } from '../_lib/notify';
 
 function isAuthError(err: unknown) {
   return err instanceof HttpError && (err.status === 401 || err.status === 403);
@@ -79,6 +80,26 @@ export async function POST(req: NextRequest) {
       file_name: fileName || '',
     }).select().single();
     if (error) throw new Error(error.message);
+
+    // แจ้งเตือน (in-app + push) สมาชิกดีลคนอื่น — ไม่รวมผู้ส่ง
+    // ระบบเดิมไม่มี notifyUsers ตรงนี้ → เพิ่มเพื่อให้แชทใหม่ได้รับ push บนมือถือ
+    if (safeRole !== 'system') {
+      const { data: dealRow } = await db.from('deals')
+        .select('buyer_id, seller_id, middleman_id, title')
+        .eq('id', dealId).maybeSingle();
+      const recipients = [dealRow?.buyer_id, dealRow?.seller_id, dealRow?.middleman_id]
+        .filter((x): x is string => !!x && x !== me.id);
+      if (recipients.length) {
+        const senderName = profile?.display_name || 'สมาชิก';
+        const body = type === 'image' ? '📷 ส่งรูป' : type === 'file' ? '📎 ส่งไฟล์' : (content || '').slice(0, 100);
+        await notifyUsers(db, recipients, {
+          title: `💬 ${senderName}: ${dealRow?.title || 'ดีล'}`,
+          body,
+          link: `/deal/${dealId}`,
+        });
+      }
+    }
+
     return NextResponse.json({ message: msg });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;
