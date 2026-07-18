@@ -292,7 +292,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'start_call': {
         const isParty = isSeller || isMiddleman || isBuyer;
-        systemMsg = `📹 ${myName || 'ผู้ใช้'}${isParty ? '' : ' (ผู้สนใจจากลิงก์แชร์)'} เข้าร่วมวิดีโอคอล — กดเข้าร่วมได้เลย`;
+        const mode = body.mode === 'voice' ? 'voice' : 'video';
+        // ฝัง caller id + mode ใน content ด้วย prefix 📞| เพื่อให้ client แยก "ฉันโทร" vs "คนอื่นโทรเข้า" ได้
+        systemMsg = `📞|caller=${me.id}|mode=${mode}|${myName || 'ผู้ใช้'}${isParty ? '' : ' (ผู้สนใจจากลิงก์แชร์)'} เริ่ม${mode === 'voice' ? 'โทรเสียง' : 'วิดีโอคอล'} — กดเข้าร่วมได้เลย`;
+        break;
+      }
+      case 'end_call': {
+        systemMsg = `📞|end|${myName || 'ผู้ใช้'} วางสายแล้ว`;
         break;
       }
       case 'meetup_set_location': {
@@ -639,7 +645,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         .filter(x => !(action === 'select_middleman' && x === updated.middleman_id));
       if (recipients.length) {
         const title =
-          action === 'start_call' ? `📹 วิดีโอคอล: ${updated.title || 'ดีล'}` :
+          action === 'start_call' ? `📞 สายเรียกเข้า: ${updated.title || 'ดีล'}` :
           action === 'visit' ? `👀 มีคนเข้ามาดูห้องดีล: ${updated.title || ''}` :
           `ดีล: ${updated.title || 'ไม่มีชื่อ'}`;
         await notifyUsers(db, recipients, {

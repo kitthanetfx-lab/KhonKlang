@@ -33,6 +33,13 @@ interface Props {
   onTimeout?: () => void;
   /** วินาทีต่อครั้ง — default 600 (10 นาที) */
   maxSeconds?: number;
+  /**
+   * background=true → รัน LiveKit room แบบซ่อน (audio ยังทำงาน แต่ไม่แสดง video tiles)
+   * ใช้ตอน voice call ทำงานเป็น background — ผู้ใช้ใช้หน้าจอหลักของดีลได้พร้อมกัน
+   */
+  background?: boolean;
+  /** ถูกเรียกเมื่อเชื่อมต่อสำเร็จ (ใช้ sync ตัวนับเวลาฝั่ง parent ตอน voice background) */
+  onConnected?: () => void;
 }
 
 const CALL_LIMIT_SECONDS = 10 * 60; // 10 นาทีต่อครั้ง ตาม requirement
@@ -67,7 +74,7 @@ const ROOM_OPTIONS = {
   disconnectOnPageLeft: true,
 };
 
-export default function DealVideoCall({ dealId, getAuthHeaders, onEnd, mode = 'video', onTimeout, maxSeconds = CALL_LIMIT_SECONDS }: Props) {
+export default function DealVideoCall({ dealId, getAuthHeaders, onEnd, mode = 'video', onTimeout, maxSeconds = CALL_LIMIT_SECONDS, background = false, onConnected }: Props) {
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
   const [err, setErr] = useState('');
 
@@ -111,7 +118,7 @@ export default function DealVideoCall({ dealId, getAuthHeaders, onEnd, mode = 'v
       onDisconnected={onEnd}
       style={{ height: '100%', width: '100%' }}
     >
-      <CallStage isVideo={isVideo} maxSeconds={maxSeconds} onTimeout={onTimeout} />
+      <CallStage isVideo={isVideo} maxSeconds={maxSeconds} onTimeout={onTimeout} background={background} onConnected={onConnected} />
     </LiveKitRoom>
   );
 }
@@ -121,9 +128,11 @@ interface StageProps {
   isVideo: boolean;
   maxSeconds: number;
   onTimeout?: () => void;
+  background?: boolean;
+  onConnected?: () => void;
 }
 
-function CallStage({ isVideo, maxSeconds, onTimeout }: StageProps) {
+function CallStage({ isVideo, maxSeconds, onTimeout, background = false, onConnected }: StageProps) {
   const connState = useConnectionState();
   const [remaining, setRemaining] = useState(maxSeconds);
   const startedAtRef = useRef<number | null>(null);
@@ -135,6 +144,7 @@ function CallStage({ isVideo, maxSeconds, onTimeout }: StageProps) {
   // เริ่มนับถอยหลังเมื่อเชื่อมต่อสำเร็จ — setState ทั้งหมดอยู่ใน callback (interval) ไม่ใช่ใน body ของ effect
   useEffect(() => {
     if (connState !== 'connected') return;
+    onConnected?.();
     startedAtRef.current = Date.now();
     const iv = window.setInterval(() => {
       const start = startedAtRef.current;
@@ -148,7 +158,7 @@ function CallStage({ isVideo, maxSeconds, onTimeout }: StageProps) {
       }
     }, 500);
     return () => window.clearInterval(iv);
-  }, [connState, maxSeconds, onTimeout]);
+  }, [connState, maxSeconds, onTimeout, onConnected]);
 
   // รวม participant ที่ไม่ซ้ำ — จากทั้ง camera + mic
   const participants = useMemo(() => {
@@ -162,6 +172,19 @@ function CallStage({ isVideo, maxSeconds, onTimeout }: StageProps) {
   const micOf = useCallback((p: Participant) => micTracks.find(t => t.participant.identity === p.identity), [micTracks]);
 
   const connecting = connState !== 'connected';
+
+  // background mode (voice call ทำงานเป็น background) — mount เฉพาะ audio tracks
+  // เพื่อให้ยังได้ยินเสียงสนทนาโดยไม่ render video tile ใดๆ (ประหยัด CPU/GPU)
+  if (background) {
+    return (
+      <div className="lk-room" aria-hidden="true">
+        {/* audio ของทุก remote participant ที่มีไมค์ */}
+        {micTracks.filter(tr => !tr.participant.isLocal).map(tr => (
+          <AudioTrack key={tr.participant.identity} trackRef={tr} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="lk-room">

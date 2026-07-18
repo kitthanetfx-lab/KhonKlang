@@ -2590,6 +2590,47 @@ body.in-call .dr-floatbar { display: flex; }
   font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
   border: 1.5px solid var(--surface);
 }
+/* ปุ่ม 📞 ตอนกำลังคุย voice background — แสดงตัวนับเวลาสีแดง + กระพริบเบาๆ */
+.dr-floatbar-btn.voice-active {
+  color: #fff; background: var(--rose-500);
+  font-family: var(--font-mono); font-weight: 700;
+}
+.dr-floatbar-btn.voice-active .ic { animation: voicePulse 1.6s ease-in-out infinite; }
+.dr-floatbar-btn.voice-active .dur { font-size: 13px; letter-spacing: .02em; }
+@keyframes voicePulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+/* ปุ่ม 📞 ตอนมีสายเรียกเข้า — กระพริบเร็วแรง สีเขียว-เหลืองสลับ */
+.dr-floatbar-btn.ringing {
+  color: #fff; animation: ringFlash .5s ease-in-out infinite alternate;
+}
+.dr-floatbar-btn.ringing .ic { animation: ringShake .3s ease-in-out infinite; }
+@keyframes ringFlash { from { background: var(--green-500); } to { background: var(--amber-400); } }
+@keyframes ringShake { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
+
+/* popup รับสายเรียกเข้า — ลอยกลางล่าง */
+.dr-incoming-call {
+  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%); z-index: 146;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--sh-lg); padding: 16px 18px; width: min(92vw, 360px); text-align: center;
+  animation: drToastIn .25s var(--ease-out);
+}
+.dr-incoming-call-ic { font-size: 32px; margin-bottom: 6px; animation: ringShake .4s ease-in-out infinite; display: inline-block; }
+.dr-incoming-call-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--ink); margin-bottom: 2px; }
+.dr-incoming-call-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
+.dr-incoming-call-actions { display: flex; gap: 10px; }
+.dr-incoming-call-actions button { flex: 1; padding: 10px 12px; border-radius: var(--r-pill); border: none; font-family: var(--font-display); font-weight: 700; font-size: 14px; cursor: pointer; transition: transform .1s; }
+.dr-incoming-call-actions button:active { transform: scale(.97); }
+.dr-incoming-call-accept { background: var(--green-500); color: #fff; }
+.dr-incoming-call-accept:hover { background: var(--green-600); }
+.dr-incoming-call-decline { background: var(--surface-2); color: var(--rose-600); border: 1px solid var(--line); }
+.dr-incoming-call-decline:hover { background: color-mix(in srgb, var(--rose-500) 10%, var(--surface-2)); }
+
+/* container สำหรับ DealVideoCall ตอน voice background — ซ่อนไว้แต่ยัง mount เพื่อให้เสียงทำงาน */
+.dr-voice-bg {
+  position: fixed; left: 0; top: 0; width: 1px; height: 1px;
+  opacity: 0; pointer-events: none; z-index: -1; overflow: hidden;
+}
+
 /* toast แจ้งหมดเวลาคอล */
 .dr-call-timeout-toast {
   position: fixed; left: 50%; top: 78px; transform: translateX(-50%); z-index: 145;
