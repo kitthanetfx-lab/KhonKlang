@@ -22,7 +22,7 @@ import {
   useRemoteParticipants,
   useLocalParticipant,
 } from '@livekit/components-react';
-import { Track, AudioPresets, TrackEvent, type Participant } from 'livekit-client';
+import { Track, AudioPresets, type Participant, type RemoteParticipant } from 'livekit-client';
 
 interface Props {
   dealId: string;
@@ -60,8 +60,9 @@ function initialOf(name?: string): string {
 }
 
 // Latency tuning — ลดดีเลย์: h264 decode เร็ว, adaptiveStream/dynacast ลด bandwidth, speech preset ลด audio latency
-// (BASE_ROOM_OPTIONS ไม่มี videoCaptureDefaults — จะใส่ตาม device ใน component ผ่าน useMemo)
-const BASE_ROOM_OPTIONS = {
+// (ค่าคงที่ ไม่ขึ้นกับ props — ยกขึ้นเป็น module-level เพื่อกัน useMemo หลัง early return ซึ่งผิด rules-of-hooks)
+// ปรับค่าลงเพื่อลดดีเลย์/แล็ก: 540x960 (ใกล้ h540 preset) + 800kbps — adaptiveStream จะปรับ quality ตามขนาด tile/เน็ต
+const ROOM_OPTIONS = {
   adaptiveStream: true,
   dynacast: true,
   publishDefaults: {
@@ -72,34 +73,17 @@ const BASE_ROOM_OPTIONS = {
     videoEncoding: { maxBitrate: 800_000, maxFramerate: 24 },
     simulcast: true,
   },
+  // กล้องแนวตั้ง 540x960 — เล็กลงจาก 720x1280 เพื่อลด bandwidth + CPU encode/decode → ลดแล็ก
+  videoCaptureDefaults: { resolution: { width: 540, height: 960, frameRate: 24 } },
   audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   disconnectOnPageLeft: true,
 };
-
-// detect มือถือ vs คอม — มือถือ = portrait (540×960), คอม = landscape (960×540 เว็บแคม)
-function detectIsMobile(): boolean {
-  if (typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return true;
-  if (typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches) return true;
-  return false;
-}
 
 export default function DealVideoCall({ dealId, getAuthHeaders, onEnd, mode = 'video', onTimeout, maxSeconds = CALL_LIMIT_SECONDS, background = false, onConnected, onAnswered }: Props) {
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
   const [err, setErr] = useState('');
 
   const isVideo = mode === 'video';
-
-  // ตรวจ device ครั้งเดียว — ส่งผลต่อ resolution ที่จะ capture (portrait vs landscape)
-  const isMobile = useMemo(() => detectIsMobile(), []);
-  // ROOM_OPTIONS รวม videoCaptureDefaults ตาม device — มือถือ portrait, คอม landscape (เว็บแคม)
-  const roomOptions = useMemo(() => ({
-    ...BASE_ROOM_OPTIONS,
-    videoCaptureDefaults: {
-      resolution: isMobile
-        ? { width: 540, height: 960, frameRate: 24 }   // portrait — กล้องมือถือ
-        : { width: 960, height: 540, frameRate: 24 },  // landscape — เว็บแคมคอม
-    },
-  }), [isMobile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +118,7 @@ export default function DealVideoCall({ dealId, getAuthHeaders, onEnd, mode = 'v
       connect
       audio
       video={isVideo}
-      options={roomOptions}
+      options={ROOM_OPTIONS}
       connectOptions={{ peerConnectionTimeout: 15000 }}
       onDisconnected={onEnd}
       style={{ height: '100%', width: '100%' }}
@@ -342,44 +326,8 @@ function ParticipantTile({ participant, isVideo, cameraRef, micRef, pip, speaker
   const isLocal = participant.isLocal;
   const name = participant.name || participant.identity || 'ผู้ใช้';
   const muted = !!micRef?.publication?.isMuted;
+  const hasVideo = isVideo && !!cameraRef;
   const speaking = !muted && (participant.isSpeaking || false);
-
-  // track จริงจาก publication — TrackReference เก็บแค่ publication + source, track เข้าผ่าน publication.track
-  const camPub = cameraRef?.publication;
-  const camTrack = camPub?.track;
-  // initial: local track แสดงได้ทันที (publish+attach เอง) — remote ต้องรอ dimensions
-  const [hasFrame, setHasFrame] = useState(() => isLocal && !!camTrack && isVideo);
-
-  // track ตัวไหนเริ่มมี frame จริง → set hasFrame=true (เลิกแสดง placeholder / เลิกหน้าดำ)
-  // สำคัญ: กัน <VideoTrack> render ทันทีที่มี publication แต่ยังไม่ flow ซึ่งทำให้มือถือเจอหน้าดำ
-  useEffect(() => {
-    if (!camTrack || !isVideo) return;
-    if (isLocal) return;  // local ตั้ง hasFrame ใน initial state แล้ว
-    // remote — รอจนกว่า track จะ attached element + flow (publication.dimensions > 0)
-    const check = () => {
-      const dims = camPub?.dimensions;
-      if (dims && dims.width > 0 && dims.height > 0) setHasFrame(true);
-    };
-    check();
-    // ใช้ publication events (SubscriptionStatusChanged/Unmuted) — track dimensions update sync มาที่ publication.dimensions
-    camPub?.on(TrackEvent.SubscriptionStatusChanged, check);
-    camPub?.on(TrackEvent.Unmuted, check);
-    const onMuted = () => setHasFrame(false);
-    camPub?.on(TrackEvent.Muted, onMuted);
-    return () => {
-      camPub?.off(TrackEvent.SubscriptionStatusChanged, check);
-      camPub?.off(TrackEvent.Unmuted, check);
-      camPub?.off(TrackEvent.Muted, onMuted);
-    };
-  }, [camTrack, camPub, isVideo, isLocal]);
-
-  // hasVideo ต้องมีทั้ง publication + frame จริง → กันหน้าดำตอน track ยังไม่ flow
-  const hasVideo = isVideo && !!cameraRef && hasFrame;
-
-  // อ่านขนาดจริงจาก publication.dimensions → ตั้ง inline aspectRatio ให้ tile เป็นไปตาม source (portrait/landscape)
-  const dims = camPub?.dimensions;
-  const aspectRatio = dims && dims.width > 0 && dims.height > 0 ? `${dims.width} / ${dims.height}` : undefined;
-  const tileStyle = aspectRatio ? { aspectRatio } : undefined;
 
   const inner = (
     <>
@@ -393,7 +341,7 @@ function ParticipantTile({ participant, isVideo, cameraRef, micRef, pip, speaker
           <span>{name}{isLocal ? ' (คุณ)' : ''}</span>
           <span style={{ fontSize: 11, opacity: .7 }}>
             {isVideo
-              ? (muted ? '🔇 เงียบ' : isLocal ? '⏳ กำลังเปิดกล้อง…' : '⏳ กำลังเชื่อมต่อกล้อง…')
+              ? (hasVideo ? '' : muted ? '🔇 เงียบ' : '🎤 รอเปิดกล้อง')
               : muted ? '🔇 เงียบ' : speaking ? '🎙️ กำลังพูด' : '🎤 โทรเสียง'}
           </span>
         </div>
@@ -409,5 +357,5 @@ function ParticipantTile({ participant, isVideo, cameraRef, micRef, pip, speaker
   );
 
   if (pip) return <div className="lk-pip">{inner}</div>;
-  return <div className="lk-tile" style={tileStyle}>{inner}</div>;
+  return <div className="lk-tile">{inner}</div>;
 }
