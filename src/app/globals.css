@@ -2647,16 +2647,20 @@ body.in-call .dr-floatbar { display: flex; }
    แทน VideoConference ดั้งเดิม — tile แนวตั้ง กันหลุดเฟรม/เบลอ
    ============================================================ */
 .lk-room { height: 100%; width: 100%; display: flex; flex-direction: column; background: #000; position: relative; overflow: hidden; }
-/* container จำกัดความกว้าง + จัดกลาง — กัน tile บานใหญ่เกินจอคอม */
+/* container จำกัดความกว้าง + จัดกลาง — กัน tile บานใหญ่เกินจอคอม
+   align-items: stretch (ไม่ใช่ center) เพื่อให้ tile ใน column/row เต็ม cross-axis — กัน tile ยุบตัวจน video ไม่แสดงบนมือถือ */
 .lk-split {
   flex: 1; display: flex; min-height: 0; gap: 2px; padding: 2px;
-  justify-content: center; align-items: center;
+  justify-content: center; align-items: stretch;
   max-width: 760px; max-height: 100%; margin: 0 auto; width: 100%;
 }
-/* มือถือ: แบ่งบน/ล่าง (column) — tile สูงสุด 70vh เว้นที่ให้เมนู controls ด้านล่าง */
+/* มือถือ: แบ่งบน/ล่าง (column) — tile ต้องมี aspect-ratio และ width 100% มิฉะนั้น video จะไม่แสดง (root cause เดิม) */
 @media (max-width: 720px) {
   .lk-split { flex-direction: column; max-width: 100%; }
-  .lk-tile { flex: 1 1 0; min-height: 0; max-height: 70vh; }
+  .lk-tile {
+    flex: 1 1 0; min-height: 0; max-height: 70vh;
+    width: 100%; aspect-ratio: 9 / 16;
+  }
 }
 /* แท็บเล็ต/คอม: แบ่งซ้าย/ขวา (row) — tile ไม่เกิน 360px ต่ออัน (2 tile = 720px กลางจอ) */
 @media (min-width: 721px) {

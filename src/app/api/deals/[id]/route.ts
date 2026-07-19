@@ -102,7 +102,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
 
     // โหลด deal_price_state / deal_meetup ตามต้องการ (เฉพาะ action ที่ใช้)
-    const needsPriceState = ['price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back'].includes(action);
+    const needsPriceState = ['price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back', 'request_evidence'].includes(action);
     const needsMeetup = action.startsWith('meetup_');
     const [pdRow, mdRow] = await Promise.all([
       needsPriceState ? db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data) : Promise.resolve(null),
@@ -199,6 +199,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'add_evidence': {
+        // ในขั้น payment_pending (ตรวจหลักฐานก่อนตกลงราคา) → จำกัดเฉพาะผู้ขายเท่านั้นที่อัปโหลดได้
+        // ขั้นอื่น (packing/receive/check) ยังอัพได้ตาม role เดิม
+        if (deal.status === 'payment_pending' && !isSeller) {
+          return NextResponse.json({ error: 'ในขั้นนี้เฉพาะผู้ขายอัปโหลดหลักฐานได้ — ผู้ซื้อ/คนกลางแค่ตรวจและยืนยัน' }, { status: 403 });
+        }
         const { evidenceType, fileId, fileName, content } = body;
         // chat_text เก็บประวัติการสนทนาทั้งหมดเป็นหลักฐานชิ้นเดียว (ไม่ใช่ทีละข้อความ) จึงต้องยาวกว่าแคปทั่วไป 200 ตัวอักษร
         const contentCap = evidenceType === 'chat_text' ? 4000 : 200;
@@ -547,6 +552,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const hasMm = !!deal.middleman_id;
         const allDone = sellerDone && buyerDone && (!hasMm || middlemanDone);
         systemMsg = allDone ? '📁 ทุกฝ่ายยืนยันเก็บหลักฐานเรียบร้อย — ไปตกลงราคาและค่าบริการต่อได้' : `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ยืนยันเก็บหลักฐานแล้ว — รอฝ่ายอื่น`;
+        break;
+      }
+      case 'request_evidence': {
+        // ผู้ซื้อ/คนกลาง ขอหลักฐานเพิ่มจากผู้ขาย → reset evidence_done_* เป็น false (ต้องยืนยันใหม่หลังได้รับหลักฐานเพิ่ม)
+        // ผู้ขายห้ามขอเอง (ผู้ขายเป็นฝ่ายอัปโหลด)
+        if (!isBuyer && !isMiddleman) return NextResponse.json({ error: 'เฉพาะผู้ซื้อ/คนกลางขอหลักฐานเพิ่มได้' }, { status: 403 });
+        const detail = String(body.detail || '').trim().slice(0, 300);
+        priceUpdates = { evidence_done_seller: false, evidence_done_buyer: false, evidence_done_middleman: false };
+        systemMsg = `🔍 ${isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'} ขอหลักฐานเพิ่ม${detail ? `: ${detail}` : ' — โปรดอัปโหลดเพิ่ม'}`;
         break;
       }
       case 'request_chat_back': {

@@ -520,6 +520,9 @@ export default function DealRoom() {
   const sellerFeeInputRef = useRef<HTMLInputElement>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showStep3Warning, setShowStep3Warning] = useState(false);
+  // ช่องกรอก "ขอหลักฐานเพิ่ม" — ผู้ซื่อ/คนกลาง ระบุรายละเอียดที่อยากให้ผู้ขายถ่ายเพิ่ม
+  const [showRequestEvidence, setShowRequestEvidence] = useState(false);
+  const [requestEvidenceDetail, setRequestEvidenceDetail] = useState('');
   const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
   const [priceInput, setPriceInput] = useState('');
   const [feePayerInput, setFeePayerInput] = useState<'buyer' | 'seller' | 'split' | ''>('');
@@ -2079,7 +2082,9 @@ export default function DealRoom() {
 
   // ─── Evidence panel ──────────────────────────────────────────────────────
   function renderEvidencePanel() {
-    const canUp = (myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status)) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
+    // ในขั้น payment_pending (ตรวจหลักฐานก่อนตกลงราคา) → เฉพาะผู้ขายที่อัปโหลดได้
+    // ขั้นอื่น (packing/receive/check) → ตาม role เดิม
+    const canUp = (myRole === 'seller' && ['packing', 'shipped_to_middleman', 'payment_pending'].includes(deal!.status)) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
     // โหมดง่าย: ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่องเมื่อของมาถึง
     const canBuyerUnbox = isSimple && myRole === 'buyer' && deal!.status === 'shipped_to_buyer';
     const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: isSimple ? '📬 วิดีโอก่อนแกะกล่อง (ผู้ซื้อ)' : '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)', chat: '💬 หลักฐานจากแชท', chat_text: '💬 ข้อความแชท', call: '📹 วิดีโอคอลที่บันทึก' };
@@ -2169,8 +2174,9 @@ export default function DealRoom() {
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
     if (s === 'payment_pending') {
       if (pd.agreed) return { step: 5 }; // ตกลงราคาแล้ว → โอนเงินได้
-      const evReady = !!pd.evidence_done_buyer && !!pd.evidence_done_seller;
-      if (evReady) return { step: 4 }; // ตรวจหลักฐานเสร็จทั้งคู่ → ตกลงราคา
+      // เงื่อนไขบังคับใหม่: ต้องมีหลักฐาน ≥1 + ผู้ซื้อยืนยัน (ผู้ขายไม่ต้อง — auto-true เมื่ออัพโหลด)
+      const evReady = evidence.length > 0 && !!pd.evidence_done_buyer;
+      if (evReady) return { step: 4 }; // ตรวจหลักฐานเสร็จ → ตกลงราคา
       return { step: reviewStarted ? 3 : 2 }; // กำลังตรวจหลักฐาน หรือ พูดคุย
     }
     if (s === 'payment_uploaded') {
@@ -2206,7 +2212,8 @@ export default function DealRoom() {
       const mmRS = !!pd.chat_done_middleman || !!pd.evidence_done_middleman;
       // ต้องครบทุกฝ่าย (&&) ถึงจะข้ามไป step ถัดไป — กันฝ่ายเดียวกดแล้ว actualStep เพิ่ม ทำให้อีกฝ่ายกด "ถัดไป" ข้ามได้
       const reviewStarted = sellerRS && buyerRS && mmRS;
-      const evReady = !!pd.evidence_done_buyer && !!pd.evidence_done_seller && !!pd.evidence_done_middleman;
+      // เงื่อนไขบังคับใหม่: ต้องมีหลักฐาน ≥1 + ผู้ซื้อยืนยัน + คนกลางยืนยัน (ผู้ขายไม่ต้องยืนยัน = auto-true เมื่ออัพโหลด)
+      const evReady = evidence.length > 0 && !!pd.evidence_done_buyer && !!pd.evidence_done_middleman;
       if (!reviewStarted) return { step: 3 }; // คุย 3 ฝ่ายก่อน
       if (!evReady) return { step: 4 }; // ตรวจ/ยืนยันหลักฐานก่อน
       if (!pd.agreed) return { step: 5 }; // ค่อยตกลงราคาและค่าบริการ
@@ -2661,59 +2668,109 @@ export default function DealRoom() {
   }
 
   // ─── ขั้น 4: ตรวจหลักฐาน + ยืนยัน ─────────────────────────────────────────
+  // logic ใหม่: ผู้ขายอัพโหลดหลักฐาน (รูป/วิดีโอ) / ผู้ซื้อกดยืนยัน / คนกลางยืนยัน (regular)
+  // ผู้ซื้อสามารถขอหลักฐานเพิ่มเติมจากผู้ขายได้ (พร้อมระบุรายละเอียด)
   function renderWizardStepEvidenceReview(nextStep = 5) {
     const pd: DealPriceState = priceState || {};
-    const sellerDone = !!pd.evidence_done_seller;
     const buyerDone = !!pd.evidence_done_buyer;
     const middlemanDone = !!pd.evidence_done_middleman;
     const isRegularDeal = deal!.deal_type !== 'simple';
     const hasMm = !!deal!.middleman_id;
-    const meDone = myRole === 'seller' ? sellerDone : myRole === 'buyer' ? buyerDone : middlemanDone;
+    const hasEvidence = evidence.length > 0;
+    // ผู้ขายไม่ต้องกดยืนยัน (เป็นฝ่ายอัปโหลด) → auto-true เมื่อมีหลักฐาน, คนกลาง/ผู้ซื้อต้องกด
+    const meIsConfirmer = myRole === 'buyer' || myRole === 'middleman';
+    const meDone = myRole === 'seller' ? hasEvidence : (myRole === 'buyer' ? buyerDone : middlemanDone);
+    const allConfirmed = hasEvidence && buyerDone && (!isRegularDeal || !hasMm || middlemanDone);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card">
           <div className="dr-card-title">📁 ตรวจหลักฐานก่อนโอนเงิน</div>
-          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4, lineHeight: 1.6 }}>ตรวจดูประวัติการคุย รูป และวิดีโอคอลที่บันทึกไว้ด้านล่าง ถ้าครบถ้วนถูกต้องแล้วให้กดยืนยัน</p>
+          {myRole === 'seller' ? (
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4, lineHeight: 1.6 }}>
+              คุณเป็นผู้ขาย → อัปโหลดรูป/วิดีโอสินค้าด้านล่างให้ครบ เพื่อให้ผู้ซื้อ{hasMm ? 'และคนกลาง' : ''}ตรวจและยืนยัน จึงจะไปตกลงราคาต่อได้
+            </p>
+          ) : (
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4, lineHeight: 1.6 }}>
+              ตรวจดูรูป/วิดีโอสินค้าที่ผู้ขายอัปโหลดด้านล่าง ถ้าถูกต้องครบถ้วนให้กดยืนยัน — หรือกด &quot;ขอหลักฐานเพิ่ม&quot; ถ้าอยากดูมุม/จุดเพิ่มเติม
+            </p>
+          )}
         </div>
         {renderEvidencePanel()}
         <div className="dr-card">
           {renderParticipantStatusRows([
-            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerDone, doneText: '✅ ยืนยันถูกต้องแล้ว' },
+            { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: hasEvidence, doneText: hasEvidence ? '✅ อัปโหลดแล้ว' : '⏳ รออัปโหลด' },
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerDone, doneText: '✅ ยืนยันถูกต้องแล้ว' },
             ...(isRegularDeal && hasMm ? [{ roleLabel: 'คนกลาง', name: deal!.middleman_name || '-', ok: middlemanDone, doneText: '✅ ยืนยันถูกต้องแล้ว' }] : []),
           ])}
-          {!meDone
-            ? <AsyncButton className="btn btn-green btn-block btn-lg" onClick={async () => {
-              const previousPriceState = priceState || {};
-              setPriceState(prev => ({
-                ...(prev || {}),
-                evidence_done_seller: myRole === 'seller' ? true : !!prev?.evidence_done_seller,
-                evidence_done_buyer: myRole === 'buyer' ? true : !!prev?.evidence_done_buyer,
-                evidence_done_middleman: myRole === 'middleman' ? true : !!prev?.evidence_done_middleman,
-              }));
-              const nextDeal = await doAction('evidence_done');
-              if (!nextDeal) {
-                setPriceState(previousPriceState);
-                return;
-              }
-              const { data } = await supabase.auth.getSession();
-              const headers = data.session?.access_token
-                ? { Authorization: `Bearer ${data.session.access_token}` }
-                : await getAuthHeaders(true);
-              const freshDeal = await fetchDeal(headers);
-              const fresh = await fetch(`/api/deals/${dealId}`, { headers, cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
-              const freshPd: DealPriceState = fresh?.priceState || {};
-              const nextSellerDone = !!freshPd.evidence_done_seller;
-              const nextBuyerDone = !!freshPd.evidence_done_buyer;
-              const nextMiddlemanDone = !!freshPd.evidence_done_middleman;
-              if ((freshDeal?.deal_type === 'simple' && (freshPd.evidence_done_buyer && freshPd.evidence_done_seller))
-                || (nextSellerDone && nextBuyerDone && (!isRegularDeal || !hasMm || nextMiddlemanDone))) {
-                setWzViewStep(nextStep);
-              }
-            }}>✅ ตรวจแล้ว ถูกต้อง — ยืนยัน</AsyncButton>
-            : sellerDone && buyerDone && (!isRegularDeal || !hasMm || middlemanDone)
+
+          {/* ─── ฝั่งผู้ขาย: แค่รอผู้ซื้อยืนยัน (ไม่มีปุ่มยืนยัน) ─── */}
+          {myRole === 'seller' && (
+            <p style={{ fontSize: 13.5, color: 'var(--muted)', textAlign: 'center', marginBottom: 10 }}>
+              {hasEvidence ? '✅ อัปโหลดหลักฐานแล้ว — รอผู้ซื้อ' + (hasMm ? 'และคนกลาง' : '') + 'ยืนยัน' : '⚠️ อัปโหลดหลักฐานอย่างน้อย 1 รายการด้านบน'}
+            </p>
+          )}
+
+          {/* ─── ฝั่งผู้ซื้อ/คนกลาง: ปุ่มขอหลักฐานเพิ่ม + ปุ่มยืนยัน ─── */}
+          {meIsConfirmer && !meDone && (
+            <>
+              {/* ปุ่ม/ช่อง ขอหลักฐานเพิ่ม */}
+              {!showRequestEvidence ? (
+                <button type="button" className="btn btn-ghost btn-block" style={{ marginBottom: 10 }}
+                  onClick={() => setShowRequestEvidence(true)}>
+                  🔍 ขอหลักฐานเพิ่มเติม
+                </button>
+              ) : (
+                <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: 12, marginBottom: 10 }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>ระบุรายละเอียดที่อยากให้ผู้ขายถ่ายเพิ่ม:</div>
+                  <textarea
+                    value={requestEvidenceDetail}
+                    onChange={e => setRequestEvidenceDetail(e.target.value)}
+                    placeholder="เช่น ขอวิดีโอเปิดเครื่องทดสอบ, ขอถ่ายซีเรียลชัดๆ, ขอดูกล่องทั้งหมด"
+                    rows={2}
+                    maxLength={300}
+                    style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', fontSize: 13, resize: 'vertical', marginBottom: 8 }}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <AsyncButton className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={async () => {
+                      const nextDeal = await doAction('request_evidence', { detail: requestEvidenceDetail.trim() });
+                      if (nextDeal) {
+                        setShowRequestEvidence(false);
+                        setRequestEvidenceDetail('');
+                      }
+                    }}>📤 ส่งคำขอ</AsyncButton>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setShowRequestEvidence(false); setRequestEvidenceDetail(''); }}>ยกเลิก</button>
+                  </div>
+                </div>
+              )}
+
+              {/* ปุ่มยืนยันหลักฐาน — disabled ถ้ายังไม่มีหลักฐานเลย */}
+              <AsyncButton className="btn btn-green btn-block btn-lg" disabled={!hasEvidence}
+                onClick={async () => {
+                  const previousPriceState = priceState || {};
+                  setPriceState(prev => ({
+                    ...(prev || {}),
+                    evidence_done_buyer: myRole === 'buyer' ? true : !!prev?.evidence_done_buyer,
+                    evidence_done_middleman: myRole === 'middleman' ? true : !!prev?.evidence_done_middleman,
+                  }));
+                  const nextDeal = await doAction('evidence_done');
+                  if (!nextDeal) { setPriceState(previousPriceState); return; }
+                  const fresh = await fetch(`/api/deals/${dealId}`, { headers: await getAuthHeaders(true), cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+                  const freshPd: DealPriceState = fresh?.priceState || {};
+                  if (hasEvidence && freshPd.evidence_done_buyer && (!isRegularDeal || !hasMm || freshPd.evidence_done_middleman)) {
+                    setWzViewStep(nextStep);
+                  }
+                }}>
+                {hasEvidence ? '✅ ตรวจแล้ว ถูกต้อง — ยืนยัน' : '⚠️ ยังไม่มีหลักฐานให้ตรวจ'}
+              </AsyncButton>
+            </>
+          )}
+
+          {/* ─── คนที่ยืนยันแล้ว — แสดงสถานะรอ/ไปต่อ ─── */}
+          {meIsConfirmer && meDone && (
+            allConfirmed
               ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ไปตกลงราคา →</button>
-              : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน</p>}
+              : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รอ{hasMm && myRole === 'buyer' ? 'คนกลาง' : 'ผู้ซื้อ'}ยืนยัน</p>
+          )}
         </div>
       </div>
     );
