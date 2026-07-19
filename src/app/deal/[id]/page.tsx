@@ -5020,9 +5020,9 @@ export default function DealRoom() {
               <span className="ic">📞</span><span>โทร</span>
             </button>
           ) : null}
-          {/* ปุ่มวิดีโอคอล — ซ่อนตอนอยู่ในคอล/มีสายเข้า/กำลังโทร */}
+          {/* ปุ่มวิดีโอคอล — ปิดใช้งานเนื่องจากฟังก์ชันนี้ยังทำไม่เสร็จ */}
           {callStatus === 'idle' && !incomingCall && (
-            <button type="button" className="dr-floatbar-btn video" onClick={() => startCall('video')} title="วิดีโอคอล">
+            <button type="button" className="dr-floatbar-btn video" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="วิดีโอคอล (ยังไม่พร้อมใช้งาน)">
               <span className="ic">📹</span><span>วิดีโอ</span>
             </button>
           )}
