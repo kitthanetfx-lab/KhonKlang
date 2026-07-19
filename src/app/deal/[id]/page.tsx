@@ -969,17 +969,21 @@ export default function DealRoom() {
     return () => window.clearInterval(iv);
   }, [isActiveCall]);
 
-  // ─── ตรวจจับ "อีกฝ่ายวางสาย" — เมื่อเห็น message 📞|end ใหม่ขณะอยู่ในคอล ───
+  // ─── ตรวจจับ "อีกฝ่ายวางสาย/ปฏิเสธ" — เมื่อเห็น message 📞|end ขณะอยู่ในคอล (active) หรือขณะกำลังรอสาย (outgoing) ───
+  // ต้องรวม outgoing ด้วย มิฉะนั้นฝั่งโทรจะไม่รู้ว่าอีกฝ่ายปฏิเสธ (declineIncomingCall ส่ง end_call กลับ) และจะรอจนครบ 30 วิ
   useEffect(() => {
-    if (!isActiveCall || !activeCallMsgId) return;
+    if ((!isActiveCall && callStatus !== 'outgoing') || !activeCallMsgId) return;
     // ค้นหา end message ที่เกิดหลังจาก start message ของคอลปัจจุบัน
     const startIdx = msgs.findIndex(m => m.id === activeCallMsgId);
     if (startIdx < 0) return;
     for (let i = startIdx + 1; i < msgs.length; i += 1) {
       const m = msgs[i];
       if (m.role === 'system' && m.content.startsWith('📞|end')) {
-        // อีกฝ่ายวางสาย → แจ้งและคืน idle
-        setCallEndedReason({ title: '📞 วางสายแล้ว', sub: 'อีกฝ่ายวางสาย' });
+        // ถ้าตอน active = วางสายกลางคัน, ถ้าตอน outgoing = อีกฝ่ายปฏิเสธสายเรียกเข้า
+        const wasRinging = callStatus === 'outgoing';
+        setCallEndedReason(wasRinging
+          ? { title: '📵 อีกฝ่ายปฏิเสธสาย', sub: 'อีกฝ่ายไม่รับสาย' }
+          : { title: '📞 วางสายแล้ว', sub: 'อีกฝ่ายวางสาย' });
         setCallStatus('idle');
         setCallSeconds(0);
         setCallMode('video');
@@ -988,7 +992,7 @@ export default function DealRoom() {
         return;
       }
     }
-  }, [msgs, isActiveCall, activeCallMsgId]);
+  }, [msgs, isActiveCall, callStatus, activeCallMsgId]);
 
   // ปลดล็อก AudioContext ตอน user แตะหน้าจอครั้งแรก (เบราว์เซอร์บล็อกเสียงที่ไม่ได้เริ่มจาก gesture)
   // จำเป็นเพื่อให้เสียงปี๊ดสายเรียกเข้าเล่นได้ในภายหลัง
@@ -1183,9 +1187,24 @@ export default function DealRoom() {
     setCallStatus('connecting');
   }
 
-  /** ปฏิเสธสายเรียกเข้า — mark msg id ว่าปฏิเสธแล้ว (ฝั่งโทรจะเห็นว่าไม่มีคนเข้าร่วม → หมดเวลาเอง) */
+  /** ปฏิเสธสายเรียกเข้า — mark local + ส่ง 📞|end กลับไปฝั่งโทร เพื่อให้ฝั่งโทรหยุด ringing ทันที (ไม่ต้องรอ 30 วิ) */
   function declineIncomingCall() {
-    if (incomingCall) setDismissedCallIds(prev => new Set(prev).add(incomingCall.msgId));
+    if (!incomingCall) return;
+    setDismissedCallIds(prev => new Set(prev).add(incomingCall.msgId));
+    activeCallMsgIdRef.current = incomingCall.msgId;
+    // ส่งสัญญาณปฏิเสธกลับ → ฝั่งโทรจะเห็น 📞|end ผ่าน end-detect effect และแสดง "อีกฝ่ายปฏิเสธสาย"
+    if (myId) {
+      (async () => {
+        try {
+          const headers = await getAuthHeaders();
+          await fetch(`/api/deals/${dealId}`, {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'end_call' }),
+          });
+        } catch { /* network — ฝั่งโทรจะ timeout 30 วิ เอง */ }
+      })();
+    }
   }
 
   /** ชื่อคู่สาย (ใช้ในหน้า ringing) — ดึงจากฝ่ายตรงข้ามในดีล */
