@@ -2606,14 +2606,15 @@ body.in-call .dr-floatbar { display: flex; }
 @keyframes ringFlash { from { background: var(--green-500); } to { background: var(--amber-400); } }
 @keyframes ringShake { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
 
-/* popup รับสายเรียกเข้า — ลอยกลางล่าง */
+/* popup รับสายเรียกเข้า — ลอยกลางจอ (เปลี่ยนจาก bottom เพื่อกันหลุดจอมือถือ) */
 .dr-incoming-call {
-  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%); z-index: 146;
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 146;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
   box-shadow: var(--sh-lg); padding: 16px 18px; width: min(92vw, 360px); text-align: center;
-  animation: drToastIn .25s var(--ease-out);
+  max-height: 90vh; overflow-y: auto;
+  animation: drCenterIn .25s var(--ease-out);
 }
+@keyframes drCenterIn { from { opacity: 0; transform: translate(-50%, -45%) scale(.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 .dr-incoming-call-ic { font-size: 32px; margin-bottom: 6px; animation: ringShake .4s ease-in-out infinite; display: inline-block; }
 .dr-incoming-call-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--ink); margin-bottom: 2px; }
 .dr-incoming-call-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
@@ -2631,14 +2632,15 @@ body.in-call .dr-floatbar { display: flex; }
   opacity: 0; pointer-events: none; z-index: -1; overflow: hidden;
 }
 
-/* toast แจ้งหมดเวลาคอล */
+/* toast แจ้งหมดเวลา/วางสาย/ไม่รับสาย — ลอยกลางจอ (เปลี่ยนจาก top:78px เพื่อกันหลุดจอมือถือ) */
 .dr-call-timeout-toast {
-  position: fixed; left: 50%; top: 78px; transform: translateX(-50%); z-index: 145;
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 145;
   background: var(--surface); border: 1px solid var(--amber-400); border-radius: var(--r-md);
   box-shadow: var(--sh-lg); padding: 14px 18px; max-width: min(92vw, 380px); text-align: center;
-  animation: drToastIn .25s var(--ease-out);
+  max-height: 90vh; overflow-y: auto;
+  animation: drCenterIn .25s var(--ease-out);
 }
-@keyframes drToastIn { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes drToastIn { from { opacity: 0; transform: translate(-50%, calc(-50% - 8px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
 
 /* ============================================================
    Custom LiveKit split layout (responsive: มือถือ=บน/ล่าง, คอม/แท็บเล็ต=ซ้าย/ขวา)

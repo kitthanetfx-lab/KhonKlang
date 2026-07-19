@@ -4822,8 +4822,8 @@ export default function DealRoom() {
         <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{dealCode(deal.id)} · {statusText(deal)} · ฿{deal.price.toLocaleString()}</div></div>
         <div className="dr-hctas">
           <HeaderAccountActions showNotify />
-          <button className="dr-cta-link" onClick={copyLink}>{copied ? '✅ คัดลอกแล้ว' : '🔗 แชร์'}</button>
-          {/* ปุ่มโทรคุย/วิดีโอคอล/แชท ย้ายไปเป็นแถบลอยด้านล่าง (.dr-floatbar) แสดงตลอดทุกขั้นตอน */}
+          {/* ปุ่มแชร์ลิงก์เอาออกแล้ว — แชร์ใช้ครั้งเดียวตอนสร้างดีล ไม่จำเป็นต้องมีในหน้าดีล
+              ปุ่มโทรคุย/วิดีโอคอล/แชท ย้ายไปเป็นแถบลอยด้านล่าง (.dr-floatbar) แสดงตลอดทุกขั้นตอน */}
         </div>
       </header>
 
