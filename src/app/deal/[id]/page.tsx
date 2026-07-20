@@ -2447,12 +2447,7 @@ export default function DealRoom() {
     // เลือกผู้จ่ายค่าบริการของฉัน
     const mySelection = myRole === 'buyer' ? buyerSelection : myRole === 'seller' ? sellerSelection : null;
     const setMySelection = async (selection: 'buyer' | 'seller' | 'split') => {
-      // First update local state
-      setPriceState(prev => ({
-        ...(prev || {}),
-        [myRole === 'buyer' ? 'fee_payer_selection_buyer' : 'fee_payer_selection_seller']: selection
-      }));
-      // Then call API
+      // Just call API, let fetchDeal update priceState after revalidation
       await doAction('select_fee_payer', { feePayer: selection });
     };
     
@@ -2516,12 +2511,13 @@ export default function DealRoom() {
                   background: mySelection === option ? 'rgba(99, 102, 241, 0.08)' : 'white',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: mySelection === option ? 'var(--accent)' : 'var(--ink)'
+                  color: mySelection === option ? 'var(--accent)' : 'var(--ink)',
+                  opacity: acting ? 0.5 : 1
                 }}
                 onClick={async () => {
-                  if (!meAccepted) await setMySelection(option);
+                  if (!meAccepted && !acting) await setMySelection(option);
                 }}
-                disabled={meAccepted}
+                disabled={meAccepted || acting}
               >
                 {getSelectionLabel(option)}
               </button>
