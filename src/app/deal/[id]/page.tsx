@@ -1951,7 +1951,7 @@ export default function DealRoom() {
               )}
 
               {/* ผู้ขายโอนค่าบริการส่วนของตน — ทันที แยกจากยอดสินค้า */}
-              {myRole === 'seller' && sellerShouldPay > 0 && priceAgreed && ['payment_pending', 'payment_uploaded'].includes(deal!.status) && (
+              {myRole === 'seller' && sellerShouldPay > 0 && ['payment_pending', 'payment_uploaded'].includes(deal!.status) && (
                 pd.seller_fee_slip
                   ? <div className="dr-slip-status">✅ คุณโอนค่าบริการ ฿{sellerShouldPay.toLocaleString()} แล้ว — รอศูนย์กลางตรวจสอบ</div>
                   : <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
