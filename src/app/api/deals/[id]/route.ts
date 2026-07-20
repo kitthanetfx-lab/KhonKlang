@@ -682,10 +682,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           const title =
             action === 'visit' ? `👀 มีคนเข้ามาดูห้องดีล: ${updated.title || ''}` :
             `ดีล: ${updated.title || 'ไม่มีชื่อ'}`;
+          // เพิ่มข้อมูล data เพื่อบอกฝั่ง native ว่ามีข้อเสนอใหม่
+          const dataPayload: Record<string, string> = { dealId: id };
+          if (action === 'price_propose') {
+            dataPayload.type = 'price_proposal';
+            dataPayload.proposedBy = updated.proposed_by || '';
+            dataPayload.proposedPrice = String(updated.proposed_price || '');
+            dataPayload.proposedFeePayer = updated.proposed_fee_payer || '';
+          } else if (action === 'price_agree') {
+            dataPayload.type = 'price_agreement';
+          }
           await notifyUsers(db, recipients, {
             title,
             body: systemMsg,
             link: `/deal/${id}`,
+            data: dataPayload,
           });
         }
       }
