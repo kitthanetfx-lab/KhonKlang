@@ -1960,6 +1960,23 @@ export default function DealRoom() {
                       <button onClick={() => sellerFeeInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนค่าบริการแล้ว — อัปโหลดสลิป</button>
                     </div>
               )}
+              
+              {/* กรณีผู้ขายจ่ายค่ากลาง: ผู้ซื้อก็ต้องเห็นเลขบัญชีกลางเพื่อโอนเงิน */}
+              {isSellerPaysAll && myRole === 'buyer' && (
+                <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
+                  <div style={{ fontWeight: 700, color: '#075985', marginBottom: 6 }}>🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
+                  <PaymentMethods amount={buyerShouldPay} note="โอนเงินค่าสินค้าเข้าบัญชีกลาง แล้วอัปโหลดสลิป" />
+                </div>
+              )}
+              
+              {/* กรณีหารครึ่ง: ผู้ซื้อก็ต้องเห็นเลขบัญชีกลางเพื่อโอนเงิน */}
+              {isSplit && myRole === 'buyer' && (
+                <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
+                  <div style={{ fontWeight: 700, color: '#075985', marginBottom: 6 }}>🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
+                  <PaymentMethods amount={buyerShouldPay} note="โอนเงินค่าสินค้า + ค่ากลาง 50% เข้าบัญชีกลาง แล้วอัปโหลดสลิป" />
+                </div>
+              )}
+              
               {deal!.status === 'payment_uploaded' && myRole === 'buyer' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — {isSimple ? 'รอศูนย์กลางยืนยันรับเงิน' : 'รอคนกลางยืนยัน'}</div>}
             </>
           );
