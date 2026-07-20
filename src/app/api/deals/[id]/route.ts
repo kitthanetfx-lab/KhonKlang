@@ -112,6 +112,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const md = mdRow || {};
 
     switch (action) {
+      case 'select_fee_payer': {
+        // ผู้ซื้อ/ผู้ขายเลือกผู้จ่ายค่าบริการในขั้นตอนที่ 1
+        if (!isSeller && !isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (!['buyer', 'seller', 'split'].includes(body.feePayer)) {
+          return NextResponse.json({ error: 'Invalid feePayer' }, { status: 400 });
+        }
+        if (isSeller) {
+          priceUpdates = { fee_payer_selection_seller: body.feePayer };
+        } else {
+          priceUpdates = { fee_payer_selection_buyer: body.feePayer };
+        }
+        // Check if both have selected and matched
+        const buyerSel = isBuyer ? body.feePayer : pd.fee_payer_selection_buyer;
+        const sellerSel = isSeller ? body.feePayer : pd.fee_payer_selection_seller;
+        if (buyerSel && sellerSel && buyerSel === sellerSel) {
+          systemMsg = `ทั้งสองฝ่ายเลือกผู้จ่ายค่าบริการแล้ว: ${buyerSel === 'buyer' ? 'ผู้ซื้อจ่าย' : buyerSel === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง'}`;
+        } else {
+          systemMsg = `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เลือกผู้จ่ายค่าบริการแล้ว — รออีกฝ่ายเลือกให้ตรงกัน`;
+        }
+        break;
+      }
       case 'join_as_buyer': {
         if (!['posted', 'waiting_buyer'].includes(deal.status))
           return NextResponse.json({ error: 'Deal not available' }, { status: 400 });
@@ -150,6 +171,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'accept_terms': {
+        // Check fee payer selections first
+        const currentPd = pd;
+        const buyerSel = currentPd.fee_payer_selection_buyer;
+        const sellerSel = currentPd.fee_payer_selection_seller;
+        
+        if (!buyerSel || !sellerSel || buyerSel !== sellerSel) {
+          return NextResponse.json({ error: 'ต้องเลือกผู้จ่ายค่าบริการให้ตรงกันทั้งสองฝ่ายก่อนยอมรับเงื่อนไข' }, { status: 400 });
+        }
+        
         if (isSeller)    updates.seller_accepted_terms    = true;
         if (isMiddleman) updates.middleman_accepted_terms = true;
         if (isBuyer)     updates.buyer_accepted_terms     = true;
@@ -158,6 +188,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const bc = isBuyer     ? true : deal.buyer_accepted_terms;
         const hasMm = !!deal.middleman_id;
         if (sc && bc && (!hasMm || mc)) {
+          // Set the fee_payer on the deal
+          updates.fee_payer = buyerSel;
           updates.status = 'payment_pending';
           systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — เริ่มคุย 3 ฝ่ายและเก็บหลักฐานได้';
         } else {
@@ -560,7 +592,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         priceUpdates = { evidence_done_seller: sellerDone, evidence_done_buyer: buyerDone, evidence_done_middleman: middlemanDone };
         const hasMm = !!deal.middleman_id;
         const allDone = sellerDone && buyerDone && (!hasMm || middlemanDone);
-        systemMsg = allDone ? '📁 ทุกฝ่ายยืนยันเก็บหลักฐานเรียบร้อย — ไปตกลงราคาและค่าบริการต่อได้' : `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ยืนยันเก็บหลักฐานแล้ว — รอฝ่ายอื่น`;
+        systemMsg = allDone ? '📁 ทุกฝ่ายยืนยันเก็บหลักฐานเรียบร้อย — ไปขั้นโอนเงินได้เลย' : `${isSeller ? 'ผู้ขาย' : isBuyer ? 'ผู้ซื้อ' : 'คนกลาง'}ยืนยันเก็บหลักฐานแล้ว — รอฝ่ายอื่น`;
         break;
       }
       case 'request_evidence': {

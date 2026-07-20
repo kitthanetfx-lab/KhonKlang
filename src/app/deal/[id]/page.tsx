@@ -279,6 +279,9 @@ interface DealPriceState {
   // ค่าบริการที่คนกลางเสนอเอง
   proposed_mm_fee?: number; proposed_inspection_fee?: number;
   mm_fee_accepted_seller?: boolean; mm_fee_accepted_buyer?: boolean;
+  // ขั้นตอนที่ 1: เลือกผู้จ่ายค่าบริการ
+  fee_payer_selection_buyer?: 'buyer' | 'seller' | 'split';
+  fee_payer_selection_seller?: 'buyer' | 'seller' | 'split';
 }
 interface EvidenceItem { id: string; deal_id: string; type: string; file_id: string; file_name: string; content?: string; uploaded_by?: string; uploader_name?: string; created_at: string; }
 interface Middleman { userId: string; code: string; name: string; tier: string; workProvince: string; phone: string; categories?: string; reviewScore: number; reviewCount: number; }
@@ -1868,14 +1871,13 @@ export default function DealRoom() {
         {(() => {
           const pd: DealPriceState = priceState || {};
           const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
-          const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
+          // ใช้ค่า fee_payer จากขั้นตอนที่ 1
+          const fp = String(deal!.fee_payer || pd.fee_payer_selection_buyer || pd.fee_payer_selection_seller || 'split');
           const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
           const buyerShare = fb.total - sellerShare;
           const buyerTotal = deal!.price + buyerShare;
           const sellerNet = Math.max(deal!.price, 0);
-          const priceAgreed = !!pd.agreed;
           const hasMm = !!deal!.middleman_id;
-          const evidenceDone = !!(pd.evidence_done_buyer && pd.evidence_done_seller && (!hasMm || pd.evidence_done_middleman));
           const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
           const fpName = fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
           const isBuyerPaysAll = fp === 'buyer';
@@ -2200,8 +2202,8 @@ export default function DealRoom() {
   // โฟกัสทีละขั้นตอน (การ์ดเดียว) แทนการแสดงทุกการ์ดพร้อมกันแบบเดิม — ลดความสับสน
   // ═══════════════════════════════════════════════════════════════════════
   const WIZARD_STEP_TITLES = [
-    'ยอมรับเงื่อนไข', 'พูดคุย', 'ตรวจหลักฐาน', 'ตกลงราคา', 'โอนเงิน',
-    'ตรวจสอบ', 'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
+    'ยอมรับเงื่อนไข', 'พูดคุย', 'ตรวจหลักฐาน', 'โอนเงิน', 'ตรวจสอบ',
+    'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
   ];
   const WZ_TOTAL = WIZARD_STEP_TITLES.length;
 
@@ -2230,10 +2232,9 @@ export default function DealRoom() {
     const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
     if (s === 'payment_pending') {
-      if (pd.agreed) return { step: 5 }; // ตกลงราคาแล้ว → โอนเงินได้
       // เงื่อนไขบังคับใหม่: ต้องมีหลักฐาน ≥1 + ผู้ซื้อยืนยัน (ผู้ขายไม่ต้อง — auto-true เมื่ออัพโหลด)
       const evReady = evidence.length > 0 && !!pd.evidence_done_buyer;
-      if (evReady) return { step: 4 }; // ตรวจหลักฐานเสร็จ → ตกลงราคา
+      if (evReady) return { step: 5 }; // ตรวจหลักฐานเสร็จ → โอนเงินได้เลย
       return { step: reviewStarted ? 3 : 2 }; // กำลังตรวจหลักฐาน หรือ พูดคุย
     }
     if (s === 'payment_uploaded') {
@@ -2273,24 +2274,24 @@ export default function DealRoom() {
       const evReady = evidence.length > 0 && !!pd.evidence_done_buyer && !!pd.evidence_done_middleman;
       if (!reviewStarted) return { step: 3 }; // คุย 3 ฝ่ายก่อน
       if (!evReady) return { step: 4 }; // ตรวจ/ยืนยันหลักฐานก่อน
-      if (!pd.agreed) return { step: 5 }; // ค่อยตกลงราคาและค่าบริการ
-      return { step: 6 }; // โอนเงิน (HUB)
+      // ข้ามขั้นตอนตกลงราคา ไปตรงถึงขั้นตอนโอนเงินเลย
+      return { step: 5 }; // โอนเงิน (HUB) - was step 6 before
     }
     if (s === 'payment_uploaded') {
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
-      const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
+      const fp = String(deal!.fee_payer || pd.fee_payer_selection_buyer || pd.fee_payer_selection_seller || 'split');
       const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
-      if (sellerShare > 0 && !pd.seller_fee_slip) return { step: 6 }; // ยังรอผู้ขายจ่าย
-      return { step: 7 }; // ตรวจสอบการโอน (HUB)
+      if (sellerShare > 0 && !pd.seller_fee_slip) return { step: 5 }; // ยังรอผู้ขายจ่าย - was step 6 before
+      return { step: 6 }; // ตรวจสอบการโอน (HUB) - was step 7 before
     }
-    if (s === 'packing') return { step: 8 };
-    if (s === 'shipped_to_middleman') return { step: 9 };
-    if (['middleman_received', 'middleman_checking'].includes(s)) return { step: 10 };
-    if (s === 'shipped_to_buyer') return { step: 11 };
-    if (s === 'delivered') return { step: 12 };
-    if (s === 'completed') return { step: pd.payout_slip_file_id ? 14 : 13, outcome: 'success' };
-    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 14 : 13, outcome: 'cancelled' };
-    if (s === 'disputed') return { step: 13, outcome: 'disputed' };
+    if (s === 'packing') return { step: 7 }; // was step 8 before
+    if (s === 'shipped_to_middleman') return { step: 8 }; // was step 9 before
+    if (['middleman_received', 'middleman_checking'].includes(s)) return { step: 9 }; // was step 10 before
+    if (s === 'shipped_to_buyer') return { step: 10 }; // was step 11 before
+    if (s === 'delivered') return { step: 11 }; // was step 12 before
+    if (s === 'completed') return { step: pd.payout_slip_file_id ? 13 : 12, outcome: 'success' }; // was 14/13 before
+    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 13 : 12, outcome: 'cancelled' }; // was 14/13 before
+    if (s === 'disputed') return { step: 12, outcome: 'disputed' }; // was step 13 before
     return { step: 1 };
   }
 
@@ -2435,6 +2436,37 @@ export default function DealRoom() {
     const t = termsFor(deal!.deal_type);
     const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
     const meAccepted = (myRole === 'seller' && deal!.seller_accepted_terms) || (myRole === 'buyer' && deal!.buyer_accepted_terms);
+    const pd: DealPriceState = priceState || {};
+    
+    // ตรวจสอบว่าทั้งสองฝ่ายเลือกผู้จ่ายค่าบริการตรงกันหรือไม่
+    const buyerSelection = pd.fee_payer_selection_buyer;
+    const sellerSelection = pd.fee_payer_selection_seller;
+    const bothSelected = !!buyerSelection && !!sellerSelection;
+    const selectionsMatch = buyerSelection === sellerSelection;
+    
+    // เลือกผู้จ่ายค่าบริการของฉัน
+    const mySelection = myRole === 'buyer' ? buyerSelection : myRole === 'seller' ? sellerSelection : null;
+    const setMySelection = async (selection: 'buyer' | 'seller' | 'split') => {
+      // First update local state
+      setPriceState(prev => ({
+        ...(prev || {}),
+        [myRole === 'buyer' ? 'fee_payer_selection_buyer' : 'fee_payer_selection_seller']: selection
+      }));
+      // Then call API
+      await doAction('select_fee_payer', { feePayer: selection });
+    };
+    
+    // ชื่อการเลือก
+    const getSelectionLabel = (selection: string) => {
+      if (selection === 'buyer') return 'ผู้ซื้อ';
+      if (selection === 'seller') return 'ผู้ขาย';
+      if (selection === 'split') return 'หารครึ่ง';
+      return '';
+    };
+    
+    // ปุ่มยอมรับเงื่อนไขจะ enable ก็ต่อเมื่อทั้งสองฝ่ายเลือกตรงกัน
+    const canAcceptTerms = bothSelected && selectionsMatch;
+    
     return (
       <div className="dr-card">
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
@@ -2467,12 +2499,69 @@ export default function DealRoom() {
           {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}><span>รวมค่าบริการ</span><span>฿{fb.total.toLocaleString()}</span></div>
         </div>
+        
+        {/* เลือกผู้จ่ายค่าบริการ */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>🎯 เลือกผู้จ่ายค่าบริการ</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(['buyer', 'seller', 'split'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: '10px 8px',
+                  borderRadius: 'var(--r-md)',
+                  border: `2px solid ${mySelection === option ? 'var(--accent)' : 'var(--line)'}`,
+                  background: mySelection === option ? 'rgba(99, 102, 241, 0.08)' : 'white',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: mySelection === option ? 'var(--accent)' : 'var(--ink)'
+                }}
+                onClick={async () => {
+                  if (!meAccepted) await setMySelection(option);
+                }}
+                disabled={meAccepted}
+              >
+                {getSelectionLabel(option)}
+              </button>
+            ))}
+          </div>
+          {/* แสดงสถานะการเลือกของทั้งสองฝ่าย */}
+          <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', fontSize: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span>ผู้ขาย:</span>
+              <span style={{ fontWeight: 600 }}>{sellerSelection ? getSelectionLabel(sellerSelection) : '⏳ ยังไม่ได้เลือก'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>ผู้ซื้อ:</span>
+              <span style={{ fontWeight: 600 }}>{buyerSelection ? getSelectionLabel(buyerSelection) : '⏳ ยังไม่ได้เลือก'}</span>
+            </div>
+            {bothSelected && !selectionsMatch && (
+              <div style={{ marginTop: 8, color: '#dc2626', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
+                ⚠️ การเลือกไม่ตรงกัน กรุณาเลือกใหม่ให้ตรงกัน
+              </div>
+            )}
+            {bothSelected && selectionsMatch && (
+              <div style={{ marginTop: 8, color: '#16a34a', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
+                ✅ การเลือกตรงกันแล้ว!
+              </div>
+            )}
+          </div>
+        </div>
+        
         {renderParticipantStatusRows([
           { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: deal!.seller_accepted_terms, doneText: '✅ ยอมรับแล้ว' },
           { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: deal!.buyer_accepted_terms, doneText: '✅ ยอมรับแล้ว' },
         ], { marginBottom: 16 })}
         {!meAccepted
-          ? <AsyncButton className="btn btn-primary btn-block btn-lg" onClick={() => doAction('accept_terms')}>✅ ยอมรับเงื่อนไข</AsyncButton>
+          ? <AsyncButton 
+              className="btn btn-primary btn-block btn-lg" 
+              onClick={() => doAction('accept_terms')}
+              disabled={!canAcceptTerms}
+            >
+              {canAcceptTerms ? '✅ ยอมรับเงื่อนไข' : '⏳ เลือกผู้จ่ายค่าบริการให้ตรงกันก่อน'}
+            </AsyncButton>
           : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยอมรับเงื่อนไขแล้ว — รออีกฝ่าย</p>}
       </div>
     );
@@ -2744,7 +2833,7 @@ export default function DealRoom() {
           <div className="dr-card-title">📁 ตรวจหลักฐานก่อนโอนเงิน</div>
           {myRole === 'seller' ? (
             <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4, lineHeight: 1.6 }}>
-              คุณเป็นผู้ขาย → อัปโหลดรูป/วิดีโอสินค้าด้านล่างให้ครบ เพื่อให้ผู้ซื้อ{hasMm ? 'และคนกลาง' : ''}ตรวจและยืนยัน จึงจะไปตกลงราคาต่อได้
+              คุณเป็นผู้ขาย → อัปโหลดรูป/วิดีโอสินค้าด้านล่างให้ครบ เพื่อให้ผู้ซื้อ{hasMm ? 'และคนกลาง' : ''}ตรวจและยืนยัน จึงจะไปโอนเงินต่อได้
             </p>
           ) : (
             <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4, lineHeight: 1.6 }}>
@@ -2825,7 +2914,7 @@ export default function DealRoom() {
           {/* ─── คนที่ยืนยันแล้ว — แสดงสถานะรอ/ไปต่อ ─── */}
           {meIsConfirmer && meDone && (
             allConfirmed
-              ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ไปตกลงราคา →</button>
+              ? <button className="btn btn-primary btn-block btn-lg" onClick={() => setWzViewStep(nextStep)}>✅ ทุกฝ่ายยืนยันแล้ว — ไปโอนเงิน →</button>
               : <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center', marginBottom: 10 }}>✅ คุณยืนยันแล้ว — รอ{hasMm && myRole === 'buyer' ? 'คนกลาง' : 'ผู้ซื้อ'}ยืนยัน</p>
           )}
         </div>
@@ -4904,7 +4993,7 @@ export default function DealRoom() {
           {step === 0 && renderWizardStep0()}
           {step === 1 && renderWizardStep1()}
           {step === 2 && renderWizardStepChat()}
-          {step === 3 && renderWizardStepEvidenceReview()}
+          {step === 3 && renderWizardStepEvidenceReview(5)}
           {step === 4 && renderWizardStepPrice()}
           {step === 5 && renderPaymentSection()}
           {step === 6 && renderWizardStep4()}
