@@ -2439,13 +2439,15 @@ export default function DealRoom() {
     const pd: DealPriceState = priceState || {};
     
     // ตรวจสอบว่าทั้งสองฝ่ายเลือกผู้จ่ายค่าบริการตรงกันหรือไม่
-    const buyerSelection = pd.fee_payer_selection_buyer;
-    const sellerSelection = pd.fee_payer_selection_seller;
-    const bothSelected = !!buyerSelection && !!sellerSelection;
-    const selectionsMatch = buyerSelection === sellerSelection;
+    // ถ้า deal.fee_payer มีค่าแสดงว่าตกลงกันได้แล้ว
+    const isAgreed = !!deal?.fee_payer;
+    const buyerSelection = isAgreed ? deal.fee_payer : (pd.proposed_by === 'buyer' ? pd.proposed_fee_payer : null);
+    const sellerSelection = isAgreed ? deal.fee_payer : (pd.proposed_by === 'seller' ? pd.proposed_fee_payer : null);
+    const bothSelected = isAgreed;
+    const selectionsMatch = isAgreed;
     
     // เลือกผู้จ่ายค่าบริการของฉัน
-    const mySelection = myRole === 'buyer' ? buyerSelection : myRole === 'seller' ? sellerSelection : null;
+    const mySelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? buyerSelection : myRole === 'seller' ? sellerSelection : null);
     const setMySelection = async (selection: 'buyer' | 'seller' | 'split') => {
       // Just call API, let fetchDeal update priceState after revalidation
       await doAction('select_fee_payer', { feePayer: selection });
@@ -2533,16 +2535,15 @@ export default function DealRoom() {
               <span>ผู้ซื้อ:</span>
               <span style={{ fontWeight: 600 }}>{buyerSelection ? getSelectionLabel(buyerSelection) : '⏳ ยังไม่ได้เลือก'}</span>
             </div>
-            {bothSelected && !selectionsMatch && (
-              <div style={{ marginTop: 8, color: '#dc2626', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
-                ⚠️ การเลือกไม่ตรงกัน กรุณาเลือกใหม่ให้ตรงกัน
+            {isAgreed ? (
+              <div style={{ marginTop: 8, color: 'var(--success)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
+                ✅ ทั้งสองฝ่ายตกลงผู้จ่ายค่าบริการตรงกันแล้ว
               </div>
-            )}
-            {bothSelected && selectionsMatch && (
-              <div style={{ marginTop: 8, color: '#16a34a', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
-                ✅ การเลือกตรงกันแล้ว!
+            ) : (buyerSelection || sellerSelection) ? (
+              <div style={{ marginTop: 8, color: 'var(--accent)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
+                ⏳ รออีกฝ่ายกดยืนยันให้ตรงกัน (หรือกดตัวเลือกอื่นเพื่อเสนอใหม่)
               </div>
-            )}
+            ) : null}
           </div>
         </div>
         

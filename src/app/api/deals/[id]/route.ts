@@ -113,23 +113,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     switch (action) {
       case 'select_fee_payer': {
-        // ผู้ซื้อ/ผู้ขายเลือกผู้จ่ายค่าบริการในขั้นตอนที่ 1
+        // ผู้ซื้อ/ผู้ขายเสนอผู้จ่ายค่าบริการในขั้นตอนที่ 1
         if (!isSeller && !isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!['buyer', 'seller', 'split'].includes(body.feePayer)) {
           return NextResponse.json({ error: 'Invalid feePayer' }, { status: 400 });
         }
-        if (isSeller) {
-          priceUpdates = { fee_payer_selection_seller: body.feePayer };
+        
+        const myRole = isSeller ? 'seller' : 'buyer';
+        const otherRole = isSeller ? 'buyer' : 'seller';
+        const proposedFeePayer = pd.proposed_fee_payer;
+        const proposedBy = pd.proposed_by;
+
+        if (proposedBy === otherRole && proposedFeePayer === body.feePayer) {
+          // The other party proposed this, and we selected the same -> Match!
+          updates = { fee_payer: body.feePayer };
+          priceUpdates = { 
+            proposed_fee_payer: null, 
+            proposed_by: null,
+            agreed: true
+          };
+          systemMsg = `ทั้งสองฝ่ายตกลงผู้จ่ายค่าบริการแล้ว: ${body.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : body.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง'}`;
         } else {
-          priceUpdates = { fee_payer_selection_buyer: body.feePayer };
-        }
-        // Check if both have selected and matched
-        const buyerSel = isBuyer ? body.feePayer : pd.fee_payer_selection_buyer;
-        const sellerSel = isSeller ? body.feePayer : pd.fee_payer_selection_seller;
-        if (buyerSel && sellerSel && buyerSel === sellerSel) {
-          systemMsg = `ทั้งสองฝ่ายเลือกผู้จ่ายค่าบริการแล้ว: ${buyerSel === 'buyer' ? 'ผู้ซื้อจ่าย' : buyerSel === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง'}`;
-        } else {
-          systemMsg = `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เลือกผู้จ่ายค่าบริการแล้ว — รออีกฝ่ายเลือกให้ตรงกัน`;
+          // New proposal
+          priceUpdates = { 
+            proposed_fee_payer: body.feePayer,
+            proposed_by: myRole
+          };
+          systemMsg = `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เสนอให้${body.feePayer === 'buyer' ? 'ผู้ซื้อ' : body.feePayer === 'seller' ? 'ผู้ขาย' : 'ทั้งสองฝ่ายหารครึ่ง'}จ่ายค่าบริการ — รออีกฝ่ายยืนยัน`;
         }
         break;
       }
