@@ -187,9 +187,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'upload_payment': {
+        // ผู้ซื้ออัปโหลดสลิปโอนเงินค่าสินค้า (และค่ากลางถ้า fee_payer = 'buyer')
         if (!isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         updates = { payment_slip_file_id: body.fileId, payment_slip_verified_at: null, status: 'payment_uploaded' };
         systemMsg = 'ผู้ซื้ออัปโหลดหลักฐานการโอนเงินแล้ว';
+        break;
+      }
+      case 'upload_middleman_fee': {
+        // ผู้ขายอัปโหลดสลิปโอนค่ากลาง (กรณี fee_payer = 'seller' หรือ 'split')
+        if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
+        priceUpdates = { seller_fee_slip: String(body.fileId), seller_fee_slip_verified_at: null };
+        systemMsg = 'ผู้ขายโอนค่าบริการส่วนของตนแล้ว — รอศูนย์กลางตรวจสอบ';
         break;
       }
       case 'confirm_payment': {

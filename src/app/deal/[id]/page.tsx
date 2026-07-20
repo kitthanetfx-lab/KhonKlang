@@ -1878,16 +1878,24 @@ export default function DealRoom() {
           const evidenceDone = !!(pd.evidence_done_buyer && pd.evidence_done_seller && (!hasMm || pd.evidence_done_middleman));
           const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
           const fpName = fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
+          const isBuyerPaysAll = fp === 'buyer';
+          const isSellerPaysAll = fp === 'seller';
+          const isSplit = fp === 'split';
+          
+          // คำนวณยอดที่แต่ละฝ่ายต้องโอน
+          const buyerShouldPay = isBuyerPaysAll ? buyerTotal : deal!.price; // ผู้ซื้อจ่ายทั้งหมด = ค่าสินค้า + ค่ากลางทั้งหมด
+          const sellerShouldPay = isSellerPaysAll ? fb.total : isSplit ? Math.round(fb.total / 2) : 0;
+          
           const payTitle = myRole === 'buyer'
             ? '💳 ยอดที่คุณต้องโอน'
             : myRole === 'seller'
               ? '💳 ค่าบริการฝั่งผู้ขาย'
               : '💳 สรุปการชำระเงิน';
           const payAmount = myRole === 'buyer'
-            ? buyerTotal
+            ? buyerShouldPay
             : myRole === 'seller'
-              ? sellerShare
-              : buyerTotal;
+              ? sellerShouldPay
+              : buyerShouldPay;
           return (
             <>
               <div className="dr-card-title">{payTitle}</div>
@@ -1899,29 +1907,42 @@ export default function DealRoom() {
                 {/* แถวผู้ซื้อ — bold เฉพาะเมื่อดู role ผู้ซื้อ, มิฉะนั้น muted */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'buyer' ? 700 : 400, color: myRole === 'buyer' ? 'var(--ink)' : 'var(--muted)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
                   <span>ผู้ซื้อ {deal!.buyer_name || ''} โอนเงินเข้าศูนย์กลาง</span>
-                  <span>฿{buyerTotal.toLocaleString()}</span>
+                  <span>฿{buyerShouldPay.toLocaleString()}</span>
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>= ราคาสินค้า ฿{deal!.price.toLocaleString()} + ค่าบริการส่วนผู้ซื้อ ฿{buyerShare.toLocaleString()}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>= ราคาสินค้า ฿{deal!.price.toLocaleString()} {buyerShare > 0 ? `+ ค่าบริการส่วนผู้ซื้อ ฿{buyerShare.toLocaleString()}` : ''}</div>
                 {/* แถวผู้ขาย — bold เฉพาะเมื่อดู role ผู้ขาย */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'seller' ? 700 : 400, color: myRole === 'seller' ? 'var(--ink)' : (sellerShare > 0 ? '#8a5a00' : 'var(--muted)'), marginTop: 4 }}>
-                  <span>ผู้ขาย {deal!.seller_name || ''} ชำระค่าบริการแยก</span>
-                  <span>{sellerShare > 0 ? `฿${sellerShare.toLocaleString()}` : '฿0'}</span>
-                </div>
+                {sellerShouldPay > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'seller' ? 700 : 400, color: myRole === 'seller' ? 'var(--ink)' : (sellerShare > 0 ? '#8a5a00' : 'var(--muted)'), marginTop: 4 }}>
+                    <span>ผู้ขาย {deal!.seller_name || ''} ชำระค่าบริการแยก</span>
+                    <span>฿{sellerShouldPay.toLocaleString()}</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginTop: 4 }}>
                   <span>ยอดสุทธิที่ผู้ขาย {deal!.seller_name || ''} ได้รับเมื่อดีลสำเร็จ</span>
                   <span>฿{sellerNet.toLocaleString()}</span>
                 </div>
               </div>
-              {renderParticipantStatusRows([
-                { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPaymentDone, doneText: sellerShare > 0 ? '✅ ส่งสลิปแล้ว' : '✅ ไม่ต้องชำระเพิ่ม', waitText: sellerShare > 0 ? '⏳ รอส่งสลิป' : '⏳ รอเงื่อนไขถัดไป' },
-                { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.payment_slip_file_id, doneText: '✅ ส่งสลิปแล้ว', waitText: '⏳ รอส่งสลิป' },
-              ], { marginBottom: 12 })}
+              
+              {/* แสดงสถานะสลิปของแต่ละฝ่าย */}
+              {isBuyerPaysAll ? (
+                // กรณี 1: ผู้ซื้อจ่ายทั้งหมด
+                renderParticipantStatusRows([
+                  { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: true, doneText: '✅ ไม่ต้องชำระเพิ่ม', waitText: '⏳ รอเงื่อนไขถัดไป' },
+                  { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.payment_slip_file_id, doneText: '✅ ส่งสลิปแล้ว', waitText: '⏳ รอส่งสลิป' },
+                ], { marginBottom: 12 })
+              ) : (
+                // กรณี 2 & 3: ผู้ขายจ่ายค่ากลาง (ทั้งหมดหรือครึ่งหนึ่ง)
+                renderParticipantStatusRows([
+                  { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPaymentDone, doneText: sellerShouldPay > 0 ? '✅ ส่งสลิปแล้ว' : '✅ ไม่ต้องชำระเพิ่ม', waitText: sellerShouldPay > 0 ? '⏳ รอส่งสลิป' : '⏳ รอเงื่อนไขถัดไป' },
+                  { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.payment_slip_file_id, doneText: '✅ ส่งสลิปแล้ว', waitText: '⏳ รอส่งสลิป' },
+                ], { marginBottom: 12 })
+              )}
 
               {deal!.status === 'payment_pending' && myRole === 'buyer' && (
                 !priceAgreed ? <p style={{ fontSize: 13, color: '#b22441' }}>⚠️ ต้องตกลงราคาในขั้นตอน &quot;ตกลงราคา&quot; ให้ครบทุกฝ่ายก่อน จึงจะโอนเงินได้</p>
                 : !evidenceDone ? <p style={{ fontSize: 13, color: '#b22441' }}>⚠️ ทุกฝ่ายต้องกด &quot;เก็บหลักฐานเสร็จสิ้น&quot; ก่อน จึงจะโอนเงินได้</p>
                 : (<>
-                    <PaymentMethods amount={buyerTotal} note={`เงินจะพักไว้กับ บริษัท กลางฮับ จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`} />
+                    <PaymentMethods amount={buyerShouldPay} note={`เงินจะพักไว้กับ บริษัท กลางฮับ จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`} />
                     <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
                   </>)
               )}
@@ -1930,12 +1951,12 @@ export default function DealRoom() {
               )}
 
               {/* ผู้ขายโอนค่าบริการส่วนของตน — ทันที แยกจากยอดสินค้า */}
-              {myRole === 'seller' && sellerShare > 0 && priceAgreed && ['payment_pending', 'payment_uploaded'].includes(deal!.status) && (
+              {myRole === 'seller' && sellerShouldPay > 0 && priceAgreed && ['payment_pending', 'payment_uploaded'].includes(deal!.status) && (
                 pd.seller_fee_slip
-                  ? <div className="dr-slip-status">✅ คุณโอนค่าบริการ ฿{sellerShare.toLocaleString()} แล้ว — รอศูนย์กลางตรวจสอบ</div>
+                  ? <div className="dr-slip-status">✅ คุณโอนค่าบริการ ฿{sellerShouldPay.toLocaleString()} แล้ว — รอศูนย์กลางตรวจสอบ</div>
                   : <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
-                      <div style={{ fontWeight: 700, color: '#8a5a00', marginBottom: 6 }}>⚡ ค่าบริการส่วนของคุณ ฿{sellerShare.toLocaleString()} — โอนทันที</div>
-                      <PaymentMethods amount={sellerShare} note="โอนค่าบริการส่วนของผู้ขายเข้าศูนย์กลาง แล้วอัปโหลดสลิป (แยกจากยอดสินค้า)" />
+                      <div style={{ fontWeight: 700, color: '#8a5a00', marginBottom: 6 }}>⚡ ค่าบริการส่วนของคุณ ฿{sellerShouldPay.toLocaleString()} — โอนทันที</div>
+                      <PaymentMethods amount={sellerShouldPay} note="โอนค่าบริการส่วนของผู้ขายเข้าศูนย์กลาง แล้วอัปโหลดสลิป (แยกจากยอดสินค้า)" />
                       <button onClick={() => sellerFeeInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนค่าบริการแล้ว — อัปโหลดสลิป</button>
                     </div>
               )}
@@ -1946,7 +1967,7 @@ export default function DealRoom() {
         <input ref={evidInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }}
           onChange={async e => { const f = e.target.files?.[0]; if (!f) return; const purl = beginUploadPreview(f); try { const headers = await getAuthHeaders(); const prepared = await compressImage(f); const form = new FormData(); form.append('file', prepared); const r = await fetch('/api/upload-deal', { method: 'POST', headers, body: form }); const d = await r.json(); if (r.ok) await doAction('upload_payment', { fileId: d.fileId }); else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ'); } finally { endUploadPreview(purl); } e.target.value = ''; }} />
         <input ref={sellerFeeInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }}
-          onChange={async e => { const f = e.target.files?.[0]; if (!f) return; const purl = beginUploadPreview(f); try { const headers = await getAuthHeaders(); const prepared = await compressImage(f); const form = new FormData(); form.append('file', prepared); const r = await fetch('/api/upload-deal', { method: 'POST', headers, body: form }); const d = await r.json(); if (r.ok) await doAction('seller_fee_paid', { fileId: d.fileId }); else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ'); } finally { endUploadPreview(purl); } e.target.value = ''; }} />
+          onChange={async e => { const f = e.target.files?.[0]; if (!f) return; const purl = beginUploadPreview(f); try { const headers = await getAuthHeaders(); const prepared = await compressImage(f); const form = new FormData(); form.append('file', prepared); const r = await fetch('/api/upload-deal', { method: 'POST', headers, body: form }); const d = await r.json(); if (r.ok) await doAction('upload_middleman_fee', { fileId: d.fileId }); else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ'); } finally { endUploadPreview(purl); } e.target.value = ''; }} />
       </div>
     );
   }
