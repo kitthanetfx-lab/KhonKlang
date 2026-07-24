@@ -113,33 +113,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     switch (action) {
       case 'select_fee_payer': {
-        // ผู้ซื้อ/ผู้ขายเสนอผู้จ่ายค่าบริการในขั้นตอนที่ 1
+        // ผู้ซื้อ/ผู้ขายเลือกผู้จ่ายค่าบริการในขั้นตอนที่ 1
         if (!isSeller && !isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!['buyer', 'seller', 'split'].includes(body.feePayer)) {
           return NextResponse.json({ error: 'Invalid feePayer' }, { status: 400 });
         }
 
-        const mySelectionKey = isSeller ? 'fee_payer_selection_seller' : 'fee_payer_selection_buyer';
-        const otherSelection = isSeller ? pd.fee_payer_selection_buyer : pd.fee_payer_selection_seller;
-        const payerLabel = body.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : body.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
-        const nextPriceUpdates: Record<string, unknown> = {
-          [mySelectionKey]: body.feePayer,
-          // ล้างค่าชุดเก่าที่เคยใช้กับ step 1 เพื่อไม่ให้หน้าเว็บอ่านสลับกับ flow เสนอราคา
-          proposed_fee_payer: null,
-          proposed_by: null,
-        };
-
-        if (otherSelection === body.feePayer) {
-          updates = { fee_payer: body.feePayer };
-          priceUpdates = { ...nextPriceUpdates, agreed: true };
-          systemMsg = `ทั้งสองฝ่ายตกลงผู้จ่ายค่าบริการแล้ว: ${payerLabel}`;
+        // บันทึกการเลือกของฝ่ายนี้ลงฟิลด์แยกกัน
+        if (isSeller) {
+          priceUpdates.fee_payer_selection_seller = body.feePayer;
         } else {
-          // ถ้ายังเลือกไม่ตรงกัน ให้ล้างผลตกลงเดิมก่อน เพื่อบังคับให้เลือกให้ตรงกันใหม่
+          priceUpdates.fee_payer_selection_buyer = body.feePayer;
+        }
+
+        // เช็คว่าทั้งสองฝ่ายเลือกแล้วและตรงกันหรือไม่
+        const currentBuyerSel = isBuyer ? body.feePayer : pd.fee_payer_selection_buyer;
+        const currentSellerSel = isSeller ? body.feePayer : pd.fee_payer_selection_seller;
+        const bothSelectedAndMatch = currentBuyerSel && currentSellerSel && currentBuyerSel === currentSellerSel;
+
+        if (bothSelectedAndMatch) {
+          updates = { fee_payer: currentBuyerSel };
+          systemMsg = `ทั้งสองฝ่ายตกลงผู้จ่ายค่าบริการแล้ว: ${currentBuyerSel === 'buyer' ? 'ผู้ซื้อจ่าย' : currentBuyerSel === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง'}`;
+        } else {
+          // ถ้ายังไม่ตรงกัน ให้ล้าง fee_payer ใน deal ถ้ามี
           updates = { fee_payer: null };
-          priceUpdates = { ...nextPriceUpdates, agreed: false };
-          systemMsg = otherSelection
-            ? `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เลือก ${payerLabel} แต่ยังไม่ตรงกับอีกฝ่าย`
-            : `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เลือก ${payerLabel} — รออีกฝ่ายยืนยัน`;
+          systemMsg = `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เลือก ${body.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : body.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง'} — รออีกฝ่ายเลือก`;
         }
         break;
       }
