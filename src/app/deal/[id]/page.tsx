@@ -659,21 +659,6 @@ export default function DealRoom() {
   useEffect(() => {
     setLocalStep1FeePayer(null);
   }, [dealId]);
-  
-  // Sync local state with server when we get our own selection
-  useEffect(() => {
-    if (!priceState || !deal) return;
-    const serverMySelection = myRole === 'buyer' 
-      ? priceState.fee_payer_selection_buyer 
-      : priceState.fee_payer_selection_seller;
-    if (serverMySelection && !localStep1FeePayer) {
-      setLocalStep1FeePayer(serverMySelection);
-    }
-    // If we've agreed, reset local state
-    if (deal.fee_payer) {
-      setLocalStep1FeePayer(null);
-    }
-  }, [priceState, deal, myRole, localStep1FeePayer]);
 
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
@@ -1323,6 +1308,20 @@ export default function DealRoom() {
         : deal.buyer_id === myId
           ? 'buyer'
           : 'guest';
+  // Sync local state with server when we get our own selection
+  useEffect(() => {
+    if (!priceState || !deal) return;
+    const serverMySelection = myRole === 'buyer' 
+      ? priceState.fee_payer_selection_buyer 
+      : priceState.fee_payer_selection_seller;
+    if (serverMySelection && !localStep1FeePayer) {
+      setLocalStep1FeePayer(serverMySelection);
+    }
+    // If we've agreed, reset local state
+    if (deal.fee_payer) {
+      setLocalStep1FeePayer(null);
+    }
+  }, [priceState, deal, myRole, localStep1FeePayer]);
   // (เดิมคำนวณ callLive จาก system message 📞| — ตอนนี้ย้ายไปเป็น derived value incomingCall + voiceBgActive/showCall แทนแล้ว)
   const stepIdx = STEP_ORDER.indexOf(deal.status);
   const pct = stepIdx >= 0 ? Math.round((stepIdx / (STEP_ORDER.length - 1)) * 100) : 0;
