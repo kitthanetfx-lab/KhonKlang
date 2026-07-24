@@ -102,7 +102,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
 
     // โหลด deal_price_state / deal_meetup ตามต้องการ (เฉพาะ action ที่ใช้)
-    const needsPriceState = ['price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back', 'request_evidence'].includes(action);
+    const needsPriceState = ['select_fee_payer', 'price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back', 'request_evidence'].includes(action);
     const needsMeetup = action.startsWith('meetup_');
     const [pdRow, mdRow] = await Promise.all([
       needsPriceState ? db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data) : Promise.resolve(null),
