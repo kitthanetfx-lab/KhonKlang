@@ -2441,10 +2441,10 @@ export default function DealRoom() {
     // ตรวจสอบว่าทั้งสองฝ่ายเลือกผู้จ่ายค่าบริการตรงกันหรือไม่
     // ถ้า deal.fee_payer มีค่าแสดงว่าตกลงกันได้แล้ว
     const isAgreed = !!deal?.fee_payer;
-    const buyerSelection = isAgreed ? deal.fee_payer : (pd.proposed_by === 'buyer' ? pd.proposed_fee_payer : null);
-    const sellerSelection = isAgreed ? deal.fee_payer : (pd.proposed_by === 'seller' ? pd.proposed_fee_payer : null);
-    const bothSelected = isAgreed;
-    const selectionsMatch = isAgreed;
+    const buyerSelection = (isAgreed ? deal.fee_payer : pd.fee_payer_selection_buyer) || null;
+    const sellerSelection = (isAgreed ? deal.fee_payer : pd.fee_payer_selection_seller) || null;
+    const bothSelected = !!buyerSelection && !!sellerSelection;
+    const selectionsMatch = bothSelected && buyerSelection === sellerSelection;
     
     // เลือกผู้จ่ายค่าบริการของฉัน
     const mySelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? buyerSelection : myRole === 'seller' ? sellerSelection : null);
@@ -2539,9 +2539,13 @@ export default function DealRoom() {
               <div style={{ marginTop: 8, color: 'var(--success)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
                 ✅ ทั้งสองฝ่ายตกลงผู้จ่ายค่าบริการตรงกันแล้ว
               </div>
+            ) : bothSelected && !selectionsMatch ? (
+              <div style={{ marginTop: 8, color: '#b45309', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
+                ⚠️ ทั้งสองฝ่ายเลือกคนละแบบ กรุณาเลือกให้ตรงกันก่อน
+              </div>
             ) : (buyerSelection || sellerSelection) ? (
               <div style={{ marginTop: 8, color: 'var(--accent)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
-                ⏳ รออีกฝ่ายกดยืนยันให้ตรงกัน (หรือกดตัวเลือกอื่นเพื่อเสนอใหม่)
+                ⏳ รออีกฝ่ายเลือกให้ตรงกัน
               </div>
             ) : null}
           </div>

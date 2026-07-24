@@ -118,28 +118,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!['buyer', 'seller', 'split'].includes(body.feePayer)) {
           return NextResponse.json({ error: 'Invalid feePayer' }, { status: 400 });
         }
-        
-        const myRole = isSeller ? 'seller' : 'buyer';
-        const otherRole = isSeller ? 'buyer' : 'seller';
-        const proposedFeePayer = pd.proposed_fee_payer;
-        const proposedBy = pd.proposed_by;
 
-        if (proposedBy === otherRole && proposedFeePayer === body.feePayer) {
-          // The other party proposed this, and we selected the same -> Match!
+        const mySelectionKey = isSeller ? 'fee_payer_selection_seller' : 'fee_payer_selection_buyer';
+        const otherSelection = isSeller ? pd.fee_payer_selection_buyer : pd.fee_payer_selection_seller;
+        const payerLabel = body.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : body.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง';
+        const nextPriceUpdates: Record<string, unknown> = {
+          [mySelectionKey]: body.feePayer,
+          // ล้างค่าชุดเก่าที่เคยใช้กับ step 1 เพื่อไม่ให้หน้าเว็บอ่านสลับกับ flow เสนอราคา
+          proposed_fee_payer: null,
+          proposed_by: null,
+        };
+
+        if (otherSelection === body.feePayer) {
           updates = { fee_payer: body.feePayer };
-          priceUpdates = { 
-            proposed_fee_payer: null, 
-            proposed_by: null,
-            agreed: true
-          };
-          systemMsg = `ทั้งสองฝ่ายตกลงผู้จ่ายค่าบริการแล้ว: ${body.feePayer === 'buyer' ? 'ผู้ซื้อจ่าย' : body.feePayer === 'seller' ? 'ผู้ขายจ่าย' : 'หารครึ่ง'}`;
+          priceUpdates = { ...nextPriceUpdates, agreed: true };
+          systemMsg = `ทั้งสองฝ่ายตกลงผู้จ่ายค่าบริการแล้ว: ${payerLabel}`;
         } else {
-          // New proposal
-          priceUpdates = { 
-            proposed_fee_payer: body.feePayer,
-            proposed_by: myRole
-          };
-          systemMsg = `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เสนอให้${body.feePayer === 'buyer' ? 'ผู้ซื้อ' : body.feePayer === 'seller' ? 'ผู้ขาย' : 'ทั้งสองฝ่ายหารครึ่ง'}จ่ายค่าบริการ — รออีกฝ่ายยืนยัน`;
+          // ถ้ายังเลือกไม่ตรงกัน ให้ล้างผลตกลงเดิมก่อน เพื่อบังคับให้เลือกให้ตรงกันใหม่
+          updates = { fee_payer: null };
+          priceUpdates = { ...nextPriceUpdates, agreed: false };
+          systemMsg = otherSelection
+            ? `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เลือก ${payerLabel} แต่ยังไม่ตรงกับอีกฝ่าย`
+            : `${isBuyer ? 'ผู้ซื้อ' : 'ผู้ขาย'}เลือก ${payerLabel} — รออีกฝ่ายยืนยัน`;
         }
         break;
       }
