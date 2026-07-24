@@ -659,6 +659,21 @@ export default function DealRoom() {
   useEffect(() => {
     setLocalStep1FeePayer(null);
   }, [dealId]);
+  
+  // Sync local state with server when we get our own selection
+  useEffect(() => {
+    if (!priceState || !deal) return;
+    const serverMySelection = myRole === 'buyer' 
+      ? priceState.fee_payer_selection_buyer 
+      : priceState.fee_payer_selection_seller;
+    if (serverMySelection && !localStep1FeePayer) {
+      setLocalStep1FeePayer(serverMySelection);
+    }
+    // If we've agreed, reset local state
+    if (deal.fee_payer) {
+      setLocalStep1FeePayer(null);
+    }
+  }, [priceState, deal, myRole, localStep1FeePayer]);
 
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
@@ -2453,16 +2468,9 @@ export default function DealRoom() {
     // ถ้า deal.fee_payer มีค่าแสดงว่าตกลงกันได้แล้ว
     const isAgreed = !!deal?.fee_payer;
     
-    // อ่านค่าจาก server: ถ้า proposed_by คือ buyer/seller ให้เอาค่านั้น
-    const serverBuyerSelection = isAgreed ? deal.fee_payer : (pd.proposed_by === 'buyer' ? pd.proposed_fee_payer : null);
-    const serverSellerSelection = isAgreed ? deal.fee_payer : (pd.proposed_by === 'seller' ? pd.proposed_fee_payer : null);
-    
-    // ใช้ local state สำหรับตัวเอง (ถ้ามี), ไม่งั้นใช้ server state; สำหรับอีกฝ่ายใช้ server state เท่านั้น
-    const myServerSelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? serverBuyerSelection : serverSellerSelection);
-    const myEffectiveSelection = isAgreed ? deal.fee_payer : (localStep1FeePayer || myServerSelection);
-    
-    const buyerSelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? myEffectiveSelection : serverBuyerSelection) || null;
-    const sellerSelection = isAgreed ? deal.fee_payer : (myRole === 'seller' ? myEffectiveSelection : serverSellerSelection) || null;
+    // อ่านค่าจาก server โดยตรงจาก fee_payer_selection_buyer/seller
+    const buyerSelection = isAgreed ? deal.fee_payer : pd.fee_payer_selection_buyer || null;
+    const sellerSelection = isAgreed ? deal.fee_payer : pd.fee_payer_selection_seller || null;
     
     const bothSelected = !!buyerSelection && !!sellerSelection;
     const selectionsMatch = bothSelected && buyerSelection === sellerSelection;
@@ -2470,11 +2478,17 @@ export default function DealRoom() {
     // เลือกผู้จ่ายค่าบริการของฉัน
     const mySelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? buyerSelection : myRole === 'seller' ? sellerSelection : null);
     const setMySelection = async (selection: 'buyer' | 'seller' | 'split') => {
-      // อัปเดต local state ก่อน (ให้ UI แสดงผลทันที ไม่รอ server)
+      // ใช้ local state เพื่อแสดงผลทันที (ก่อน server response)
       setLocalStep1FeePayer(selection);
-      // แล้วค่อย call API
+      // call API
       await doAction('select_fee_payer', { feePayer: selection });
     };
+    
+    // ใช้ local state สำหรับ UI ถ้ายังไม่มี response จาก server
+    const displayMySelection = mySelection || localStep1FeePayer;
+    // อัปเดต buyer/sellerSelection สำหรับ UI ด้วย local state ถ้าเป็นตัวเอง
+    const displayBuyerSelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? (localStep1FeePayer || buyerSelection) : buyerSelection) || null;
+    const displaySellerSelection = isAgreed ? deal.fee_payer : (myRole === 'seller' ? (localStep1FeePayer || sellerSelection) : sellerSelection) || null;
     
     // ชื่อการเลือก
     const getSelectionLabel = (selection: string) => {
@@ -2532,11 +2546,11 @@ export default function DealRoom() {
                   flex: 1,
                   padding: '10px 8px',
                   borderRadius: 'var(--r-md)',
-                  border: `2px solid ${mySelection === option ? 'var(--accent)' : 'var(--line)'}`,
-                  background: mySelection === option ? 'rgba(99, 102, 241, 0.08)' : 'white',
+                  border: `2px solid ${displayMySelection === option ? 'var(--accent)' : 'var(--line)'}`,
+                  background: displayMySelection === option ? 'rgba(99, 102, 241, 0.08)' : 'white',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: mySelection === option ? 'var(--accent)' : 'var(--ink)',
+                  color: displayMySelection === option ? 'var(--accent)' : 'var(--ink)',
                   opacity: acting ? 0.5 : 1
                 }}
                 onClick={async () => {
@@ -2552,11 +2566,11 @@ export default function DealRoom() {
           <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', fontSize: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
               <span>ผู้ขาย:</span>
-              <span style={{ fontWeight: 600 }}>{sellerSelection ? getSelectionLabel(sellerSelection) : '⏳ ยังไม่ได้เลือก'}</span>
+              <span style={{ fontWeight: 600 }}>{displaySellerSelection ? getSelectionLabel(displaySellerSelection) : '⏳ ยังไม่ได้เลือก'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>ผู้ซื้อ:</span>
-              <span style={{ fontWeight: 600 }}>{buyerSelection ? getSelectionLabel(buyerSelection) : '⏳ ยังไม่ได้เลือก'}</span>
+              <span style={{ fontWeight: 600 }}>{displayBuyerSelection ? getSelectionLabel(displayBuyerSelection) : '⏳ ยังไม่ได้เลือก'}</span>
             </div>
             {isAgreed ? (
               <div style={{ marginTop: 8, color: 'var(--success)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
@@ -2566,7 +2580,7 @@ export default function DealRoom() {
               <div style={{ marginTop: 8, color: '#b45309', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
                 ⚠️ ทั้งสองฝ่ายเลือกคนละแบบ กรุณาเลือกให้ตรงกันก่อน
               </div>
-            ) : (buyerSelection || sellerSelection) ? (
+            ) : (displayBuyerSelection || displaySellerSelection) ? (
               <div style={{ marginTop: 8, color: 'var(--accent)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
                 ⏳ รออีกฝ่ายเลือกให้ตรงกัน
               </div>
