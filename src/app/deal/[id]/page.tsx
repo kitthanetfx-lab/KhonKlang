@@ -529,6 +529,8 @@ export default function DealRoom() {
   const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
   const [priceInput, setPriceInput] = useState('');
   const [feePayerInput, setFeePayerInput] = useState<'buyer' | 'seller' | 'split' | ''>('');
+  // Local state สำหรับ step 1: เลือกผู้จ่ายค่าบริการ (ป้องกัน UI กลับกัน)
+  const [localStep1FeePayer, setLocalStep1FeePayer] = useState<'buyer' | 'seller' | 'split' | null>(null);
   const [showPriceProposal, setShowPriceProposal] = useState(false);
   const callFileInputRef = useRef<HTMLInputElement>(null);
   // wizard แบบง่าย: สถานะ local อย่างเดียว (ไม่บันทึกลง DB) ว่าฉันกด "คุยกันจบแล้ว" ไปดูหน้าหลักฐานหรือยัง
@@ -643,11 +645,20 @@ export default function DealRoom() {
         setDeal(nextDeal); setDealError('');
         setMeetup(d.meetup || null); setPriceState(d.priceState || null); setEvidence(d.evidence || []);
         setBuyerBank(d.buyerBank || null); setSellerBank(d.sellerBank || null); setMiddlemanBank(d.middlemanBank || null);
+        // Reset local step 1 fee payer state when deal is agreed
+        if (nextDeal.fee_payer) {
+          setLocalStep1FeePayer(null);
+        }
         return nextDeal;
       } else setDealError(d.error || `Error ${r.status}`);
     } catch (e: any) { setDealError(e?.message || 'Network error'); }
     return null;
   }, [dealId, setDeal, setDealError]);
+
+  // Reset local step 1 fee payer state when dealId changes (new deal)
+  useEffect(() => {
+    setLocalStep1FeePayer(null);
+  }, [dealId]);
 
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
@@ -2441,15 +2452,27 @@ export default function DealRoom() {
     // ตรวจสอบว่าทั้งสองฝ่ายเลือกผู้จ่ายค่าบริการตรงกันหรือไม่
     // ถ้า deal.fee_payer มีค่าแสดงว่าตกลงกันได้แล้ว
     const isAgreed = !!deal?.fee_payer;
-    const buyerSelection = (isAgreed ? deal.fee_payer : pd.fee_payer_selection_buyer) || null;
-    const sellerSelection = (isAgreed ? deal.fee_payer : pd.fee_payer_selection_seller) || null;
+    
+    // อ่านค่าจาก server: ถ้า proposed_by คือ buyer/seller ให้เอาค่านั้น
+    const serverBuyerSelection = isAgreed ? deal.fee_payer : (pd.proposed_by === 'buyer' ? pd.proposed_fee_payer : null);
+    const serverSellerSelection = isAgreed ? deal.fee_payer : (pd.proposed_by === 'seller' ? pd.proposed_fee_payer : null);
+    
+    // ใช้ local state สำหรับตัวเอง (ถ้ามี), ไม่งั้นใช้ server state; สำหรับอีกฝ่ายใช้ server state เท่านั้น
+    const myServerSelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? serverBuyerSelection : serverSellerSelection);
+    const myEffectiveSelection = isAgreed ? deal.fee_payer : (localStep1FeePayer || myServerSelection);
+    
+    const buyerSelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? myEffectiveSelection : serverBuyerSelection) || null;
+    const sellerSelection = isAgreed ? deal.fee_payer : (myRole === 'seller' ? myEffectiveSelection : serverSellerSelection) || null;
+    
     const bothSelected = !!buyerSelection && !!sellerSelection;
     const selectionsMatch = bothSelected && buyerSelection === sellerSelection;
     
     // เลือกผู้จ่ายค่าบริการของฉัน
     const mySelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? buyerSelection : myRole === 'seller' ? sellerSelection : null);
     const setMySelection = async (selection: 'buyer' | 'seller' | 'split') => {
-      // Just call API, let fetchDeal update priceState after revalidation
+      // อัปเดต local state ก่อน (ให้ UI แสดงผลทันที ไม่รอ server)
+      setLocalStep1FeePayer(selection);
+      // แล้วค่อย call API
       await doAction('select_fee_payer', { feePayer: selection });
     };
     
