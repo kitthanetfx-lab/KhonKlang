@@ -193,15 +193,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'accept_terms': {
-        // Check fee payer selections first
-        const currentPd = pd;
-        const buyerSel = currentPd.fee_payer_selection_buyer;
-        const sellerSel = currentPd.fee_payer_selection_seller;
-        
+        // Check fee payer selections first — default 'buyer' ถ้า DB ยังเป็น null (requirement: เริ่มต้นผู้ซื้อจ่าย)
+        const buyerSel = pd.fee_payer_selection_buyer || 'buyer';
+        const sellerSel = pd.fee_payer_selection_seller || 'buyer';
+
         if (!buyerSel || !sellerSel || buyerSel !== sellerSel) {
           return NextResponse.json({ error: 'ต้องเลือกผู้จ่ายค่าบริการให้ตรงกันทั้งสองฝ่ายก่อนยอมรับเงื่อนไข' }, { status: 400 });
         }
-        
+
         if (isSeller)    updates.seller_accepted_terms    = true;
         if (isMiddleman) updates.middleman_accepted_terms = true;
         if (isBuyer)     updates.buyer_accepted_terms     = true;
@@ -210,7 +209,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const bc = isBuyer     ? true : deal.buyer_accepted_terms;
         const hasMm = !!deal.middleman_id;
         if (sc && bc && (!hasMm || mc)) {
-          // Set the fee_payer on the deal
+          // Set the fee_payer on the deal (ใช้ค่าที่ตกลงกัน — default 'buyer' ถ้าไม่มี)
           updates.fee_payer = buyerSel;
           updates.status = 'payment_pending';
           systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — เริ่มคุย 3 ฝ่ายและเก็บหลักฐานได้';
@@ -701,7 +700,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (['buyer_joined', 'terms_pending'].includes(String(updated.status))
       && updated.seller_accepted_terms && updated.buyer_accepted_terms
       && (!updated.middleman_id || updated.middleman_accepted_terms)) {
-      const { data: fixed } = await db.from('deals').update({ status: 'payment_pending' }).eq('id', id).select().single();
+      // อ่าน fee_payer_selection อีกครั้งเพื่อเซ็ต fee_payer บน deal (default 'buyer' ถ้า null)
+      const finalPd = (await db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data)) || {};
+      const finalBuyerSel = finalPd.fee_payer_selection_buyer || 'buyer';
+      const finalSellerSel = finalPd.fee_payer_selection_seller || 'buyer';
+      const agreedFeePayer = finalBuyerSel === finalSellerSel ? finalBuyerSel : 'buyer';
+      const { data: fixed } = await db.from('deals').update({ status: 'payment_pending', fee_payer: agreedFeePayer }).eq('id', id).select().single();
       if (fixed) {
         updated = fixed;
         if (!systemMsg || /ยอมรับเงื่อนไขแล้ว$/.test(systemMsg)) systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — เริ่มคุย 3 ฝ่ายและเก็บหลักฐานได้';
