@@ -529,10 +529,15 @@ export default function DealRoom() {
   const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
   const [priceInput, setPriceInput] = useState('');
   const [feePayerInput, setFeePayerInput] = useState<'buyer' | 'seller' | 'split' | ''>('');
-  // Local state สำหรับ step 1: เลือกผู้จ่ายค่าบริการ (ป้องกัน UI กลับกัน)
-  const [localStep1FeePayer, setLocalStep1FeePayer] = useState<'buyer' | 'seller' | 'split' | null>(null);
   const [showPriceProposal, setShowPriceProposal] = useState(false);
   const callFileInputRef = useRef<HTMLInputElement>(null);
+  // ─── เลือกผู้จ่ายค่ากลาง (ขั้น 1) ───
+  // myFeePayer = เก็บการเลือกของ "ฉัน" แยกจาก server เพื่อกัน poll เขียนทับ (root cause ของ "เด้ง")
+  // feePayerTouched = true เมื่อผู้ใช้เคยเปลี่ยนค่าแล้ว (พอ touched แล้ว จะไม่ให้ server เขียนทับอีก)
+  const [myFeePayer, setMyFeePayer] = useState<'buyer' | 'seller' | 'split' | null>(null);
+  const feePayerTouched = useRef(false);
+  // pendingFeePayer = ตัวเลือกที่ผู้ใช้คลิก รอ popup ยืนยันก่อนส่ง API
+  const [pendingFeePayer, setPendingFeePayer] = useState<'buyer' | 'seller' | 'split' | null>(null);
   // wizard แบบง่าย: สถานะ local อย่างเดียว (ไม่บันทึกลง DB) ว่าฉันกด "คุยกันจบแล้ว" ไปดูหน้าหลักฐานหรือยัง
   const [chatReviewReady, setChatReviewReady] = useState(false);
   const chatBundledRef = useRef(false); // กัน bundleChatTranscriptAsEvidence ถูกเรียกซ้ำ
@@ -645,20 +650,11 @@ export default function DealRoom() {
         setDeal(nextDeal); setDealError('');
         setMeetup(d.meetup || null); setPriceState(d.priceState || null); setEvidence(d.evidence || []);
         setBuyerBank(d.buyerBank || null); setSellerBank(d.sellerBank || null); setMiddlemanBank(d.middlemanBank || null);
-        // Reset local step 1 fee payer state when deal is agreed
-        if (nextDeal.fee_payer) {
-          setLocalStep1FeePayer(null);
-        }
         return nextDeal;
       } else setDealError(d.error || `Error ${r.status}`);
     } catch (e: any) { setDealError(e?.message || 'Network error'); }
     return null;
   }, [dealId, setDeal, setDealError]);
-
-  // Reset local step 1 fee payer state when dealId changes (new deal)
-  useEffect(() => {
-    setLocalStep1FeePayer(null);
-  }, [dealId]);
 
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
@@ -1308,20 +1304,7 @@ export default function DealRoom() {
         : deal.buyer_id === myId
           ? 'buyer'
           : 'guest';
-  // Sync local state with server when we get our own selection
-  useEffect(() => {
-    if (!priceState || !deal) return;
-    const serverMySelection = myRole === 'buyer' 
-      ? priceState.fee_payer_selection_buyer 
-      : priceState.fee_payer_selection_seller;
-    if (serverMySelection && !localStep1FeePayer) {
-      setLocalStep1FeePayer(serverMySelection);
-    }
-    // If we've agreed, reset local state
-    if (deal.fee_payer) {
-      setLocalStep1FeePayer(null);
-    }
-  }, [priceState, deal, myRole, localStep1FeePayer]);
+
   // (เดิมคำนวณ callLive จาก system message 📞| — ตอนนี้ย้ายไปเป็น derived value incomingCall + voiceBgActive/showCall แทนแล้ว)
   const stepIdx = STEP_ORDER.indexOf(deal.status);
   const pct = stepIdx >= 0 ? Math.round((stepIdx / (STEP_ORDER.length - 1)) * 100) : 0;
@@ -2464,39 +2447,45 @@ export default function DealRoom() {
     const pd: DealPriceState = priceState || {};
     
     // ตรวจสอบว่าทั้งสองฝ่ายเลือกผู้จ่ายค่าบริการตรงกันหรือไม่
-    // ถ้า deal.fee_payer มีค่าแสดงว่าตกลงกันได้แล้ว
+    // ถ้า deal.fee_payer มีค่าแสดงว่าตกลงกันได้แล้ว (โชว์ค่าสุดท้าย)
     const isAgreed = !!deal?.fee_payer;
-    
-    // อ่านค่าจาก server โดยตรงจาก fee_payer_selection_buyer/seller
-    const buyerSelection = isAgreed ? deal.fee_payer : pd.fee_payer_selection_buyer || null;
-    const sellerSelection = isAgreed ? deal.fee_payer : pd.fee_payer_selection_seller || null;
-    
-    const bothSelected = !!buyerSelection && !!sellerSelection;
-    const selectionsMatch = bothSelected && buyerSelection === sellerSelection;
-    
-    // เลือกผู้จ่ายค่าบริการของฉัน
-    const mySelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? buyerSelection : myRole === 'seller' ? sellerSelection : null);
-    const setMySelection = async (selection: 'buyer' | 'seller' | 'split') => {
-      // ใช้ local state เพื่อแสดงผลทันที (ก่อน server response)
-      setLocalStep1FeePayer(selection);
-      // call API
-      await doAction('select_fee_payer', { feePayer: selection });
+    // ฝั่งตัวเอง (mySelection): ถ้าผู้ใช้เคยเปลี่ยน (touched) ใช้ local state — กัน poll เขียนทับทำให้ highlight "เด้ง"
+    //                  ถ้ายังไม่เคยเปลี่ยน ใช้ค่าจาก server (sync ครั้งแรก) หรือ default 'buyer'
+    // ฝั่งอีกฝ่าย (otherSelection) ใช้ค่าจาก server (pd) ปกติ
+    const serverMine = myRole === 'buyer' ? pd.fee_payer_selection_buyer : myRole === 'seller' ? pd.fee_payer_selection_seller : null;
+    const mySelection = isAgreed
+      ? (deal!.fee_payer as 'buyer' | 'seller' | 'split')
+      : (feePayerTouched.current
+          ? myFeePayer
+          : (serverMine || 'buyer')) as 'buyer' | 'seller' | 'split';
+    const otherSelection = isAgreed
+      ? (deal!.fee_payer as 'buyer' | 'seller' | 'split')
+      : (myRole === 'buyer' ? pd.fee_payer_selection_seller : myRole === 'seller' ? pd.fee_payer_selection_buyer : pd.fee_payer_selection_buyer);
+    const bothSelected = !!mySelection && !!otherSelection;
+    const selectionsMatch = !!mySelection && !!otherSelection && mySelection === otherSelection;
+
+    // เปิด popup ยืนยันก่อนเปลี่ยนค่า (กดค่าเดิมไม่ต้อง popup)
+    const requestChangeSelection = (selection: 'buyer' | 'seller' | 'split') => {
+      if (meAccepted || isAgreed || selection === mySelection) return;
+      setPendingFeePayer(selection);
     };
-    
-    // ใช้ local state สำหรับ UI ถ้ายังไม่มี response จาก server
-    const displayMySelection = mySelection || localStep1FeePayer;
-    // อัปเดต buyer/sellerSelection สำหรับ UI ด้วย local state ถ้าเป็นตัวเอง
-    const displayBuyerSelection = isAgreed ? deal.fee_payer : (myRole === 'buyer' ? (localStep1FeePayer || buyerSelection) : buyerSelection) || null;
-    const displaySellerSelection = isAgreed ? deal.fee_payer : (myRole === 'seller' ? (localStep1FeePayer || sellerSelection) : sellerSelection) || null;
-    
+    const confirmChangeSelection = async () => {
+      if (!pendingFeePayer) return;
+      const next = pendingFeePayer;
+      setPendingFeePayer(null);
+      feePayerTouched.current = true;     // mark touched — จากนี้ไม่ให้ server เขียนทับ
+      setMyFeePayer(next);                // local ทันที — highlight ไม่เด้ง
+      await doAction('select_fee_payer', { feePayer: next });
+    };
+
     // ชื่อการเลือก
-    const getSelectionLabel = (selection: string) => {
+    const getSelectionLabel = (selection?: string) => {
       if (selection === 'buyer') return 'ผู้ซื้อ';
       if (selection === 'seller') return 'ผู้ขาย';
       if (selection === 'split') return 'หารครึ่ง';
       return '';
     };
-    
+
     // ปุ่มยอมรับเงื่อนไขจะ enable ก็ต่อเมื่อทั้งสองฝ่ายเลือกตรงกัน
     const canAcceptTerms = bothSelected && selectionsMatch;
     
@@ -2545,31 +2534,37 @@ export default function DealRoom() {
                   flex: 1,
                   padding: '10px 8px',
                   borderRadius: 'var(--r-md)',
-                  border: `2px solid ${displayMySelection === option ? 'var(--accent)' : 'var(--line)'}`,
-                  background: displayMySelection === option ? 'rgba(99, 102, 241, 0.08)' : 'white',
+                  border: `2px solid ${mySelection === option ? 'var(--accent)' : 'var(--line)'}`,
+                  background: mySelection === option ? 'rgba(99, 102, 241, 0.08)' : 'white',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: displayMySelection === option ? 'var(--accent)' : 'var(--ink)',
+                  color: mySelection === option ? 'var(--accent)' : 'var(--ink)',
                   opacity: acting ? 0.5 : 1
                 }}
-                onClick={async () => {
-                  if (!meAccepted && !acting) await setMySelection(option);
-                }}
-                disabled={meAccepted || acting}
+                onClick={() => requestChangeSelection(option)}
+                disabled={meAccepted || isAgreed || acting}
               >
                 {getSelectionLabel(option)}
               </button>
             ))}
           </div>
-          {/* แสดงสถานะการเลือกของทั้งสองฝ่าย */}
+          {/* แสดงสถานะการเลือกของทั้งสองฝ่าย — ฝั่งตัวเองจาก local state, ฝั่งอีกฝ่ายจาก server */}
           <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', fontSize: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span>ผู้ขาย:</span>
-              <span style={{ fontWeight: 600 }}>{displaySellerSelection ? getSelectionLabel(displaySellerSelection) : '⏳ ยังไม่ได้เลือก'}</span>
+              <span>{myRole === 'seller' ? 'ผู้ขาย (คุณ):' : 'ผู้ขาย:'}</span>
+              <span style={{ fontWeight: 600 }}>
+                {isAgreed
+                  ? getSelectionLabel(deal!.fee_payer)
+                  : (myRole === 'seller' ? getSelectionLabel(mySelection || undefined) || '⏳ ยังไม่ได้เลือก' : (pd.fee_payer_selection_seller ? getSelectionLabel(pd.fee_payer_selection_seller) : '⏳ ยังไม่ได้เลือก'))}
+              </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>ผู้ซื้อ:</span>
-              <span style={{ fontWeight: 600 }}>{displayBuyerSelection ? getSelectionLabel(displayBuyerSelection) : '⏳ ยังไม่ได้เลือก'}</span>
+              <span>{myRole === 'buyer' ? 'ผู้ซื้อ (คุณ):' : 'ผู้ซื้อ:'}</span>
+              <span style={{ fontWeight: 600 }}>
+                {isAgreed
+                  ? getSelectionLabel(deal!.fee_payer)
+                  : (myRole === 'buyer' ? getSelectionLabel(mySelection || undefined) || '⏳ ยังไม่ได้เลือก' : (pd.fee_payer_selection_buyer ? getSelectionLabel(pd.fee_payer_selection_buyer) : '⏳ ยังไม่ได้เลือก'))}
+              </span>
             </div>
             {isAgreed ? (
               <div style={{ marginTop: 8, color: 'var(--success)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
@@ -2579,13 +2574,29 @@ export default function DealRoom() {
               <div style={{ marginTop: 8, color: '#b45309', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
                 ⚠️ ทั้งสองฝ่ายเลือกคนละแบบ กรุณาเลือกให้ตรงกันก่อน
               </div>
-            ) : (displayBuyerSelection || displaySellerSelection) ? (
+            ) : (mySelection || otherSelection) ? (
               <div style={{ marginTop: 8, color: 'var(--accent)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>
                 ⏳ รออีกฝ่ายเลือกให้ตรงกัน
               </div>
             ) : null}
           </div>
         </div>
+
+        {/* popup ยืนยันการเปลี่ยนผู้จ่ายค่าบริการ */}
+        {pendingFeePayer && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setPendingFeePayer(null)}>
+            <div style={{ background: 'var(--surface)', borderRadius: 'var(--r-lg)', padding: 20, maxWidth: 360, width: '100%', boxShadow: 'var(--sh-lg)' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>ยืนยันการเปลี่ยน</div>
+              <div style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 16 }}>
+                เปลี่ยนผู้จ่ายค่าบริการเป็น <b style={{ color: 'var(--ink)' }}>{getSelectionLabel(pendingFeePayer)}</b> ใช่ไหม?
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="btn btn-block" style={{ background: 'var(--surface-2)' }} onClick={() => setPendingFeePayer(null)}>ยกเลิก</button>
+                <AsyncButton className="btn btn-primary btn-block" onClick={confirmChangeSelection}>ยืนยัน</AsyncButton>
+              </div>
+            </div>
+          </div>
+        )}
         
         {renderParticipantStatusRows([
           { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: deal!.seller_accepted_terms, doneText: '✅ ยอมรับแล้ว' },
