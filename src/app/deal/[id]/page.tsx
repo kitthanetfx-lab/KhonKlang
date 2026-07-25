@@ -1899,7 +1899,8 @@ export default function DealRoom() {
           const isSplit = fp === 'split';
 
           // คำนวณยอดที่แต่ละฝ่ายต้องโอน — ใช้ sellerShare ตรงๆ กันค่าไม่ตรงกัน
-          const buyerShouldPay = isBuyerPaysAll ? buyerTotal : deal!.price; // ผู้ซื้อจ่ายทั้งหมด = ค่าสินค้า + ค่ากลางทั้งหมด
+          // ผู้ซื้อ = ค่าสินค้า + ค่าบริการส่วนผู้ซื้อ (buyerShare) ทุกกรณี
+          const buyerShouldPay = buyerTotal; // = deal.price + buyerShare (กรณี buyer จ่ายทั้งหมด buyerShare = total)
           const sellerShouldPay = sellerShare;
           
           const payTitle = myRole === 'buyer'
@@ -1955,10 +1956,17 @@ export default function DealRoom() {
               )}
 
               {deal!.status === 'payment_pending' && myRole === 'buyer' && (
-                <>
-                  <PaymentMethods amount={buyerShouldPay} note={`เงินจะพักไว้กับ บริษัท กลางฮับ จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`} />
+                <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
+                  <div style={{ fontWeight: 700, color: '#075985', marginBottom: 6 }}>🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
+                  <PaymentMethods amount={buyerShouldPay} note={
+                    isSellerPaysAll
+                      ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} เข้าบัญชีกลาง (ผู้ขายจ่ายค่าบริการเอง)`
+                      : isSplit
+                        ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()} = ฿${buyerShouldPay.toLocaleString()}`
+                        : `เงินจะพักไว้กับ บริษัท กลางฮับ จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`
+                  } />
                   <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
-                </>
+                </div>
               )}
               {deal!.status === 'payment_pending' && myRole !== 'buyer' && myRole !== 'seller' && (
                 <div style={{ fontSize: 13, color: 'var(--muted)' }}>รอผู้ซื้อโอนเงินเข้าระบบพักเงินของบริษัท</div>
@@ -1973,24 +1981,6 @@ export default function DealRoom() {
                       <PaymentMethods amount={sellerShouldPay} note="โอนค่าบริการส่วนของผู้ขายเข้าศูนย์กลาง แล้วอัปโหลดสลิป (แยกจากยอดสินค้า)" />
                       <button onClick={() => sellerFeeInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนค่าบริการแล้ว — อัปโหลดสลิป</button>
                     </div>
-              )}
-              
-              {/* กรณีผู้ขายจ่ายค่ากลาง: ผู้ซื้อก็ต้องเห็นเลขบัญชีกลางและปุ่มโอนเงิน */}
-              {isSellerPaysAll && myRole === 'buyer' && (
-                <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
-                  <div style={{ fontWeight: 700, color: '#075985', marginBottom: 6 }}>🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
-                  <PaymentMethods amount={buyerShouldPay} note="โอนเงินค่าสินค้าเข้าบัญชีกลาง แล้วอัปโหลดสลิป" />
-                  <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
-                </div>
-              )}
-              
-              {/* กรณีหารครึ่ง: ผู้ซื้อก็ต้องเห็นเลขบัญชีกลางและปุ่มโอนเงิน */}
-              {isSplit && myRole === 'buyer' && (
-                <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
-                  <div style={{ fontWeight: 700, color: '#075985', marginBottom: 6 }}>🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
-                  <PaymentMethods amount={buyerShouldPay} note="โอนเงินค่าสินค้า + ค่ากลาง 50% เข้าบัญชีกลาง แล้วอัปโหลดสลิป" />
-                  <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
-                </div>
               )}
               
               {deal!.status === 'payment_uploaded' && myRole === 'buyer' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — {isSimple ? 'รอศูนย์กลางยืนยันรับเงิน' : 'รอคนกลางยืนยัน'}</div>}
