@@ -111,7 +111,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
 
     // โหลด deal_price_state / deal_meetup ตามต้องการ (เฉพาะ action ที่ใช้)
-    const needsPriceState = ['select_fee_payer', 'price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back', 'request_evidence'].includes(action);
+    const needsPriceState = ['select_fee_payer', 'accept_terms', 'price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back', 'request_evidence'].includes(action);
     const needsMeetup = action.startsWith('meetup_');
     const [pdRow, mdRow] = await Promise.all([
       needsPriceState ? db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data) : Promise.resolve(null),
@@ -132,17 +132,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const myField = isSeller ? 'fee_payer_selection_seller' : 'fee_payer_selection_buyer';
         const otherField = isSeller ? 'fee_payer_selection_buyer' : 'fee_payer_selection_seller';
         const mySelection = body.feePayer;
-        const otherSelection = pd[otherField];
+        // default 'buyer' ถ้าอีกฝ่ายยังไม่ได้เลือก (ตรงกับ GET ที่คืน default 'buyer')
+        const otherSelection = pd[otherField] || 'buyer';
 
         // อัปเดต priceState: ตั้งค่าฟิลด์ของตัวเอง, คงอีกฝ่ายไว้
         priceUpdates[myField] = mySelection;
         // ถ้าอีกฝ่ายมีค่าอยู่แล้ว ให้คงไว้
-        if (otherSelection) {
-          priceUpdates[otherField] = otherSelection;
+        if (pd[otherField]) {
+          priceUpdates[otherField] = pd[otherField];
         }
 
-        // เช็คว่าทั้งสองฝ่ายเลือกเหมือนกันไหม
-        if (otherSelection && otherSelection === mySelection) {
+        // เช็คว่าทั้งสองฝ่ายเลือกเหมือนกันไหม (default 'buyer' ถ้าอีกฝ่ายยังไม่เลือก)
+        if (otherSelection === mySelection) {
           // ตรงกัน -> ตั้งค่า deal.fee_payer
           updates = { fee_payer: mySelection };
           priceUpdates.agreed = true;
