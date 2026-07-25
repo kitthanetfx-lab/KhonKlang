@@ -1,110 +1,118 @@
-# แผนแก้ "เลือกผู้จ่ายค่ากลางเด้งสลับไปมา"
+# แผน Redesign Deal Flow — แยกอิสระฝั่งผู้ซื้อ/ผู้ขาย ขั้น 2+3
 
-## Root Cause ของปัญหา
-- `fetchDeal()` (บรรทัด 644) เขียนทับ `priceState` ทั้งก้อนทุกครั้งที่ poll (4-15 วิ) และทุกครั้งที่ `doAction` re-fetch
-- UI highlight ปุ่ม (`mySelection`) อ่านจาก `pd` (= `priceState` จาก server) → ที่ผู้ใช้เพิ่งกดหายไปทันที เพราะ server state เขียนทับ local state
-- ไม่มี local state แยกต่างหากสำหรับ "ฝั่งตัวเองเลือกอะไร" → poll มาทุกครั้ง highlight กระโดด → ดูเหมือน "เด้ง"
+## สรุป flow ใหม่ (เทียบกับเดิม)
 
-## UX ใหม่ (ตามที่ยืนยัน)
-1. **ค่าเริ่มต้น = ผู้ซื้อจ่าย** ทั้งสองฝ่าย (เปลี่ยนจาก "null = ยังไม่เลือก")
-2. **คลิกเปลี่ยนตัวเลือก** (เช่น ผู้ซื้อ → ผู้ขาย) → มี **popup ยืนยัน** → พอยืนยัน → เปลี่ยนฝั่งตัวเอง + ส่ง API
-3. **แยก local vs server** — ฝั่งตัวเองเลือกอะไร รู้จาก local state ไม่โดน poll เขียนทับ
-4. **ปุ่มยอมรับเงื่อนไข**: unlock เมื่อฝั่งตัวเอง + ฝั่งอีกฝ่าย (จาก server) ตรงกัน
-
----
-
-## การแก้
-
-### A. Frontend — `src/app/deal/[id]/page.tsx`
-
-#### A1. เพิ่ม local state สำหรับฝั่งตัวเอง (ไม่ใช่ derive จาก pd อีกต่อไป)
-```ts
-// state ใหม่ — เก็บการเลือกของ "ฉัน" แยกจาก server (กัน poll เขียนทับ)
-// default = 'buyer' ตามที่ user ต้องการ
-const [myFeePayer, setMyFeePayer] = useState<'buyer' | 'seller' | 'split'>('buyer');
-```
-- ใช้ `useEffect` sync ครั้งแรกจาก server (ถ้า server มีค่าฝั่งตัวเองอยู่แล้ว) — แต่ครั้งต่อไปไม่ sync อีก (กันเด้ง):
-```ts
-useEffect(() => {
-  // sync ฝั่งตัวเองจาก server เฉพาะตอน initial load (เพื่อกู้ค่าที่เคยเลือก)
-  if (priceState && !feePayerInitialized.current) {
-    const serverMine = myRole === 'buyer' ? priceState.fee_payer_selection_buyer : priceState.fee_payer_selection_seller;
-    if (serverMine) setMyFeePayer(serverMine);
-    feePayerInitialized.current = true;
-  }
-}, [priceState, myRole]);
-```
-
-#### A2. ปรับ `renderWizardStep1()` (บรรทัด 2434-2568) — ใช้ local state + popup ยืนยัน
-
-**แทนที่ `mySelection` derivation + `setMySelection`** (บรรทัด 2447-2457):
-- `mySelection` ← `myFeePayer` (local) แทน `pd.fee_payer_selection_*`
-- `setMySelection` → เปิด popup ยืนยันก่อน (เก็บ `pendingFeePayer`) → พอ confirm ค่อย setMyFeePayer + doAction
-
-**ฝั่งอีกฝ่าย** (server-synced, โดน poll ได้):
-```ts
-const otherSelection = myRole === 'buyer' ? pd.fee_payer_selection_seller : pd.fee_payer_selection_buyer;
-// ใช้สำหรับแสดงสถานะฝั่งอีกฝ่าย และเทียบ canAcceptTerms
-```
-
-**ปุ่มเลือก** (บรรทัด 2506-2529):
-- onClick → เปิด popup ถ้าเปลี่ยนจากค่าปัจจุบัน: `setPendingFeePayer(option)`
-- highlight จาก `myFeePayer` (local) — ไม่เด้ง
-
-**canAcceptTerms** (บรรทัด 2468):
-```ts
-const canAcceptTerms = !!myFeePayer && !!otherSelection && myFeePayer === otherSelection;
-```
-
-#### A3. เพิ่ม JSX สำหรับ popup ยืนยัน
-```tsx
-{pendingFeePayer && (
-  <div className="dr-confirm-overlay">  // ใช้ CSS class ที่มีอยู่แล้ว
-    <div className="dr-confirm-dialog">
-      <div>ยืนยันเปลี่ยนผู้จ่ายค่าบริการเป็น "{getSelectionLabel(pendingFeePayer)}"?</div>
-      <div className="dr-confirm-actions">
-        <button onClick={() => setPendingFeePayer(null)}>ยกเลิก</button>
-        <AsyncButton onClick={async () => {
-          setMyFeePayer(pendingFeePayer);
-          await doAction('select_fee_payer', { feePayer: pendingFeePayer });
-          setPendingFeePayer(null);
-        }}>ยืนยัน</AsyncButton>
-      </div>
-    </div>
-  </div>
-)}
-```
-
-**State ใหม่**:
-```ts
-const [pendingFeePayer, setPendingFeePayer] = useState<'buyer'|'seller'|'split' | null>(null);
-const feePayerInitialized = useRef(false);
-```
-
-### B. Backend — `src/app/api/deals/[id]/route.ts`
-
-**ไม่ต้องเปลี่ยนโครงสร้าง** — `select_fee_payer` (บรรทัด 115-135) + `accept_terms` (บรรทัด 173-200) ยังเทียบ `fee_payer_selection_buyer === fee_payer_selection_seller` เหมือนเดิม
-
-เพียงแต่ logic ฝั่ง client จะเปลี่ยน — ฝั่งตัวเองไม่เคยเขียนทับโดย poll แล้ว ทำให้ server state ของแต่ละฝ่ายนิ่ง ไม่มี feedback loop
-
-### C. (optional ไม่บังคับ) ค่าเริ่มต้นฝั่ง server
-ถ้าต้องการให้ default = 'buyer' ทั้งคู่ทันทีตอนสร้างดีล ให้เพิ่มใน backend ตอนสร้าง deal → แต่ไม่บังคับ เพราะ client จะมี default เป็น 'buyer' อยู่แล้ว
+| ขั้น | flow เดิม | **flow ใหม่** |
+|---|---|---|
+| 1 | ยอมรับเงื่อนไข + เลือกผู้จ่าย (รอทั้งคู่) | เหมือนเดิม |
+| **2 โอนเงิน** | ผู้ซื้อโอน flip status → ผู้ขายจึงโอน | **แยกอิสระ**: ฝั่งไหนเสร็จก็ผ่านฝั่งนั้น ไม่ต้องรอ |
+| **3 อัปหลักฐาน** | ทั้งคู่ต้องอัป+ยืนยันครบ | **แยกอิสระ**: ฝั่งไหนอัปเสร็จก็ผ่าน (ผู้ขาย + ผู้ซื้อ อัปได้ทั้งคู่) |
+| ~~4 ตรวจหลักฐาน~~ | AND-gate | **ตัดออก** (หลักฐานไปแสดงในแท็บ "หลักฐาน") |
+| ~~5 ตกลงราคา~~ | (dead code อยู่แล้ว) | **ตัดออก** |
+| 6→7 MM ตรวจสอบ → packing | MM ยืนยัน | **เหมือนเดิม** — MM ยืนยัน แต่ server เช็คว่าทั้งสองฝ่ายทำขั้น 2+3 เสร็จ |
+| 7+ packing/ส่ง/MMตรวจ/MMส่ง/ผู้ซื้อรับ | (เหมือนเดิม) | **เหมือนเดิม** — คง flow คนกลางไว้ |
 
 ---
 
-## ไฟล์ที่แก้
-1. **`src/app/deal/[id]/page.tsx`** — เพิ่ม `myFeePayer`/`pendingFeePayer`/`feePayerInitialized` state + useEffect initial sync + ปรับ `renderWizardStep1()` ใช้ local state + เพิ่ม popup JSX
+## การแก้ (4 ส่วนหลัก)
 
-(Backend ไม่ต้องแก้)
+### A. Backend — `src/app/api/deals/[id]/route.ts`
+
+**A1. `upload_payment` (บรรทัด 243-248) — เลิก flip status ทันที**
+- เดิม: ตั้ง `payment_slip_file_id` + status → `payment_uploaded`
+- ใหม่: ตั้ง `payment_slip_file_id` เท่านั้น (status ค้าง `payment_pending`)
+- เหตุผล: ทำให้ผู้ขายไม่ถูกบังคับให้ทำตามลำดับ
+
+**A2. `upload_middleman_fee` (บรรทัด 250-256) — เหมือนเดิม** (เพียงแต่ตอนนี้ทำงานใน `payment_pending` ได้ ไม่ต้องรอ status flip)
+
+**A3. `confirm_payment` (บรรทัด 258-262) — เพิ่ม guard แบบเข้มงวด**
+```ts
+case 'confirm_payment': {
+  if (!isMiddleman) return 403;
+  // GUARD ใหม่: ต้องมีสลิปทั้งคู่ + หลักฐานทั้งคู่ ก่อนเข้า packing
+  if (!deal.payment_slip_file_id) return 400 'ยังรอผู้ซื้ออัปสลิปการโอน';
+  const sellerShare = ...; // คำนวณจาก fee_payer
+  if (sellerShare > 0 && !pd.seller_fee_slip) return 400 'ยังรอผู้ขายอัปสลิปค่าบริการ';
+  const buyerEv = /* นับ evidence ที่ uploader=buyer */;
+  const sellerEv = /* นับ evidence ที่ uploader=seller */;
+  if (buyerEv === 0 || sellerEv === 0) return 400 'ยังรอทั้งสองฝ่ายอัปหลักฐาน';
+  updates = { status: 'packing', middleman_confirmed_payment: true };
+  ...
+}
+```
+
+**A4. `accept_terms` (บรรทัด 196-222) — auto-set ค่า price** (กัน downstream code พัง)
+- เพิ่มหลังบรรทัด 214: `priceUpdates.agreed = true; priceUpdates.proposed_price = deal.price; priceUpdates.proposed_fee_payer = buyerSel;`
+- เหตุผล: เนื่องจากตัดขั้นตกลงราคา จึงต้อง mark ว่าตกลงแล้ว
+
+### B. Frontend step logic — `src/app/deal/[id]/page.tsx`
+
+**B1. `getRegularStep()` (บรรทัด 2261-2301) — เปลี่ยน logic ขั้น payment_pending**
+```ts
+if (s === 'payment_pending') {
+  // flow ใหม่: แยกอิสระ — ฝั่งไหนเสร็จก็ผ่านฝั่งนั้น
+  // เช็คเฉพาะฝั่งตัวเอง: myDone = อัปสลิปแล้ว + อัปหลักฐานแล้ว (อย่างน้อย 1)
+  const myHasSlip = myRole === 'buyer' ? !!deal.payment_slip_file_id
+                  : myRole === 'seller' ? (sellerShare <= 0 || !!pd.seller_fee_slip) : true;
+  const myHasEvidence = evidence.some(e => e.uploaded_by === myId);
+  const myDone = myHasSlip && myHasEvidence;
+  // ทั้งคู่เสร็จ → รอ MM confirm (step 6) / ถ้าไม่มี MM ควร auto-advance แต่เราคง MM ไว้
+  const bothDone = !!deal.payment_slip_file_id
+    && (sellerShare <= 0 || !!pd.seller_fee_slip)
+    && evidence.some(e => /* buyer */)
+    && evidence.some(e => /* seller */);
+  if (bothDone) return { step: 6 }; // รอ MM ยืนยัน
+  if (myDone) return { step: 6 };   // ฉันทำเสร็จแล้ว → รออีกฝ่าย (แต่ UI บอกว่าทำส่วนตัวเสร็จ)
+  return { step: 5 };               // ยังไม่เสร็จฝั่งตัวเอง
+}
+```
+(รายละเอียด refine ตอน implement — หัวใจคือเปลี่ยน `&&` → เช็คฝั่งตัวเอง และทั้งคู่→step 6 รอ MM)
+
+**B2. `getSimpleStep()` (บรรทัด 2227-2259)** — ปรับ logic คล้าย getRegularStep (แยกอิสระ + ตัดขั้นยืนยันหลักฐาน)
+
+**B3. ลบ dispatch ขั้น 4 (evidence review) + ขั้น 5 (price) ใน wizard**
+- บรรทัด 4184 (regular): ลบ `case 4 → renderWizardStepEvidenceReview`
+- บรรทัด 4185 (regular): ลบ `case 5 → renderWizardStepPrice`
+- บรรทัด 5041 + 5043 (simple): ลบเหมือนกัน
+- **เลื่อน step number**: ขั้น 6 (payment) → 4, ขั้น 7 (MM verify) → 5, ... หรือใช้เลขเดิมแต่ skip (เลือกตอน implement ตามความสะดวก)
+- แสดง `renderEvidencePanel()` ในแท็บ "หลักฐาน" ต่อไป (มีอยู่แล้วที่บรรทัด 5169)
+
+**B4. `renderWizardStepEvidenceReview()` + `renderWizardStepPrice()`** — ลบทั้งฟังก์ชัน (หรือเก็บไว้แต่ไม่เรียก)
+
+**B5. `renderPaymentSection()` (บรรทัด 1878-1996)** — ปรับให้ทั้งสองฝ่ายโอนได้พร้อมกัน (เปลี่ยน `payment_uploaded` → ใช้ `payment_pending` สำหรับทั้งคู่ และ UI แสดงสถานะ "รออีกฝ่าย" ฝั่งตัวเองแบบแยก)
+
+### C. Evidence upload — ฝั่งผู้ซื้อต้องอัปได้ด้วย
+
+**C1. `add_evidence` backend (บรรทัด 264-290)** — เพิ่มสิทธิ์ผู้ซื้อ
+- เดิม: ใน `payment_pending` เฉพาะ seller อัปได้
+- ใหม่: ทั้ง buyer + seller อัปได้ใน `payment_pending` (MM ยังอัปในขั้นของ MM)
+
+**C2. `renderEvidencePanel()` (บรรทัด 2147-2202)** — แก้ `canUp` ให้ buyer อัปได้ใน payment_pending
+
+### D. UX — แสดงสถานะฝั่งตัวเอง + ฝั่งอีกฝ่าย
+
+- ฝั่งตัวเอง "เสร็จแล้ว" → UI แสดง "✅ คุณทำเสร็จแล้ว — รออีกฝ่ายทำขั้น X"
+- ฝั่งอีกฝ่าย "ยังไม่เสร็จ" → แสดง "⏳ รอ [ผู้ซื้อ/ผู้ขาย] อัปสลิป/หลักฐาน"
+- ทั้งคู่เสร็จ + MM ยืนยัน → เข้า packing
+
+---
+
+## ไฟล์ที่แก้ (2 ไฟล์)
+1. **`src/app/api/deals/[id]/route.ts`** — upload_payment (A1), confirm_payment guard (A3), accept_terms auto-agree (A4), add_evidence buyer rights (C1)
+2. **`src/app/deal/[id]/page.tsx`** — getRegularStep/getSimpleStep (B1/B2), wizard dispatch (B3), ลบ step functions (B4), renderPaymentSection (B5), renderEvidencePanel buyer upload (C2)
 
 ## ลำดับการทำ
-1. เพิ่ม state ใหม่ + useEffect sync ครั้งแรก
-2. ปรับ `renderWizardStep1()`: ใช้ `myFeePayer` แทน derive จาก pd, เปลี่ยน onClick → เปิด popup, คำนวณ canAcceptTerms ใหม่
-3. เพิ่ม popup JSX (ใช้ CSS class ที่มีอยู่ — ขอเช็คก่อนทำว่ามี `.dr-confirm-overlay` หรือใช้อันอื่น)
-4. type-check + lint
+1. Backend ก่อน: upload_payment + confirm_payment + accept_terms + add_evidence
+2. Frontend step logic: getRegularStep/getSimpleStep
+3. Frontend wizard dispatch: ลบขั้น 4+5 + เลื่อนเลข
+4. Frontend payment/evidence UI: ปรับให้แยกฝั่ง
+5. type-check + lint + push
 
 ## ข้อควรระวัง
-- `useEffect` sync ใช้ `feePayerInitialized.current` เป็น gate — sync ครั้งเดียวตอน initial load กัน feedback loop
-- ถ้าผู้ใช้ refresh หน้า → local state กลับเป็น 'buyer' → useEffect sync จาก server ภายใน ~1 วิ (หลัง fetchDeal ครั้งแรก) → ใช้ค่าล่าสุดที่เคยเลือก
-- popup ยืนยันเกิดเฉพาะตอน "เปลี่ยน" ค่า (ไม่ใช่คลิกซ้ำค่าเดิม) — ถ้าคลิกค่าเดิมที่เลือกอยู่ ไม่ต้อง popup
-- `doAction` re-fetch จะยังคงทำงาน → server state update ฝั่งอีกฝ่าย → แต่ฝั่งตัวเองไม่โดนทับเพราะใช้ local state
+- **MM (คนกลาง) คง flow เดิม**: หลัง packing ผู้ขายส่งให้ MM → MM ตรวจ → ส่งต่อผู้ซื้อ (เหมือนเดิม)
+- **MM ยืนยันการโอน**: ยังเป็น MM ที่กด confirm_payment → packing (เหมือนเดิม) แต่ server เช็ค guard เข้มขึ้น
+- **`delivered` status**: ดูเหมือนเป็น dead code (ไม่มี action ตั้ง) — ไม่แตะ
+- **DealPriceState mirror ใน admin/deals/page.tsx**: ไม่ต้องแก้ (ไม่ได้เพิ่ม field ใหม่ — ใช้ evidence count + payment_slip_file_id ที่มีอยู่แล้ว)
+- **Step numbering**: regular vs simple ใช้เลขคนละชุด — ต้องระวังตอนปรับ dispatch
+- **Test scenario**: ทดสอบทั้ง 3 fee_payer (buyer/seller/split) × ลำดับการทำ (buyer ก่อน/seller ก่อน/พร้อมกัน)
+- **Backward compat**: ดีลเก่าที่อยู่ใน payment_uploaded แล้ว ต้องยังใช้ได้ — getRegularStep ต้องจัดการ status เดิมด้วย

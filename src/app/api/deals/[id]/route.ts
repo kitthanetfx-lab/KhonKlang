@@ -4,7 +4,7 @@ import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../../_lib/notify';
 import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
 import { getTierCreditLimit } from '@/lib/financeLedger';
-import { computeDealFees } from '@/lib/fees';
+import { computeDealFees, FEE_DEFAULTS } from '@/lib/fees';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
 
 // หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
@@ -104,14 +104,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     let updates: Record<string, unknown> = {};
     let priceUpdates: Record<string, unknown> = {};
-    let meetupUpdates: Record<string, unknown> = {};
+    const meetupUpdates: Record<string, unknown> = {};
     let evidenceInsert: Record<string, unknown> | null = null;
     let replaceChatTranscript = false;
     let systemMsg = '';
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
 
     // โหลด deal_price_state / deal_meetup ตามต้องการ (เฉพาะ action ที่ใช้)
-    const needsPriceState = ['select_fee_payer', 'accept_terms', 'price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back', 'request_evidence'].includes(action);
+    const needsPriceState = ['select_fee_payer', 'accept_terms', 'confirm_payment', 'price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back', 'request_evidence'].includes(action);
     const needsMeetup = action.startsWith('meetup_');
     const [pdRow, mdRow] = await Promise.all([
       needsPriceState ? db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data) : Promise.resolve(null),
@@ -213,6 +213,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           // Set the fee_payer on the deal (ใช้ค่าที่ตกลงกัน — default 'buyer' ถ้าไม่มี)
           updates.fee_payer = buyerSel;
           updates.status = 'payment_pending';
+          // flow ใหม่: ตัดขั้นตกลงราคาออก → auto-mark agreed ที่นี่เลย (กัน downstream code พัง)
+          priceUpdates.agreed = true;
+          priceUpdates.proposed_price = deal.price;
+          priceUpdates.proposed_fee_payer = buyerSel;
           systemMsg = 'ทุกฝ่ายยอมรับเงื่อนไขแล้ว — เริ่มคุย 3 ฝ่ายและเก็บหลักฐานได้';
         } else {
           const who = isSeller ? 'ผู้ขาย' : isMiddleman ? 'คนกลาง' : 'ผู้ซื้อ';
@@ -242,8 +246,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'upload_payment': {
         // ผู้ซื้ออัปโหลดสลิปโอนเงินค่าสินค้า (และค่ากลางถ้า fee_payer = 'buyer')
+        // flow ใหม่: ไม่ flip status ทันที — ค้าง payment_pending เพื่อให้ผู้ขายทำขั้นตัวเองได้พร้อมกัน
+        // status → payment_uploaded จะเกิดก็ต่อเมื่อ MM กด confirm_payment หลังเช็คทั้งสองฝ่ายเสร็จ
         if (!isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        updates = { payment_slip_file_id: body.fileId, payment_slip_verified_at: null, status: 'payment_uploaded' };
+        if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
+        updates = { payment_slip_file_id: String(body.fileId), payment_slip_verified_at: null };
         systemMsg = 'ผู้ซื้ออัปโหลดหลักฐานการโอนเงินแล้ว';
         break;
       }
@@ -256,16 +263,35 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'confirm_payment': {
+        // MM ยืนยันรับเงิน — flow ใหม่: เช็ค guard เข้มงวด ต้องมีสลิป + หลักฐาน ครบทั้งสองฝ่ายก่อนเข้า packing
         if (!isMiddleman) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        // 1) สลิปผู้ซื้อ
+        if (!deal.payment_slip_file_id) {
+          return NextResponse.json({ error: 'ยังรอผู้ซื้ออัปสลิปการโอนเงิน' }, { status: 400 });
+        }
+        // 2) สลิปผู้ขาย (กรณี seller/split)
+        const fp = String(deal.fee_payer || pd.proposed_fee_payer || 'split');
+        const fb = computeDealFees(FEE_DEFAULTS, Number(deal.price) || 0, deal.deal_type);
+        const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
+        if (sellerShare > 0 && !pd.seller_fee_slip) {
+          return NextResponse.json({ error: 'ยังรอผู้ขายอัปสลิปค่าบริการ' }, { status: 400 });
+        }
+        // 3) หลักฐาน — ทั้งผู้ซื้อและผู้ขายต้องอัปอย่างน้อย 1 ชิ้น
+        const evidenceList = (await db.from('deal_evidence').select('uploaded_by').eq('deal_id', id).then(r => r.data)) || [];
+        const hasBuyerEvidence = evidenceList.some((e: { uploaded_by?: string }) => e.uploaded_by === deal.buyer_id);
+        const hasSellerEvidence = evidenceList.some((e: { uploaded_by?: string }) => e.uploaded_by === deal.seller_id);
+        if (!hasBuyerEvidence || !hasSellerEvidence) {
+          return NextResponse.json({ error: 'ยังรอทั้งสองฝ่ายอัปหลักฐาน (แชท/รูป/วิดีโอ)' }, { status: 400 });
+        }
         updates = { status: 'packing', middleman_confirmed_payment: true };
         systemMsg = 'คนกลางยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้า';
         break;
       }
       case 'add_evidence': {
-        // ในขั้น payment_pending (ตรวจหลักฐานก่อนตกลงราคา) → จำกัดเฉพาะผู้ขายเท่านั้นที่อัปโหลดได้
+        // flow ใหม่: ในขั้น payment_pending ทั้งผู้ซื้อและผู้ขายอัปโหลดหลักฐานได้ (แยกอิสระ)
         // ขั้นอื่น (packing/receive/check) ยังอัพได้ตาม role เดิม
-        if (deal.status === 'payment_pending' && !isSeller) {
-          return NextResponse.json({ error: 'ในขั้นนี้เฉพาะผู้ขายอัปโหลดหลักฐานได้ — ผู้ซื้อ/คนกลางแค่ตรวจและยืนยัน' }, { status: 403 });
+        if (deal.status === 'payment_pending' && !isSeller && !isBuyer) {
+          return NextResponse.json({ error: 'ในขั้นนี้เฉพาะผู้ซื้อ/ผู้ขายอัปโหลดหลักฐานได้' }, { status: 403 });
         }
         const { evidenceType, fileId, fileName, content } = body;
         // chat_text เก็บประวัติการสนทนาทั้งหมดเป็นหลักฐานชิ้นเดียว (ไม่ใช่ทีละข้อความ) จึงต้องยาวกว่าแคปทั่วไป 200 ตัวอักษร
