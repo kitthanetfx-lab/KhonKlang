@@ -1883,9 +1883,11 @@ export default function DealRoom() {
         {(() => {
           const pd: DealPriceState = priceState || {};
           const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
-          // ใช้ค่า fee_payer จากขั้นตอนที่ 1
-          const fp = String(deal!.fee_payer || pd.fee_payer_selection_buyer || pd.fee_payer_selection_seller || 'split');
-          const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+          // ใช้ค่า fee_payer: ถ้า deal ยอมรับเงื่อนไขแล้ว (deal.fee_payer) ใช้ค่านั้น, ถ้ายังใช้ proposed_fee_payer จากขั้นตกลงราคา
+          // (ห้าม fallback ไป fee_payer_selection_* เพราะ default 'buyer' จะทำให้ผู้ขายเห็นยอด 0 ผิด)
+          const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
+          // sellerShare = ยอดที่ผู้ขายต้องจ่าย — ใช้สูตร Math.round(fb.total/2) เหมือน sellerShouldPay กันต่างกัน 1 บาท
+          const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
           const buyerShare = fb.total - sellerShare;
           const buyerTotal = deal!.price + buyerShare;
           const sellerNet = Math.max(deal!.price, 0);
@@ -1895,10 +1897,10 @@ export default function DealRoom() {
           const isBuyerPaysAll = fp === 'buyer';
           const isSellerPaysAll = fp === 'seller';
           const isSplit = fp === 'split';
-          
-          // คำนวณยอดที่แต่ละฝ่ายต้องโอน
+
+          // คำนวณยอดที่แต่ละฝ่ายต้องโอน — ใช้ sellerShare ตรงๆ กันค่าไม่ตรงกัน
           const buyerShouldPay = isBuyerPaysAll ? buyerTotal : deal!.price; // ผู้ซื้อจ่ายทั้งหมด = ค่าสินค้า + ค่ากลางทั้งหมด
-          const sellerShouldPay = isSellerPaysAll ? fb.total : isSplit ? Math.round(fb.total / 2) : 0;
+          const sellerShouldPay = sellerShare;
           
           const payTitle = myRole === 'buyer'
             ? '💳 ยอดที่คุณต้องโอน'
@@ -2039,7 +2041,7 @@ export default function DealRoom() {
     const isMt = deal!.deal_type === 'meetup';
     const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
     const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
-    const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+    const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
     const buyerShare = fb.total - sellerShare;
     const sellerNet = Math.max(deal!.price, 0);
     const finished = deal!.status === 'completed';
@@ -2254,7 +2256,7 @@ export default function DealRoom() {
       // ห้ามข้ามไปขั้น "ทีมงานตรวจสอบ" ทันทีที่ผู้ซื้ออัปโหลดสลิป — ต้องรอผู้ขายโอนค่าบริการก่อน ไม่งั้นปุ่มผู้ขายจะหายไปเฉยๆ
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
       const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
-      const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+      const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
       if (sellerShare > 0 && !pd.seller_fee_slip) return { step: 5 };
       return { step: 6 };
     }
@@ -2291,8 +2293,9 @@ export default function DealRoom() {
     }
     if (s === 'payment_uploaded') {
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
-      const fp = String(deal!.fee_payer || pd.fee_payer_selection_buyer || pd.fee_payer_selection_seller || 'split');
-      const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+      // ใช้ proposed_fee_payer fallback (เหมือนจุดอื่น) — กันผู้ขายเห็น 0 แล้วข้ามขั้นจ่ายค่าบริการผิด
+      const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
+      const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
       if (sellerShare > 0 && !pd.seller_fee_slip) return { step: 5 }; // ยังรอผู้ขายจ่าย - was step 6 before
       return { step: 6 }; // ตรวจสอบการโอน (HUB) - was step 7 before
     }
@@ -2979,7 +2982,7 @@ export default function DealRoom() {
     const pd: DealPriceState = priceState || {};
     const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
     const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
-    const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? (fb.total - Math.round(fb.total / 2)) : 0;
+    const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
     const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
     return (
       <div className="dr-card" style={{ textAlign: 'center', padding: '30px 20px' }}>
