@@ -820,7 +820,9 @@ export default function DealRoom() {
     if (!dealId) return;
     const simpleStep = deal?.deal_type === 'simple' ? getSimpleStep().step : null;
     const waitSyncFast = deal?.deal_type === 'simple' && (simpleStep === 2 || simpleStep === 3);
-    const intervalMs = isFinishedStatus(deal?.status) ? 45000 : waitSyncFast ? 4000 : 15000;
+    // poll เร็วตอนเลือกผู้จ่ายค่ากลาง (terms_pending) — กัน "เห็นว่าอีกฝ่ายยังไม่เลือก" ทั้งที่เลือกแล้ว
+    const inTermsStep = deal?.status === 'terms_pending' || deal?.status === 'buyer_joined';
+    const intervalMs = isFinishedStatus(deal?.status) ? 45000 : (waitSyncFast || inTermsStep) ? 4000 : 15000;
     const timer = window.setInterval(() => { void fetchDeal(headersRef.current); }, intervalMs);
     return () => window.clearInterval(timer);
   }, [
@@ -833,6 +835,8 @@ export default function DealRoom() {
     priceState?.evidence_done_buyer,
     priceState?.evidence_done_seller,
     priceState?.evidence_done_middleman,
+    priceState?.fee_payer_selection_buyer,
+    priceState?.fee_payer_selection_seller,
     chatReviewReady,
   ]);
 
