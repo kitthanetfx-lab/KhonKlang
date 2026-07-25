@@ -63,9 +63,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       getBankInfo(db, current.middleman_id),
     ]);
 
+    // default 'buyer' สำหรับ fee_payer_selection ของทั้งสองฝ่าย (requirement: เริ่มต้นผู้ซื้อจ่าย)
+    // ถ้า DB ยังเป็น null (row เก่า หรือยังไม่ได้เลือก) ให้คืนค่า default ออกไป
+    const rawPs = priceStateRes.data || {};
+    const psWithDefaults = {
+      ...rawPs,
+      fee_payer_selection_buyer: rawPs.fee_payer_selection_buyer || 'buyer',
+      fee_payer_selection_seller: rawPs.fee_payer_selection_seller || 'buyer',
+    };
+
     return NextResponse.json({
       deal: { ...current, images: (imagesRes.data || []).map(r => r.file_id) },
-      priceState: priceStateRes.data || null,
+      priceState: psWithDefaults,
       meetup: meetupRes.data || null,
       evidence: evidenceRes.data || [],
       buyerBank, sellerBank, middlemanBank,
