@@ -2146,12 +2146,14 @@ export default function DealRoom() {
   // ─── Evidence panel ──────────────────────────────────────────────────────
   function renderEvidencePanel() {
     // flow ใหม่: ในขั้น payment_pending ทั้งผู้ซื้อและผู้ขายอัปโหลดหลักฐานได้ (แยกอิสระ)
-    // ขั้นอื่น (packing/receive/check) → ตาม role เดิม
+    // ขั้นอื่น (packing/receive/check) → ตาม role เดิม (regular เท่านั้น)
     const canUp = ((myRole === 'seller' || myRole === 'buyer') && ['packing', 'shipped_to_middleman', 'payment_pending', 'payment_uploaded'].includes(deal!.status)) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
     // โหมดง่าย: ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่องเมื่อของมาถึง
     const canBuyerUnbox = isSimple && myRole === 'buyer' && deal!.status === 'shipped_to_buyer';
-    const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: isSimple ? '📬 วิดีโอก่อนแกะกล่อง (ผู้ซื้อ)' : '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)', chat: '💬 หลักฐานจากแชท', chat_text: '💬 ข้อความแชท', call: '📹 วิดีโอคอลที่บันทึก' };
+    const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: isSimple ? '📬 วิดีโอก่อนแกะกล่อง (ผู้ซื้อ)' : '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)', chat: '💬 หลักฐานจากแชท', chat_text: '💬 ข้อความแชท', call: '📹 วิดีโอคอลที่บันทึก', other: '📎 หลักฐาน' };
     const items = evidence;
+    // simple flow: อัปอะไรก็ได้ ไม่ต้องเลือกประเภท — เลือกประเภทเฉพาะ regular (ผู้ขาย/คนกลาง ในขั้น packing/receive/check)
+    const needsTypeSelect = !isSimple && canUp && (myRole === 'seller' || myRole === 'middleman') && ['packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking'].includes(deal!.status);
     return (
       <div className="dr-evid-inner">
         {isSimple && myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status) && (
@@ -2170,12 +2172,14 @@ export default function DealRoom() {
         {canUp && (
           <div className="dr-card">
             <div className="dr-card-title">อัปโหลดหลักฐาน</div>
-            <select className="dr-select" style={{ marginBottom: 12 }} value={evidenceType} onChange={e => setEvidenceType(e.target.value)}>
-              {myRole === 'seller' && <><option value="packing">วิดีโอแพ็คของ</option><option value="testing">วิดีโอทดสอบ</option></>}
-              {myRole === 'middleman' && <><option value="receive">วิดีโอรับสินค้า</option><option value="check">วิดีโอตรวจ</option></>}
-            </select>
+            {needsTypeSelect && (
+              <select className="dr-select" style={{ marginBottom: 12 }} value={evidenceType} onChange={e => setEvidenceType(e.target.value)}>
+                {myRole === 'seller' && <><option value="packing">วิดีโอแพ็คของ</option><option value="testing">วิดีโอทดสอบ</option></>}
+                {myRole === 'middleman' && <><option value="receive">วิดีโอรับสินค้า</option><option value="check">วิดีโอตรวจ</option></>}
+              </select>
+            )}
             <button onClick={() => evidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> เลือกไฟล์ (รูป/วิดีโอ)</button>
-            <input ref={evidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) await uploadFile(f, true); }} />
+            <input ref={evidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) await uploadFile(f, true, isSimple ? 'other' : undefined); }} />
           </div>
         )}
         {items.length === 0 && !canUp && <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '32px 0' }}>ยังไม่มีหลักฐาน</p>}
@@ -2184,9 +2188,16 @@ export default function DealRoom() {
             const url = item.file_id ? fileUrl(item.file_id) : '';
             const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
             const isImg = item.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+            // ลบได้เฉพาะไอเทมที่ตัวเองอัป และอยู่ในขั้นที่ยังแก้ไขได้
+            const canDelete = item.uploaded_by === myId && canUp;
             return (
               <div key={item.id || i} className="dr-card" style={{ padding: 12 }}>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{typeLabel[item.type] || item.type}{item.uploader_name ? ` · ${item.uploader_name}` : ''}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>{typeLabel[item.type] || item.type}{item.uploader_name ? ` · ${item.uploader_name}` : ''}</span>
+                  {canDelete && (
+                    <button type="button" onClick={() => { if (confirm('ลบหลักฐานชิ้นนี้?')) doAction('delete_evidence', { evidenceId: item.id }); }} style={{ background: 'none', border: 'none', color: 'var(--rose-500)', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1 }} title="ลบ">✕</button>
+                  )}
+                </div>
                 {!item.file_id
                   ? <div style={{ fontSize: 14, color: 'var(--ink)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.content || '(ไม่มีข้อความ)'}</div>
                   : isVid ? <video src={url} controls style={{ width: '100%', maxHeight: 220, borderRadius: 'var(--r-md)', background: '#000' }} />
@@ -2232,21 +2243,21 @@ export default function DealRoom() {
     if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
     const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
-    // flow ใหม่ (simple — ไม่มีคนกลาง ทีมงานยืนยันแทน):
-    //   step 2 = โอนเงิน (แยกอิสระ), step 3 = อัปหลักฐาน (แยกอิสระ), step 4 = รอทีมงานยืนยัน
+    // flow ใหม่ (simple): แยกอิสระ — เช็คเฉพาะฝั่งตัวเอง ฝั่งตัวเองเสร็จก็ไปขั้นถัดไปได้เลย
+    //   step 2 = โอนเงิน (ฝั่งตัวเองยังไม่โอน), step 3 = อัปหลักฐาน (ฝั่งตัวเองยังไม่อัป),
+    //   step 4 = รอทีมงานยืนยัน (ฝั่งตัวเองทำครบแล้ว — server guard เช็คทั้งสองฝ่ายก่อน flip → packing)
     if (['payment_pending', 'payment_uploaded'].includes(s)) {
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
       const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
       const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
-      const buyerHasSlip = !!deal!.payment_slip_file_id;
-      const sellerHasSlip = sellerShare <= 0 || !!pd.seller_fee_slip;
-      const buyerHasEvidence = evidence.some(e => e.uploaded_by === deal!.buyer_id);
-      const sellerHasEvidence = evidence.some(e => e.uploaded_by === deal!.seller_id);
-      const bothPaid = buyerHasSlip && sellerHasSlip;
-      const bothEvidenced = buyerHasEvidence && sellerHasEvidence;
-      if (bothPaid && bothEvidenced) return { step: 4 }; // รอทีมงานยืนยัน
-      if (bothPaid) return { step: 3 };                   // โอนเสร็จ → อัปหลักฐาน
-      return { step: 2 };                                  // ยังไม่โอน
+      // สถานะฝั่งตัวเอง
+      const myHasSlip = myRole === 'buyer' ? !!deal!.payment_slip_file_id
+                      : myRole === 'seller' ? (sellerShare <= 0 || !!pd.seller_fee_slip)
+                      : true;
+      const myHasEvidence = myId ? evidence.some(e => e.uploaded_by === myId) : false;
+      if (myHasSlip && myHasEvidence) return { step: 4 }; // ฝั่งเราทำครบ → รอทีมงานยืนยัน
+      if (myHasSlip) return { step: 3 };                   // โอนเสร็จ → อัปหลักฐาน
+      return { step: 2 };                                   // ยังไม่โอน
     }
     if (s === 'packing') return { step: 5 };
     if (s === 'shipped_to_buyer') return { step: 6 };

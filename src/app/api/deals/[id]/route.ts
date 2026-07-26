@@ -294,12 +294,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'ในขั้นนี้เฉพาะผู้ซื้อ/ผู้ขายอัปโหลดหลักฐานได้' }, { status: 403 });
         }
         const { evidenceType, fileId, fileName, content } = body;
+        // type default = 'other' ถ้าไม่ได้ส่งมา (flow ใหม่ simple ไม่ต้องเลือกประเภท)
+        const finalType = evidenceType || 'other';
         // chat_text เก็บประวัติการสนทนาทั้งหมดเป็นหลักฐานชิ้นเดียว (ไม่ใช่ทีละข้อความ) จึงต้องยาวกว่าแคปทั่วไป 200 ตัวอักษร
-        const contentCap = evidenceType === 'chat_text' ? 4000 : 200;
-        replaceChatTranscript = evidenceType === 'chat_text';
+        const contentCap = finalType === 'chat_text' ? 4000 : 200;
+        replaceChatTranscript = finalType === 'chat_text';
         evidenceInsert = {
           deal_id: id,
-          type: evidenceType,
+          type: finalType,
           file_id: fileId || '',
           file_name: fileName || '',
           content: content ? String(content).slice(0, contentCap) : '',
@@ -310,8 +312,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           packing: 'วิดีโอแพ็คของ', testing: 'วิดีโอทดสอบสินค้า',
           receive: 'วิดีโอรับสินค้า', check: 'วิดีโอตรวจสินค้า',
           chat: 'หลักฐานจากแชท', chat_text: 'ประวัติการสนทนา', call: 'วิดีโอคอลที่บันทึก',
+          other: 'หลักฐาน',
         };
-        systemMsg = `เก็บ${label[evidenceType] || evidenceType}เป็นหลักฐานแล้ว`;
+        systemMsg = `เก็บ${label[finalType] || finalType}เป็นหลักฐานแล้ว`;
+        break;
+      }
+      case 'delete_evidence': {
+        // ลบหลักฐาน — เฉพาะไอเทมที่ตัวเองอัปโหลด
+        const evidenceId = String(body.evidenceId || '');
+        if (!evidenceId) return NextResponse.json({ error: 'Missing evidenceId' }, { status: 400 });
+        const { data: evidenceItem } = await db.from('deal_evidence').select('uploaded_by').eq('id', evidenceId).eq('deal_id', id).maybeSingle();
+        if (!evidenceItem) return NextResponse.json({ error: 'ไม่พบหลักฐาน' }, { status: 404 });
+        if (evidenceItem.uploaded_by !== me.id) return NextResponse.json({ error: 'ลบได้เฉพาะหลักฐานที่คุณอัปโหลดเอง' }, { status: 403 });
+        await db.from('deal_evidence').delete().eq('id', evidenceId).eq('deal_id', id);
+        systemMsg = 'ลบหลักฐานแล้ว';
         break;
       }
       case 'seller_done_packing': {
