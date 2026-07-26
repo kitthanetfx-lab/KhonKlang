@@ -3430,6 +3430,13 @@ export default function DealRoom() {
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ...buyerRow },
           ], { marginBottom: 0 })}
         </div>
+        {/* แสดงหลักฐานทั้งหมดในดีล ให้ทุกฝ่ายเห็นตอนเสร็จสิ้น */}
+        {evidence.length > 0 && (
+          <div style={{ marginTop: 16, textAlign: 'left' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>📁 หลักฐานทั้งหมดในดีล ({evidence.length} รายการ)</div>
+            {renderEvidencePanel()}
+          </div>
+        )}
       </div>
     );
   }

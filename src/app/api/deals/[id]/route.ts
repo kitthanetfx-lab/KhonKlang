@@ -246,11 +246,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       case 'upload_payment': {
         // ผู้ซื้ออัปโหลดสลิปโอนเงินค่าสินค้า (และค่ากลางถ้า fee_payer = 'buyer')
-        // flow ใหม่: ไม่ flip status ทันที — ค้าง payment_pending เพื่อให้ผู้ขายทำขั้นตัวเองได้พร้อมกัน
-        // status → payment_uploaded จะเกิดก็ต่อเมื่อ MM กด confirm_payment หลังเช็คทั้งสองฝ่ายเสร็จ
+        // flip status → payment_uploaded เพื่อให้ admin เห็นในคิว "⚡ ยืนยันรับเงิน" ของหน้าดีล & ข้อพิพาท
+        // (admin จะเช็คเองว่าผู้ขายอัปสลิปค่าบริการครบไหนก่อนกดยืนยัน → packing)
         if (!isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
-        updates = { payment_slip_file_id: String(body.fileId), payment_slip_verified_at: null };
+        updates = { payment_slip_file_id: String(body.fileId), payment_slip_verified_at: null, status: 'payment_uploaded' };
         systemMsg = 'ผู้ซื้ออัปโหลดหลักฐานการโอนเงินแล้ว';
         break;
       }
