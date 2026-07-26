@@ -2205,8 +2205,10 @@ export default function DealRoom() {
   // Wizard ขั้นตอนดีล — เฉพาะ "ซื้อขายผ่านกลางแบบง่าย" (deal_type === 'simple')
   // โฟกัสทีละขั้นตอน (การ์ดเดียว) แทนการแสดงทุกการ์ดพร้อมกันแบบเดิม — ลดความสับสน
   // ═══════════════════════════════════════════════════════════════════════
+  // flow ใหม่ (simple 9→8 ขั้น): ตัด 'พูดคุย' + 'ตรวจหลักฐาน' เพิ่ม 'อัปหลักฐาน'
+  // 1=ยอมรับเงื่อนไข, 2=โอนเงิน, 3=อัปหลักฐาน, 4=รอทีมงานยืนยัน, 5=แพ็ค+จัดส่ง, 6=รับสินค้า, 7=โอนเงิน/เสร็จสมบูรณ์, 8=outcome
   const WIZARD_STEP_TITLES = [
-    'ยอมรับเงื่อนไข', 'พูดคุย', 'ตรวจหลักฐาน', 'โอนเงิน', 'ตรวจสอบ',
+    'ยอมรับเงื่อนไข', 'โอนเงิน', 'อัปหลักฐาน', 'รอทีมงานยืนยัน',
     'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
   ];
   const WZ_TOTAL = WIZARD_STEP_TITLES.length;
@@ -2230,8 +2232,8 @@ export default function DealRoom() {
     if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
     const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
-    // flow ใหม่: payment_pending รวม payment_uploaded (backend flip ตรงไป packing แล้ว)
-    // ทั้งสองฝ่ายทำ "สลิป + หลักฐาน" แยกอิสระ — ฝั่งไหนเสร็จก็ผ่านฝั่งนั้น ทั้งคู่เสร็จ → รอทีมงานยืนยัน (step 6)
+    // flow ใหม่ (simple — ไม่มีคนกลาง ทีมงานยืนยันแทน):
+    //   step 2 = โอนเงิน (แยกอิสระ), step 3 = อัปหลักฐาน (แยกอิสระ), step 4 = รอทีมงานยืนยัน
     if (['payment_pending', 'payment_uploaded'].includes(s)) {
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
       const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
@@ -2240,15 +2242,17 @@ export default function DealRoom() {
       const sellerHasSlip = sellerShare <= 0 || !!pd.seller_fee_slip;
       const buyerHasEvidence = evidence.some(e => e.uploaded_by === deal!.buyer_id);
       const sellerHasEvidence = evidence.some(e => e.uploaded_by === deal!.seller_id);
-      const bothDone = buyerHasSlip && sellerHasSlip && buyerHasEvidence && sellerHasEvidence;
-      if (bothDone) return { step: 6 }; // รอทีมงานยืนยัน
-      return { step: 5 }; // ยังไม่เสร็จ — ฝั่งไหนยังไม่เสร็จก็ทำขั้นนี้
+      const bothPaid = buyerHasSlip && sellerHasSlip;
+      const bothEvidenced = buyerHasEvidence && sellerHasEvidence;
+      if (bothPaid && bothEvidenced) return { step: 4 }; // รอทีมงานยืนยัน
+      if (bothPaid) return { step: 3 };                   // โอนเสร็จ → อัปหลักฐาน
+      return { step: 2 };                                  // ยังไม่โอน
     }
-    if (s === 'packing') return { step: 7 };
-    if (s === 'shipped_to_buyer') return { step: 8 };
-    if (s === 'completed') return { step: pd.payout_slip_file_id ? 10 : 9, outcome: 'success' };
-    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 10 : 9, outcome: 'cancelled' };
-    if (s === 'disputed') return { step: 9, outcome: 'disputed' };
+    if (s === 'packing') return { step: 5 };
+    if (s === 'shipped_to_buyer') return { step: 6 };
+    if (s === 'completed') return { step: pd.payout_slip_file_id ? 8 : 7, outcome: 'success' };
+    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 8 : 7, outcome: 'cancelled' };
+    if (s === 'disputed') return { step: 7, outcome: 'disputed' };
     return { step: 1 };
   }
 
@@ -2259,21 +2263,25 @@ export default function DealRoom() {
     if (['buyer_joined', 'terms_pending'].includes(s)) {
       if (!deal!.middleman_id) return { step: 1 }; // ยังไม่เลือกคนกลาง
       const allAccepted = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms && !!deal!.middleman_accepted_terms;
-      return { step: allAccepted ? 3 : 2 }; // คนกลางเลือกแล้ว -> รอยืนยัน / เข้าห้องคุย 3 ฝ่าย
+      return { step: allAccepted ? 3 : 2 };
     }
-    // flow ใหม่: payment_pending รวม payment_uploaded (backend flip ตรงไป packing แล้ว)
-    // ทั้งสองฝ่ายทำ "สลิป + หลักฐาน" แยกอิสระ — ฝั่งไหนเสร็จก็ผ่านฝั่งนั้น ทั้งคู่เสร็จ → รอ MM ยืนยัน (step 6)
-    if (['payment_pending', 'payment_uploaded'].includes(s)) {
+    // regular flow เดิม — ไม่แตะ (focus ที่ simple)
+    if (s === 'payment_pending') {
+      const sellerRS = !!pd.chat_done_seller || !!pd.evidence_done_seller;
+      const buyerRS = !!pd.chat_done_buyer || !!pd.evidence_done_buyer;
+      const mmRS = !!pd.chat_done_middleman || !!pd.evidence_done_middleman;
+      const reviewStarted = sellerRS && buyerRS && mmRS;
+      const evReady = evidence.length > 0 && !!pd.evidence_done_buyer && !!pd.evidence_done_middleman;
+      if (!reviewStarted) return { step: 3 };
+      if (!evReady) return { step: 4 };
+      return { step: 5 };
+    }
+    if (s === 'payment_uploaded') {
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
       const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
       const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
-      const buyerHasSlip = !!deal!.payment_slip_file_id;
-      const sellerHasSlip = sellerShare <= 0 || !!pd.seller_fee_slip;
-      const buyerHasEvidence = evidence.some(e => e.uploaded_by === deal!.buyer_id);
-      const sellerHasEvidence = evidence.some(e => e.uploaded_by === deal!.seller_id);
-      const bothDone = buyerHasSlip && sellerHasSlip && buyerHasEvidence && sellerHasEvidence;
-      if (bothDone) return { step: 6 }; // รอคนกลางยืนยัน
-      return { step: 5 }; // ยังไม่เสร็จ — ฝั่งไหนยังไม่เสร็จก็ทำขั้นนี้
+      if (sellerShare > 0 && !pd.seller_fee_slip) return { step: 5 };
+      return { step: 6 };
     }
     if (s === 'packing') return { step: 7 };
     if (s === 'shipped_to_middleman') return { step: 8 };
@@ -2847,6 +2855,40 @@ export default function DealRoom() {
   // ─── ขั้น 4: ตรวจหลักฐาน + ยืนยัน ─────────────────────────────────────────
   // logic ใหม่: ผู้ขายอัพโหลดหลักฐาน (รูป/วิดีโอ) / ผู้ซื้อกดยืนยัน / คนกลางยืนยัน (regular)
   // ผู้ซื้อสามารถขอหลักฐานเพิ่มเติมจากผู้ขายได้ (พร้อมระบุรายละเอียด)
+  // ─── ขั้น 5 ใหม่: อัปโหลดหลักฐาน (แยกอิสระ — ทั้งผู้ขายและผู้ซื้ออัปได้) ───────────────
+  function renderWizardStepEvidenceUpload() {
+    const myHasEvidence = myId ? evidence.some(e => e.uploaded_by === myId) : false;
+    const otherRole = myRole === 'buyer' ? 'ผู้ขาย' : myRole === 'seller' ? 'ผู้ซื้อ' : '';
+    const otherHasEvidence = myRole === 'buyer'
+      ? evidence.some(e => e.uploaded_by === deal!.seller_id)
+      : myRole === 'seller'
+        ? evidence.some(e => e.uploaded_by === deal!.buyer_id)
+        : false;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="dr-card">
+          <div className="dr-card-title">📁 อัปโหลดหลักฐาน</div>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4, lineHeight: 1.6 }}>
+            {myRole === 'seller'
+              ? 'อัปโหลดรูปสินค้า หลักฐานการแชท วิดีโอคอล หรือหลักฐานอื่นๆ ที่เกี่ยวข้องกับดีลนี้'
+              : myRole === 'buyer'
+                ? 'อัปโหลดหลักฐานการแชท รายละเอียดโพสสินค้าของผู้ขาย หรือหลักฐานอื่นๆ ที่เกี่ยวข้องกับดีลนี้'
+                : 'อัปโหลดหลักฐานที่เกี่ยวข้องกับดีลนี้'}
+          </p>
+        </div>
+        {renderEvidencePanel()}
+        <div className="dr-card">
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: myHasEvidence ? 'var(--green-600)' : 'var(--muted)', textAlign: 'center' }}>
+            {myHasEvidence ? '✅ คุณอัปหลักฐานแล้ว' : '⏳ คุณยังไม่ได้อัปหลักฐาน'}
+          </div>
+          <div style={{ fontSize: 12.5, color: otherHasEvidence ? 'var(--green-600)' : 'var(--muted)', textAlign: 'center', marginTop: 4 }}>
+            {otherHasEvidence ? `✅ ${otherRole}อัปหลักฐานแล้ว` : `⏳ รอ${otherRole}อัปหลักฐาน`}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderWizardStepEvidenceReview(nextStep = 5) {
     const pd: DealPriceState = priceState || {};
     const buyerDone = !!pd.evidence_done_buyer;
@@ -4167,9 +4209,10 @@ export default function DealRoom() {
           {step === 1 && renderRStep2()}
           {step === 2 && renderRStep1()}
           {step === 3 && renderWizardStepChat()}
-          {/* flow ใหม่: ตัดขั้น 4 (ตรวจหลักฐาน) + ขั้น 5 (ตกลงราคา) — หลักฐานอัปในแท็บ "หลักฐาน", ราคา auto-agreed ตอน accept_terms */}
-          {step === 5 && renderPaymentSection()}
-          {step === 6 && renderWizardStep4()}
+          {step === 4 && renderWizardStepEvidenceReview()}
+          {step === 5 && renderWizardStepPrice()}
+          {step === 6 && renderPaymentSection()}
+          {step === 7 && renderWizardStep4()}
           {step === 8 && renderRStep8()}
           {step === 9 && renderRStep9()}
           {step === 10 && renderRStep10()}
@@ -5022,15 +5065,14 @@ export default function DealRoom() {
         <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
           {step === 0 && renderWizardStep0()}
           {step === 1 && renderWizardStep1()}
-          {step === 2 && renderWizardStepChat()}
-          {step === 3 && renderWizardStepEvidenceReview(5)}
-          {step === 4 && renderWizardStepPrice()}
-          {step === 5 && renderPaymentSection()}
-          {step === 6 && renderWizardStep4()}
-          {step === 7 && renderWizardStep5()}
-          {step === 8 && renderWizardStep6()}
-          {step === 9 && renderWizardStep7(outcome)}
-          {step === 10 && renderWizardStep8(outcome)}
+          {/* flow ใหม่ (simple): ตัดขั้นคุย + ตัดขั้นตรวจหลักฐาน + ตัดขั้นตกลงราคา */}
+          {step === 2 && renderPaymentSection()}
+          {step === 3 && renderWizardStepEvidenceUpload()}
+          {step === 4 && renderWizardStep4()}
+          {step === 5 && renderWizardStep5()}
+          {step === 6 && renderWizardStep6()}
+          {step === 7 && renderWizardStep7(outcome)}
+          {step === 8 && renderWizardStep8(outcome)}
         </div>
         {step >= 1 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>
