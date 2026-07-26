@@ -2259,8 +2259,8 @@ export default function DealRoom() {
     const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
     if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
     // flow ใหม่ (simple): แยกอิสระ — เช็คเฉพาะฝั่งตัวเอง ฝั่งตัวเองเสร็จก็ไปขั้นถัดไปได้เลย
-    //   step 2 = โอนเงิน (ฝั่งตัวเองยังไม่โอน), step 3 = อัปหลักฐาน (ฝั่งตัวเองยังไม่อัป),
-    //   step 4 = รอทีมงานยืนยัน (ฝั่งตัวเองทำครบแล้ว — server guard เช็คทั้งสองฝ่ายก่อน flip → packing)
+    //   step 2 = โอนเงิน, step 3 = อัปหลักฐาน, step 4 = รอทีมงานยืนยัน
+    //   ฝั่งตัวเองต้อง "อัป + กดยืนยันหลักฐาน" ถึงจะไป step 4 (ไม่ต้องรออีกฝ่าย)
     if (['payment_pending', 'payment_uploaded'].includes(s)) {
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
       const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
@@ -2269,10 +2269,12 @@ export default function DealRoom() {
       const myHasSlip = myRole === 'buyer' ? !!deal!.payment_slip_file_id
                       : myRole === 'seller' ? (sellerShare <= 0 || !!pd.seller_fee_slip)
                       : true;
-      const myHasEvidence = myId ? evidence.some(e => e.uploaded_by === myId) : false;
-      if (myHasSlip && myHasEvidence) return { step: 4 }; // ฝั่งเราทำครบ → รอทีมงานยืนยัน
-      if (myHasSlip) return { step: 3 };                   // โอนเสร็จ → อัปหลักฐาน
-      return { step: 2 };                                   // ยังไม่โอน
+      const myEvidenceDone = myRole === 'buyer' ? !!pd.evidence_done_buyer
+                           : myRole === 'seller' ? !!pd.evidence_done_seller
+                           : true;
+      if (myHasSlip && myEvidenceDone) return { step: 4 }; // ฝั่งเราทำครบ → รอทีมงานยืนยัน
+      if (myHasSlip) return { step: 3 };                    // โอนเสร็จ → อัปหลักฐาน
+      return { step: 2 };                                    // ยังไม่โอน
     }
     if (s === 'packing') return { step: 5 };
     if (s === 'shipped_to_buyer') return { step: 6 };
@@ -2883,13 +2885,11 @@ export default function DealRoom() {
   // ผู้ซื้อสามารถขอหลักฐานเพิ่มเติมจากผู้ขายได้ (พร้อมระบุรายละเอียด)
   // ─── ขั้น 5 ใหม่: อัปโหลดหลักฐาน (แยกอิสระ — ทั้งผู้ขายและผู้ซื้ออัปได้) ───────────────
   function renderWizardStepEvidenceUpload() {
+    const pd: DealPriceState = priceState || {};
     const myHasEvidence = myId ? evidence.some(e => e.uploaded_by === myId) : false;
+    const myEvidenceDone = myRole === 'buyer' ? !!pd.evidence_done_buyer : myRole === 'seller' ? !!pd.evidence_done_seller : false;
     const otherRole = myRole === 'buyer' ? 'ผู้ขาย' : myRole === 'seller' ? 'ผู้ซื้อ' : '';
-    const otherHasEvidence = myRole === 'buyer'
-      ? evidence.some(e => e.uploaded_by === deal!.seller_id)
-      : myRole === 'seller'
-        ? evidence.some(e => e.uploaded_by === deal!.buyer_id)
-        : false;
+    const otherEvidenceDone = myRole === 'buyer' ? !!pd.evidence_done_seller : myRole === 'seller' ? !!pd.evidence_done_buyer : false;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="dr-card">
@@ -2904,13 +2904,28 @@ export default function DealRoom() {
         </div>
         {renderEvidencePanel()}
         <div className="dr-card">
-          <div style={{ fontSize: 13.5, fontWeight: 600, color: myHasEvidence ? 'var(--green-600)' : 'var(--muted)', textAlign: 'center' }}>
-            {myHasEvidence ? '✅ คุณอัปหลักฐานแล้ว' : '⏳ คุณยังไม่ได้อัปหลักฐาน'}
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: myEvidenceDone ? 'var(--green-600)' : (myHasEvidence ? 'var(--ink)' : 'var(--muted)'), textAlign: 'center', marginBottom: 4 }}>
+            {myEvidenceDone ? '✅ คุณยืนยันหลักฐานแล้ว' : myHasEvidence ? '✅ คุณอัปหลักฐานแล้ว — กดยืนยันเพื่อไปขั้นถัดไป' : '⏳ คุณยังไม่ได้อัปหลักฐาน'}
           </div>
-          <div style={{ fontSize: 12.5, color: otherHasEvidence ? 'var(--green-600)' : 'var(--muted)', textAlign: 'center', marginTop: 4 }}>
-            {otherHasEvidence ? `✅ ${otherRole}อัปหลักฐานแล้ว` : `⏳ รอ${otherRole}อัปหลักฐาน`}
+          <div style={{ fontSize: 12.5, color: otherEvidenceDone ? 'var(--green-600)' : 'var(--muted)', textAlign: 'center' }}>
+            {otherEvidenceDone ? `✅ ${otherRole}ยืนยันหลักฐานแล้ว` : `⏳ รอ${otherRole}อัป+ยืนยันหลักฐาน (ไม่ต้องรอ — ทำฝั่งตัวเองได้เลย)`}
           </div>
         </div>
+        {/* ปุ่มยืนยันหลักฐาน — ฝั่งตัวเองอัป ≥1 แล้วกดยืนยัน → ไป step 4 (รอทีมงานยืนยัน) ไม่ต้องรออีกฝ่าย */}
+        {!myEvidenceDone && (
+          <AsyncButton
+            className="btn btn-primary btn-block btn-lg"
+            disabled={!myHasEvidence}
+            onClick={async () => {
+              await doAction('evidence_done');
+            }}
+          >
+            {myHasEvidence ? '✅ ยืนยันหลักฐาน — ไปขั้นถัดไป' : '⏳ อัปหลักฐานอย่างน้อย 1 ชิ้นก่อน'}
+          </AsyncButton>
+        )}
+        {myEvidenceDone && (
+          <p style={{ fontSize: 13.5, color: 'var(--green-600)', textAlign: 'center' }}>✅ คุณยืนยันหลักฐานแล้ว — รอทีมงานตรวจสอบ</p>
+        )}
       </div>
     );
   }
