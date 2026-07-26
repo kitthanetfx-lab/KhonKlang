@@ -826,7 +826,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     await syncDealLedger(db, updated as Record<string, unknown>).catch(() => {});
-    return NextResponse.json({ deal: updated });
+    // คืน evidence list ล่าสุดด้วย — กัน frontend re-fetch ทับ optimistic update จนภาพหาย
+    let latestEvidence: unknown[] | undefined;
+    if (evidenceInsert || action === 'delete_evidence') {
+      const { data: evRows } = await db.from('deal_evidence').select('*').eq('deal_id', id).order('created_at', { ascending: true });
+      latestEvidence = evRows || [];
+    }
+    return NextResponse.json({ deal: updated, evidence: latestEvidence });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;
     return NextResponse.json({ error: String(err) }, { status });

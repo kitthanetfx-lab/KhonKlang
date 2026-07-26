@@ -1026,7 +1026,9 @@ export default function DealRoom() {
       const r = await fetch(`/api/deals/${dealId}`, { method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...extra }) });
       const d = await r.json();
       if (r.ok) {
-        // re-fetch ทั้งดีล+meetup+priceState+evidence ให้ตรงกัน (PATCH คืนแค่ deal row)
+        // ถ้า PATCH คืน evidence list ล่าสุดมาด้วย → setEvidence ทันที (กัน re-fetch ทับ optimistic จนภาพหาย)
+        if (Array.isArray(d.evidence)) setEvidence(d.evidence);
+        // re-fetch ทั้งดีล+meetup+priceState+evidence ให้ตรงกัน
         const nextDeal = await fetchDeal(headers);
         if ((tab === 'chat' || isInCall) && isDealParty(nextDeal ?? deal, myId)) await fetchMsgs(headers, nextDeal ?? deal, myId);
         return nextDeal;
@@ -1085,20 +1087,18 @@ export default function DealRoom() {
         fileId = d.fileId; fileName = d.fileName;
       }
       if (isEvidence) {
-        // optimistic update: เพิ่ม evidence ลง state ทันที กัน UI "ไม่ขึ้นแสดง" หลังอัป
         const tempType = evidenceTypeOverride || evidenceType;
-        const tempItem: EvidenceItem = {
-          id: `temp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          deal_id: dealId, type: tempType, file_id: fileId, file_name: fileName,
-          content: '', uploaded_by: myId, uploader_name: myName, created_at: new Date().toISOString(),
-        };
-        setEvidence(prev => [...prev, tempItem]);
-        await doAction('add_evidence', { evidenceType: tempType, fileId, fileName });
-        // re-fetch เพื่อ sync กับ DB (เอา temp item ออก ใส่ของจริง)
+        // ส่ง add_evidence → doAction re-fetch จะเอา evidence ล่าสุดจาก DB มาแสดงเอง
+        // (อย่าทำ optimistic update — doAction re-fetch จะเขียนทับ state ทำให้ item "หาย")
+        const nextDeal = await doAction('add_evidence', { evidenceType: tempType, fileId, fileName });
+        if (!nextDeal) {
+          alert('บันทึกหลักฐานไม่สำเร็จ — กรุณาลองอีกครั้ง');
+          return;
+        }
+        // re-fetch เพิ่มอีกครั้ง (กัน race — บางครั้ง DB commit เสร็จหลัง doAction re-fetch)
         const headers = await getAuthHeaders();
         const r = await fetch(`/api/deals/${dealId}`, { headers, cache: 'no-store' });
-        const d = await r.json();
-        if (r.ok && d.evidence) setEvidence(d.evidence);
+        if (r.ok) { const d = await r.json(); if (d.evidence) setEvidence(d.evidence); }
       }
       else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', fileId, fileName);
     } finally { endUploadPreview(purl); }

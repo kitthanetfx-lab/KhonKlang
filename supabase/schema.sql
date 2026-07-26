@@ -34,7 +34,7 @@ create type deal_status as enum (
 -- NOTE: 'delivered' is a dead state in the current app (defined, never set).
 -- Kept for parity; safe to leave unused.
 
-create type evidence_type as enum ('packing', 'testing', 'receive', 'check', 'chat', 'chat_text', 'call');
+create type evidence_type as enum ('packing', 'testing', 'receive', 'check', 'chat', 'chat_text', 'call', 'other');
 create type message_role as enum ('user', 'system');
 create type message_type as enum ('text', 'image', 'file', 'system');
 
