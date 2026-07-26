@@ -1084,7 +1084,22 @@ export default function DealRoom() {
         if (!r.ok) { alert(d.error || 'Upload failed'); return; }
         fileId = d.fileId; fileName = d.fileName;
       }
-      if (isEvidence) await doAction('add_evidence', { evidenceType: evidenceTypeOverride || evidenceType, fileId, fileName });
+      if (isEvidence) {
+        // optimistic update: เพิ่ม evidence ลง state ทันที กัน UI "ไม่ขึ้นแสดง" หลังอัป
+        const tempType = evidenceTypeOverride || evidenceType;
+        const tempItem: EvidenceItem = {
+          id: `temp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          deal_id: dealId, type: tempType, file_id: fileId, file_name: fileName,
+          content: '', uploaded_by: myId, uploader_name: myName, created_at: new Date().toISOString(),
+        };
+        setEvidence(prev => [...prev, tempItem]);
+        await doAction('add_evidence', { evidenceType: tempType, fileId, fileName });
+        // re-fetch เพื่อ sync กับ DB (เอา temp item ออก ใส่ของจริง)
+        const headers = await getAuthHeaders();
+        const r = await fetch(`/api/deals/${dealId}`, { headers, cache: 'no-store' });
+        const d = await r.json();
+        if (r.ok && d.evidence) setEvidence(d.evidence);
+      }
       else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', fileId, fileName);
     } finally { endUploadPreview(purl); }
   }
