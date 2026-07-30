@@ -15,7 +15,7 @@ import { InAppBanner } from '@/components/InAppBanner';
 import { withExternalBrowserParam } from '@/lib/inApp';
 import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
-import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
+import { FeeConfig, FEE_DEFAULTS, computeDealFees, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { useUser } from '@/lib/useUser';
@@ -232,7 +232,7 @@ function FloatingChatBox({ msgs, myId, chatInput, setChatInput, sending, acting,
 
 interface Deal {
   id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
-  buyer_id: string; buyer_name: string; title: string; description: string; price: number; category: string;
+  buyer_id: string; buyer_name: string; creator_id?: string; title: string; description: string; price: number; category: string;
   status: string; reject_reason: string;
   seller_accepted_terms: boolean; middleman_accepted_terms: boolean; buyer_accepted_terms: boolean;
   middleman_confirmed_payment: boolean; buyer_confirmed_check: boolean;
@@ -527,6 +527,7 @@ export default function DealRoom() {
   const [showRequestEvidence, setShowRequestEvidence] = useState(false);
   const [requestEvidenceDetail, setRequestEvidenceDetail] = useState('');
   const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
+  const [simpleShare, setSimpleShare] = useState<SimpleDealShareBreakdown & { creatorId?: string | null; creatorName?: string } | null>(null);
   const [priceInput, setPriceInput] = useState('');
   const [feePayerInput, setFeePayerInput] = useState<'buyer' | 'seller' | 'split' | ''>('');
   const [showPriceProposal, setShowPriceProposal] = useState(false);
@@ -650,6 +651,7 @@ export default function DealRoom() {
         setDeal(nextDeal); setDealError('');
         setMeetup(d.meetup || null); setPriceState(d.priceState || null); setEvidence(d.evidence || []);
         setBuyerBank(d.buyerBank || null); setSellerBank(d.sellerBank || null); setMiddlemanBank(d.middlemanBank || null);
+        setSimpleShare(d.simpleShare || null);
         return nextDeal;
       } else setDealError(d.error || `Error ${r.status}`);
     } catch (e: any) { setDealError(e?.message || 'Network error'); }
@@ -2040,6 +2042,41 @@ export default function DealRoom() {
   }
 
   // ─── สรุปการเงิน: เลขดีล + บัญชีรับเงินทุกฝ่าย + ยอดที่ต้องคืน/โอนเมื่อจบดีล ──
+  function canViewSimpleShareBreakdown() {
+    if (deal?.deal_type !== 'simple' || !simpleShare) return false;
+    if (myRole === 'buyer' && myId !== deal.creator_id) return false;
+    return myRole === 'seller' || myId === deal.creator_id;
+  }
+
+  function renderSimpleShareBreakdownCard() {
+    if (!canViewSimpleShareBreakdown() || !simpleShare) return null;
+    return (
+      <div className="dr-card" style={{ borderColor: 'color-mix(in srgb, #f97316 35%, var(--line))' }}>
+        <div className="dr-card-title">💼 ส่วนแบ่งค่าบริการ (ดีลแบบง่าย)</div>
+        <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
+            <span>ค่าบริการรวม</span><span>฿{simpleShare.totalFee.toLocaleString()}</span>
+          </div>
+          {simpleShare.creatorEligible ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--green-700)' }}>
+                <span>ส่วนแบ่งผู้สร้างดีล ({simpleShare.sharePercent}%)</span>
+                <span style={{ fontWeight: 700 }}>฿{simpleShare.creatorShare.toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
+                <span>รายได้แพลตฟอร์ม</span><span>฿{simpleShare.platformShare.toLocaleString()}</span>
+              </div>
+            </>
+          ) : (
+            <div style={{ color: 'var(--muted)', fontSize: 12.5 }}>
+              ผู้สร้างดีลยังไม่ลงทะเบียนครบทั้งผู้ขาย+คนกลาง — แพลตฟอร์มได้ค่าบริการเต็มจำนวน
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderFinanceSummaryCard() {
     const pd: DealPriceState = priceState || {};
     const md: MeetupData = meetup || {};
@@ -3488,6 +3525,7 @@ export default function DealRoom() {
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: true, doneText: isCancelled ? '✅ ได้รับเงินคืนแล้ว' : '✅ ดีลเสร็จสมบูรณ์' },
           ], { marginBottom: 0 })}
         </div>
+        {renderSimpleShareBreakdownCard()}
 
         {/* ─ หลักฐานทั้งหมดในดีล ─ */}
         {hasAnyEvidence && (

@@ -158,6 +158,7 @@ create table deals (
   middleman_name             text,
   buyer_id                  uuid references profiles(id) on delete set null,
   buyer_name                 text,
+  creator_id                uuid references profiles(id) on delete set null,  -- ผู้สร้างดีล (ใช้คำนวณส่วนแบ่ง simple)
 
   title                     text not null,
   description               text,
@@ -193,6 +194,7 @@ create table deals (
 );
 create index idx_deals_seller on deals(seller_id);
 create index idx_deals_buyer on deals(buyer_id);
+create index idx_deals_creator on deals(creator_id);
 create index idx_deals_middleman on deals(middleman_id);
 create index idx_deals_status on deals(status);
 create index idx_deals_created on deals(created_at desc);
@@ -469,6 +471,7 @@ create table fee_config (
   platform_cut_percent    numeric(5,2) not null default 20,
   simple_fee_percent      numeric(5,2) not null default 2,
   simple_fee_min          integer not null default 20,
+  simple_middleman_share_percent numeric(5,2) not null default 18,  -- % ส่วนแบ่งให้ผู้สร้างดีลที่ลงทะเบียนทั้ง seller+middleman
   inspection_fee          integer not null default 100,
   packing_fee             integer not null default 50,
   deposit_bronze          integer not null default 1000,

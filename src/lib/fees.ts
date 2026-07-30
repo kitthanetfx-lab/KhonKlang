@@ -4,7 +4,7 @@
 export interface FeeConfig {
   escrowFeePercent: number; escrowFeeMin: number;
   middlemanFeePercent: number; middlemanFeeMin: number; platformCutPercent: number;
-  simpleFeePercent: number; simpleFeeMin: number;
+  simpleFeePercent: number; simpleFeeMin: number; simpleMiddlemanSharePercent: number;
   inspectionFee: number; packingFee: number;
   depositBronze: number; depositSilver: number; depositGold: number; depositPlatinum: number;
   failedDealFee: number;
@@ -25,7 +25,7 @@ export interface FeeConfig {
 export const FEE_DEFAULTS: FeeConfig = {
   escrowFeePercent: 2.5, escrowFeeMin: 20,
   middlemanFeePercent: 1.5, middlemanFeeMin: 30, platformCutPercent: 20,
-  simpleFeePercent: 2, simpleFeeMin: 20,
+  simpleFeePercent: 2, simpleFeeMin: 20, simpleMiddlemanSharePercent: 18,
   inspectionFee: 100, packingFee: 50,
   depositBronze: 1000, depositSilver: 5000, depositGold: 20000, depositPlatinum: 50000,
   failedDealFee: 50,
@@ -88,4 +88,36 @@ export function computeDealFees(c: FeeConfig, price: number, dealType?: string):
     ? 'ยังไม่รวมเงินประกันเดินทางที่วางคืนได้'
     : 'หากดีลไม่สำเร็จ/ตีกลับ อาจมีค่าจัดส่งคืนเพิ่มเติม';
   return { lines, total, note };
+}
+
+/** ผู้สร้างดีล simple ลงทะเบียนทั้ง seller + middleman แล้วหรือยัง */
+export function isSimpleShareEligible(profile?: { sellerStatus?: string; middlemanStatus?: string } | null): boolean {
+  return profile?.sellerStatus === 'approved' && profile?.middlemanStatus === 'approved';
+}
+
+export interface SimpleDealShareBreakdown {
+  totalFee: number;
+  creatorShare: number;
+  platformShare: number;
+  sharePercent: number;
+  creatorEligible: boolean;
+}
+
+/** คำนวณส่วนแบ่งค่าบริการดีลแบบง่าย — แพลตฟอร์ม vs ผู้สร้างที่ลงทะเบียนครบ */
+export function computeSimpleDealShare(
+  config: FeeConfig,
+  price: number,
+  creatorProfile?: { sellerStatus?: string; middlemanStatus?: string } | null,
+): SimpleDealShareBreakdown {
+  const totalFee = computeDealFees(config, price, 'simple').total;
+  const sharePercent = Math.min(100, Math.max(0, Number(config.simpleMiddlemanSharePercent) || 0));
+  const creatorEligible = isSimpleShareEligible(creatorProfile);
+  const creatorShare = creatorEligible ? Math.round((totalFee * sharePercent) / 100) : 0;
+  return {
+    totalFee,
+    creatorShare,
+    platformShare: Math.max(totalFee - creatorShare, 0),
+    sharePercent,
+    creatorEligible,
+  };
 }

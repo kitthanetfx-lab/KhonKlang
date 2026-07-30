@@ -89,6 +89,14 @@ export async function GET(req: NextRequest) {
     const bankPairs = await Promise.all(uids.map(async uid => [uid, await getBankInfo(db, uid)] as const));
     const bankMap = new Map(bankPairs);
 
+    const creatorIds = Array.from(new Set(
+      deals.filter(d => d.deal_type === 'simple' && d.creator_id).map(d => d.creator_id as string),
+    ));
+    const { data: creatorProfiles } = creatorIds.length
+      ? await db.from('profiles').select('id, display_name, seller_status, middleman_status').in('id', creatorIds)
+      : { data: [] as { id: string; display_name: string | null; seller_status: string | null; middleman_status: string | null }[] };
+    const creatorMap = new Map((creatorProfiles || []).map(p => [p.id, p]));
+
     let documents = deals.map(d => ({
       ...d,
       meetup: meetupMap.get(d.id) || null,
@@ -98,6 +106,7 @@ export async function GET(req: NextRequest) {
       buyerBank: bankMap.get(d.buyer_id) || null,
       sellerBank: bankMap.get(d.seller_id) || null,
       middlemanBank: bankMap.get(d.middleman_id) || null,
+      creatorProfile: d.creator_id ? creatorMap.get(d.creator_id) || null : null,
     }));
 
     // กรองเพิ่มฝั่ง JS เพราะต้องเช็คฟิลด์ที่อยู่ใน deal_price_state/deal_meetup (join แล้วถึงรู้)

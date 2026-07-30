@@ -66,6 +66,7 @@ export async function readFeesConfig(db: SupabaseClient): Promise<FeeConfig> {
     platformCutPercent: Number(data.platform_cut_percent) || FEE_DEFAULTS.platformCutPercent,
     simpleFeePercent: Number(data.simple_fee_percent) || FEE_DEFAULTS.simpleFeePercent,
     simpleFeeMin: Number(data.simple_fee_min) || FEE_DEFAULTS.simpleFeeMin,
+    simpleMiddlemanSharePercent: Number(data.simple_middleman_share_percent) || FEE_DEFAULTS.simpleMiddlemanSharePercent,
     inspectionFee: Number(data.inspection_fee) || FEE_DEFAULTS.inspectionFee,
     packingFee: Number(data.packing_fee) || FEE_DEFAULTS.packingFee,
     depositBronze: Number(data.deposit_bronze) || FEE_DEFAULTS.depositBronze,
@@ -165,7 +166,22 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
   const feePayerInput = String(deal.fee_payer || pd.proposed_fee_payer || 'split');
   const feeBreakdown = computeDealFees(fees, price, dealType);
   const feePayer = splitFeeByPayer(feeBreakdown.total, feePayerInput);
-  const feeParts = splitDealFeeComponents(fees, feeBreakdown.lines);
+
+  let creatorEligible = false;
+  let creatorId = String(deal.creator_id || '');
+  let creatorName = '';
+  if (dealType === 'simple' && creatorId) {
+    const { data: creatorProfile } = await db.from('profiles')
+      .select('display_name, seller_status, middleman_status')
+      .eq('id', creatorId).maybeSingle();
+    creatorEligible = creatorProfile?.seller_status === 'approved' && creatorProfile?.middleman_status === 'approved';
+    creatorName = creatorProfile?.display_name || '';
+  }
+
+  const feeParts = splitDealFeeComponents(fees, feeBreakdown.lines, {
+    dealType,
+    creatorEligible: dealType === 'simple' ? creatorEligible : undefined,
+  });
   const activeKeys = new Set<string>();
 
   const push = async (entry: LedgerDoc) => {
@@ -294,7 +310,30 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
         purpose: dealType === 'simple' ? 'ค่าธรรมเนียมแพลตฟอร์ม (ซื้อขายผ่านกลางแบบง่าย)' : 'ค่าธรรมเนียมแพลตฟอร์ม',
         counterparty_name: `${text(deal.buyer_name, 200)} / ${text(deal.seller_name, 200)}`.trim(), bucket: '', file_id: '',
         approve_link: `/deal/${dealId}`, active: feeParts.platformFee > 0,
-        meta: { lines: feeSummary(feeBreakdown.lines.filter(line => line.label !== 'ค่าบริการคนกลาง')), platformCutFromMiddleman: feeParts.platformCutFromMiddleman, dealType },
+        meta: {
+          lines: feeSummary(feeBreakdown.lines.filter(line => line.label !== 'ค่าบริการคนกลาง')),
+          platformCutFromMiddleman: feeParts.platformCutFromMiddleman,
+          dealType,
+          simpleCreatorShare: feeParts.simpleCreatorShare || 0,
+          simpleSharePercent: dealType === 'simple' ? Number(fees.simpleMiddlemanSharePercent) || 0 : undefined,
+        },
+      }));
+    }
+
+    if (dealType === 'simple' && (feeParts.simpleCreatorShare || 0) > 0 && creatorId) {
+      await push(buildEntry({
+        entry_key: `deal:${dealId}:simple_creator_share`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
+        owner_type: 'middleman', owner_id: creatorId, owner_name: text(creatorName, 200),
+        entry_type: 'middleman_fee_net', direction: 'outgoing', amount: feeParts.simpleCreatorShare || 0,
+        status: status === 'completed' ? (pd.middleman_fee_sent_at ? 'paid' : 'scheduled') : status === 'cancelled' ? 'cancelled' : 'expected', title,
+        purpose: 'ส่วนแบ่งค่าบริการดีลแบบง่าย (ผู้สร้างดีล)', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: text(pd.middleman_fee_slip_file_id, 255),
+        approve_link: `/deal/${dealId}`, active: true,
+        meta: {
+          dealType: 'simple',
+          sharePercent: Number(fees.simpleMiddlemanSharePercent) || 0,
+          creatorEligible: true,
+          payoutNote: text(pd.middleman_fee_note, 300),
+        },
       }));
     }
 

@@ -1,5 +1,40 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-30 (21:20)
+
+### ส่วนแบ่งค่าบริการดีลแบบง่าย (simple) — ผู้สร้างดีลที่ลงทะเบียนทั้ง seller+middleman
+
+**โจทย์**: ผู้สร้างดีล simple ที่ `seller_status=approved` และ `middleman_status=approved` ได้รับ % ของค่าบริการตามที่แอดมินตั้ง — แสดงเฉพาะหน้าแอดมินดีลและหน้าสรุปผู้ขาย/ผู้สร้าง (ไม่แสดงให้ผู้ซื้อ) — **ไม่จำกัดสิทธิ์** สร้างดีล (ทุกคนใช้ได้ตามเดิม)
+
+**แก้ไข**:
+1. **`supabase/migrations/0019_simple_middleman_share.sql`** — `fee_config.simple_middleman_share_percent` (default 18%) + `deals.creator_id` + backfill ดีลเก่า
+2. **`src/lib/fees.ts`** — `simpleMiddlemanSharePercent`, `computeSimpleDealShare()`, `isSimpleShareEligible()`
+3. **`src/lib/financeLedger.ts`** — `splitDealFeeComponents()` รองรับ simple + creatorEligible
+4. **`src/app/api/_lib/financeLedger.ts`** — sync ledger: แยก platform_fee / simple_creator_share (middleman_fee_net)
+5. **`src/app/admin/settings/page.tsx`** + **`route.ts`** — ช่อง "ส่วนแบ่งคนกลาง" ในกลุ่มดีลแบบง่าย
+6. **`src/app/api/deals/route.ts`** — บันทึก `creator_id: me.id` ตอนสร้างดีล
+7. **`src/app/api/deals/[id]/route.ts`** — GET คืน `simpleShare` breakdown
+8. **`src/app/admin/deals/page.tsx`** — แสดง panel ส่วนแบ่งดีล simple
+9. **`src/app/deal/[id]/page.tsx`** — แสดง breakdown ขั้นจบดีล เมื่อ role=seller หรือเป็นผู้สร้างดีล (ซ่อนจากผู้ซื้อ)
+
+**งานฝั่งผู้ใช้**: รัน `supabase/migrations/0019_simple_middleman_share.sql` ใน Supabase SQL Editor
+
+### ไฟล์ที่แก้ไข (2026-07-30 21:20)
+- `supabase/migrations/0019_simple_middleman_share.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/lib/fees.ts`
+- `src/lib/financeLedger.ts`
+- `src/app/api/_lib/financeLedger.ts`
+- `src/app/admin/settings/page.tsx`
+- `src/app/api/admin/settings/route.ts`
+- `src/app/api/deals/route.ts`
+- `src/app/api/deals/[id]/route.ts`
+- `src/app/api/admin/deals/route.ts`
+- `src/app/admin/deals/page.tsx`
+- `src/app/deal/[id]/page.tsx`
+
+---
+
 ## 2026-07-16 (17:15)
 
 ### แก้บั๊ก delete_account_history 42P13 + รูปโปรไฟล์ไม่ขึ้นที่หน้าแรก

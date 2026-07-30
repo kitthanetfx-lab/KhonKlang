@@ -4,7 +4,7 @@ import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../../_lib/notify';
 import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
 import { getTierCreditLimit } from '@/lib/financeLedger';
-import { computeDealFees, FEE_DEFAULTS } from '@/lib/fees';
+import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare } from '@/lib/fees';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
 
 // หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
@@ -72,12 +72,34 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       fee_payer_selection_seller: rawPs.fee_payer_selection_seller || 'buyer',
     };
 
+    let simpleShare = null;
+    if (current.deal_type === 'simple') {
+      const fees = await readFeesConfig(db);
+      let creatorProfile: { seller_status?: string; middleman_status?: string; display_name?: string } | null = null;
+      if (current.creator_id) {
+        const { data } = await db.from('profiles')
+          .select('display_name, seller_status, middleman_status')
+          .eq('id', current.creator_id).maybeSingle();
+        creatorProfile = data;
+      }
+      const share = computeSimpleDealShare(fees, Number(current.price) || 0, {
+        sellerStatus: creatorProfile?.seller_status,
+        middlemanStatus: creatorProfile?.middleman_status,
+      });
+      simpleShare = {
+        ...share,
+        creatorId: current.creator_id || null,
+        creatorName: creatorProfile?.display_name || '',
+      };
+    }
+
     return NextResponse.json({
       deal: { ...current, images: (imagesRes.data || []).map(r => r.file_id) },
       priceState: psWithDefaults,
       meetup: meetupRes.data || null,
       evidence: evidenceRes.data || [],
       buyerBank, sellerBank, middlemanBank,
+      simpleShare,
     });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

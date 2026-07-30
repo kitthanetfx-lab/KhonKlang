@@ -46,6 +46,8 @@ export interface LedgerFeeComponent {
   platformCutFromMiddleman: number;
   middlemanNetFee: number;
   totalFee: number;
+  /** ดีล simple: ส่วนแบ่งให้ผู้สร้างที่ลงทะเบียนครบ */
+  simpleCreatorShare?: number;
 }
 
 export interface MiddlemanWalletSnapshot {
@@ -93,11 +95,32 @@ export function tierForDeposit(config: FeeConfig, confirmedTotal: number): strin
   return 'Bronze';
 }
 
-export function splitDealFeeComponents(config: FeeConfig, lines: FeeLine[]): LedgerFeeComponent {
+export function splitDealFeeComponents(
+  config: FeeConfig,
+  lines: FeeLine[],
+  opts?: { dealType?: string; creatorEligible?: boolean },
+): LedgerFeeComponent {
   const middlemanGrossFee = lines
     .filter(line => line.label === 'ค่าบริการคนกลาง')
     .reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
   const totalFee = lines.reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
+
+  if (opts?.dealType === 'simple') {
+    const sharePercent = Math.min(100, Math.max(0, Number(config.simpleMiddlemanSharePercent) || 0));
+    const simpleCreatorShare = opts.creatorEligible
+      ? Math.round((totalFee * sharePercent) / 100)
+      : 0;
+    const platformShare = Math.max(totalFee - simpleCreatorShare, 0);
+    return {
+      platformFee: platformShare,
+      middlemanGrossFee: 0,
+      platformCutFromMiddleman: 0,
+      middlemanNetFee: simpleCreatorShare,
+      totalFee,
+      simpleCreatorShare,
+    };
+  }
+
   const platformBase = Math.max(totalFee - middlemanGrossFee, 0);
   const platformCutFromMiddleman = middlemanGrossFee > 0
     ? Math.round((middlemanGrossFee * (Number(config.platformCutPercent) || 0)) / 100)

@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
       source: source === 'listing' ? 'listing' : 'private',
       deal_type: dealType === 'meetup' ? 'meetup' : dealType === 'simple' ? 'simple' : 'normal',
       status: isBuyer ? 'waiting_seller' : 'posted',
+      creator_id: me.id,
     }).select().single();
     if (error || !doc) throw new Error(error?.message || 'create deal failed');
 

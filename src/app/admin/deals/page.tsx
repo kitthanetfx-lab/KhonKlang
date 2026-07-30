@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2, Banknote } from 'lucide-react';
 import { dealCode } from '@/lib/dealNumber';
-import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
+import { FeeConfig, FEE_DEFAULTS, computeDealFees, computeSimpleDealShare, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { splitDealFeeComponents } from '@/lib/financeLedger';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 
@@ -28,6 +28,8 @@ interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
 interface Deal {
   id: string; title: string; price: number; status: string; deal_type?: string;
   buyer_name: string; seller_name: string; middleman_name: string; middleman_id?: string;
+  creator_id?: string;
+  creatorProfile?: { display_name?: string; seller_status?: string; middleman_status?: string } | null;
   reject_reason: string; created_at: string;
   fee_payer?: 'buyer' | 'seller' | 'split';
   payment_slip_file_id?: string; payment_slip_verified_at?: string;
@@ -109,6 +111,36 @@ export default function AdminDeals() {
     const fb = computeDealFees(fees, d.price, d.deal_type);
     const parts = splitDealFeeComponents(fees, fb.lines);
     return parts.middlemanNetFee;
+  }
+
+  function simpleShareOf(d: Deal): SimpleDealShareBreakdown | null {
+    if (d.deal_type !== 'simple') return null;
+    return computeSimpleDealShare(fees, d.price, {
+      sellerStatus: d.creatorProfile?.seller_status,
+      middlemanStatus: d.creatorProfile?.middleman_status,
+    });
+  }
+
+  function renderSimpleSharePanel(d: Deal) {
+    const share = simpleShareOf(d);
+    if (!share) return null;
+    return (
+      <div className="mt-2 rounded-xl border border-orange-200 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-900 px-3 py-2 text-xs space-y-1">
+        <p className="font-semibold text-orange-800 dark:text-orange-200">💼 ส่วนแบ่งค่าบริการ (ดีลแบบง่าย)</p>
+        <p className="text-gray-600 dark:text-gray-300">ค่าบริการรวม: <span className="font-mono font-semibold">฿{share.totalFee.toLocaleString()}</span></p>
+        {share.creatorEligible ? (
+          <>
+            <p className="text-emerald-700 dark:text-emerald-300">
+              ส่วนแบ่งผู้สร้างดีล ({share.sharePercent}%): <span className="font-mono font-semibold">฿{share.creatorShare.toLocaleString()}</span>
+              {d.creatorProfile?.display_name ? ` · ${d.creatorProfile.display_name}` : ''}
+            </p>
+            <p className="text-gray-600 dark:text-gray-300">รายได้แพลตฟอร์ม: <span className="font-mono font-semibold">฿{share.platformShare.toLocaleString()}</span></p>
+          </>
+        ) : (
+          <p className="text-gray-500">ผู้สร้างดีลยังไม่ลงทะเบียนครบทั้งผู้ขาย+คนกลาง — แพลตฟอร์มได้ค่าบริการเต็ม ฿{share.totalFee.toLocaleString()}</p>
+        )}
+      </div>
+    );
   }
 
   const load = useCallback(async (filter: string) => {
@@ -446,6 +478,7 @@ export default function AdminDeals() {
                   <p className="text-xs text-gray-500 mt-1">
                     ผู้ขาย: {d.seller_name || '-'} · ผู้ซื้อ: {d.buyer_name || '-'} {d.middleman_name ? `· คนกลาง: ${d.middleman_name}` : ''}
                   </p>
+                  {renderSimpleSharePanel(d)}
                   {d.reject_reason && <p className="text-xs text-red-500 mt-1">เหตุ: {d.reject_reason}</p>}
                   {refund && (
                     <p className="text-xs mt-1 text-gray-500">
