@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2, Banknote } from 'lucide-react';
@@ -85,8 +86,12 @@ const TABS = [
   { k: 'completed', label: 'สำเร็จ' },
 ];
 
-export default function AdminDeals() {
-  const [tab, setTab] = useState('active');
+const TAB_KEYS = new Set(TABS.map(t => t.k));
+
+function AdminDealsInner() {
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const [tab, setTab] = useState(() => (tabFromUrl && TAB_KEYS.has(tabFromUrl) ? tabFromUrl : 'active'));
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [acting, setActing] = useState('');
   const [fees, setFees] = useState<FeeConfig>(FEE_DEFAULTS);
@@ -802,5 +807,13 @@ export default function AdminDeals() {
         })}
         </div>
       </div>
+  );
+}
+
+export default function AdminDeals() {
+  return (
+    <Suspense fallback={<div className="max-w-4xl mx-auto py-10 text-center text-gray-500">กำลังโหลด...</div>}>
+      <AdminDealsInner />
+    </Suspense>
   );
 }

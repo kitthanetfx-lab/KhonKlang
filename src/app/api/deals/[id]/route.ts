@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../../_lib/notify';
 import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
+import { loadAdminDealSnapshot } from '../../_lib/adminDealQueue';
+import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare } from '@/lib/fees';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
@@ -119,6 +121,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('id', id).single();
     if (dealErr || !deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+    const beforeSnapshot = await loadAdminDealSnapshot(db, deal);
 
     const isSeller    = deal.seller_id    === me.id;
     const isMiddleman = deal.middleman_id === me.id;
@@ -848,6 +851,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     await syncDealLedger(db, updated as Record<string, unknown>).catch(() => {});
+    await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated);
     // คืน evidence list ล่าสุดด้วย — กัน frontend re-fetch ทับ optimistic update จนภาพหาย
     let latestEvidence: unknown[] | undefined;
     if (evidenceInsert || action === 'delete_evidence') {

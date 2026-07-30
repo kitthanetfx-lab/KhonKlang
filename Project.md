@@ -1,5 +1,39 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-30 (23:50)
+
+### แก้ badge แอดมิน + แจ้งเตือน LINE OA เมื่อดีลเข้าคิวงาน
+
+**โจทย์**:
+1. Badge 💰 โอนเงินค่าสินค้า (และแท็บอื่น) นับไม่ตรงกับรายการจริง
+2. แจ้ง LINE OA ทีมแอดมินเมื่อดีลเข้าคิว: ยืนยันรับเงิน / โอนค่าสินค้า / คืนผู้ซื้อ / โอนค่าคนกลาง / คืนประกัน — ครั้งเดียวต่อดีลต่อขั้น
+
+**แก้ไข**:
+1. **`src/app/api/_lib/adminDealQueue.ts`** — logic ร่วนนับคิว + detect ขั้นที่เพิ่งเข้า
+2. **`src/app/api/admin/deals/route.ts`** — `getCounts()` ใช้เงื่อนไขเดียวกับ filter รายการ
+3. **`src/lib/lineAdminNotify.ts`** + **`adminLineNotifyHook.ts`** — ยิง LINE Messaging API push
+4. **`supabase/migrations/0020_admin_line_notifications.sql`** — dedupe `(deal_id, step)`
+5. Hook ใน **`deals/[id]/route.ts`** และ **`admin/deals/route.ts`**
+6. **`admin/deals/page.tsx`** — รองรับ `?tab=` จากลิงก์ LINE
+
+**งานฝั่งผู้ใช้**:
+- รัน migration `0020_admin_line_notifications.sql`
+- ตั้ง Vercel env: `LINE_MESSAGING_CHANNEL_ACCESS_TOKEN`, `LINE_ADMIN_GROUP_ID` (channel เดียวกับ LINE Login)
+- เชิญ OA bot เข้ากลุ่มทีมแอดมิน
+
+### ไฟล์ที่แก้ไข (2026-07-30 23:50)
+- `supabase/migrations/0020_admin_line_notifications.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/app/api/_lib/adminDealQueue.ts` (ใหม่)
+- `src/app/api/_lib/adminLineNotifyHook.ts` (ใหม่)
+- `src/lib/lineAdminNotify.ts` (ใหม่)
+- `src/app/api/admin/deals/route.ts`
+- `src/app/api/deals/[id]/route.ts`
+- `src/app/admin/deals/page.tsx`
+- `.env.local.example`
+
+---
+
 ## 2026-07-30 (22:10)
 
 ### ปรับปรุงดีลแบบง่าย + แอดมิน + cron ลบดีลหมดอายุ

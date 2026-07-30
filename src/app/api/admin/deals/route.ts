@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { deleteDealById } from '../../_lib/deleteDeal';
+import { getAdminDealCounts, loadAdminDealSnapshot } from '../../_lib/adminDealQueue';
+import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
 
 async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string | null) {
   if (!uid) return null;
@@ -17,24 +19,7 @@ async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string |
 
 /** นับจำนวนดีลทุก tab พร้อมกัน: ?filter=counts */
 async function getCounts(db: ReturnType<typeof getAdminClient>) {
-  const [active, confirmPay, paySeller, refundPending, meetupRefund, disputed, middlemanFee] = await Promise.all([
-    db.from('deals').select('id', { count: 'exact', head: true }).neq('status', 'completed').neq('status', 'cancelled'),
-    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'payment_uploaded'),
-    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'completed').neq('deal_type', 'meetup'),
-    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'cancelled').neq('deal_type', 'meetup'),
-    db.from('deal_meetup').select('id', { count: 'exact', head: true }).is('refund_outcome', null),
-    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'disputed'),
-    db.from('deals').select('id', { count: 'exact', head: true }).eq('status', 'completed').not('middleman_id', 'is', null),
-  ]);
-  return {
-    active: active.count || 0,
-    confirm_pay: confirmPay.count || 0,
-    pay_seller: paySeller.count || 0,
-    refund_pending: refundPending.count || 0,
-    meetup_refund: meetupRefund.count || 0,
-    disputed: disputed.count || 0,
-    middleman_fee: middlemanFee.count || 0,
-  };
+  return getAdminDealCounts(db);
 }
 
 /** รายการดีลสำหรับแอดมิน: ?filter=disputed | active | completed | meetup_refund | counts */
@@ -141,6 +126,7 @@ export async function PATCH(req: NextRequest) {
     // ดึงดีลปัจจุบัน
     const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('id', id).maybeSingle();
     if (dealErr || !deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+    const beforeSnapshot = await loadAdminDealSnapshot(db, deal);
     const { data: priceState } = await db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle();
     const feePayer = String(priceState?.proposed_fee_payer || deal.fee_payer || 'split');
     const sellerSlipRequired = deal.deal_type !== 'meetup' && (feePayer === 'seller' || feePayer === 'split');
@@ -314,6 +300,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const { data: updated } = await db.from('deals').select('*').eq('id', id).maybeSingle();
+    if (updated) await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated);
     return NextResponse.json({ deal: updated });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;

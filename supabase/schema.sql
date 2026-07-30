@@ -590,6 +590,14 @@ create table notifications (
 );
 create index idx_notifications_user on notifications(user_id, created_at desc);
 
+create table admin_line_notifications (
+  deal_id   uuid not null references deals(id) on delete cascade,
+  step      text not null check (step in ('confirm_pay', 'pay_seller', 'refund_pending', 'middleman_fee', 'meetup_refund')),
+  sent_at   timestamptz not null default now(),
+  primary key (deal_id, step)
+);
+create index idx_admin_line_notifications_sent on admin_line_notifications(sent_at desc);
+
 -- ============================================================================
 -- 11.5. DEVICE TOKENS (FCM/APNs — push notification สำหรับแอปมือถือ)
 -- ============================================================================
