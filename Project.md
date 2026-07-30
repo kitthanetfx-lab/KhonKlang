@@ -1,5 +1,39 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-30 (22:10)
+
+### ปรับปรุงดีลแบบง่าย + แอดมิน + cron ลบดีลหมดอายุ
+
+**โจทย์**:
+1. แอดมินเห็นหลักฐานทั้ง 2 ฝ่าย (รวม type `other` ของ simple deal)
+2. ลบดีลอัตโนมัติเมื่ออีกฝ่ายยังไม่เข้าร่วมเกิน 2 วัน (status `posted` / `waiting_seller` / `waiting_buyer`)
+3. จัดลำดับขั้นจบดีล: การ์ดเสร็จ → ให้คะแนน+ปุ่มจบ → สลิป → สถานะ/ส่วนแบ่ง → หลักฐาน
+4. เปลี่ยนข้อความส่วนแบ่งเป็น **ค่าสินค้า + คอมมิชชั่น** (ไม่แสดงส่วนแพลตฟอร์ม)
+
+**แก้ไข**:
+1. **`src/app/admin/deals/page.tsx`** — `parcelEvidenceOf()` รองรับทุก type ที่มีไฟล์ + แสดงฝ่ายผู้อัปโหลด, แสดง `created_at` ทุกดีล, panel ค่าสินค้า+คอมมิชชั่น
+2. **`src/app/api/_lib/deleteDeal.ts`** (ใหม่) — helper ลบดีลถาวร (extract จาก admin route)
+3. **`src/app/api/cron/expire-deals/route.ts`** (ใหม่) — cron ลบดีลหมดอายุ (ต้องมี `CRON_SECRET`)
+4. **`vercel.json`** (ใหม่) — cron รัน `0 3 * * *` (03:00 UTC ทุกวัน)
+5. **`src/app/api/admin/deals/route.ts`** — refactor ใช้ `deleteDealById()`
+6. **`.env.local.example`** — เพิ่ม `CRON_SECRET`
+7. **`src/app/deal/[id]/page.tsx`** — reorder step จบดีล (simple / regular step14 / meetup step8-9), `renderCompletionReviewBlock()`, แสดง `created_at`, breakdown ค่าสินค้า+คอมมิชชั่น, หลักฐาน type `other`
+
+**งานฝั่งผู้ใช้**:
+- ตั้ง `CRON_SECRET` ใน Vercel Environment Variables แล้ว redeploy
+- (ถ้ายังไม่รัน) รัน migration `0019_simple_middleman_share.sql`
+
+### ไฟล์ที่แก้ไข (2026-07-30 22:10)
+- `src/app/api/_lib/deleteDeal.ts` (ใหม่)
+- `src/app/api/cron/expire-deals/route.ts` (ใหม่)
+- `vercel.json` (ใหม่)
+- `src/app/api/admin/deals/route.ts`
+- `src/app/admin/deals/page.tsx`
+- `src/app/deal/[id]/page.tsx`
+- `.env.local.example`
+
+---
+
 ## 2026-07-30 (21:20)
 
 ### ส่วนแบ่งค่าบริการดีลแบบง่าย (simple) — ผู้สร้างดีลที่ลงทะเบียนทั้ง seller+middleman

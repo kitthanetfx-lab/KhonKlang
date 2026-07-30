@@ -28,6 +28,7 @@ interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
 interface Deal {
   id: string; title: string; price: number; status: string; deal_type?: string;
   buyer_name: string; seller_name: string; middleman_name: string; middleman_id?: string;
+  buyer_id?: string; seller_id?: string;
   creator_id?: string;
   creatorProfile?: { display_name?: string; seller_status?: string; middleman_status?: string } | null;
   reject_reason: string; created_at: string;
@@ -50,6 +51,7 @@ interface EvidenceItem {
   file_id: string;
   file_name?: string;
   uploader_name?: string;
+  uploaded_by?: string;
 }
 
 interface DealReview {
@@ -126,21 +128,27 @@ export default function AdminDeals() {
     if (!share) return null;
     return (
       <div className="mt-2 rounded-xl border border-orange-200 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-900 px-3 py-2 text-xs space-y-1">
-        <p className="font-semibold text-orange-800 dark:text-orange-200">💼 ส่วนแบ่งค่าบริการ (ดีลแบบง่าย)</p>
-        <p className="text-gray-600 dark:text-gray-300">ค่าบริการรวม: <span className="font-mono font-semibold">฿{share.totalFee.toLocaleString()}</span></p>
+        <p className="font-semibold text-orange-800 dark:text-orange-200">💼 ค่าสินค้า + คอมมิชชั่น</p>
+        <p className="text-gray-600 dark:text-gray-300">ค่าสินค้า: <span className="font-mono font-semibold">฿{Number(d.price || 0).toLocaleString()}</span></p>
         {share.creatorEligible ? (
-          <>
-            <p className="text-emerald-700 dark:text-emerald-300">
-              ส่วนแบ่งผู้สร้างดีล ({share.sharePercent}%): <span className="font-mono font-semibold">฿{share.creatorShare.toLocaleString()}</span>
-              {d.creatorProfile?.display_name ? ` · ${d.creatorProfile.display_name}` : ''}
-            </p>
-            <p className="text-gray-600 dark:text-gray-300">รายได้แพลตฟอร์ม: <span className="font-mono font-semibold">฿{share.platformShare.toLocaleString()}</span></p>
-          </>
+          <p className="text-emerald-700 dark:text-emerald-300">
+            คอมมิชชั่น ({share.sharePercent}%): <span className="font-mono font-semibold">฿{share.creatorShare.toLocaleString()}</span>
+            {d.creatorProfile?.display_name ? ` · ${d.creatorProfile.display_name}` : ''}
+          </p>
         ) : (
-          <p className="text-gray-500">ผู้สร้างดีลยังไม่ลงทะเบียนครบทั้งผู้ขาย+คนกลาง — แพลตฟอร์มได้ค่าบริการเต็ม ฿{share.totalFee.toLocaleString()}</p>
+          <p className="text-gray-500">คอมมิชชั่น: ไม่มีสิทธิ์ (ผู้สร้างดีลยังไม่ลงทะเบียนครบทั้งผู้ขาย+คนกลาง)</p>
         )}
       </div>
     );
+  }
+
+  function formatDealCreatedAt(iso?: string) {
+    if (!iso) return '-';
+    try {
+      return new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+    } catch {
+      return iso;
+    }
   }
 
   const load = useCallback(async (filter: string) => {
@@ -381,20 +389,29 @@ export default function AdminDeals() {
   }
 
   function parcelEvidenceOf(d: Deal) {
-    const labelMap: Record<string, string> = {
-      packing: 'ผู้ขายอัปโหลดหลักฐานแพ็ค/พัสดุ',
-      receive: 'ผู้ซื้ออัปโหลดหลักฐานรับสินค้า',
-      testing: 'ผู้ขายอัปโหลดหลักฐานทดสอบ',
-      check: 'คนกลางอัปโหลดหลักฐานตรวจสินค้า',
-      inspection: 'คนกลางอัปโหลดหลักฐานตรวจสินค้า',
+    const typeLabel: Record<string, string> = {
+      packing: 'หลักฐานแพ็คสินค้า',
+      receive: 'หลักฐานรับสินค้า',
+      testing: 'หลักฐานทดสอบสินค้า',
+      check: 'หลักฐานตรวจสินค้า',
+      inspection: 'หลักฐานตรวจสินค้า',
       chat: 'หลักฐานจากแชท',
       call: 'บันทึกวิดีโอคอล',
+      meet: 'หลักฐานการเจอกัน',
+      other: 'หลักฐาน',
+      chat_text: 'ประวัติการสนทนา',
+    };
+    const partyLabel = (item: EvidenceItem) => {
+      if (item.uploaded_by && item.uploaded_by === (d as Deal & { buyer_id?: string }).buyer_id) return 'ผู้ซื้อ';
+      if (item.uploaded_by && item.uploaded_by === (d as Deal & { seller_id?: string }).seller_id) return 'ผู้ขาย';
+      if (item.uploader_name) return item.uploader_name;
+      return 'ไม่ระบุ';
     };
     return (d.evidence || [])
-      .filter(item => ['packing', 'receive', 'testing', 'check', 'inspection', 'chat', 'call'].includes(item.type) && item.file_id)
+      .filter(item => !!item.file_id)
       .map(item => ({
         ...item,
-        label: labelMap[item.type] || item.type,
+        label: `${typeLabel[item.type] || 'หลักฐาน'} (${partyLabel(item)})`,
       }));
   }
 
@@ -477,6 +494,7 @@ export default function AdminDeals() {
                   <p className="font-semibold mt-1 text-gray-900 dark:text-gray-100">{d.title}</p>
                   <p className="text-xs text-gray-500 mt-1">
                     ผู้ขาย: {d.seller_name || '-'} · ผู้ซื้อ: {d.buyer_name || '-'} {d.middleman_name ? `· คนกลาง: ${d.middleman_name}` : ''}
+                    · สร้างเมื่อ: {formatDealCreatedAt(d.created_at)}
                   </p>
                   {renderSimpleSharePanel(d)}
                   {d.reject_reason && <p className="text-xs text-red-500 mt-1">เหตุ: {d.reject_reason}</p>}

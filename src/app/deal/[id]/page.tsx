@@ -232,7 +232,8 @@ function FloatingChatBox({ msgs, myId, chatInput, setChatInput, sending, acting,
 
 interface Deal {
   id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
-  buyer_id: string; buyer_name: string; creator_id?: string; title: string; description: string; price: number; category: string;
+  buyer_id: string; buyer_name: string; creator_id?: string; created_at?: string;
+  title: string; description: string; price: number; category: string;
   status: string; reject_reason: string;
   seller_accepted_terms: boolean; middleman_accepted_terms: boolean; buyer_accepted_terms: boolean;
   middleman_confirmed_payment: boolean; buyer_confirmed_check: boolean;
@@ -2052,28 +2053,78 @@ export default function DealRoom() {
     if (!canViewSimpleShareBreakdown() || !simpleShare) return null;
     return (
       <div className="dr-card" style={{ borderColor: 'color-mix(in srgb, #f97316 35%, var(--line))' }}>
-        <div className="dr-card-title">💼 ส่วนแบ่งค่าบริการ (ดีลแบบง่าย)</div>
+        <div className="dr-card-title">💼 ค่าสินค้า + คอมมิชชั่น</div>
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
-            <span>ค่าบริการรวม</span><span>฿{simpleShare.totalFee.toLocaleString()}</span>
+            <span>ค่าสินค้า</span><span style={{ fontWeight: 700, color: 'var(--ink)' }}>฿{(deal!.price || 0).toLocaleString()}</span>
           </div>
           {simpleShare.creatorEligible ? (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--green-700)' }}>
-                <span>ส่วนแบ่งผู้สร้างดีล ({simpleShare.sharePercent}%)</span>
-                <span style={{ fontWeight: 700 }}>฿{simpleShare.creatorShare.toLocaleString()}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
-                <span>รายได้แพลตฟอร์ม</span><span>฿{simpleShare.platformShare.toLocaleString()}</span>
-              </div>
-            </>
-          ) : (
-            <div style={{ color: 'var(--muted)', fontSize: 12.5 }}>
-              ผู้สร้างดีลยังไม่ลงทะเบียนครบทั้งผู้ขาย+คนกลาง — แพลตฟอร์มได้ค่าบริการเต็มจำนวน
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--green-700)' }}>
+              <span>คอมมิชชั่น ({simpleShare.sharePercent}%)</span>
+              <span style={{ fontWeight: 700 }}>฿{simpleShare.creatorShare.toLocaleString()}</span>
             </div>
+          ) : (
+            <div style={{ color: 'var(--muted)', fontSize: 12.5 }}>คอมมิชชั่น: ไม่มีสิทธิ์ (ผู้สร้างดีลยังไม่ลงทะเบียนครบทั้งผู้ขาย+คนกลาง)</div>
           )}
         </div>
       </div>
+    );
+  }
+
+  function formatDealCreatedAt(iso?: string) {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+    } catch {
+      return iso;
+    }
+  }
+
+  function renderCompletionReviewBlock(isCancelled: boolean) {
+    return (
+      <>
+        {!isCancelled && (
+          <ReviewPanel
+            deal={deal!}
+            myRole={myRole as 'buyer' | 'seller' | 'middleman'}
+            headers={authHdrs}
+            onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
+            onRatedChange={setCompletionAllRated}
+            onSubmitError={() => setCompletionSending(false)}
+            externalSubmitTrigger={completionSubmitTrigger}
+          />
+        )}
+        {(() => {
+          const isNotParty = myRole === 'guest' || myRole === '';
+          const alreadyDone = completionReviewed || isCancelled || isNotParty;
+          if (alreadyDone) return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>
+                🏠 เสร็จสิ้น-กลับหน้าหลัก
+              </button>
+            </div>
+          );
+          if (completionAllRated) return (
+            <div style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-block btn-lg"
+                disabled={completionSending}
+                onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
+              >
+                {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
+              </button>
+            </div>
+          );
+          return (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>
+                🔒 บันทึกหลักฐาน-จบดีล
+              </button>
+            </div>
+          );
+        })()}
+      </>
     );
   }
 
@@ -3495,7 +3546,8 @@ export default function DealRoom() {
     const receiveEvid = evidence.filter(e => e.type === 'receive');
     const chatEvid = evidence.filter(e => e.type === 'chat' || e.type === 'call');
     const inspectionEvid = evidence.filter(e => e.type === 'inspection' || e.type === 'check');
-    const hasAnyEvidence = packingEvid.length > 0 || receiveEvid.length > 0 || chatEvid.length > 0 || inspectionEvid.length > 0;
+    const otherEvid = evidence.filter(e => ['other', 'meet', 'chat_text', 'testing'].includes(e.type));
+    const hasAnyEvidence = packingEvid.length > 0 || receiveEvid.length > 0 || chatEvid.length > 0 || inspectionEvid.length > 0 || otherEvid.length > 0;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -3504,6 +3556,9 @@ export default function DealRoom() {
           <div className="dr-done-title">{isCancelled ? 'ดีลถูกยกเลิก — คืนเงินผู้ซื้อแล้ว' : 'ดีลเสร็จสมบูรณ์!'}</div>
           <div className="dr-done-sub">{isCancelled ? 'ศูนย์กลางโอนเงินคืนผู้ซื้อเรียบร้อยแล้ว' : 'ศูนย์กลางโอนเงินให้ผู้ขายเรียบร้อยแล้ว (ดำเนินการโดยทีมงาน)'}</div>
         </div>
+
+        {renderCompletionReviewBlock(isCancelled)}
+
         {allSlips.length > 0 && (
           <div className="dr-card">
             <div className="dr-card-title">📎 สลิปทั้งหมดในดีล</div>
@@ -3555,51 +3610,14 @@ export default function DealRoom() {
                 {renderWizardEvidenceThumbs(chatEvid)}
               </div>
             )}
+            {otherEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📎 หลักฐานอื่นๆ ({otherEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(otherEvid)}
+              </div>
+            )}
           </div>
         )}
-
-        {!isCancelled && (
-          <ReviewPanel
-            deal={deal!}
-            myRole={myRole as 'buyer' | 'seller' | 'middleman'}
-            headers={authHdrs}
-            onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
-            onRatedChange={setCompletionAllRated}
-            onSubmitError={() => setCompletionSending(false)}
-            externalSubmitTrigger={completionSubmitTrigger}
-          />
-        )}
-        {/* ── ปุ่มบันทึกหลักฐาน-จบดีล ── */}
-        {(() => {
-          const isNotParty = myRole === 'guest' || myRole === '';
-          const alreadyDone = completionReviewed || isCancelled || isNotParty;
-          if (alreadyDone) return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>
-                🏠 เสร็จสิ้น-กลับหน้าหลัก
-              </button>
-            </div>
-          );
-          if (completionAllRated) return (
-            <div style={{ marginTop: 8 }}>
-              <button
-                type="button"
-                className="btn btn-primary btn-block btn-lg"
-                disabled={completionSending}
-                onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
-              >
-                {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
-              </button>
-            </div>
-          );
-          return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>
-                🔒 บันทึกหลักฐาน-จบดีล
-              </button>
-            </div>
-          );
-        })()}
       </div>
     );
   }
@@ -4173,7 +4191,8 @@ export default function DealRoom() {
       const receiveEvid14 = evidence.filter(e => e.type === 'receive');
       const chatEvid14 = evidence.filter(e => e.type === 'chat' || e.type === 'call');
       const inspectionEvid14 = evidence.filter(e => e.type === 'inspection' || e.type === 'check');
-      const hasEvid14 = packingEvid14.length > 0 || receiveEvid14.length > 0 || chatEvid14.length > 0 || inspectionEvid14.length > 0;
+      const otherEvid14 = evidence.filter(e => ['other', 'meet', 'chat_text', 'testing'].includes(e.type));
+      const hasEvid14 = packingEvid14.length > 0 || receiveEvid14.length > 0 || chatEvid14.length > 0 || inspectionEvid14.length > 0 || otherEvid14.length > 0;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="dr-card dr-done-card">
@@ -4181,6 +4200,9 @@ export default function DealRoom() {
             <div className="dr-done-title">{isCancelled ? 'ดีลถูกยกเลิก — คืนเงินแล้ว' : 'ดีลเสร็จสมบูรณ์!'}</div>
             <div className="dr-done-sub">{isCancelled ? 'ศูนย์กลางโอนเงินคืนผู้ซื้อเรียบร้อยแล้ว' : 'ศูนย์กลางโอนเงินให้ผู้ขายและคืนเครดิตคนกลางเรียบร้อยแล้ว'}</div>
           </div>
+
+          {renderCompletionReviewBlock(isCancelled)}
+
           {allSlips14.length > 0 && (
             <div className="dr-card">
               <div className="dr-card-title">📎 สลิปทั้งหมดในดีล</div>
@@ -4231,50 +4253,14 @@ export default function DealRoom() {
                   {renderWizardEvidenceThumbs(chatEvid14)}
                 </div>
               )}
+              {otherEvid14.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📎 หลักฐานอื่นๆ ({otherEvid14.length} ไฟล์)</div>
+                  {renderWizardEvidenceThumbs(otherEvid14)}
+                </div>
+              )}
             </div>
           )}
-          {!isCancelled && (
-            <ReviewPanel
-              deal={deal!}
-              myRole={myRole as 'buyer' | 'seller' | 'middleman'}
-              headers={authHdrs}
-              onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
-              onRatedChange={setCompletionAllRated}
-              onSubmitError={() => setCompletionSending(false)}
-              externalSubmitTrigger={completionSubmitTrigger}
-            />
-          )}
-          {/* ── ปุ่มบันทึกหลักฐาน-จบดีล ── */}
-          {(() => {
-            const isNotParty = myRole === 'guest' || myRole === '';
-            const alreadyDone = completionReviewed || isCancelled || isNotParty;
-            if (alreadyDone) return (
-              <div style={{ marginTop: 8 }}>
-                <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>
-                  🏠 เสร็จสิ้น-กลับหน้าหลัก
-                </button>
-              </div>
-            );
-            if (completionAllRated) return (
-              <div style={{ marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-block btn-lg"
-                  disabled={completionSending}
-                  onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
-                >
-                  {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
-                </button>
-              </div>
-            );
-            return (
-              <div style={{ marginTop: 8 }}>
-                <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>
-                  🔒 บันทึกหลักฐาน-จบดีล
-                </button>
-              </div>
-            );
-          })()}
         </div>
       );
     }
@@ -4881,6 +4867,9 @@ export default function DealRoom() {
             <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ทีมงานกำลังตัดสินและโอนเงินประกันคืน — จะแจ้งให้ทราบเมื่อโอนแล้ว</p>
           </div>
         )}
+
+        {renderCompletionReviewBlock(isCancelled)}
+
         {/* gallery สลิปวางประกัน */}
         {depositSlips.length > 0 && (
           <div className="dr-card">
@@ -4917,44 +4906,6 @@ export default function DealRoom() {
             </div>
           </div>
         )}
-        {/* ระบบ review + completion เหมือน simple wizard */}
-        {!isCancelled && (
-          <ReviewPanel
-            deal={deal!}
-            myRole={myRole as 'buyer' | 'seller' | 'middleman'}
-            headers={authHdrs}
-            onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
-            onRatedChange={setCompletionAllRated}
-            onSubmitError={() => setCompletionSending(false)}
-            externalSubmitTrigger={completionSubmitTrigger}
-          />
-        )}
-        {(() => {
-          if (isCancelled) return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>🏠 กลับหน้าหลัก</button>
-            </div>
-          );
-          const alreadyDone = completionReviewed;
-          if (alreadyDone) return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>🏠 เสร็จสิ้น-กลับหน้าหลัก</button>
-            </div>
-          );
-          if (completionAllRated) return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-primary btn-block btn-lg" disabled={completionSending}
-                onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}>
-                {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
-              </button>
-            </div>
-          );
-          return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>🔒 บันทึกหลักฐาน-จบดีล</button>
-            </div>
-          );
-        })()}
       </div>
     );
   }
@@ -4984,6 +4935,9 @@ export default function DealRoom() {
           {outcomeLabel && <div className="dr-done-sub">ผลการคืนเงินประกัน: {outcomeLabel}</div>}
           {md.refund_decision_note && <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>{md.refund_decision_note}</div>}
         </div>
+
+        {renderCompletionReviewBlock(false)}
+
         {/* gallery สลิปทั้งหมด */}
         {allSlips.length > 0 && (
           <div className="dr-card">
@@ -5020,37 +4974,6 @@ export default function DealRoom() {
             </div>
           </div>
         )}
-        {/* ระบบ review + completion เหมือน simple wizard */}
-        <ReviewPanel
-          deal={deal!}
-          myRole={myRole as 'buyer' | 'seller' | 'middleman'}
-          headers={authHdrs}
-          onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
-          onRatedChange={setCompletionAllRated}
-          onSubmitError={() => setCompletionSending(false)}
-          externalSubmitTrigger={completionSubmitTrigger}
-        />
-        {(() => {
-          const alreadyDone = completionReviewed;
-          if (alreadyDone) return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>🏠 เสร็จสิ้น-กลับหน้าหลัก</button>
-            </div>
-          );
-          if (completionAllRated) return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-primary btn-block btn-lg" disabled={completionSending}
-                onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}>
-                {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
-              </button>
-            </div>
-          );
-          return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>🔒 บันทึกหลักฐาน-จบดีล</button>
-            </div>
-          );
-        })()}
       </div>
     );
   }
@@ -5180,7 +5103,7 @@ export default function DealRoom() {
       <InAppBanner />
       <header className="dr-header">
         <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
-        <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{dealCode(deal.id)} · {statusText(deal)} · ฿{deal.price.toLocaleString()}</div></div>
+        <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{dealCode(deal.id)} · {statusText(deal)} · ฿{deal.price.toLocaleString()}{deal.created_at ? ` · สร้าง ${formatDealCreatedAt(deal.created_at)}` : ''}</div></div>
         <div className="dr-hctas">
           <HeaderAccountActions showNotify />
           {/* ปุ่มแชร์ลิงก์เอาออกแล้ว — แชร์ใช้ครั้งเดียวตอนสร้างดีล ไม่จำเป็นต้องมีในหน้าดีล
