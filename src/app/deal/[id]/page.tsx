@@ -2045,8 +2045,7 @@ export default function DealRoom() {
   // ─── สรุปการเงิน: เลขดีล + บัญชีรับเงินทุกฝ่าย + ยอดที่ต้องคืน/โอนเมื่อจบดีล ──
   function canViewSimpleShareBreakdown() {
     if (deal?.deal_type !== 'simple' || !simpleShare) return false;
-    if (myRole === 'buyer' && myId !== deal.creator_id) return false;
-    return myRole === 'seller' || myId === deal.creator_id;
+    return !!myId && myId === deal.creator_id;
   }
 
   function renderSimpleShareBreakdownCard() {
@@ -2064,7 +2063,7 @@ export default function DealRoom() {
               <span style={{ fontWeight: 700 }}>฿{simpleShare.creatorShare.toLocaleString()}</span>
             </div>
           ) : (
-            <div style={{ color: 'var(--muted)', fontSize: 12.5 }}>คอมมิชชั่น: ไม่มีสิทธิ์ (ผู้สร้างดีลยังไม่ลงทะเบียนครบทั้งผู้ขาย+คนกลาง)</div>
+            <div style={{ color: 'var(--muted)', fontSize: 12.5 }}>คอมมิชชั่น: ไม่มีสิทธิ์ (ต้องเป็นผู้สร้างดีลและลงทะเบียนผู้ขาย+คนกลางครบ)</div>
           )}
         </div>
       </div>

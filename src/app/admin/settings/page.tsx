@@ -41,7 +41,7 @@ const GROUPS: { title: string; icon: React.ReactNode; fields: [NumKey, string, s
   { title: 'ซื้อขายผ่านกลางแบบง่าย (ส่งตรง)', icon: <Zap size={16} className="text-orange-600" />, fields: [
     ['simpleFeePercent', 'ค่าธรรมเนียม', '% ของราคา'],
     ['simpleFeeMin', 'ขั้นต่ำ', 'บาท'],
-    ['simpleMiddlemanSharePercent', 'ส่วนแบ่งคนกลาง', '% ของค่าบริการ'],
+    ['simpleMiddlemanSharePercent', 'คอมมิชชั่นผู้สร้างดีล', '% ของค่าบริการ (ผู้สร้างที่ลงทะเบียนผู้ขาย+คนกลาง)'],
   ] },
   { title: 'ค่าบริการตรวจ/แพ็คสินค้า', icon: <Search size={16} className="text-teal-600" />, fields: [
     ['inspectionFee', 'ค่าตรวจสอบสินค้า', 'บาท'],

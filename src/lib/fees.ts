@@ -90,10 +90,24 @@ export function computeDealFees(c: FeeConfig, price: number, dealType?: string):
   return { lines, total, note };
 }
 
-/** ผู้สร้างดีล simple ลงทะเบียนทั้ง seller + middleman แล้วหรือยัง */
+/** ผู้สร้างดีล simple (ไม่ว่าจะเป็นผู้ซื้อหรือผู้ขายในดีล) ลงทะเบียนทั้ง seller + middleman แล้วหรือยัง */
 export function isSimpleShareEligible(profile?: { sellerStatus?: string; middlemanStatus?: string } | null): boolean {
   return profile?.sellerStatus === 'approved' && profile?.middlemanStatus === 'approved';
 }
+
+/** ฝ่ายของผู้สร้างดีลในดีลปัจจุบัน */
+export function simpleCreatorSide(deal: { creator_id?: string | null; seller_id?: string | null; buyer_id?: string | null }): 'seller' | 'buyer' | 'unknown' {
+  if (!deal.creator_id) return 'unknown';
+  if (deal.creator_id === deal.seller_id) return 'seller';
+  if (deal.creator_id === deal.buyer_id) return 'buyer';
+  return 'unknown';
+}
+
+export const SIMPLE_CREATOR_SIDE_LABEL: Record<'seller' | 'buyer' | 'unknown', string> = {
+  seller: 'ผู้ขาย (ผู้สร้างดีล)',
+  buyer: 'ผู้ซื้อ (ผู้สร้างดีล)',
+  unknown: 'ผู้สร้างดีล',
+};
 
 export interface SimpleDealShareBreakdown {
   totalFee: number;
@@ -103,7 +117,7 @@ export interface SimpleDealShareBreakdown {
   creatorEligible: boolean;
 }
 
-/** คำนวณส่วนแบ่งค่าบริการดีลแบบง่าย — แพลตฟอร์ม vs ผู้สร้างที่ลงทะเบียนครบ */
+/** คำนวณคอมมิชชั่นดีลแบบง่าย — ผู้สร้างดีล (ผู้ซื้อหรือผู้ขาย) ที่ลงทะเบียนครบ */
 export function computeSimpleDealShare(
   config: FeeConfig,
   price: number,

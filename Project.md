@@ -1,5 +1,27 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-07-31 (17:20)
+
+### สิทธิ์คอมมิชชั่นดีลแบบง่าย — ผู้สร้างดีล (ผู้ซื้อหรือผู้ขาย)
+
+**โจทย์**: ผู้ได้รับคอมมิชชั่น = **ผู้สร้างดีล** (`creator_id`) ไม่ว่าจะสร้างในฐานะผู้ขายหรือผู้ซื้อ — ต้องลงทะเบียนผู้ขาย+คนกลางครบ (`approved`)
+
+**แก้ไข**:
+1. **`src/lib/fees.ts`** — `simpleCreatorSide()`, `SIMPLE_CREATOR_SIDE_LABEL`, อัปเดตคำอธิบาย eligibility
+2. **`src/app/deal/[id]/page.tsx`** — แสดง breakdown เฉพาะผู้สร้างดีล (`myId === creator_id`)
+3. **`src/app/admin/deals/page.tsx`** — แสดงฝ่ายผู้สร้าง (ผู้ซื้อ/ผู้ขาย) ใน panel คอมมิชชั่น
+4. **`src/app/api/deals/[id]/route.ts`** — คืน `creatorSide` ใน `simpleShare`
+5. **`src/app/admin/settings/page.tsx`** — ปรับ label คอมมิชชั่นผู้สร้างดีล
+
+### ไฟล์ที่แก้ไข (2026-07-31 17:20)
+- `src/lib/fees.ts`
+- `src/app/deal/[id]/page.tsx`
+- `src/app/admin/deals/page.tsx`
+- `src/app/api/deals/[id]/route.ts`
+- `src/app/admin/settings/page.tsx`
+
+---
+
 ## 2026-07-30 (23:50)
 
 ### แก้ badge แอดมิน + แจ้งเตือน LINE OA เมื่อดีลเข้าคิวงาน

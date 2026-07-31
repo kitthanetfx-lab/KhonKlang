@@ -6,7 +6,7 @@ import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
 import { loadAdminDealSnapshot } from '../../_lib/adminDealQueue';
 import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
 import { getTierCreditLimit } from '@/lib/financeLedger';
-import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare } from '@/lib/fees';
+import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide } from '@/lib/fees';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
 
 // หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
@@ -92,6 +92,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         ...share,
         creatorId: current.creator_id || null,
         creatorName: creatorProfile?.display_name || '',
+        creatorSide: simpleCreatorSide(current),
       };
     }
 

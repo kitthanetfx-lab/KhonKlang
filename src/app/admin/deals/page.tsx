@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2, Banknote } from 'lucide-react';
 import { dealCode } from '@/lib/dealNumber';
-import { FeeConfig, FEE_DEFAULTS, computeDealFees, computeSimpleDealShare, type SimpleDealShareBreakdown } from '@/lib/fees';
+import { FeeConfig, FEE_DEFAULTS, computeDealFees, computeSimpleDealShare, simpleCreatorSide, SIMPLE_CREATOR_SIDE_LABEL, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { splitDealFeeComponents } from '@/lib/financeLedger';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 
@@ -131,17 +131,24 @@ function AdminDealsInner() {
   function renderSimpleSharePanel(d: Deal) {
     const share = simpleShareOf(d);
     if (!share) return null;
+    const creatorSide = simpleCreatorSide(d);
+    const creatorSideLabel = SIMPLE_CREATOR_SIDE_LABEL[creatorSide];
     return (
       <div className="mt-2 rounded-xl border border-orange-200 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-900 px-3 py-2 text-xs space-y-1">
         <p className="font-semibold text-orange-800 dark:text-orange-200">💼 ค่าสินค้า + คอมมิชชั่น</p>
+        {d.creator_id && (
+          <p className="text-gray-600 dark:text-gray-300">
+            ผู้สร้างดีล: <span className="font-semibold">{creatorSideLabel}</span>
+            {d.creatorProfile?.display_name ? ` · ${d.creatorProfile.display_name}` : ''}
+          </p>
+        )}
         <p className="text-gray-600 dark:text-gray-300">ค่าสินค้า: <span className="font-mono font-semibold">฿{Number(d.price || 0).toLocaleString()}</span></p>
         {share.creatorEligible ? (
           <p className="text-emerald-700 dark:text-emerald-300">
             คอมมิชชั่น ({share.sharePercent}%): <span className="font-mono font-semibold">฿{share.creatorShare.toLocaleString()}</span>
-            {d.creatorProfile?.display_name ? ` · ${d.creatorProfile.display_name}` : ''}
           </p>
         ) : (
-          <p className="text-gray-500">คอมมิชชั่น: ไม่มีสิทธิ์ (ผู้สร้างดีลยังไม่ลงทะเบียนครบทั้งผู้ขาย+คนกลาง)</p>
+          <p className="text-gray-500">คอมมิชชั่น: ไม่มีสิทธิ์ (ผู้สร้างดีลยังไม่ลงทะเบียนผู้ขาย+คนกลางครบ)</p>
         )}
       </div>
     );

@@ -326,7 +326,7 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
         owner_type: 'middleman', owner_id: creatorId, owner_name: text(creatorName, 200),
         entry_type: 'middleman_fee_net', direction: 'outgoing', amount: feeParts.simpleCreatorShare || 0,
         status: status === 'completed' ? (pd.middleman_fee_sent_at ? 'paid' : 'scheduled') : status === 'cancelled' ? 'cancelled' : 'expected', title,
-        purpose: 'ส่วนแบ่งค่าบริการดีลแบบง่าย (ผู้สร้างดีล)', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: text(pd.middleman_fee_slip_file_id, 255),
+        purpose: 'คอมมิชชั่นดีลแบบง่าย (ผู้สร้างดีล — ผู้ซื้อหรือผู้ขายที่ลงทะเบียนครบ)', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: text(pd.middleman_fee_slip_file_id, 255),
         approve_link: `/deal/${dealId}`, active: true,
         meta: {
           dealType: 'simple',
