@@ -592,7 +592,9 @@ export default function DealRoom() {
 
   useEffect(() => {
     const r = document.documentElement;
-    r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
+    r.style.setProperty('--accent', '#2f6bf0');
+    r.style.setProperty('--accent-strong', '#1f54d6');
+    // อย่า override --accent-soft — globals.css ตั้งค่าตาม light/dark แล้ว
   }, []);
 
   useEffect(() => {
@@ -2632,7 +2634,9 @@ export default function DealRoom() {
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>🎯 เลือกผู้จ่ายค่าบริการ</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {(['buyer', 'seller', 'split'] as const).map((option) => (
+            {(['buyer', 'seller', 'split'] as const).map((option) => {
+              const isSelected = mySelection === option;
+              return (
               <button
                 key={option}
                 type="button"
@@ -2640,19 +2644,19 @@ export default function DealRoom() {
                   flex: 1,
                   padding: '10px 8px',
                   borderRadius: 'var(--r-md)',
-                  border: `2px solid ${mySelection === option ? 'var(--accent)' : 'var(--line)'}`,
-                  background: mySelection === option ? 'rgba(99, 102, 241, 0.08)' : 'white',
+                  border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--line)'}`,
+                  background: isSelected ? 'var(--accent)' : 'var(--surface-2)',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: mySelection === option ? 'var(--accent)' : 'var(--ink)',
-                  opacity: acting ? 0.5 : 1
+                  color: isSelected ? '#fff' : 'var(--ink)',
+                  opacity: acting ? 0.5 : 1,
                 }}
                 onClick={() => requestChangeSelection(option)}
                 disabled={meAccepted || isAgreed || acting}
               >
                 {getSelectionLabel(option)}
               </button>
-            ))}
+            );})}
           </div>
           {/* แสดงสถานะการเลือกของทั้งสองฝ่าย — ฝั่งตัวเองจาก local state, ฝั่งอีกฝ่ายจาก server */}
           <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', fontSize: 12 }}>
@@ -2751,7 +2755,7 @@ export default function DealRoom() {
             ? `หารครึ่ง (คนละ ฿${_half.toLocaleString()})`
             : fpName(currentFeePayer);
           return (
-            <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
+            <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 35%, var(--line))', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}><span>ราคาปัจจุบัน</span><span>฿{currentPrice.toLocaleString()}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', marginTop: 2 }}><span>ค่าบริการรวม ฿{_fb.total.toLocaleString()}</span><span>{feeLabel}</span></div>
             </div>

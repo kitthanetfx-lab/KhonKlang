@@ -1,5 +1,21 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-01 (12:45)
+
+### แก้ dark mode — ปุ่มเลือกผู้จ่ายค่าบริการอ่านไม่ชัด
+
+**ปัญหา**: ปุ่ม "ผู้ซื้อ / ผู้ขาย / คนละครึ่ง" ใน dark mode ใช้พื้นหลัง `white` + สี `var(--ink)` (ขาว) อ่านไม่เห็น; `useEffect` override `--accent-soft` เป็น `#eef4ff` ตลอด ทำลาย theme มืด
+
+**แก้ไข** (`src/app/deal/[id]/page.tsx`):
+1. ปุ่มที่เลือก: พื้นหลัง `var(--accent)` + ตัวอักษรขาว; ไม่เลือก: `var(--surface-2)` + `var(--ink)`
+2. ลบการ override `--accent-soft` ใน `useEffect` — ให้ `globals.css` จัดการตาม `data-theme`
+3. กรอบการ์ดสถานะ: เปลี่ยน border hardcode `#d7e3ff` → `color-mix` จาก accent/line
+
+### ไฟล์ที่แก้ไข (2026-08-01 12:45)
+- `src/app/deal/[id]/page.tsx`
+
+---
+
 ## 2026-07-31 (17:20)
 
 ### สิทธิ์คอมมิชชั่นดีลแบบง่าย — ผู้สร้างดีล (ผู้ซื้อหรือผู้ขาย)
