@@ -20,7 +20,7 @@ export async function maybeNotifyAdminLineQueues(
       readFeesConfig(db),
     ]);
     const steps = detectEnteredAdminQueueSteps(before, after, fees);
-    if (steps.length) await notifyAdminLineSteps(db, after.deal, steps);
+    if (steps.length) await notifyAdminLineSteps(db, after, steps);
   } catch (err) {
     console.error('[adminLineNotifyHook]', err);
   }

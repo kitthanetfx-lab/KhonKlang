@@ -20,6 +20,8 @@ export type AdminDealRow = {
   price?: number | null;
   deal_number?: string | null;
   title?: string | null;
+  buyer_name?: string | null;
+  seller_name?: string | null;
 };
 
 export type AdminPriceStateRow = {
@@ -27,11 +29,14 @@ export type AdminPriceStateRow = {
   payout_slip_file_id?: string | null;
   refund_slip_file_id?: string | null;
   middleman_fee_sent_at?: string | null;
+  seller_fee_slip?: string | null;
 };
 
 export type AdminMeetupRow = {
   deal_id?: string;
   refund_outcome?: string | null;
+  buyer_slip?: string | null;
+  seller_slip?: string | null;
 };
 
 export type AdminDealSnapshot = {

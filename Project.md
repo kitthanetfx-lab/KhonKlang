@@ -1,5 +1,23 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-02 (00:25)
+
+### แจ้ง LINE แอดมิน — เพิ่มชื่อคู่ดีล + รูปสลิป
+
+**โจทย์**: ข้อความ LINE OA เมื่อดีลเข้าคิวงาน ให้มีชื่อผู้ซื้อ/ผู้ขาย และแนบสลิปที่โอนมา
+
+**แก้ไข**:
+1. **`src/lib/lineAdminNotify.ts`** — ข้อความมีผู้ขาย/ผู้ซื้อ; ส่ง Image Message ตามขั้นคิว (สลิปผู้ซื้อ, สลิปค่าบริการผู้ขาย, สลิปประกัน meetup); PDF/ไม่ใช่รูป → ใส่ลิงก์ในข้อความ
+2. **`src/app/api/_lib/adminDealQueue.ts`** — ขยาย type `buyer_name`, `seller_name`, `seller_fee_slip`, `buyer_slip`, `seller_slip`
+3. **`src/app/api/_lib/adminLineNotifyHook.ts`** — ส่ง `AdminDealSnapshot` เต็มให้ notify
+
+### ไฟล์ที่แก้ไข (2026-08-02 00:25)
+- `src/lib/lineAdminNotify.ts`
+- `src/app/api/_lib/adminDealQueue.ts`
+- `src/app/api/_lib/adminLineNotifyHook.ts`
+
+---
+
 ## 2026-08-01 (12:45)
 
 ### แก้ dark mode — ปุ่มเลือกผู้จ่ายค่าบริการอ่านไม่ชัด
