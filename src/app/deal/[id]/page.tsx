@@ -242,6 +242,7 @@ interface Deal {
 }
 
 interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
+interface BuyerShipping { name: string; phone: string; address: string; }
 function bankLine(b?: BankInfo | null) {
   if (!b || (!b.bankName && !b.bankAcct)) return 'ยังไม่ได้บันทึกบัญชีรับเงิน';
   return `${b.bankName || '-'} · ${b.bankAcct || '-'} · ${b.bankOwner || '-'}`;
@@ -400,6 +401,7 @@ export default function DealRoom() {
   const [priceState, setPriceState] = useState<DealPriceState | null>(null);
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
   const [buyerBank, setBuyerBank] = useState<BankInfo | null>(null);
+  const [buyerShipping, setBuyerShipping] = useState<BuyerShipping | null>(null);
   const [sellerBank, setSellerBank] = useState<BankInfo | null>(null);
   const [middlemanBank, setMiddlemanBank] = useState<BankInfo | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -647,19 +649,21 @@ export default function DealRoom() {
 
   const fetchDeal = useCallback(async (headers: Record<string, string> = {}) => {
     try {
-      const r = await fetch(`/api/deals/${dealId}`, { headers, cache: 'no-store' });
+      const hdrs = headers.Authorization ? headers : await getAuthHeaders();
+      const r = await fetch(`/api/deals/${dealId}`, { headers: hdrs, cache: 'no-store' });
       const d = await r.json();
       if (r.ok) {
         const nextDeal = d.deal as Deal;
         setDeal(nextDeal); setDealError('');
         setMeetup(d.meetup || null); setPriceState(d.priceState || null); setEvidence(d.evidence || []);
         setBuyerBank(d.buyerBank || null); setSellerBank(d.sellerBank || null); setMiddlemanBank(d.middlemanBank || null);
+        setBuyerShipping(d.buyerShipping || null);
         setSimpleShare(d.simpleShare || null);
         return nextDeal;
       } else setDealError(d.error || `Error ${r.status}`);
     } catch (e: any) { setDealError(e?.message || 'Network error'); }
     return null;
-  }, [dealId, setDeal, setDealError]);
+  }, [dealId, getAuthHeaders, setDeal, setDealError]);
 
   const fetchMsgs = useCallback(async (headers: Record<string, string>, currentDeal: Deal | null = deal, currentUserId = myId) => {
     if (!headers.Authorization || !isDealParty(currentDeal, currentUserId)) return;
@@ -2489,6 +2493,41 @@ export default function DealRoom() {
     return { trackingNumber, trackingProvider };
   }
 
+  function renderBuyerShippingCard() {
+    if (!buyerShipping) return null;
+    const { name, phone, address } = buyerShipping;
+    const missingContact = !phone && !address;
+    return (
+      <div className="dr-card">
+        <div className="dr-card-title">📦 ที่อยู่ในการจัดส่ง</div>
+        {missingContact ? (
+          <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65 }}>
+            ผู้ซื้อยังไม่ได้บันทึกที่อยู่หรือเบอร์โทรในโปรไฟล์ — แจ้งให้ผู้ซื้ออัปเดตที่หน้าโปรไฟล์ก่อนจัดส่ง
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13.5 }}>
+              <span style={{ color: 'var(--muted)', flexShrink: 0 }}>ชื่อผู้รับ</span>
+              <span style={{ fontWeight: 700, color: 'var(--ink)', textAlign: 'right' }}>{name}</span>
+            </div>
+            {address && (
+              <div>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 4 }}>ที่อยู่</div>
+                <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{address}</div>
+              </div>
+            )}
+            {phone && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 35%, var(--line))', borderRadius: 'var(--r-md)', padding: '10px 14px' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-2)' }}>📞 เบอร์โทร</span>
+                <a href={`tel:${phone}`} style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-strong)' }}>{phone}</a>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function renderTrackingInfoCard(title: string, trackingNumber?: string, trackingProvider?: string) {
     const cleanTrackingNumber = String(trackingNumber || '').trim();
     if (!cleanTrackingNumber) return null;
@@ -3265,6 +3304,7 @@ export default function DealRoom() {
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {renderBuyerShippingCard()}
         <div className="dr-card">
           <div style={{ display: 'grid', gridTemplateColumns: packingHeaderColumns, gap: 10 }}>
             {packingHeaderSteps.map(item => (
@@ -3949,6 +3989,7 @@ export default function DealRoom() {
       const canUpStep = (s: 1|2|3) => s === 1 || !!packingSlots[s - 2];
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {renderBuyerShippingCard()}
           <div className="dr-card">
             <div className="dr-card-title">อัปโหลด 3 ขั้นตอน</div>
             <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>ถ่ายวิดีโอทุกขั้นตอน แพ็ค → โลจิสติกส์ → สลิป แล้วกรอกเลขพัสดุส่งให้คนกลาง</p>

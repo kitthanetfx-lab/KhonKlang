@@ -37,6 +37,37 @@ async function getBankInfo(db: SupabaseClient, uid?: string | null): Promise<{ b
   return { bankName, bankAcct, bankOwner };
 }
 
+const POST_PAYMENT_STATUSES = new Set([
+  'packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking',
+  'shipped_to_buyer', 'delivered', 'completed',
+]);
+
+/** ที่อยู่จัดส่งผู้ซื้อ — แสดงเฉพาะผู้ขายหลังยืนยันรับเงินแล้ว */
+async function getBuyerShippingForSeller(
+  db: SupabaseClient,
+  deal: Record<string, unknown>,
+  viewerId: string,
+  viewerRole: string,
+): Promise<{ name: string; phone: string; address: string } | null> {
+  if (deal.deal_type === 'meetup') return null;
+  if (!POST_PAYMENT_STATUSES.has(String(deal.status))) return null;
+  const isSeller = viewerId === deal.seller_id;
+  const isAdmin = viewerRole === 'admin';
+  if (!isSeller && !isAdmin) return null;
+  if (!deal.buyer_id) return null;
+
+  const { data: p } = await db.from('profiles')
+    .select('phone, address, display_name')
+    .eq('id', deal.buyer_id as string)
+    .maybeSingle();
+
+  return {
+    name: String(deal.buyer_name || p?.display_name || '-').trim() || '-',
+    phone: String(p?.phone || '').trim(),
+    address: String(p?.address || '').trim(),
+  };
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -96,6 +127,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       };
     }
 
+    let buyerShipping: { name: string; phone: string; address: string } | null = null;
+    try {
+      const me = await verifyUser(req);
+      buyerShipping = await getBuyerShippingForSeller(db, current, me.id, me.role);
+    } catch {
+      // public view — ไม่ส่งข้อมูลส่วนตัวผู้ซื้อ
+    }
+
     return NextResponse.json({
       deal: { ...current, images: (imagesRes.data || []).map(r => r.file_id) },
       priceState: psWithDefaults,
@@ -103,6 +142,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       evidence: evidenceRes.data || [],
       buyerBank, sellerBank, middlemanBank,
       simpleShare,
+      buyerShipping,
     });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
