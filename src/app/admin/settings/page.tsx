@@ -9,7 +9,10 @@ import { THAI_BANKS } from '@/lib/banks';
 interface FeeConfig {
   escrowFeePercent: number; escrowFeeMin: number;
   middlemanFeePercent: number; middlemanFeeMin: number; platformCutPercent: number;
-  simpleFeePercent: number; simpleFeeMin: number; simpleMiddlemanSharePercent: number;
+  simpleFeePercent: number; simpleFeeMin: number;
+  simpleShareTier1Multiplier: number; simpleShareTier1Percent: number;
+  simpleShareTier2Multiplier: number; simpleShareTier2Percent: number;
+  simpleShareTier3Multiplier: number; simpleShareTier3Percent: number;
   inspectionFee: number; packingFee: number;
   depositBronze: number; depositSilver: number; depositGold: number; depositPlatinum: number;
   failedDealFee: number;
@@ -27,6 +30,11 @@ type BoolKey = 'promoEnabled' | 'promoFree';
 type StrKey = 'returnShippingBy' | 'companyPromptPay' | 'companyBankName' | 'companyBankAcct' | 'companyBankHolder' | 'companyQrFileId'
   | 'promoScope' | 'promoStart' | 'promoEnd' | 'promoLabel';
 type NumKey = Exclude<keyof FeeConfig, StrKey | BoolKey>;
+const TIER_KEYS: { tier: number; mult: NumKey; pct: NumKey }[] = [
+  { tier: 1, mult: 'simpleShareTier1Multiplier', pct: 'simpleShareTier1Percent' },
+  { tier: 2, mult: 'simpleShareTier2Multiplier', pct: 'simpleShareTier2Percent' },
+  { tier: 3, mult: 'simpleShareTier3Multiplier', pct: 'simpleShareTier3Percent' },
+];
 const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
 // กลุ่มฟิลด์สำหรับแสดงผล: [key, label, หน่วย]
@@ -41,7 +49,6 @@ const GROUPS: { title: string; icon: React.ReactNode; fields: [NumKey, string, s
   { title: 'ซื้อขายผ่านกลางแบบง่าย (ส่งตรง)', icon: <Zap size={16} className="text-orange-600" />, fields: [
     ['simpleFeePercent', 'ค่าธรรมเนียม', '% ของราคา'],
     ['simpleFeeMin', 'ขั้นต่ำ', 'บาท'],
-    ['simpleMiddlemanSharePercent', 'คอมมิชชั่นผู้สร้างดีล', '% ของค่าบริการ (ผู้สร้างที่ลงทะเบียนผู้ขาย+คนกลาง)'],
   ] },
   { title: 'ค่าบริการตรวจ/แพ็คสินค้า', icon: <Search size={16} className="text-teal-600" />, fields: [
     ['inspectionFee', 'ค่าตรวจสอบสินค้า', 'บาท'],
@@ -165,6 +172,43 @@ export default function SettingsPage() {
               </div>
             </div>
           ))}
+
+          <div className="bg-white dark:bg-gray-900 border border-orange-200 dark:border-orange-900 rounded-2xl p-5">
+              <h2 className="font-semibold text-sm flex items-center gap-2 mb-1"><Zap size={16} className="text-orange-600" /> คอมมิชชั่นผู้สร้างดีล (3 ชั้น)</h2>
+              <p className="text-xs text-gray-500 mb-4">
+                เปรียบเทียบค่าบริการดีลแบบง่ายกับ <b>ค่าคนกลางขั้นต่ำ</b> (฿{fees.middlemanFeeMin.toLocaleString()}) — เลือกชั้นสูงสุดที่ครบเงื่อนไข
+              </p>
+              <div className="space-y-3">
+                {TIER_KEYS.map(({ tier, mult, pct }) => {
+                  const threshold = Math.round((fees[mult] || 0) * fees.middlemanFeeMin);
+                  return (
+                    <div key={tier} className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end rounded-xl border border-gray-100 dark:border-gray-800 p-3">
+                      <label className="block">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">ชั้น {tier} — จำนวนเท่าของค่ากลาง</span>
+                        <div className="mt-1 flex items-center gap-2">
+                          <input type="number" min="0" step="any" value={fees[mult]}
+                            onChange={e => setField(mult, e.target.value)}
+                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
+                          <span className="text-xs text-gray-400 shrink-0">เท่า</span>
+                        </div>
+                      </label>
+                      <label className="block">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">% แบ่งให้ผู้สร้างดีล</span>
+                        <div className="mt-1 flex items-center gap-2">
+                          <input type="number" min="0" max="100" step="any" value={fees[pct]}
+                            onChange={e => setField(pct, e.target.value)}
+                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
+                          <span className="text-xs text-gray-400 shrink-0">%</span>
+                        </div>
+                      </label>
+                      <p className="text-xs text-gray-500 pb-2 sm:text-right">
+                        ค่าบริการ ≥ ฿{threshold.toLocaleString()}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
             <h2 className="font-semibold text-sm flex items-center gap-2 mb-4"><RotateCcw size={16} className="text-rose-600" /> ผู้รับผิดชอบค่าส่งคืน (เมื่อตีกลับผู้ขาย)</h2>

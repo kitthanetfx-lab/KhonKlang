@@ -1,5 +1,33 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-03 (23:15)
+
+### คอมมิชชั่นดีลแบบง่าย — 3 ชั้น (เท่า × ค่ากลางขั้นต่ำ)
+
+**โจทย์**: แบ่ง % ให้ผู้สร้างดีล (ผู้ขาย+คนกลาง) เป็น 3 ชั้น — ค่าบริการดีล simple เทียบกับ `middlemanFeeMin` × จำนวนเท่า (ตั้งค่าเท่าและ% ได้ทุกชั้น)
+
+**แก้ไข**:
+1. **`supabase/migrations/0021_simple_share_tiers.sql`** — 6 คอลัมน์ tier ใน `fee_config`
+2. **`src/lib/fees.ts`** — `resolveSimpleShareTier()`, ปรับ `computeSimpleDealShare()`
+3. **`src/lib/financeLedger.ts`** — คำนวณส่วนแบ่งตามชั้น
+4. **`src/app/admin/settings/page.tsx`** — UI ตั้งค่า 3 ชั้น
+5. หน้าดีล + แอดมินดีล — แสดงชั้นและ % ที่ได้
+
+**งานฝั่งผู้ใช้**: รัน migration `0021_simple_share_tiers.sql`
+
+### ไฟล์ที่แก้ไข (2026-08-03 23:15)
+- `supabase/migrations/0021_simple_share_tiers.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/lib/fees.ts`
+- `src/lib/financeLedger.ts`
+- `src/app/api/_lib/financeLedger.ts`
+- `src/app/api/admin/settings/route.ts`
+- `src/app/admin/settings/page.tsx`
+- `src/app/admin/deals/page.tsx`
+- `src/app/deal/[id]/page.tsx`
+
+---
+
 ## 2026-08-03 (01:00)
 
 ### ขั้น Packing — ผู้ขายเห็นที่อยู่จัดส่งผู้ซื้อ

@@ -4,7 +4,12 @@
 export interface FeeConfig {
   escrowFeePercent: number; escrowFeeMin: number;
   middlemanFeePercent: number; middlemanFeeMin: number; platformCutPercent: number;
-  simpleFeePercent: number; simpleFeeMin: number; simpleMiddlemanSharePercent: number;
+  simpleFeePercent: number; simpleFeeMin: number;
+  /** @deprecated ใช้ simpleShareTier* แทน — เก็บไว้ backward compat */
+  simpleMiddlemanSharePercent: number;
+  simpleShareTier1Multiplier: number; simpleShareTier1Percent: number;
+  simpleShareTier2Multiplier: number; simpleShareTier2Percent: number;
+  simpleShareTier3Multiplier: number; simpleShareTier3Percent: number;
   inspectionFee: number; packingFee: number;
   depositBronze: number; depositSilver: number; depositGold: number; depositPlatinum: number;
   failedDealFee: number;
@@ -26,6 +31,9 @@ export const FEE_DEFAULTS: FeeConfig = {
   escrowFeePercent: 2.5, escrowFeeMin: 20,
   middlemanFeePercent: 1.5, middlemanFeeMin: 30, platformCutPercent: 20,
   simpleFeePercent: 2, simpleFeeMin: 20, simpleMiddlemanSharePercent: 18,
+  simpleShareTier1Multiplier: 1, simpleShareTier1Percent: 30,
+  simpleShareTier2Multiplier: 2, simpleShareTier2Percent: 40,
+  simpleShareTier3Multiplier: 4, simpleShareTier3Percent: 50,
   inspectionFee: 100, packingFee: 50,
   depositBronze: 1000, depositSilver: 5000, depositGold: 20000, depositPlatinum: 50000,
   failedDealFee: 50,
@@ -109,11 +117,47 @@ export const SIMPLE_CREATOR_SIDE_LABEL: Record<'seller' | 'buyer' | 'unknown', s
   unknown: 'ผู้สร้างดีล',
 };
 
+export interface SimpleShareTierResult {
+  tier: number;
+  multiplier: number;
+  sharePercent: number;
+  thresholdAmount: number;
+}
+
+/** เลือกชั้นคอมมิชชั่นดีลแบบง่าย — ค่าบริการดีลเทียบกับ (เท่า × ค่าคนกลางขั้นต่ำ) */
+export function resolveSimpleShareTier(config: FeeConfig, totalFee: number): SimpleShareTierResult {
+  const fee = Math.max(0, Number(totalFee) || 0);
+  const baseline = Math.max(0, Number(config.middlemanFeeMin) || 0);
+  const tiers = [
+    { tier: 1, multiplier: Number(config.simpleShareTier1Multiplier), percent: Number(config.simpleShareTier1Percent) },
+    { tier: 2, multiplier: Number(config.simpleShareTier2Multiplier), percent: Number(config.simpleShareTier2Percent) },
+    { tier: 3, multiplier: Number(config.simpleShareTier3Multiplier), percent: Number(config.simpleShareTier3Percent) },
+  ]
+    .filter(t => t.multiplier > 0)
+    .sort((a, b) => b.multiplier - a.multiplier);
+
+  for (const t of tiers) {
+    const threshold = baseline > 0 ? Math.round(t.multiplier * baseline) : 0;
+    if (baseline <= 0 || fee >= threshold) {
+      return {
+        tier: t.tier,
+        multiplier: t.multiplier,
+        sharePercent: Math.min(100, Math.max(0, t.percent)),
+        thresholdAmount: threshold,
+      };
+    }
+  }
+  return { tier: 0, multiplier: 0, sharePercent: 0, thresholdAmount: 0 };
+}
+
 export interface SimpleDealShareBreakdown {
   totalFee: number;
   creatorShare: number;
   platformShare: number;
   sharePercent: number;
+  shareTier: number;
+  shareTierMultiplier: number;
+  shareThreshold: number;
   creatorEligible: boolean;
 }
 
@@ -124,14 +168,18 @@ export function computeSimpleDealShare(
   creatorProfile?: { sellerStatus?: string; middlemanStatus?: string } | null,
 ): SimpleDealShareBreakdown {
   const totalFee = computeDealFees(config, price, 'simple').total;
-  const sharePercent = Math.min(100, Math.max(0, Number(config.simpleMiddlemanSharePercent) || 0));
+  const tier = resolveSimpleShareTier(config, totalFee);
+  const sharePercent = tier.sharePercent;
   const creatorEligible = isSimpleShareEligible(creatorProfile);
-  const creatorShare = creatorEligible ? Math.round((totalFee * sharePercent) / 100) : 0;
+  const creatorShare = creatorEligible && sharePercent > 0 ? Math.round((totalFee * sharePercent) / 100) : 0;
   return {
     totalFee,
     creatorShare,
     platformShare: Math.max(totalFee - creatorShare, 0),
     sharePercent,
+    shareTier: tier.tier,
+    shareTierMultiplier: tier.multiplier,
+    shareThreshold: tier.thresholdAmount,
     creatorEligible,
   };
 }

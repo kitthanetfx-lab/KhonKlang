@@ -67,6 +67,12 @@ export async function readFeesConfig(db: SupabaseClient): Promise<FeeConfig> {
     simpleFeePercent: Number(data.simple_fee_percent) || FEE_DEFAULTS.simpleFeePercent,
     simpleFeeMin: Number(data.simple_fee_min) || FEE_DEFAULTS.simpleFeeMin,
     simpleMiddlemanSharePercent: Number(data.simple_middleman_share_percent) || FEE_DEFAULTS.simpleMiddlemanSharePercent,
+    simpleShareTier1Multiplier: Number(data.simple_share_tier1_multiplier) || FEE_DEFAULTS.simpleShareTier1Multiplier,
+    simpleShareTier1Percent: Number(data.simple_share_tier1_percent) ?? FEE_DEFAULTS.simpleShareTier1Percent,
+    simpleShareTier2Multiplier: Number(data.simple_share_tier2_multiplier) || FEE_DEFAULTS.simpleShareTier2Multiplier,
+    simpleShareTier2Percent: Number(data.simple_share_tier2_percent) ?? FEE_DEFAULTS.simpleShareTier2Percent,
+    simpleShareTier3Multiplier: Number(data.simple_share_tier3_multiplier) || FEE_DEFAULTS.simpleShareTier3Multiplier,
+    simpleShareTier3Percent: Number(data.simple_share_tier3_percent) ?? FEE_DEFAULTS.simpleShareTier3Percent,
     inspectionFee: Number(data.inspection_fee) || FEE_DEFAULTS.inspectionFee,
     packingFee: Number(data.packing_fee) || FEE_DEFAULTS.packingFee,
     depositBronze: Number(data.deposit_bronze) || FEE_DEFAULTS.depositBronze,
@@ -315,7 +321,8 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
           platformCutFromMiddleman: feeParts.platformCutFromMiddleman,
           dealType,
           simpleCreatorShare: feeParts.simpleCreatorShare || 0,
-          simpleSharePercent: dealType === 'simple' ? Number(fees.simpleMiddlemanSharePercent) || 0 : undefined,
+          simpleSharePercent: dealType === 'simple' ? feeParts.simpleSharePercent || 0 : undefined,
+          simpleShareTier: dealType === 'simple' ? feeParts.simpleShareTier || 0 : undefined,
         },
       }));
     }
@@ -330,7 +337,8 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
         approve_link: `/deal/${dealId}`, active: true,
         meta: {
           dealType: 'simple',
-          sharePercent: Number(fees.simpleMiddlemanSharePercent) || 0,
+          sharePercent: feeParts.simpleSharePercent || 0,
+          shareTier: feeParts.simpleShareTier || 0,
           creatorEligible: true,
           payoutNote: text(pd.middleman_fee_note, 300),
         },

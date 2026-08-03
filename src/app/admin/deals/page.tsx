@@ -144,9 +144,14 @@ function AdminDealsInner() {
         )}
         <p className="text-gray-600 dark:text-gray-300">ค่าสินค้า: <span className="font-mono font-semibold">฿{Number(d.price || 0).toLocaleString()}</span></p>
         {share.creatorEligible ? (
-          <p className="text-emerald-700 dark:text-emerald-300">
-            คอมมิชชั่น ({share.sharePercent}%): <span className="font-mono font-semibold">฿{share.creatorShare.toLocaleString()}</span>
-          </p>
+          share.shareTier > 0 ? (
+            <p className="text-emerald-700 dark:text-emerald-300">
+              คอมมิชชั่น ชั้น {share.shareTier} ({share.shareTierMultiplier}× ค่ากลาง · {share.sharePercent}%):{' '}
+              <span className="font-mono font-semibold">฿{share.creatorShare.toLocaleString()}</span>
+            </p>
+          ) : (
+            <p className="text-gray-500">คอมมิชชั่น: ค่าบริการ ฿{share.totalFee.toLocaleString()} ยังไม่ถึงชั้นขั้นต่ำ</p>
+          )
         ) : (
           <p className="text-gray-500">คอมมิชชั่น: ไม่มีสิทธิ์ (ผู้สร้างดีลยังไม่ลงทะเบียนผู้ขาย+คนกลางครบ)</p>
         )}

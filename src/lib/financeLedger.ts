@@ -1,5 +1,6 @@
 import { dealCode } from '@/lib/dealNumber';
 import type { FeeConfig, FeeLine } from '@/lib/fees';
+import { resolveSimpleShareTier } from '@/lib/fees';
 
 export type LedgerDirection = 'incoming' | 'outgoing' | 'hold' | 'internal';
 export type LedgerStatus =
@@ -48,6 +49,8 @@ export interface LedgerFeeComponent {
   totalFee: number;
   /** ดีล simple: ส่วนแบ่งให้ผู้สร้างที่ลงทะเบียนครบ */
   simpleCreatorShare?: number;
+  simpleSharePercent?: number;
+  simpleShareTier?: number;
 }
 
 export interface MiddlemanWalletSnapshot {
@@ -106,8 +109,9 @@ export function splitDealFeeComponents(
   const totalFee = lines.reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
 
   if (opts?.dealType === 'simple') {
-    const sharePercent = Math.min(100, Math.max(0, Number(config.simpleMiddlemanSharePercent) || 0));
-    const simpleCreatorShare = opts.creatorEligible
+    const tier = resolveSimpleShareTier(config, totalFee);
+    const sharePercent = tier.sharePercent;
+    const simpleCreatorShare = opts.creatorEligible && sharePercent > 0
       ? Math.round((totalFee * sharePercent) / 100)
       : 0;
     const platformShare = Math.max(totalFee - simpleCreatorShare, 0);
@@ -118,6 +122,8 @@ export function splitDealFeeComponents(
       middlemanNetFee: simpleCreatorShare,
       totalFee,
       simpleCreatorShare,
+      simpleSharePercent: sharePercent,
+      simpleShareTier: tier.tier,
     };
   }
 

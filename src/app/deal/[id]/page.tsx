@@ -2064,10 +2064,16 @@ export default function DealRoom() {
             <span>ค่าสินค้า</span><span style={{ fontWeight: 700, color: 'var(--ink)' }}>฿{(deal!.price || 0).toLocaleString()}</span>
           </div>
           {simpleShare.creatorEligible ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--green-700)' }}>
-              <span>คอมมิชชั่น ({simpleShare.sharePercent}%)</span>
-              <span style={{ fontWeight: 700 }}>฿{simpleShare.creatorShare.toLocaleString()}</span>
-            </div>
+            simpleShare.shareTier > 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--green-700)' }}>
+                <span>คอมมิชชั่น ชั้น {simpleShare.shareTier} ({simpleShare.shareTierMultiplier}× ค่ากลาง · {simpleShare.sharePercent}%)</span>
+                <span style={{ fontWeight: 700 }}>฿{simpleShare.creatorShare.toLocaleString()}</span>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--muted)', fontSize: 12.5 }}>
+                ค่าบริการ ฿{simpleShare.totalFee.toLocaleString()} ยังไม่ถึงชั้นขั้นต่ำ — ยังไม่ได้คอมมิชชั่น
+              </div>
+            )
           ) : (
             <div style={{ color: 'var(--muted)', fontSize: 12.5 }}>คอมมิชชั่น: ไม่มีสิทธิ์ (ต้องเป็นผู้สร้างดีลและลงทะเบียนผู้ขาย+คนกลางครบ)</div>
           )}

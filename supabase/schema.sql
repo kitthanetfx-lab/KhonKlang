@@ -471,7 +471,13 @@ create table fee_config (
   platform_cut_percent    numeric(5,2) not null default 20,
   simple_fee_percent      numeric(5,2) not null default 2,
   simple_fee_min          integer not null default 20,
-  simple_middleman_share_percent numeric(5,2) not null default 18,  -- % ส่วนแบ่งให้ผู้สร้างดีลที่ลงทะเบียนทั้ง seller+middleman
+  simple_middleman_share_percent numeric(5,2) not null default 18,  -- legacy; ใช้ simple_share_tier* แทน
+  simple_share_tier1_multiplier numeric(8,2) not null default 1,
+  simple_share_tier1_percent numeric(5,2) not null default 30,
+  simple_share_tier2_multiplier numeric(8,2) not null default 2,
+  simple_share_tier2_percent numeric(5,2) not null default 40,
+  simple_share_tier3_multiplier numeric(8,2) not null default 4,
+  simple_share_tier3_percent numeric(5,2) not null default 50,
   inspection_fee          integer not null default 100,
   packing_fee             integer not null default 50,
   deposit_bronze          integer not null default 1000,
