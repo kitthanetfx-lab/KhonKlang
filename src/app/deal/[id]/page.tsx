@@ -1,6 +1,6 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useState, useRef, useCallback, useMemo, type RefObject } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, type RefObject, type CSSProperties } from 'react';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -15,6 +15,7 @@ import { InAppBanner } from '@/components/InAppBanner';
 import { withExternalBrowserParam } from '@/lib/inApp';
 import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
+import { compressVideo, isVideoFile, VIDEO_UPLOAD_HINT } from '@/lib/videoCompress';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
@@ -463,7 +464,7 @@ export default function DealRoom() {
   const [completionSending, setCompletionSending] = useState(false);
   const [dealError, setDealError] = useState('');
   const [showSelectMM, setShowSelectMM] = useState(false);
-  const [uploadPreview, setUploadPreview] = useState<{ url: string; name: string } | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<{ url: string; name: string; progress?: number; status?: string } | null>(null);
   const [meetAddr, setMeetAddr] = useState<ThaiAddress>(EMPTY_ADDRESS); // ที่อยู่ของฉัน (ดีลนัดรับ)
   const [payOpen, setPayOpen] = useState(false); // เปิดกล่องช่องทางชำระเงินก่อนอัปสลิป
   const [sharingLoc, setSharingLoc] = useState(false); // กำลังแชร์ตำแหน่งระหว่างเดินทาง
@@ -1064,7 +1065,7 @@ export default function DealRoom() {
   /** โชว์รูปที่เพิ่งเลือกทันทีระหว่างรออัปโหลด — ผู้ใช้เห็นรูปเสมอ ไม่ใช่แค่ชื่อไฟล์ */
   function beginUploadPreview(f: File) {
     const url = f.type.startsWith('image/') ? URL.createObjectURL(f) : '';
-    setUploadPreview({ url, name: f.name });
+    setUploadPreview({ url, name: f.name, status: isVideoFile(f) ? 'กำลังเตรียมวิดีโอ...' : 'กำลังอัปโหลด...' });
     return url;
   }
   function endUploadPreview(url: string) {
@@ -1072,18 +1073,58 @@ export default function DealRoom() {
     setUploadPreview(null);
   }
 
+  /** ลบหลักฐานที่ตัวเองอัป — แล้วอัปใหม่ได้ในขั้นที่ยังแก้ไขได้ */
+  function canDeleteEvidenceItem(item: EvidenceItem): boolean {
+    if (!myId || !item.id || item.uploaded_by !== myId || !deal) return false;
+    const st = deal.status;
+    if (item.type === 'packing' && myRole === 'seller' && st === 'packing') return true;
+    if (item.type === 'receive' && myRole === 'buyer' && st === 'shipped_to_buyer') return true;
+    if (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(st)) return true;
+    const canUpEvidence = ((myRole === 'seller' || myRole === 'buyer') && ['packing', 'shipped_to_middleman', 'payment_pending', 'payment_uploaded'].includes(st))
+      || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(st));
+    return canUpEvidence;
+  }
+
+  async function deleteEvidenceItem(item: EvidenceItem) {
+    if (!item.id || !canDeleteEvidenceItem(item)) return;
+    if (!confirm('ลบหลักฐานนี้แล้วอัปใหม่ได้?')) return;
+    await doAction('delete_evidence', { evidenceId: item.id });
+  }
+
+  function renderVideoUploadHint(style?: CSSProperties) {
+    return <p style={{ fontSize: 12, color: '#8a5a00', lineHeight: 1.55, marginBottom: 10, ...style }}>{VIDEO_UPLOAD_HINT}</p>;
+  }
+
   async function uploadFile(file: File, isEvidence = false, evidenceTypeOverride?: string) {
     const purl = beginUploadPreview(file);
     try {
       let fileId = '', fileName = file.name;
-      if (file.type.startsWith('video/')) {
+      if (isVideoFile(file)) {
+        let prepared: File;
+        try {
+          prepared = await compressVideo(file, (pct, label) => {
+            setUploadPreview((prev) => prev ? { ...prev, progress: pct, status: label || 'กำลังบีบอัดวิดีโอ...' } : prev);
+          });
+        } catch (err) {
+          const code = err instanceof Error ? err.message : '';
+          if (code === 'VIDEO_TOO_LONG') alert('วิดีโอยาวเกิน 5 นาที — กรุณาตัดหรือถ่ายใหม่');
+          else if (code === 'UNSUPPORTED') alert('เบราว์เซอร์นี้บีบอัดวิดีโอไม่ได้ — ลองอัปเดตแอปหรือใช้ Chrome/Safari เวอร์ชันล่าสุด');
+          else alert('บีบอัดวิดีโอไม่สำเร็จ — ลองถ่ายใหม่หรือใช้คลิปที่สั้นกว่า');
+          return;
+        }
+        if (prepared.size > 50 * 1024 * 1024) {
+          alert('วิดีโอหลังบีบอัดยังใหญ่เกิน 50MB — กรุณาใช้คลิปที่สั้นกว่า');
+          return;
+        }
+        file = prepared;
         // วิดีโอมักใหญ่เกินลิมิต body ของ API route บน Vercel (~4.5MB) → อัปโหลดตรงเข้า Supabase Storage จากเบราว์เซอร์
         const ext = (file.name.split('.').pop() || 'webm').toLowerCase();
-        // โฟลเดอร์ตาม user id — กันชื่อไฟล์ของคนละคนไปกองรวมกันจนแยกไม่ออกในหน้า Storage
         const path = `${myId || 'guest'}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        setUploadPreview((prev) => prev ? { ...prev, progress: undefined, status: 'กำลังอัปโหลด...' } : prev);
         const { error } = await supabase.storage.from(DEAL_BUCKET).upload(path, file, { contentType: file.type || 'video/webm' });
         if (error) { alert(`อัปโหลดวิดีโอไม่สำเร็จ: ${error.message}`); return; }
         fileId = path;
+        fileName = file.name;
       } else {
         const headers = await getAuthHeaders(true); // force-fresh — ป้องกัน cached token หมดอายุ
         if (!headers.Authorization) { alert('กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง'); return; }
@@ -1109,7 +1150,7 @@ export default function DealRoom() {
         const r = await fetch(`/api/deals/${dealId}`, { headers, cache: 'no-store' });
         if (r.ok) { const d = await r.json(); if (d.evidence) setEvidence(d.evidence); }
       }
-      else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', fileId, fileName);
+      else await sendMsg('', file.type.startsWith('image/') ? 'image' : 'file', fileId, fileName || file.name);
     } finally { endUploadPreview(purl); }
   }
 
@@ -2278,7 +2319,8 @@ export default function DealRoom() {
         {canBuyerUnbox && (
           <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
             <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
-            <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
+            <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 8 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
+            {renderVideoUploadHint({ marginBottom: 12 })}
             <button onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดวิดีโอก่อนแกะ</button>
             <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) await uploadFile(f, true, 'receive'); }} />
           </div>
@@ -2292,6 +2334,7 @@ export default function DealRoom() {
                 {myRole === 'middleman' && <><option value="receive">วิดีโอรับสินค้า</option><option value="check">วิดีโอตรวจ</option></>}
               </select>
             )}
+            {renderVideoUploadHint()}
             <button onClick={() => evidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> เลือกไฟล์ (รูป/วิดีโอ)</button>
             <input ref={evidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) await uploadFile(f, true, isSimple ? 'other' : undefined); }} />
           </div>
@@ -2303,13 +2346,13 @@ export default function DealRoom() {
             const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
             const isImg = item.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
             // ลบได้เฉพาะไอเทมที่ตัวเองอัป และอยู่ในขั้นที่ยังแก้ไขได้
-            const canDelete = item.uploaded_by === myId && canUp;
+            const canDelete = canDeleteEvidenceItem(item);
             return (
               <div key={item.id || i} className="dr-card" style={{ padding: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ fontSize: 12, color: 'var(--muted)' }}>{typeLabel[item.type] || item.type}{item.uploader_name ? ` · ${item.uploader_name}` : ''}</span>
                   {canDelete && (
-                    <button type="button" onClick={() => { if (confirm('ลบหลักฐานชิ้นนี้?')) doAction('delete_evidence', { evidenceId: item.id }); }} style={{ background: 'none', border: 'none', color: 'var(--rose-500)', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1 }} title="ลบ">✕</button>
+                    <button type="button" onClick={() => deleteEvidenceItem(item)} style={{ background: 'none', border: 'none', color: 'var(--rose-500)', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1 }} title="ลบและอัปใหม่">✕</button>
                   )}
                 </div>
                 {!item.file_id
@@ -2959,7 +3002,7 @@ export default function DealRoom() {
           <button onClick={() => evidInputRef.current?.click()} className="btn btn-soft btn-block" style={{ marginBottom: 10 }}>
             <Icon name="upload" size={16} /> เลือกรูป/วิดีโอหลักฐาน
           </button>
-          <input ref={evidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f, true, 'chat'); } }} />
+          <input ref={evidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) { if (!isVideoFile(f) && f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f, true, 'chat'); } }} />
           {myEvidence.length > 0 ? (
             <div className="dr-evid-list">
               {myEvidence.map((item, i) => {
@@ -3204,20 +3247,29 @@ export default function DealRoom() {
 
   // ─── ขั้น 5: ผู้ขายแพ็ค + วิดีโอ + เลขพัสดุ ───────────────────────────────
   /** แกลเลอรีย่อรูป/วิดีโอหลักฐาน — ใช้ซ้ำให้ทั้งสองฝ่ายเห็นหลักฐานแพ็ค/แกะกล่องชุดเดียวกัน */
-  function renderWizardEvidenceThumbs(items: EvidenceItem[]) {
+  function renderWizardEvidenceThumbs(items: EvidenceItem[], deletable = false) {
     if (items.length === 0) return null;
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8, marginTop: 10 }}>
         {items.map((item, i) => {
           const url = item.file_id ? fileUrl(item.file_id) : '';
           const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
+          const showDelete = deletable && canDeleteEvidenceItem(item);
           return (
-            <a key={item.id || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', position: 'relative' }}>
-              {isVid
-                ? <video src={url} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
-                : <img src={url} alt={item.file_name} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8 }} />}
-              {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 20, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>▶</span>}
-            </a>
+            <div key={item.id || i} style={{ position: 'relative' }}>
+              <a href={url} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
+                {isVid
+                  ? <video src={url} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
+                  : <img src={url} alt={item.file_name} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8 }} />}
+                {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 20, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)', pointerEvents: 'none' }}>▶</span>}
+              </a>
+              {showDelete && (
+                <button type="button" onClick={() => deleteEvidenceItem(item)} title="ลบและอัปใหม่"
+                  style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 999, border: 'none', background: 'rgba(178,36,65,.92)', color: '#fff', fontSize: 12, cursor: 'pointer', lineHeight: 1 }}>
+                  ✕
+                </button>
+              )}
+            </div>
           );
         })}
       </div>
@@ -3335,7 +3387,8 @@ export default function DealRoom() {
         </div>
         <div className="dr-card">
           <div className="dr-card-title">อัปโหลด 3 ขั้นตอน</div>
-          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>อัปโหลดให้ครบตามลำดับ 1 → 2 → 3 แล้วจึงเลือกผู้ให้บริการโลจิสติกส์และกรอกเลขพัสดุเพื่อไปขั้นถัดไป</p>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.6 }}>อัปโหลดให้ครบตามลำดับ 1 → 2 → 3 แล้วจึงเลือกผู้ให้บริการโลจิสติกส์และกรอกเลขพัสดุเพื่อไปขั้นถัดไป</p>
+          {renderVideoUploadHint({ marginBottom: 12 })}
           <div style={{ display: 'grid', gridTemplateColumns: packingUploadColumns, gap: 10 }}>
             {packingSteps.map(item => {
               const uploaded = packingEvidenceSlots[item.step - 1];
@@ -3376,6 +3429,12 @@ export default function DealRoom() {
                   >
                     <Icon name="upload" size={14} /> {uploaded ? 'อัปโหลดแล้ว' : `เลือกไฟล์ขั้นตอน ${item.step}`}
                   </button>
+                  {uploaded && canDeleteEvidenceItem(uploaded) && (
+                    <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 6, color: 'var(--rose-500)', fontSize: 11 }}
+                      onClick={() => deleteEvidenceItem(uploaded)}>
+                      ลบ / อัปใหม่
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -3510,11 +3569,12 @@ export default function DealRoom() {
         {renderTrackingInfoCard('พัสดุจากผู้ขายถึงผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
         <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
           <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
-          <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
+          <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 8 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
+          {renderVideoUploadHint({ marginBottom: 12 })}
           <button onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดวิดีโอก่อนแกะ</button>
           <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
           {hasUnboxEvidence && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 10 }}>✅ อัปโหลดแล้ว {unboxEvidence.length} ไฟล์ — ผู้ขายเห็นชุดนี้ด้วย</p>}
-          {renderWizardEvidenceThumbs(unboxEvidence)}
+          {renderWizardEvidenceThumbs(unboxEvidence, true)}
         </div>
         <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {renderParticipantStatusRows([
@@ -3998,7 +4058,8 @@ export default function DealRoom() {
           {renderBuyerShippingCard()}
           <div className="dr-card">
             <div className="dr-card-title">อัปโหลด 3 ขั้นตอน</div>
-            <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>ถ่ายวิดีโอทุกขั้นตอน แพ็ค → โลจิสติกส์ → สลิป แล้วกรอกเลขพัสดุส่งให้คนกลาง</p>
+            <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.6 }}>ถ่ายวิดีโอทุกขั้นตอน แพ็ค → โลจิสติกส์ → สลิป แล้วกรอกเลขพัสดุส่งให้คนกลาง</p>
+            {renderVideoUploadHint({ marginBottom: 12 })}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
               {packingSteps.map(item => {
                 const uploaded = packingSlots[item.step - 1];
@@ -4018,6 +4079,12 @@ export default function DealRoom() {
                       onClick={() => { if (!uploaded && !locked) { setPackingUploadStep(item.step); evidInputRef.current?.click(); } }}>
                       {uploaded ? '✅' : locked ? '🔒' : <><Icon name="upload" size={12} /> อัป</>}
                     </button>
+                    {uploaded && canDeleteEvidenceItem(uploaded) && (
+                      <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 4, color: 'var(--rose-500)', fontSize: 10 }}
+                        onClick={() => deleteEvidenceItem(uploaded)}>
+                        ลบ / อัปใหม่
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -4099,13 +4166,14 @@ export default function DealRoom() {
           {effectiveViewRole === 'middleman' && !mmDone && (
             <div className="dr-card">
               <div className="dr-card-title">📹 อัปโหลดวิดีโอตรวจสินค้า</div>
-              <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>ถ่ายวิดีโอขณะตรวจสอบสินค้าเพื่อเป็นหลักฐาน</p>
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 8 }}>ถ่ายวิดีโอขณะตรวจสอบสินค้าเพื่อเป็นหลักฐาน</p>
+              {renderVideoUploadHint({ marginBottom: 10 })}
               <button type="button" className="btn btn-soft btn-block" onClick={() => evidInputRef.current?.click()}>
                 <Icon name="upload" size={16} /> อัปโหลดวิดีโอตรวจสอบ
               </button>
               <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }}
                 onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; await uploadFile(f, true, 'packing'); }} />
-              {mmEvidence.length > 0 && renderWizardEvidenceThumbs(mmEvidence)}
+              {mmEvidence.length > 0 && renderWizardEvidenceThumbs(mmEvidence, true)}
             </div>
           )}
           {/* ผู้ซื้อ: ยืนยันสินค้าตรงตามที่ตกลง */}
@@ -4163,10 +4231,11 @@ export default function DealRoom() {
           {renderTrackingInfoCard('พัสดุ คนกลาง → ผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
           <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
             <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
-            <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 12 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
+            <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6, marginBottom: 8 }}>⚠️ ต้องถ่ายวิดีโอตอนแกะกล่องทุกครั้ง หากไม่มีวิดีโอก่อนแกะ จะถือว่าสินค้าถูกต้องและเรียกร้องกับผู้ขายไม่ได้</div>
+            {renderVideoUploadHint({ marginBottom: 12 })}
             <button onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block"><Icon name="upload" size={16} /> อัปโหลดวิดีโอก่อนแกะ</button>
             <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={async e => { const files = Array.from(e.target.files || []); e.target.value = ''; for (const f of files) await uploadFile(f, true, 'receive'); }} />
-            {unboxEvidence.length > 0 && <><p style={{ fontSize: 12, color: 'var(--green-600)', marginTop: 8 }}>✅ อัปโหลดแล้ว {unboxEvidence.length} ไฟล์</p>{renderWizardEvidenceThumbs(unboxEvidence)}</>}
+            {unboxEvidence.length > 0 && <><p style={{ fontSize: 12, color: 'var(--green-600)', marginTop: 8 }}>✅ อัปโหลดแล้ว {unboxEvidence.length} ไฟล์</p>{renderWizardEvidenceThumbs(unboxEvidence, true)}</>}
           </div>
           <div className="dr-card">
             {renderConfirmRows({
@@ -5192,7 +5261,7 @@ export default function DealRoom() {
               acting={acting}
               fileInputRef={callFileInputRef}
               onSend={() => { if (chatInput.trim()) sendMsg(chatInput); }}
-              onUpload={async (files) => { for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
+              onUpload={async (files) => { for (const f of files) { if (!isVideoFile(f) && f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
               onClose={() => setFloatChatOpen(false)}
               onPin={saveMsgEvidence}
               onAutoScroll={() => chatBottomRef.current?.scrollIntoView({ behavior: 'auto' })}
@@ -5243,7 +5312,7 @@ export default function DealRoom() {
                 acting={acting}
                 fileInputRef={callFileInputRef}
                 onSend={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }}
-                onUpload={async (files) => { for (const f of files) { if (f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
+                onUpload={async (files) => { for (const f of files) { if (!isVideoFile(f) && f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
                 onClose={() => setFloatChatOpen(false)}
                 onPin={saveMsgEvidence}
                 onAutoScroll={() => chatBottomRef.current?.scrollIntoView({ behavior: 'auto' })}
@@ -5409,8 +5478,16 @@ export default function DealRoom() {
         <div className="up-toast" role="status" aria-live="polite">
           {uploadPreview.url
             ? <img src={uploadPreview.url} alt={`พรีวิว ${uploadPreview.name}`} />
-            : <span className="up-ic">📎</span>}
-          <div className="up-tx"><b>กำลังอัปโหลด...</b><span>{uploadPreview.name}</span></div>
+            : <span className="up-ic">{uploadPreview.progress != null ? '🎬' : '📎'}</span>}
+          <div className="up-tx">
+            <b>{uploadPreview.status || 'กำลังอัปโหลด...'}</b>
+            <span>{uploadPreview.name}</span>
+            {uploadPreview.progress != null && (
+              <div style={{ marginTop: 6, height: 4, borderRadius: 999, background: 'var(--line)', overflow: 'hidden' }}>
+                <div style={{ width: `${uploadPreview.progress}%`, height: '100%', background: 'var(--accent)', transition: 'width .2s' }} />
+              </div>
+            )}
+          </div>
           <span className="up-spin" aria-hidden="true" />
         </div>
       )}
