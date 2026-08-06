@@ -147,3 +147,55 @@ export async function notifyAdminLineSteps(
     await notifyAdminLineStep(db, snap, step);
   }
 }
+
+/** แจ้ง LINE ผลตรวจสลิปอัตโนมัติ (ผ่าน/ไม่ผ่าน) */
+export async function notifyAdminLineSlipCheck(params: {
+  deal: Record<string, unknown>;
+  side: 'buyer' | 'seller';
+  evaluation: { pass: boolean; reasons: string[]; warnings: string[]; slip?: { amount?: number; transRef?: string; receiverAccount?: string; senderName?: string; transDate?: string; transTime?: string } };
+  slipUrl?: string;
+}): Promise<void> {
+  const { deal, side, evaluation, slipUrl } = params;
+  const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
+  const num = String(deal.deal_number || String(deal.id || '').slice(0, 8).toUpperCase());
+  const title = String(deal.title || 'ดีล');
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
+
+  const lines = [
+    `[กลางฮับ] ${evaluation.pass ? '✅' : '⚠️'} ตรวจสลิปอัตโนมัติ — ${sideLabel}`,
+    `${num} · ${title}`,
+    evaluation.pass ? 'ผล: ผ่าน' : `ผล: ไม่ผ่าน — ${evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน'}`,
+  ];
+
+  const slip = evaluation.slip;
+  if (slip) {
+    if (slip.amount != null) lines.push(`ยอดในสลิป: ฿${Number(slip.amount).toLocaleString('th-TH')}`);
+    if (slip.senderName) lines.push(`ผู้โอน: ${slip.senderName}`);
+    if (slip.receiverAccount) lines.push(`บัญชีผู้รับ: ${slip.receiverAccount}`);
+    if (slip.transRef) lines.push(`เลขอ้างอิง: ${slip.transRef}`);
+    if (slip.transDate || slip.transTime) lines.push(`เวลาโอน: ${[slip.transDate, slip.transTime].filter(Boolean).join(' ')}`);
+  }
+  if (evaluation.warnings.length) lines.push(`หมายเหตุ: ${evaluation.warnings.join(' · ')}`);
+  lines.push(`${appUrl}/admin/deals?tab=confirm_pay`);
+
+  const messages: LineMessage[] = [{ type: 'text', text: lines.join('\n').slice(0, 5000) }];
+  if (slipUrl && messages.length < 5) {
+    messages.push({ type: 'image', originalContentUrl: slipUrl, previewImageUrl: slipUrl });
+  }
+  await sendLineAdminMessages(messages);
+}
+
+/** แจ้ง LINE เมื่อระบบอนุมัติรับเงินอัตโนมัติครบทุกสลิป */
+export async function notifyAdminLineAutoApproved(deal: Record<string, unknown>): Promise<void> {
+  const num = String(deal.deal_number || String(deal.id || '').slice(0, 8).toUpperCase());
+  const title = String(deal.title || 'ดีล');
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
+  await sendLineAdminMessages([{
+    type: 'text',
+    text: [
+      '[กลางฮับ] ✅ อนุมัติรับเงินอัตโนมัติ — เริ่มแพ็คได้',
+      `${num} · ${title}`,
+      `${appUrl}/admin/deals?tab=confirm_pay`,
+    ].join('\n').slice(0, 5000),
+  }]);
+}

@@ -1,5 +1,42 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-06 (12:50)
+
+### เปิด/ปิดทั้งเว็บ (Maintenance) + SlipOK ตรวจสลิปอัตโนมัติ
+
+**โจทย์**:
+1. แอดมินปิดทั้งเว็บได้ — redirect ทุกหน้า public → `/maintenance` (แอดมิน `/admin/*` เข้าได้), ตั้งข้อความ + วันเวลาเปิดบริการอีกครั้ง
+2. เมื่อผู้ใช้「ยืนยันรับเงิน」/อัปสลิป — ระบบเรียก SlipOK อัตโนมัติ (เกณฑ์ B: สลิปเก่า >7 วัน fail, โอนหลังอัป >2 ชม. fail); ผ่าน → LINE + verified; ไม่ผ่าน → LINE + ข้อความรอแอดมิน; ครบทุกใบ → อนุมัติ auto → packing
+
+**แก้ไข**:
+1. **`supabase/migrations/0022_site_maintenance.sql`** — คอลัมน์ `reopen_at`, row `siteMaintenance`
+2. **`src/lib/serviceControls.ts`**, **`src/app/api/_lib/appConfig.ts`**, **`src/app/api/service-controls/route.ts`** — อ่าน/เขียน maintenance
+3. **`src/middleware.ts`**, **`src/app/maintenance/page.tsx`** — redirect + หน้าปิดปรับปรุง
+4. **`src/app/admin/service-controls/page.tsx`** — UI เปิด/ปิดทั้งเว็บใน「บริการเสริม」
+5. **`src/lib/slipok.ts`**, **`src/app/api/_lib/slipAutoVerify.ts`** — ตรวจ auto + อนุมัติ auto
+6. **`src/lib/lineAdminNotify.ts`** — แจ้ง LINE ผลตรวจสลิป + อนุมัติ auto
+7. **`src/app/api/deals/[id]/route.ts`**, **`src/app/admin/deals/page.tsx`**, **`src/app/api/admin/finance/route.ts`**
+
+**งานฝั่งผู้ใช้**: รัน migration `0022_site_maintenance.sql`; ตั้ง env `SLIPOK_*`, `LINE_*`; บัญชีบริษัทใน `/admin/settings`
+
+### ไฟล์ที่แก้ไข (2026-08-06 12:50)
+- `supabase/migrations/0022_site_maintenance.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/lib/serviceControls.ts`
+- `src/app/api/_lib/appConfig.ts`
+- `src/app/api/service-controls/route.ts`
+- `src/middleware.ts`
+- `src/app/maintenance/page.tsx`
+- `src/app/admin/service-controls/page.tsx`
+- `src/lib/slipok.ts`
+- `src/app/api/_lib/slipAutoVerify.ts`
+- `src/lib/lineAdminNotify.ts`
+- `src/app/api/deals/[id]/route.ts`
+- `src/app/admin/deals/page.tsx`
+- `src/app/api/admin/finance/route.ts`
+
+---
+
 ## 2026-08-06 (01:35)
 
 ### บีบอัดวิดีโอก่อนอัป + ลบ/อัปใหม่ + คำเตือน 5 นาที

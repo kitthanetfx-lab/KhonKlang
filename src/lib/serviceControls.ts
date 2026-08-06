@@ -7,14 +7,21 @@ export type ServiceControlKey =
   | 'onsite'
   | 'marketplace'
   | 'sellerRegistration'
-  | 'middlemanRegistration';
+  | 'middlemanRegistration'
+  | 'siteMaintenance';
 
 export type ServiceControlEntry = {
   enabled: boolean;
   note: string;
+  /** วันเวลาเปิดให้บริการอีกครั้ง — ใช้กับ siteMaintenance */
+  reopenAt?: string;
 };
 
 export type ServiceControlMap = Record<ServiceControlKey, ServiceControlEntry>;
+
+/** siteMaintenance.enabled = true → ปิดปรับปรุงทั้งเว็บ */
+export const SITE_MAINTENANCE_DEFAULT_NOTE =
+  'เว็บไซต์ปิดปรับปรุงชั่วคราว — กรุณากลับมาทำรายการต่อหลังเปิดให้บริการ';
 
 export const SERVICE_CONTROL_DEFAULTS: ServiceControlMap = {
   tradeOnline: { enabled: true, note: '' },
@@ -26,6 +33,7 @@ export const SERVICE_CONTROL_DEFAULTS: ServiceControlMap = {
   marketplace: { enabled: true, note: '' },
   sellerRegistration: { enabled: true, note: '' },
   middlemanRegistration: { enabled: true, note: '' },
+  siteMaintenance: { enabled: false, note: SITE_MAINTENANCE_DEFAULT_NOTE, reopenAt: '' },
 };
 
 export const SERVICE_CONTROL_CATALOG: Array<{
@@ -98,7 +106,22 @@ export function getServiceControlMessage(entry: ServiceControlEntry | undefined,
 }
 
 export function isServiceEnabled(controls: ServiceControlMap | null | undefined, key: ServiceControlKey) {
+  if (key === 'siteMaintenance') return !Boolean((controls || SERVICE_CONTROL_DEFAULTS).siteMaintenance?.enabled);
   return Boolean((controls || SERVICE_CONTROL_DEFAULTS)[key]?.enabled);
+}
+
+/** เว็บปิดปรับปรุงอยู่หรือไม่ */
+export function isSiteInMaintenance(controls: ServiceControlMap | null | undefined): boolean {
+  return Boolean((controls || SERVICE_CONTROL_DEFAULTS).siteMaintenance?.enabled);
+}
+
+export function getSiteMaintenanceInfo(controls: ServiceControlMap | null | undefined) {
+  const entry = (controls || SERVICE_CONTROL_DEFAULTS).siteMaintenance;
+  return {
+    active: Boolean(entry?.enabled),
+    message: String(entry?.note || SITE_MAINTENANCE_DEFAULT_NOTE).trim() || SITE_MAINTENANCE_DEFAULT_NOTE,
+    reopenAt: String(entry?.reopenAt || '').trim(),
+  };
 }
 
 export function sanitizeServiceControls(input: unknown): ServiceControlMap {
@@ -106,10 +129,14 @@ export function sanitizeServiceControls(input: unknown): ServiceControlMap {
   const next = { ...SERVICE_CONTROL_DEFAULTS } as ServiceControlMap;
   for (const key of Object.keys(SERVICE_CONTROL_DEFAULTS) as ServiceControlKey[]) {
     const current = (raw[key] && typeof raw[key] === 'object') ? raw[key] as Record<string, unknown> : {};
-    next[key] = {
-      enabled: current.enabled !== false,
-      note: String(current.note ?? '').slice(0, 180),
+    const entry: ServiceControlEntry = {
+      enabled: key === 'siteMaintenance' ? current.enabled === true : current.enabled !== false,
+      note: String(current.note ?? (key === 'siteMaintenance' ? SITE_MAINTENANCE_DEFAULT_NOTE : '')).slice(0, 500),
     };
+    if (key === 'siteMaintenance') {
+      entry.reopenAt = String(current.reopenAt ?? '').slice(0, 40);
+    }
+    next[key] = entry;
   }
   return next;
 }

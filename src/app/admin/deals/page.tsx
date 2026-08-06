@@ -674,6 +674,9 @@ function AdminDealsInner() {
                 )}
                 {d.status === 'payment_uploaded' && d.deal_type !== 'meetup' && (
                   <>
+                    <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1.5 w-full">
+                      🤖 ระบบตรวจสลิปอัตโนมัติเมื่ออัปโหลด — ผ่านแล้วจะแจ้ง LINE และอนุมัติเมื่อครบทุกใบ
+                    </p>
                     {buyerSlipVerified ? (
                       <span className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">✅ สลิปผู้ซื้อถูกต้อง</span>
                     ) : d.payment_slip_file_id ? (

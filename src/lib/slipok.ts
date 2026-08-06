@@ -16,12 +16,12 @@ export interface SlipInfo {
 }
 
 export interface SlipResult {
-  ok: boolean;          // สลิปถูกต้องและผ่านทุกเงื่อนไข
-  code: string;         // 'ok' | 'no_config' | 'image_fetch' | 'network' | รหัส error ของ SlipOK (เช่น 1012, 1014)
+  ok: boolean;
+  code: string;
   message: string;
-  slip?: SlipInfo;      // ข้อมูลบนสลิป (มีแม้บางกรณี error เช่น 1012/1013/1014)
-  duplicate?: boolean;  // 1012 สลิปซ้ำ
-  wrongReceiver?: boolean; // 1014 บัญชีผู้รับไม่ตรงบัญชีร้าน
+  slip?: SlipInfo;
+  duplicate?: boolean;
+  wrongReceiver?: boolean;
 }
 
 interface RawSlip {
@@ -47,35 +47,38 @@ function norm(d: RawSlip): SlipInfo {
   };
 }
 
-/** ตรวจสลิปจาก URL รูป (ดึงรูปมาเป็น base64 แล้วส่งให้ SlipOK) */
-export async function verifySlipByUrl(imageUrl: string): Promise<SlipResult> {
+export function dealSlipPublicUrl(fileId: string): string {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  return `${base}/storage/v1/object/public/deal-files/${fileId}`;
+}
+
+export function isSlipImageFile(fileId: string): boolean {
+  const ext = fileId.split('.').pop()?.toLowerCase() || '';
+  return ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'webp';
+}
+
+/** ตรวจสลิปจาก URL รูป public (ตามเอกสาร SlipOK ใช้ field url) */
+export async function verifySlipByUrl(imageUrl: string, expectedAmount?: number): Promise<SlipResult> {
   const branchId = process.env.SLIPOK_BRANCH_ID;
   const apiKey = process.env.SLIPOK_API_KEY;
   if (!branchId || !apiKey) {
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
 
-  let base64 = '';
   try {
-    const img = await fetch(imageUrl);
-    if (!img.ok) return { ok: false, code: 'image_fetch', message: 'ดึงรูปสลิปไม่สำเร็จ' };
-    base64 = Buffer.from(await img.arrayBuffer()).toString('base64');
-  } catch {
-    return { ok: false, code: 'image_fetch', message: 'ดึงรูปสลิปไม่สำเร็จ' };
-  }
+    const body: Record<string, unknown> = { url: imageUrl, log: true };
+    if (expectedAmount != null && expectedAmount > 0) body.amount = expectedAmount;
 
-  try {
     const res = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}`, {
       method: 'POST',
       headers: { 'x-authorization': apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files: base64, log: true }),
+      body: JSON.stringify(body),
     });
     const j = await res.json().catch(() => ({} as Record<string, unknown>));
 
     if (res.ok && j.success && j.data) {
-      return { ok: true, code: 'ok', message: String(j.data.message || '✅'), slip: norm(j.data as RawSlip) };
+      return { ok: true, code: 'ok', message: String((j.data as Record<string, unknown>).message || '✅'), slip: norm(j.data as RawSlip) };
     }
-    // error: { code, message, data? }
     const code = String(j.code ?? res.status);
     return {
       ok: false,
@@ -88,4 +91,11 @@ export async function verifySlipByUrl(imageUrl: string): Promise<SlipResult> {
   } catch {
     return { ok: false, code: 'network', message: 'เชื่อมต่อ SlipOK ไม่ได้' };
   }
+}
+
+export async function verifySlipByFileId(fileId: string, expectedAmount?: number): Promise<SlipResult> {
+  if (!isSlipImageFile(fileId)) {
+    return { ok: false, code: 'not_image', message: 'ไฟล์ไม่ใช่รูปสลิป (รองรับ JPG/PNG) — รอแอดมินตรวจด้วยตนเอง' };
+  }
+  return verifySlipByUrl(dealSlipPublicUrl(fileId), expectedAmount);
 }

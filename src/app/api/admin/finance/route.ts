@@ -3,14 +3,16 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../../_lib/notify';
-import { verifySlipByUrl } from '@/lib/slipok';
+import { verifySlipByUrl, dealSlipPublicUrl } from '@/lib/slipok';
 import { getBankInfoMap, type BankInfo } from '@/lib/bankInfo';
 import { readFeesConfig, syncDealLedger, syncFinanceProjection } from '../../_lib/financeLedger';
 
 function slipUrl(bucket: 'deal_files' | 'kyc_docs', fileId: string) {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const realBucket = bucket === 'kyc_docs' ? 'kyc-docs' : 'deal-files';
-  return `${base}/storage/v1/object/public/${realBucket}/${fileId}`;
+  if (bucket === 'kyc_docs') {
+    const base = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    return `${base}/storage/v1/object/public/kyc-docs/${fileId}`;
+  }
+  return dealSlipPublicUrl(fileId);
 }
 
 interface LedgerRow {

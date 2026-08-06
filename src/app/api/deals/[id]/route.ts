@@ -5,6 +5,7 @@ import { notifyUsers } from '../../_lib/notify';
 import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
 import { loadAdminDealSnapshot } from '../../_lib/adminDealQueue';
 import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
+import { runAutoSlipVerification } from '../../_lib/slipAutoVerify';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide } from '@/lib/fees';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
@@ -888,6 +889,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             link: isPay ? '/admin/finance' : '/admin/deals',
           });
         }
+      }
+    }
+
+    if (action === 'upload_payment' || action === 'upload_middleman_fee' || action === 'seller_fee_paid') {
+      try {
+        const trigger = action === 'upload_payment' ? 'buyer' : 'seller';
+        const autoUpdated = await runAutoSlipVerification(db, id, trigger);
+        if (autoUpdated && typeof autoUpdated === 'object') updated = autoUpdated as typeof updated;
+      } catch (err) {
+        console.error('[slipAutoVerify]', err);
       }
     }
 

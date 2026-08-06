@@ -6,6 +6,7 @@ import { CheckCircle2, Film, Loader2, SlidersHorizontal } from 'lucide-react';
 import {
   SERVICE_CONTROL_CATALOG,
   SERVICE_CONTROL_GROUPS,
+  SITE_MAINTENANCE_DEFAULT_NOTE,
   ServiceControlKey,
   ServiceControlMap,
   sanitizeServiceControls,
@@ -83,6 +84,37 @@ export default function ServiceControlsPage() {
     setSaved(false);
   }
 
+  function setSiteReopenAt(value: string) {
+    setServices(current => current ? { ...current, siteMaintenance: { ...current.siteMaintenance, reopenAt: value } } : current);
+    setSaved(false);
+  }
+
+  function setSiteMaintenance(active: boolean) {
+    setServices(current => current ? {
+      ...current,
+      siteMaintenance: {
+        ...current.siteMaintenance,
+        enabled: active,
+        note: current.siteMaintenance.note || SITE_MAINTENANCE_DEFAULT_NOTE,
+      },
+    } : current);
+    setSaved(false);
+  }
+
+  const toLocalInput = (iso: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const fromLocalInput = (value: string) => {
+    if (!value) return '';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+  };
+
   async function save() {
     if (!services) return;
     setSaving(true);
@@ -144,12 +176,53 @@ export default function ServiceControlsPage() {
 
       {services && (
         <>
+          <div className="bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-5 space-y-4">
+            <div>
+              <h2 className="font-semibold text-base text-gray-900 dark:text-white">🌐 เปิด / ปิดเว็บไซต์ทั้งหมด</h2>
+              <p className="text-sm text-gray-500 mt-1">ปิดแล้วผู้ใช้ทั่วไปจะถูกพาไปหน้าแจ้งปิดปรับปรุงทันที (แอดมินเข้า /admin ได้ตามปกติ)</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button type="button" onClick={() => setSiteMaintenance(false)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${!services.siteMaintenance.enabled ? 'bg-green-600 text-white border-green-600' : 'bg-white dark:bg-gray-900 text-gray-600 border-gray-200 dark:border-gray-700'}`}>
+                เปิดเว็บ
+              </button>
+              <button type="button" onClick={() => setSiteMaintenance(true)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${services.siteMaintenance.enabled ? 'bg-amber-500 text-white border-amber-500' : 'bg-white dark:bg-gray-900 text-gray-600 border-gray-200 dark:border-gray-700'}`}>
+                ปิดปรับปรุง
+              </button>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${services.siteMaintenance.enabled ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                {services.siteMaintenance.enabled ? 'ปิดอยู่' : 'เปิดอยู่'}
+              </span>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 dark:text-gray-300">ข้อความแจ้งผู้ใช้เมื่อปิดเว็บ</label>
+              <input
+                value={services.siteMaintenance.note}
+                onChange={e => setServiceNote('siteMaintenance', e.target.value)}
+                className="mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm"
+              />
+            </div>
+          </div>
+
           {SERVICE_CONTROL_GROUPS.map(group => (
             <div key={group} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-4">
               <div>
                 <h2 className="font-semibold text-base text-gray-900 dark:text-white">{group}</h2>
                 <p className="text-sm text-gray-500 mt-1">เลือกเปิดหรือปิดเฉพาะบริการในหมวดนี้ได้ตามรอบทดลองหรือช่วงบำรุงรักษา</p>
               </div>
+
+              {group === 'บริการเสริม' && (
+                <div className="rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-950/20 p-4">
+                  <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">📅 วันเวลาเปิดให้บริการอีกครั้ง (ทั้งเว็บ)</h3>
+                  <p className="text-sm text-gray-500 mt-1 mb-2">แสดงบนหน้าปิดปรับปรุง — ว่างได้ถ้ายังไม่กำหนด</p>
+                  <input
+                    type="datetime-local"
+                    value={toLocalInput(services.siteMaintenance.reopenAt || '')}
+                    onChange={e => setSiteReopenAt(fromLocalInput(e.target.value))}
+                    className="w-full max-w-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm"
+                  />
+                </div>
+              )}
 
               <div className="grid gap-3">
                 {SERVICE_CONTROL_CATALOG.filter(item => item.group === group).map(item => {
