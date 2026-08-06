@@ -1,5 +1,30 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-06 (13:50)
+
+### สลับตรวจสลิป อัตโนมัติ/แมนนวล + เกณฑ์มูลค่าดีล
+
+**โจทย์**: ใน「ควบคุมบริการ」สลับโหมดตรวจสลิป auto/manual; ถ้า deal.price เกินเกณฑ์ที่ตั้ง → บังคับแมนนวล
+
+**แก้ไข**:
+1. **`supabase/migrations/0023_slip_auto_verify_control.sql`** — `amount_threshold`, row `slipAutoVerify` (default อัตโนมัติ)
+2. **`src/lib/serviceControls.ts`** — `shouldAutoVerifySlip()`, `getSlipAutoVerifyInfo()`
+3. **`src/app/api/_lib/appConfig.ts`** — อ่าน/เขียน threshold
+4. **`src/app/admin/service-controls/page.tsx`** — UI สวิตช์ + input ยอด
+5. **`src/app/api/_lib/slipAutoVerify.ts`** — เช็กก่อนเรียก SlipOK
+
+**งานฝั่งผู้ใช้**: รัน migration `0023_slip_auto_verify_control.sql`
+
+### ไฟล์ที่แก้ไข (2026-08-06 13:50)
+- `supabase/migrations/0023_slip_auto_verify_control.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/lib/serviceControls.ts`
+- `src/app/api/_lib/appConfig.ts`
+- `src/app/admin/service-controls/page.tsx`
+- `src/app/api/_lib/slipAutoVerify.ts`
+
+---
+
 ## 2026-08-06 (12:50)
 
 ### เปิด/ปิดทั้งเว็บ (Maintenance) + SlipOK ตรวจสลิปอัตโนมัติ

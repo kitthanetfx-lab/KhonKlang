@@ -3,13 +3,14 @@ import { SERVICE_CONTROL_DEFAULTS, ServiceControlMap, ServiceControlKey, sanitiz
 
 /** อ่านสถานะเปิด/ปิดบริการทั้งหมดจากตาราง service_controls (เดิมเป็น JSON blob ใน app_config) */
 export async function readServiceControlsConfig(db: SupabaseClient): Promise<ServiceControlMap> {
-  const { data } = await db.from('service_controls').select('key, enabled, note, reopen_at');
-  const raw: Record<string, { enabled: boolean; note: string; reopenAt?: string }> = {};
+  const { data } = await db.from('service_controls').select('key, enabled, note, reopen_at, amount_threshold');
+  const raw: Record<string, { enabled: boolean; note: string; reopenAt?: string; amountThreshold?: number | null }> = {};
   for (const row of data || []) {
     raw[row.key] = {
       enabled: row.enabled,
       note: row.note || '',
       reopenAt: row.reopen_at ? new Date(row.reopen_at).toISOString() : '',
+      amountThreshold: row.amount_threshold != null ? Number(row.amount_threshold) : null,
     };
   }
   return sanitizeServiceControls(raw);
@@ -22,6 +23,9 @@ export async function writeServiceControlsConfig(db: SupabaseClient, map: Servic
     enabled: map[key].enabled,
     note: map[key].note,
     reopen_at: key === 'siteMaintenance' && map[key].reopenAt ? map[key].reopenAt : null,
+    amount_threshold: key === 'slipAutoVerify' && map[key].amountThreshold != null && map[key].amountThreshold > 0
+      ? map[key].amountThreshold
+      : null,
   }));
   const { error } = await db.from('service_controls').upsert(rows, { onConflict: 'key' });
   if (error) throw new Error(error.message);

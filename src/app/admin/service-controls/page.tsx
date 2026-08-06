@@ -101,6 +101,23 @@ export default function ServiceControlsPage() {
     setSaved(false);
   }
 
+  function setSlipAutoMode(auto: boolean) {
+    setServices(current => current ? { ...current, slipAutoVerify: { ...current.slipAutoVerify, enabled: auto } } : current);
+    setSaved(false);
+  }
+
+  function setSlipManualThreshold(value: string) {
+    const n = Number(String(value).replace(/,/g, '').trim());
+    setServices(current => current ? {
+      ...current,
+      slipAutoVerify: {
+        ...current.slipAutoVerify,
+        amountThreshold: Number.isFinite(n) && n > 0 ? n : null,
+      },
+    } : current);
+    setSaved(false);
+  }
+
   const toLocalInput = (iso: string) => {
     if (!iso) return '';
     const d = new Date(iso);
@@ -200,6 +217,44 @@ export default function ServiceControlsPage() {
                 value={services.siteMaintenance.note}
                 onChange={e => setServiceNote('siteMaintenance', e.target.value)}
                 className="mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 border border-violet-200 dark:border-violet-900/40 rounded-2xl p-5 space-y-4">
+            <div>
+              <h2 className="font-semibold text-base text-gray-900 dark:text-white">🧾 ตรวจสลิปอัตโนมัติ / แมนนวล</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                โหมดอัตโนมัติเรียก SlipOK เมื่อผู้ใช้อัปสลิป — โหมดแมนนวลให้แอดมินกดตรวจเองในแท็บยืนยันรับเงิน
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button type="button" onClick={() => setSlipAutoMode(true)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${services.slipAutoVerify.enabled ? 'bg-green-600 text-white border-green-600' : 'bg-white dark:bg-gray-900 text-gray-600 border-gray-200 dark:border-gray-700'}`}>
+                อัตโนมัติ
+              </button>
+              <button type="button" onClick={() => setSlipAutoMode(false)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${!services.slipAutoVerify.enabled ? 'bg-amber-500 text-white border-amber-500' : 'bg-white dark:bg-gray-900 text-gray-600 border-gray-200 dark:border-gray-700'}`}>
+                แมนนวล
+              </button>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${services.slipAutoVerify.enabled ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                {services.slipAutoVerify.enabled ? 'อัตโนมัติ' : 'แมนนวล'}
+              </span>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 dark:text-gray-300">
+                มูลค่าดีลเกินกว่านี้ → บังคับแมนนวล (บาท)
+              </label>
+              <p className="text-xs text-gray-500 mt-0.5 mb-1">ใช้ราคาสินค้าในดีล (deal.price) — ว่างหรือ 0 = ไม่จำกัดยอด</p>
+              <input
+                type="number"
+                min={0}
+                step={1000}
+                value={services.slipAutoVerify.amountThreshold ?? ''}
+                onChange={e => setSlipManualThreshold(e.target.value)}
+                placeholder="เช่น 50000"
+                disabled={!services.slipAutoVerify.enabled}
+                className="w-full max-w-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm disabled:opacity-50"
               />
             </div>
           </div>

@@ -10,6 +10,8 @@ import {
 } from '@/lib/slipok';
 import { notifyAdminLineSlipCheck, notifyAdminLineAutoApproved } from '@/lib/lineAdminNotify';
 import { readFeesConfig, syncDealLedger } from '@/app/api/_lib/financeLedger';
+import { readServiceControlsConfig } from '@/app/api/_lib/appConfig';
+import { shouldAutoVerifySlip } from '@/lib/serviceControls';
 import { notifyUsers } from '@/app/api/_lib/notify';
 import { maybeNotifyAdminLineQueues } from '@/app/api/_lib/adminLineNotifyHook';
 import { loadAdminDealSnapshot, type AdminDealRow } from '@/app/api/_lib/adminDealQueue';
@@ -217,6 +219,10 @@ export async function runAutoSlipVerification(
   const { data: deal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
   if (!deal || deal.deal_type === 'meetup') return deal;
   if (!['payment_pending', 'payment_uploaded'].includes(String(deal.status))) return deal;
+
+  const controls = await readServiceControlsConfig(db);
+  const dealPrice = Number(deal.price || 0);
+  if (!shouldAutoVerifySlip(controls, dealPrice)) return deal;
 
   const { data: priceState } = await db.from('deal_price_state').select('*').eq('deal_id', dealId).maybeSingle();
   const fees = await readFeesConfig(db);

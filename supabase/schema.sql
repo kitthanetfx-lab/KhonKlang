@@ -519,16 +519,18 @@ create trigger trg_fee_config_updated_at before update on fee_config
 
 create table service_controls (
   key         text primary key,   -- tradeOnline, tradeSimple, meetupGuarantee, meetupSafeZone,
-                                   -- consign, onsite, sellerRegistration, middlemanRegistration, siteMaintenance
+                                   -- consign, onsite, sellerRegistration, middlemanRegistration,
+                                   -- siteMaintenance, slipAutoVerify
   enabled     boolean not null default true,
   note        text not null default '',
   reopen_at   timestamptz,
+  amount_threshold numeric,
   updated_at  timestamptz not null default now()
 );
 insert into service_controls (key) values
   ('tradeOnline'), ('tradeSimple'), ('meetupGuarantee'), ('meetupSafeZone'),
   ('consign'), ('onsite'), ('sellerRegistration'), ('middlemanRegistration'),
-  ('siteMaintenance');
+  ('siteMaintenance'), ('slipAutoVerify');
 create trigger trg_service_controls_updated_at before update on service_controls
   for each row execute function set_updated_at();
 

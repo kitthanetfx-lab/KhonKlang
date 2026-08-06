@@ -8,13 +8,16 @@ export type ServiceControlKey =
   | 'marketplace'
   | 'sellerRegistration'
   | 'middlemanRegistration'
-  | 'siteMaintenance';
+  | 'siteMaintenance'
+  | 'slipAutoVerify';
 
 export type ServiceControlEntry = {
   enabled: boolean;
   note: string;
   /** วันเวลาเปิดให้บริการอีกครั้ง — ใช้กับ siteMaintenance */
   reopenAt?: string;
+  /** มูลค่าดีลสูงกว่านี้ → บังคับแมนนวล — ใช้กับ slipAutoVerify */
+  amountThreshold?: number | null;
 };
 
 export type ServiceControlMap = Record<ServiceControlKey, ServiceControlEntry>;
@@ -34,6 +37,7 @@ export const SERVICE_CONTROL_DEFAULTS: ServiceControlMap = {
   sellerRegistration: { enabled: true, note: '' },
   middlemanRegistration: { enabled: true, note: '' },
   siteMaintenance: { enabled: false, note: SITE_MAINTENANCE_DEFAULT_NOTE, reopenAt: '' },
+  slipAutoVerify: { enabled: true, note: '', amountThreshold: null },
 };
 
 export const SERVICE_CONTROL_CATALOG: Array<{
@@ -124,6 +128,26 @@ export function getSiteMaintenanceInfo(controls: ServiceControlMap | null | unde
   };
 }
 
+/** slipAutoVerify.enabled = true → โหมดอัตโนมัติ; deal.price เกิน amountThreshold → แมนนวล */
+export function shouldAutoVerifySlip(
+  controls: ServiceControlMap | null | undefined,
+  dealPrice: number,
+): boolean {
+  const entry = (controls || SERVICE_CONTROL_DEFAULTS).slipAutoVerify;
+  if (!entry?.enabled) return false;
+  const threshold = entry.amountThreshold;
+  if (threshold != null && threshold > 0 && dealPrice > threshold) return false;
+  return true;
+}
+
+export function getSlipAutoVerifyInfo(controls: ServiceControlMap | null | undefined) {
+  const entry = (controls || SERVICE_CONTROL_DEFAULTS).slipAutoVerify;
+  return {
+    autoMode: Boolean(entry?.enabled),
+    manualAbovePrice: entry?.amountThreshold != null && entry.amountThreshold > 0 ? entry.amountThreshold : null,
+  };
+}
+
 export function sanitizeServiceControls(input: unknown): ServiceControlMap {
   const raw = (input && typeof input === 'object') ? input as Record<string, unknown> : {};
   const next = { ...SERVICE_CONTROL_DEFAULTS } as ServiceControlMap;
@@ -135,6 +159,11 @@ export function sanitizeServiceControls(input: unknown): ServiceControlMap {
     };
     if (key === 'siteMaintenance') {
       entry.reopenAt = String(current.reopenAt ?? '').slice(0, 40);
+    }
+    if (key === 'slipAutoVerify') {
+      const rawThreshold = current.amountThreshold ?? current.amount_threshold;
+      const n = Number(rawThreshold);
+      entry.amountThreshold = Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
     }
     next[key] = entry;
   }
