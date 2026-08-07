@@ -67,12 +67,12 @@ export async function POST(req: NextRequest) {
       last_sender: 'customer', unread_staff: true, updated_at: now,
     }).eq('customer_id', me.id);
 
-    notifySupportLineCustomerMessage({
+    await notifySupportLineCustomerMessage({
       customerId: me.id,
       customerName: myName,
       content,
       imageUrl: imageUrl || undefined,
-    }).catch(err => console.error('[support/line]', err));
+    });
 
     return NextResponse.json({ message: msg });
   } catch (err: unknown) {

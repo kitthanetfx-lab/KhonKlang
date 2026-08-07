@@ -40,8 +40,7 @@ export async function POST(req: NextRequest) {
         last_message: 'ขอให้พนักงานโทรกลับ', last_at: now, last_sender: 'customer', unread_staff: true,
       }).eq('customer_id', me.id);
       await logSystem(db, me.id, 'ลูกค้าขอให้พนักงานโทรกลับ');
-      notifySupportLineCallRequest({ customerId: me.id, customerName: myName })
-        .catch(err => console.error('[support/call/line]', err));
+      await notifySupportLineCallRequest({ customerId: me.id, customerName: myName });
       return NextResponse.json({ ok: true, callId, callStatus: 'customer_requesting' });
     }
 

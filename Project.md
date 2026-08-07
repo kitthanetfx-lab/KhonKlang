@@ -15,7 +15,10 @@
 4. **`src/app/admin/layout.tsx`** — non-admin → `/`
 5. ลบ **`/admin/setup`**, **`/admin-setup`**, **`/api/admin/setup`**
 
-**งานฝั่งผู้ใช้**: ตั้ง env `LINE_SUPPORT_GROUP_ID` บน Vercel
+**งานฝั่งผู้ใช้**: ตั้ง env `LINE_SUPPORT_GROUP_ID` บน Vercel; ต้อง redeploy หลังตั้ง env
+
+### 2026-08-07 (15:30) — แก้ LINE แชทไม่แจ้ง
+- **`src/lib/lineSupportNotify.ts`**, **`src/app/api/support/route.ts`** — `await` push LINE (กัน Vercel ตัดก่อนส่งเสร็จ) + log เมื่อ env ไม่ครบ
 
 ### ไฟล์ที่แก้ไข (2026-08-07 15:05)
 - `src/lib/lineSupportNotify.ts` (ใหม่)

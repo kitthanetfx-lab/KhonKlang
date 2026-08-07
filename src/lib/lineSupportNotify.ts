@@ -16,9 +16,17 @@ function isLineImageUrl(url: string): boolean {
 }
 
 async function sendLineSupportMessages(messages: LineMessage[]): Promise<void> {
-  const token = process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN;
-  const to = process.env.LINE_SUPPORT_GROUP_ID;
-  if (!token || !to || !messages.length) return;
+  const token = process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN?.trim();
+  const to = process.env.LINE_SUPPORT_GROUP_ID?.trim();
+  if (!messages.length) return;
+  if (!token) {
+    console.error('[lineSupportNotify] ข้าม push — ไม่มี LINE_MESSAGING_CHANNEL_ACCESS_TOKEN');
+    return;
+  }
+  if (!to) {
+    console.error('[lineSupportNotify] ข้าม push — ไม่มี LINE_SUPPORT_GROUP_ID');
+    return;
+  }
   try {
     const res = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
