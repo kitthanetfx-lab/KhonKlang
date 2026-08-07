@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { authHeaders } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
 import {
@@ -31,6 +32,7 @@ function dayShort(iso: string) {
 
 /** หน้าแชทศูนย์ช่วยเหลือฝั่งพนักงาน — ดูทุกห้องแชท ตอบลูกค้า โทรออก/รับคำขอโทรของลูกค้า */
 export default function AdminSupportPage() {
+  const searchParams = useSearchParams();
   const [threads, setThreads] = useState<ThreadRow[] | null>(null);
   const [selected, setSelected] = useState('');
   const [thread, setThread] = useState<ThreadRow | null>(null);
@@ -85,6 +87,11 @@ export default function AdminSupportPage() {
       setMsgs(d.messages || []);
     } catch { /* ลองใหม่รอบถัดไป */ }
   }, [getAuthHeaders]);
+
+  useEffect(() => {
+    const withId = searchParams.get('with')?.trim();
+    if (withId) setSelected(withId);
+  }, [searchParams]);
 
   useEffect(() => {
     const t = window.setTimeout(() => { void loadThreads(); }, 0);

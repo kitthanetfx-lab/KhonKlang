@@ -1,5 +1,33 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-07 (15:05)
+
+### LINE แจ้งแชทลูกค้า + ขอโทรกลับ (กลุ่มแยกจากดีล) + ลบ self-grant Admin
+
+**โจทย์**:
+1. ลูกค้าส่งแชท/กดขอโทรกลับ → แจ้ง LINE กลุ่ม `LINE_SUPPORT_GROUP_ID` (ไม่ใช่กลุ่มดีล)
+2. ลบหน้า/API ให้สิทธิ์ Admin เอง — ผู้ใช้ที่ไม่ใช่ admin เข้า `/admin` แล้ว redirect หน้าแรก
+
+**แก้ไข**:
+1. **`src/lib/lineSupportNotify.ts`** (ใหม่) — แจ้งแชท + ขอโทรกลับ
+2. **`src/app/api/support/route.ts`**, **`src/app/api/support/call/route.ts`** — hook notify
+3. **`src/app/admin/support/page.tsx`** — เปิดห้องจากลิงก์ `?with=customerId`
+4. **`src/app/admin/layout.tsx`** — non-admin → `/`
+5. ลบ **`/admin/setup`**, **`/admin-setup`**, **`/api/admin/setup`**
+
+**งานฝั่งผู้ใช้**: ตั้ง env `LINE_SUPPORT_GROUP_ID` บน Vercel
+
+### ไฟล์ที่แก้ไข (2026-08-07 15:05)
+- `src/lib/lineSupportNotify.ts` (ใหม่)
+- `src/app/api/support/route.ts`
+- `src/app/api/support/call/route.ts`
+- `src/app/admin/support/page.tsx`
+- `src/app/admin/layout.tsx`
+- `.env.local.example`
+- ลบ `src/app/admin/setup/page.tsx`, `src/app/admin-setup/page.tsx`, `src/app/api/admin/setup/route.ts`
+
+---
+
 ## 2026-08-07 (12:00)
 
 ### ปรับ UI/UX หน้าโซนตลาด — สไตล์ Shopee/Lazada (มือถือ / แท็บเล็ต / เดสktop)

@@ -50,7 +50,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router   = useRouter();
   const pathname = usePathname();
   const [adminName, setAdminName] = useState('');
-  const [checking, setChecking]   = useState(() => pathname !== '/admin/setup');
+  const [checking, setChecking]   = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ชั้นความปลอดภัยที่ 2 — ต้องกรอกรหัสผ่านหน้าแอดมินทุกครั้งที่เข้ามาใหม่ (ไม่เก็บสถานะไว้ที่ไหน
@@ -81,13 +81,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   useEffect(() => {
-    if (pathname === '/admin/setup') return;
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { router.replace('/login'); return; }
         const { data: profile } = await supabase.from('profiles').select('role, display_name').eq('id', user.id).maybeSingle();
-        if (profile?.role !== 'admin') { router.replace('/admin/setup'); return; }
+        if (profile?.role !== 'admin') { router.replace('/'); return; }
         setAdminName(profile.display_name || 'Admin');
         setChecking(false);
       } catch {
@@ -104,7 +103,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (pathname !== '/admin/setup' && !pwVerified) {
+  if (!pwVerified) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
         <form onSubmit={submitAdminPassword}

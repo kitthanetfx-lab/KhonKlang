@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
 import { getOrCreateThread, newCallId } from '../../_lib/support';
+import { notifySupportLineCallRequest } from '@/lib/lineSupportNotify';
 
 async function logSystem(db: SupabaseClient, threadId: string, content: string) {
   try {
@@ -36,8 +37,11 @@ export async function POST(req: NextRequest) {
       await db.from('support_threads').update({
         call_status: 'customer_requesting', call_id: callId, call_initiator: 'customer',
         call_staff_id: '', call_staff_name: '', call_updated_at: now, updated_at: now,
+        last_message: 'ขอให้พนักงานโทรกลับ', last_at: now, last_sender: 'customer', unread_staff: true,
       }).eq('customer_id', me.id);
       await logSystem(db, me.id, 'ลูกค้าขอให้พนักงานโทรกลับ');
+      notifySupportLineCallRequest({ customerId: me.id, customerName: myName })
+        .catch(err => console.error('[support/call/line]', err));
       return NextResponse.json({ ok: true, callId, callStatus: 'customer_requesting' });
     }
 

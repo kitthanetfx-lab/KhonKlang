@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
 import { getOrCreateThread } from '../_lib/support';
+import { notifySupportLineCustomerMessage } from '@/lib/lineSupportNotify';
 
 /** GET — ห้องแชทของฉัน (ลูกค้า) พร้อมข้อความล่าสุด */
 export async function GET(req: NextRequest) {
@@ -65,6 +66,13 @@ export async function POST(req: NextRequest) {
       customer_name: myName, status: 'open', last_message: content || 'ส่งรูปภาพ', last_at: now,
       last_sender: 'customer', unread_staff: true, updated_at: now,
     }).eq('customer_id', me.id);
+
+    notifySupportLineCustomerMessage({
+      customerId: me.id,
+      customerName: myName,
+      content,
+      imageUrl: imageUrl || undefined,
+    }).catch(err => console.error('[support/line]', err));
 
     return NextResponse.json({ message: msg });
   } catch (err: unknown) {
