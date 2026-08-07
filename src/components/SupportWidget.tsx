@@ -342,25 +342,32 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
                     <p className="sw-empty">สวัสดีครับ/ค่ะ มีอะไรให้ทีมงานช่วยไหม? พิมพ์คำถามได้เลย{callFeatureLocked ? ` ตอนนี้ระบบโทรอยู่ระหว่างเตรียมเปิดใช้งาน (${SUPPORT_CALLS_COMING_SOON})` : ' หรือกดโทรศัพท์ด้านบนเพื่อขอให้พนักงานโทรกลับ'}</p>
                   )}
                   {msgs.map(m => {
-                    const mine = m.sender_role !== 'staff';
-                    const readByStaff = !!(thread?.last_read_by_staff_at && mine && m.sender_role === 'customer' && !m.pending && m.created_at <= thread.last_read_by_staff_at);
-                    return (
-                      <div key={m.id} className={`sw-row ${mine ? 'mine' : ''} ${m.sender_role === 'system' ? 'sys' : ''}`}>
-                        {m.sender_role === 'system' ? (
+                    if (m.sender_role === 'system') {
+                      return (
+                        <div key={m.id} className="sw-row sys">
                           <div className="sw-sys">{m.content}</div>
-                        ) : (
-                          <>
-                            <div className={`sw-bubble ${mine ? 'mine' : ''}`}>
-                              {m.image_url && (
-                                <a href={m.image_url} target="_blank" rel="noopener noreferrer">
-                                  <img src={m.image_url} alt="รูปที่ส่งในแชท" className="sw-img" />
-                                </a>
-                              )}
-                              {m.content && <span>{m.content}</span>}
-                            </div>
-                            <small>{m.sender_role === 'staff' ? `${m.sender_name} · ` : ''}{timeShort(m.created_at)}{m.pending ? ' · กำลังส่ง...' : readByStaff ? ' · อ่านแล้ว' : ''}</small>
-                          </>
+                        </div>
+                      );
+                    }
+                    const mine = m.sender_role === 'customer';
+                    const readByStaff = !!(thread?.last_read_by_staff_at && mine && !m.pending && m.created_at <= thread.last_read_by_staff_at);
+                    return (
+                      <div key={m.id} className={`sw-row ${mine ? 'mine' : 'theirs'}`}>
+                        {!mine && (
+                          <span className="sw-sender">{m.sender_name || 'ทีมงาน'}</span>
                         )}
+                        <div className={`sw-bubble ${mine ? 'mine' : 'theirs'}`}>
+                          {m.image_url && (
+                            <a href={m.image_url} target="_blank" rel="noopener noreferrer" className="sw-img-link">
+                              <img src={m.image_url} alt="รูปที่ส่งในแชท" className="sw-img" />
+                            </a>
+                          )}
+                          {m.content && <p className="sw-text">{m.content}</p>}
+                        </div>
+                        <small className="sw-meta">
+                          {timeShort(m.created_at)}
+                          {m.pending ? ' · กำลังส่ง…' : readByStaff ? ' · อ่านแล้ว' : ''}
+                        </small>
                       </div>
                     );
                   })}
