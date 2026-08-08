@@ -1,5 +1,50 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-08 (22:45)
+
+### ปรับ GP ตลาดขาย — บวกเข้าราคา (ไม่หัก)
+
+**สูตรใหม่** (ตัวอย่าง GP 20%, คืนผู้ขาย 30%):
+- ผู้ขายตั้ง ฿100 → GP 20% = ฿20 → **ผู้บริโภคเห็น ฿120**
+- คอมมิชชั่น 30% ของ GP = ฿6 → **ผู้ขายได้ ฿106**, แพลตฟอร์ม ฿14
+
+**แก้ไข**: `computeMarketplaceGp()` ใน `src/lib/fees.ts`, preview หน้าลงขาย, hint แอดมิน, default GP 20% / คืน 30%
+
+---
+
+## 2026-08-08 (22:30)
+
+### แก้ปุ่มแบนเนอร์ + GP ตลาดขาย + ปรับ UI ตั้งค่าค่าธรรมเนียม
+
+**โจทย์**:
+1. ปุ่ม「เปลี่ยนแบนเนอร์」กดไม่ได้
+2. เพิ่ม GP ตลาดขาย — ผู้ขายกรอกราคาตั้ง แสดงราคาสุทธิในตลาดทันที + คอมมิชชั่นจาก GP
+3. หน้าแอดมินตั้งค่า GP% และคอมมิชชั่น
+4. ปรับ UI หน้า `/admin/settings` ให้กระชับ แบ่งแท็บ ไม่ต้องเลื่อนมาก
+
+**แก้ไข**:
+1. **`globals.css`** — `pointer-events: none` + `z-index` ที่แบนเนอร์; ปุ่มอัปโหลดในแผงแก้ป้ายร้าน
+2. **`supabase/migrations/0026_marketplace_gp.sql`** — `marketplace_gp_percent`, `marketplace_gp_commission_percent`, `deals.list_gross_price`
+3. **`src/lib/fees.ts`** — `computeMarketplaceGp()`
+4. **`src/app/api/deals/route.ts`** — หัก GP เมื่อ `source=listing`
+5. **`src/app/dashboard/seller/page.tsx`** — preview ราคาสุทธิ/GP/คอมมิชชั่น
+6. **`src/app/admin/settings/page.tsx`** — redesign แบบแท็บ + ฟิลด์ GP
+
+**งานฝั่งผู้ใช้**: รัน migration `0026_marketplace_gp.sql`
+
+### ไฟล์ที่แก้ไข (2026-08-08 22:30)
+- `supabase/migrations/0026_marketplace_gp.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/lib/fees.ts`
+- `src/app/api/_lib/financeLedger.ts`
+- `src/app/api/admin/settings/route.ts`
+- `src/app/api/deals/route.ts`
+- `src/app/dashboard/seller/page.tsx`
+- `src/app/admin/settings/page.tsx`
+- `src/app/globals.css`
+
+---
+
 ## 2026-08-08 (15:35)
 
 ### ป้ายร้านสวย + หน้าร้าน public + สถิติจากกิจกรรมจริง

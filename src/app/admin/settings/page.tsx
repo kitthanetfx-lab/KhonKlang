@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
-import { Settings, Loader2, CheckCircle2, ShoppingCart, Zap, Search, MapPin, Car, Shield, RotateCcw, Wallet, Tag } from 'lucide-react';
+import { Settings, Loader2, CheckCircle2, ShoppingCart, Zap, Search, MapPin, Car, Shield, RotateCcw, Wallet, Tag, Store } from 'lucide-react';
 import { THAI_BANKS } from '@/lib/banks';
 
 interface FeeConfig {
@@ -13,6 +13,7 @@ interface FeeConfig {
   simpleShareTier1Multiplier: number; simpleShareTier1Percent: number;
   simpleShareTier2Multiplier: number; simpleShareTier2Percent: number;
   simpleShareTier3Multiplier: number; simpleShareTier3Percent: number;
+  marketplaceGpPercent: number; marketplaceGpCommissionPercent: number;
   inspectionFee: number; packingFee: number;
   depositBronze: number; depositSilver: number; depositGold: number; depositPlatinum: number;
   failedDealFee: number;
@@ -26,6 +27,7 @@ interface FeeConfig {
   promoStart: string; promoEnd: string; promoLabel: string;
 }
 
+type TabId = 'trade' | 'services' | 'members' | 'account';
 type BoolKey = 'promoEnabled' | 'promoFree';
 type StrKey = 'returnShippingBy' | 'companyPromptPay' | 'companyBankName' | 'companyBankAcct' | 'companyBankHolder' | 'companyQrFileId'
   | 'promoScope' | 'promoStart' | 'promoEnd' | 'promoLabel';
@@ -37,48 +39,96 @@ const TIER_KEYS: { tier: number; mult: NumKey; pct: NumKey }[] = [
 ];
 const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
-// กลุ่มฟิลด์สำหรับแสดงผล: [key, label, หน่วย]
-const GROUPS: { title: string; icon: React.ReactNode; fields: [NumKey, string, string][] }[] = [
-  { title: 'ซื้อขายผ่านกลาง (ออนไลน์) — มีคนกลางตรวจสอบ', icon: <ShoppingCart size={16} className="text-blue-600" />, fields: [
-    ['escrowFeePercent', 'ค่าธรรมเนียมระบบ', '% ของราคา'],
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'trade', label: 'ซื้อขาย & GP' },
+  { id: 'services', label: 'บริการเสริม' },
+  { id: 'members', label: 'สมาชิก & โปร' },
+  { id: 'account', label: 'บัญชีรับเงิน' },
+];
+
+type FieldDef = [NumKey, string, string];
+const TRADE_GROUPS: { title: string; icon: React.ReactNode; hint?: string; fields: FieldDef[] }[] = [
+  { title: 'ซื้อขายผ่านกลาง (ออนไลน์)', icon: <ShoppingCart size={15} className="text-blue-600" />, fields: [
+    ['escrowFeePercent', 'ค่าธรรมเนียมระบบ', '%'],
     ['escrowFeeMin', 'ขั้นต่ำ', 'บาท'],
-    ['middlemanFeePercent', 'ค่าบริการคนกลาง', '% ของราคา'],
+    ['middlemanFeePercent', 'ค่าบริการคนกลาง', '%'],
     ['middlemanFeeMin', 'ค่าคนกลางขั้นต่ำ', 'บาท'],
     ['platformCutPercent', 'ส่วนแบ่งแพลตฟอร์มจากค่าคนกลาง', '%'],
   ] },
-  { title: 'ซื้อขายผ่านกลางแบบง่าย (ส่งตรง)', icon: <Zap size={16} className="text-orange-600" />, fields: [
-    ['simpleFeePercent', 'ค่าธรรมเนียม', '% ของราคา'],
+  { title: 'ซื้อขายผ่านกลางแบบง่าย', icon: <Zap size={15} className="text-orange-600" />, fields: [
+    ['simpleFeePercent', 'ค่าธรรมเนียม', '%'],
     ['simpleFeeMin', 'ขั้นต่ำ', 'บาท'],
   ] },
-  { title: 'ค่าบริการตรวจ/แพ็คสินค้า', icon: <Search size={16} className="text-teal-600" />, fields: [
-    ['inspectionFee', 'ค่าตรวจสอบสินค้า', 'บาท'],
-    ['packingFee', 'ค่าแพ็คสินค้า', 'บาท'],
+  { title: 'GP ตลาดขาย (ลงประกาศหน้าร้าน)', icon: <Store size={15} className="text-indigo-600" />,
+    hint: 'ผู้ขายตั้ง 100 + GP 20% → ผู้บริโภคเห็น 120 | คืนคอมมิชชั่น % ของ GP ให้ผู้ขาย ส่วนที่เหลือเป็นของแพลตฟอร์ม',
+    fields: [
+      ['marketplaceGpPercent', 'GP%', '% บวกจากราคาผู้ขาย'],
+      ['marketplaceGpCommissionPercent', 'คืนผู้ขาย', '% ของ GP'],
+    ] },
+];
+
+const SERVICE_GROUPS: { title: string; icon: React.ReactNode; fields: FieldDef[] }[] = [
+  { title: 'ตรวจ/แพ็คสินค้า', icon: <Search size={15} className="text-teal-600" />, fields: [
+    ['inspectionFee', 'ค่าตรวจสอบ', 'บาท'],
+    ['packingFee', 'ค่าแพ็ค', 'บาท'],
   ] },
-  { title: 'เกณฑ์ Tier คนกลาง (ป้ายแสดงผลตามยอดเงินค้ำประกันจริง ไม่ใช่วงเงินที่ปล่อยอัตโนมัติ)', icon: <Shield size={16} className="text-emerald-600" />, fields: [
-    ['depositBronze', 'Bronze (ขั้นต่ำ)', 'บาท'],
-    ['depositSilver', 'Silver (ขั้นต่ำ)', 'บาท'],
-    ['depositGold', 'Gold (ขั้นต่ำ)', 'บาท'],
-    ['depositPlatinum', 'Platinum (ขั้นต่ำ)', 'บาท'],
-  ] },
-  { title: 'เมื่อดีลไม่สำเร็จ / ตีกลับ', icon: <RotateCcw size={16} className="text-rose-600" />, fields: [
-    ['failedDealFee', 'ค่าจัดการดีลไม่สำเร็จ', 'บาท'],
-  ] },
-  { title: 'บริการนัดออนไซต์', icon: <MapPin size={16} className="text-amber-600" />, fields: [
+  { title: 'นัดออนไซต์', icon: <MapPin size={15} className="text-amber-600" />, fields: [
     ['onsiteBaseFee', 'ค่าบริการฐาน', 'บาท'],
     ['onsitePerKm', 'ค่าเดินทาง', 'บาท/กม.'],
   ] },
-  { title: 'รับประกันเดินทาง (นัดเจอ)', icon: <Car size={16} className="text-violet-600" />, fields: [
-    ['meetupFeePercent', 'ค่าธรรมเนียม', '% ของมูลค่า'],
-    ['meetupFeeMin', 'ค่าบริการขั้นต่ำ', 'บาท'],
+  { title: 'รับประกันเดินทาง', icon: <Car size={15} className="text-violet-600" />, fields: [
+    ['meetupFeePercent', 'ค่าธรรมเนียม', '%'],
+    ['meetupFeeMin', 'ขั้นต่ำ', 'บาท'],
   ] },
-  { title: 'ค่าสมัครสมาชิก', icon: <Wallet size={16} className="text-green-600" />, fields: [
-    ['sellerRegFee', 'ค่าสมัครผู้ขาย', 'บาท'],
-    ['middlemanRegFee', 'ค่าสมัครคนกลาง', 'บาท'],
+  { title: 'ดีลไม่สำเร็จ', icon: <RotateCcw size={15} className="text-rose-600" />, fields: [
+    ['failedDealFee', 'ค่าจัดการ', 'บาท'],
   ] },
 ];
 
+const MEMBER_GROUPS: { title: string; icon: React.ReactNode; fields: FieldDef[] }[] = [
+  { title: 'เกณฑ์ Tier คนกลาง', icon: <Shield size={15} className="text-emerald-600" />, fields: [
+    ['depositBronze', 'Bronze', 'บาท'],
+    ['depositSilver', 'Silver', 'บาท'],
+    ['depositGold', 'Gold', 'บาท'],
+    ['depositPlatinum', 'Platinum', 'บาท'],
+  ] },
+  { title: 'ค่าสมัคร', icon: <Wallet size={15} className="text-green-600" />, fields: [
+    ['sellerRegFee', 'ผู้ขาย', 'บาท'],
+    ['middlemanRegFee', 'คนกลาง', 'บาท'],
+  ] },
+];
+
+function FeeField({ label, unit, value, onChange }: { label: string; unit: string; value: number; onChange: (v: string) => void }) {
+  return (
+    <label className="admin-fee-field">
+      <span className="admin-fee-field__label">{label}</span>
+      <div className="admin-fee-field__input-wrap">
+        <input type="number" min="0" step="any" value={value} onChange={e => onChange(e.target.value)}
+          className="admin-fee-field__input" />
+        <span className="admin-fee-field__unit">{unit}</span>
+      </div>
+    </label>
+  );
+}
+
+function FeeCard({ title, icon, hint, children }: { title: string; icon: React.ReactNode; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="admin-fee-card">
+      <header className="admin-fee-card__head">
+        {icon}
+        <div>
+          <h2>{title}</h2>
+          {hint && <p>{hint}</p>}
+        </div>
+      </header>
+      {children}
+    </section>
+  );
+}
+
 export default function SettingsPage() {
   const [fees, setFees] = useState<FeeConfig | null>(null);
+  const [tab, setTab] = useState<TabId>('trade');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -99,12 +149,10 @@ export default function SettingsPage() {
     setFees(f => f ? { ...f, [k]: v === '' ? 0 : Number(v) } : f);
     setSaved(false);
   }
-
   function setStr(k: StrKey, v: string) {
     setFees(f => f ? { ...f, [k]: v } : f);
     setSaved(false);
   }
-
   function setBool(k: BoolKey, v: boolean) {
     setFees(f => f ? { ...f, [k]: v } : f);
     setSaved(false);
@@ -142,186 +190,162 @@ export default function SettingsPage() {
     finally { setSaving(false); }
   }
 
-  return (
-    <div className="max-w-2xl space-y-5">
-      <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><Settings size={20} /> ตั้งค่าค่าธรรมเนียม & ค่าบริการ</h1>
-        <p className="text-sm text-gray-500 mt-0.5">กำหนดอัตราค่าบริการของแต่ละบริการและบัญชีรับเงินของระบบจากหลังบ้าน</p>
+  function renderGroups(groups: typeof TRADE_GROUPS) {
+    if (!fees) return null;
+    return (
+      <div className="admin-fee-grid">
+        {groups.map(g => (
+          <FeeCard key={g.title} title={g.title} icon={g.icon} hint={g.hint}>
+            <div className="admin-fee-fields">
+              {g.fields.map(([k, label, unit]) => (
+                <FeeField key={k} label={label} unit={unit} value={fees[k]} onChange={v => setField(k, v)} />
+              ))}
+            </div>
+          </FeeCard>
+        ))}
       </div>
+    );
+  }
 
-      {fees === null && !error && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">⚠️ {error}</div>}
+  return (
+    <div className="admin-fee-page">
+      <header className="admin-fee-page__head">
+        <div>
+          <h1><Settings size={20} /> ตั้งค่าค่าธรรมเนียม</h1>
+          <p>กำหนดอัตราค่าบริการและบัญชีรับเงินของระบบ</p>
+        </div>
+        <div className="admin-fee-page__actions">
+          <button onClick={save} disabled={saving || !fees}
+            className="admin-fee-save">
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+            บันทึก
+          </button>
+          {saved && <span className="admin-fee-saved"><CheckCircle2 size={14} /> บันทึกแล้ว</span>}
+        </div>
+      </header>
 
-      {fees && (
+      <nav className="admin-fee-tabs">
+        {TABS.map(t => (
+          <button key={t.id} type="button" className={`admin-fee-tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {fees === null && !error && <div className="flex justify-center py-12"><Loader2 className="animate-spin text-gray-400" /></div>}
+      {error && <div className="admin-fee-error">⚠️ {error}</div>}
+
+      {fees && tab === 'trade' && (
         <>
-          {GROUPS.map(g => (
-            <div key={g.title} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
-              <h2 className="font-semibold text-sm flex items-center gap-2 mb-4">{g.icon} {g.title}</h2>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {g.fields.map(([k, label, unit]) => (
-                  <label key={k} className="block">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">{label}</span>
-                    <div className="mt-1 flex items-center gap-2">
-                      <input type="number" min="0" step="any" value={fees[k]}
-                        onChange={e => setField(k, e.target.value)}
-                        className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
-                      <span className="text-xs text-gray-400 shrink-0 w-20">{unit}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
+          {renderGroups(TRADE_GROUPS)}
+          <FeeCard title="คอมมิชชั่นผู้สร้างดีล (3 ชั้น)" icon={<Zap size={15} className="text-orange-600" />}
+            hint={`เปรียบเทียบค่าบริการดีลแบบง่ายกับค่าคนกลางขั้นต่ำ (฿${fees.middlemanFeeMin.toLocaleString()})`}>
+            <div className="admin-fee-tier-grid">
+              {TIER_KEYS.map(({ tier, mult, pct }) => {
+                const threshold = Math.round((fees[mult] || 0) * fees.middlemanFeeMin);
+                return (
+                  <div key={tier} className="admin-fee-tier">
+                    <div className="admin-fee-tier__title">ชั้น {tier} · ค่าบริการ ≥ ฿{threshold.toLocaleString()}</div>
+                    <FeeField label="จำนวนเท่าของค่ากลาง" unit="เท่า" value={fees[mult]} onChange={v => setField(mult, v)} />
+                    <FeeField label="% แบ่งให้ผู้สร้างดีล" unit="%" value={fees[pct]} onChange={v => setField(pct, v)} />
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          </FeeCard>
+        </>
+      )}
 
-          <div className="bg-white dark:bg-gray-900 border border-orange-200 dark:border-orange-900 rounded-2xl p-5">
-              <h2 className="font-semibold text-sm flex items-center gap-2 mb-1"><Zap size={16} className="text-orange-600" /> คอมมิชชั่นผู้สร้างดีล (3 ชั้น)</h2>
-              <p className="text-xs text-gray-500 mb-4">
-                เปรียบเทียบค่าบริการดีลแบบง่ายกับ <b>ค่าคนกลางขั้นต่ำ</b> (฿{fees.middlemanFeeMin.toLocaleString()}) — เลือกชั้นสูงสุดที่ครบเงื่อนไข
-              </p>
-              <div className="space-y-3">
-                {TIER_KEYS.map(({ tier, mult, pct }) => {
-                  const threshold = Math.round((fees[mult] || 0) * fees.middlemanFeeMin);
-                  return (
-                    <div key={tier} className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end rounded-xl border border-gray-100 dark:border-gray-800 p-3">
-                      <label className="block">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">ชั้น {tier} — จำนวนเท่าของค่ากลาง</span>
-                        <div className="mt-1 flex items-center gap-2">
-                          <input type="number" min="0" step="any" value={fees[mult]}
-                            onChange={e => setField(mult, e.target.value)}
-                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
-                          <span className="text-xs text-gray-400 shrink-0">เท่า</span>
-                        </div>
-                      </label>
-                      <label className="block">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">% แบ่งให้ผู้สร้างดีล</span>
-                        <div className="mt-1 flex items-center gap-2">
-                          <input type="number" min="0" max="100" step="any" value={fees[pct]}
-                            onChange={e => setField(pct, e.target.value)}
-                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
-                          <span className="text-xs text-gray-400 shrink-0">%</span>
-                        </div>
-                      </label>
-                      <p className="text-xs text-gray-500 pb-2 sm:text-right">
-                        ค่าบริการ ≥ ฿{threshold.toLocaleString()}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
-            <h2 className="font-semibold text-sm flex items-center gap-2 mb-4"><RotateCcw size={16} className="text-rose-600" /> ผู้รับผิดชอบค่าส่งคืน (เมื่อตีกลับผู้ขาย)</h2>
-            <div className="flex gap-2 flex-wrap">
+      {fees && tab === 'services' && (
+        <>
+          {renderGroups(SERVICE_GROUPS)}
+          <FeeCard title="ผู้รับผิดชอบค่าส่งคืน (ตีกลับ)" icon={<RotateCcw size={15} className="text-rose-600" />}>
+            <div className="admin-fee-pills">
               {([['buyer', 'ผู้ซื้อ'], ['seller', 'ผู้ขาย'], ['split', 'หารครึ่ง']] as const).map(([val, lbl]) => (
                 <button key={val} type="button"
                   onClick={() => { setFees(f => f ? { ...f, returnShippingBy: val } : f); setSaved(false); }}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${fees.returnShippingBy === val ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'}`}>
-                  {lbl}
-                </button>
+                  className={`admin-fee-pill${fees.returnShippingBy === val ? ' active' : ''}`}>{lbl}</button>
               ))}
             </div>
-          </div>
+          </FeeCard>
+        </>
+      )}
 
-          {/* บัญชีรับเงินของบริษัท — ลูกค้าโอนเข้าตรงนี้ (แสดงในหน้าชำระเงิน) */}
-          <div className="bg-white dark:bg-gray-900 border-2 border-green-200 dark:border-green-900 rounded-2xl p-5">
-            <h2 className="font-semibold text-sm flex items-center gap-2 mb-1"><Wallet size={16} className="text-green-600" /> บัญชีรับเงินของบริษัท (ลูกค้าโอนเข้าตรงนี้)</h2>
-            <p className="text-xs text-gray-500 mb-4">ค่านี้จะแสดงในหน้าชำระเงินของลูกค้า — ต้องตั้งให้ถูกต้อง มิฉะนั้นลูกค้าโอนเงินไม่ได้</p>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">พร้อมเพย์ (เบอร์/เลขผู้เสียภาษี)</span>
-                <input value={fees.companyPromptPay} onChange={e => setStr('companyPromptPay', e.target.value)} placeholder="0812345678"
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
-              <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">ธนาคาร</span>
-                <select value={fees.companyBankName} onChange={e => setStr('companyBankName', e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
-                  <option value="">เลือกธนาคาร</option>
-                  {THAI_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-                </select></label>
-              <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">เลขที่บัญชี</span>
-                <input value={fees.companyBankAcct} onChange={e => setStr('companyBankAcct', e.target.value)} placeholder="123-4-56789-0"
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
-              <label className="block"><span className="text-sm text-gray-600 dark:text-gray-300">ชื่อบัญชี</span>
-                <input value={fees.companyBankHolder} onChange={e => setStr('companyBankHolder', e.target.value)} placeholder="บริษัท กลางฮับ จำกัด"
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" /></label>
-            </div>
-            <div className="mt-4">
-              <span className="text-sm text-gray-600 dark:text-gray-300">รูป QR Code (ถ้ามี QR คงที่ของร้าน)</span>
-              <div className="mt-2 flex items-center gap-3 flex-wrap">
-                {fees.companyQrFileId && <img src={qrUrl(fees.companyQrFileId)} alt="QR" className="w-24 h-24 object-contain rounded-lg border border-gray-200 dark:border-gray-700" />}
-                <label className="px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-200 inline-flex items-center gap-1">
-                  {qrUploading ? <Loader2 size={14} className="animate-spin" /> : '🖼️'} {fees.companyQrFileId ? 'เปลี่ยนรูป QR' : 'อัปโหลดรูป QR'}
-                  <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadQr(f); e.target.value = ''; }} />
-                </label>
-                {fees.companyQrFileId && <button type="button" onClick={() => setStr('companyQrFileId', '')} className="text-xs text-red-500 hover:underline">ลบรูป</button>}
-              </div>
-              <p className="text-xs text-gray-400 mt-2">* ถ้าไม่อัปโหลด QR ระบบจะสร้าง QR พร้อมเพย์พร้อมยอดให้อัตโนมัติจากเลขพร้อมเพย์ด้านบน</p>
-            </div>
-          </div>
-
-          {/* โปรโมชัน/ส่วนลดค่าสมัคร — มีผลกับยอดที่แสดงในหน้าสมัครผู้ขาย/คนกลางทันที */}
-          <div className="bg-white dark:bg-gray-900 border-2 border-amber-200 dark:border-amber-900 rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="font-semibold text-sm flex items-center gap-2"><Tag size={16} className="text-amber-600" /> โปรโมชัน/ส่วนลดค่าสมัคร</h2>
+      {fees && tab === 'members' && (
+        <>
+          {renderGroups(MEMBER_GROUPS)}
+          <FeeCard title="โปรโมชันค่าสมัคร" icon={<Tag size={15} className="text-amber-600" />}>
+            <div className="admin-fee-promo-head">
+              <p>ลดราคาหรือฟรีค่าสมัครในช่วงเวลาที่กำหนด</p>
               <button type="button" onClick={() => setBool('promoEnabled', !fees.promoEnabled)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${fees.promoEnabled ? 'bg-amber-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-500'}`}>
-                {fees.promoEnabled ? 'เปิดใช้งานอยู่' : 'ปิดอยู่'}
+                className={`admin-fee-promo-toggle${fees.promoEnabled ? ' on' : ''}`}>
+                {fees.promoEnabled ? 'เปิด' : 'ปิด'}
               </button>
             </div>
-            <p className="text-xs text-gray-500 mb-4">ลดราคา หรือฟรีค่าสมัครผู้ขาย/คนกลางในช่วงเวลาที่กำหนด — มีผลกับยอดที่ลูกค้าเห็นในหน้าสมัครทันทีที่บันทึก</p>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <label className="block">
-                <span className="text-sm text-gray-600 dark:text-gray-300">ใช้กับ</span>
-                <select value={fees.promoScope} onChange={e => setStr('promoScope', e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
-                  <option value="all">ผู้ขาย + คนกลาง (ทั้งหมด)</option>
-                  <option value="seller">ผู้ขายเท่านั้น</option>
-                  <option value="middleman">คนกลางเท่านั้น</option>
+            <div className="admin-fee-fields admin-fee-fields--wide">
+              <label className="admin-fee-field">
+                <span className="admin-fee-field__label">ใช้กับ</span>
+                <select value={fees.promoScope} onChange={e => setStr('promoScope', e.target.value)} className="admin-fee-field__input">
+                  <option value="all">ผู้ขาย + คนกลาง</option>
+                  <option value="seller">ผู้ขาย</option>
+                  <option value="middleman">คนกลาง</option>
                 </select>
               </label>
-              <label className="flex items-center gap-2 mt-6 sm:mt-7 cursor-pointer">
-                <input type="checkbox" checked={fees.promoFree} onChange={e => setBool('promoFree', e.target.checked)}
-                  className="w-4 h-4 accent-amber-500" />
-                <span className="text-sm text-gray-600 dark:text-gray-300">ฟรีค่าสมัครทั้งหมด (ไม่คิดเลย % ด้านล่าง)</span>
+              <label className="admin-fee-field admin-fee-field--check">
+                <input type="checkbox" checked={fees.promoFree} onChange={e => setBool('promoFree', e.target.checked)} />
+                <span>ฟรีค่าสมัครทั้งหมด</span>
               </label>
-              <label className="block">
-                <span className="text-sm text-gray-600 dark:text-gray-300">ส่วนลด (ใช้ถ้าไม่ได้ติ๊ก &ldquo;ฟรี&rdquo;)</span>
-                <div className="mt-1 flex items-center gap-2">
-                  <input type="number" min="0" max="100" step="any" value={fees.promoPercent} disabled={fees.promoFree}
-                    onChange={e => setField('promoPercent', e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-40" />
-                  <span className="text-xs text-gray-400 shrink-0 w-20">% ส่วนลด</span>
-                </div>
+              <FeeField label="ส่วนลด" unit="%" value={fees.promoPercent} onChange={v => setField('promoPercent', v)} />
+              <label className="admin-fee-field">
+                <span className="admin-fee-field__label">ข้อความโปร</span>
+                <input value={fees.promoLabel} onChange={e => setStr('promoLabel', e.target.value)} className="admin-fee-field__input" placeholder="เช่น โปรปีใหม่" />
               </label>
-              <label className="block">
-                <span className="text-sm text-gray-600 dark:text-gray-300">ข้อความโปรโมชัน (แสดงให้ลูกค้าเห็น)</span>
-                <input value={fees.promoLabel} onChange={e => setStr('promoLabel', e.target.value)} placeholder="เช่น โปรปีใหม่ ลด 50%"
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
+              <label className="admin-fee-field">
+                <span className="admin-fee-field__label">วันเริ่ม</span>
+                <input type="date" value={fees.promoStart ? fees.promoStart.slice(0, 10) : ''} onChange={e => setStr('promoStart', e.target.value)} className="admin-fee-field__input" />
               </label>
-              <label className="block">
-                <span className="text-sm text-gray-600 dark:text-gray-300">วันที่เริ่ม</span>
-                <input type="date" value={fees.promoStart ? fees.promoStart.slice(0, 10) : ''} onChange={e => setStr('promoStart', e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
-              </label>
-              <label className="block">
-                <span className="text-sm text-gray-600 dark:text-gray-300">วันที่สิ้นสุด</span>
-                <input type="date" value={fees.promoEnd ? fees.promoEnd.slice(0, 10) : ''} onChange={e => setStr('promoEnd', e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm" />
+              <label className="admin-fee-field">
+                <span className="admin-fee-field__label">วันสิ้นสุด</span>
+                <input type="date" value={fees.promoEnd ? fees.promoEnd.slice(0, 10) : ''} onChange={e => setStr('promoEnd', e.target.value)} className="admin-fee-field__input" />
               </label>
             </div>
-            <p className="text-xs text-gray-400 mt-3">* เว้นวันที่เริ่ม/สิ้นสุดไว้ว่างได้ถ้าต้องการให้โปรไม่มีกำหนดสิ้นสุด (จนกว่าจะปิดสวิตช์เอง)</p>
-          </div>
-
-          <div className="flex items-center gap-3 sticky bottom-4">
-            <button onClick={save} disabled={saving}
-              className="px-5 py-2.5 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 shadow-lg">
-              {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} บันทึกค่าธรรมเนียม
-            </button>
-            {saved && <span className="text-sm text-green-600 flex items-center gap-1"><CheckCircle2 size={15} /> บันทึกแล้ว</span>}
-          </div>
-
-          <p className="text-xs text-gray-400">หมายเหตุ: บันทึกค่าไว้ในระบบแล้ว ขั้นต่อไปคือการนำอัตราเหล่านี้ไปคิดเงินจริงในแต่ละดีล (ยังไม่ได้เชื่อมกับ flow คิดเงิน)</p>
+          </FeeCard>
         </>
+      )}
+
+      {fees && tab === 'account' && (
+        <FeeCard title="บัญชีรับเงินของบริษัท" icon={<Wallet size={15} className="text-green-600" />}
+          hint="แสดงในหน้าชำระเงิน — ลูกค้าโอนเข้าบัญชีนี้">
+          <div className="admin-fee-fields admin-fee-fields--wide">
+            <label className="admin-fee-field">
+              <span className="admin-fee-field__label">พร้อมเพย์</span>
+              <input value={fees.companyPromptPay} onChange={e => setStr('companyPromptPay', e.target.value)} className="admin-fee-field__input" placeholder="0812345678" />
+            </label>
+            <label className="admin-fee-field">
+              <span className="admin-fee-field__label">ธนาคาร</span>
+              <select value={fees.companyBankName} onChange={e => setStr('companyBankName', e.target.value)} className="admin-fee-field__input">
+                <option value="">เลือกธนาคาร</option>
+                {THAI_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </label>
+            <label className="admin-fee-field">
+              <span className="admin-fee-field__label">เลขบัญชี</span>
+              <input value={fees.companyBankAcct} onChange={e => setStr('companyBankAcct', e.target.value)} className="admin-fee-field__input" />
+            </label>
+            <label className="admin-fee-field">
+              <span className="admin-fee-field__label">ชื่อบัญชี</span>
+              <input value={fees.companyBankHolder} onChange={e => setStr('companyBankHolder', e.target.value)} className="admin-fee-field__input" />
+            </label>
+          </div>
+          <div className="admin-fee-qr">
+            {fees.companyQrFileId && <img src={qrUrl(fees.companyQrFileId)} alt="QR" />}
+            <label className="admin-fee-qr-btn">
+              {qrUploading ? <Loader2 size={14} className="animate-spin" /> : '🖼️'} {fees.companyQrFileId ? 'เปลี่ยน QR' : 'อัปโหลด QR'}
+              <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadQr(f); e.target.value = ''; }} />
+            </label>
+            {fees.companyQrFileId && <button type="button" onClick={() => setStr('companyQrFileId', '')} className="admin-fee-qr-del">ลบ</button>}
+          </div>
+        </FeeCard>
       )}
     </div>
   );

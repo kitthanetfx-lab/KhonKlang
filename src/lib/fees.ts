@@ -25,6 +25,10 @@ export interface FeeConfig {
   promoStart: string; promoEnd: string; promoLabel: string;
   // ลิงก์วีดีโอ (YouTube embed URL) แนะนำการใช้งานที่แสดงในหน้าแรก — ตั้งได้จากหน้าควบคุมสถานะบริการ
   promoVideoUrl: string;
+  /** GP% บวกเข้าราคาที่ผู้ขายตั้ง — ราคาที่แสดงในตลาด = ราคาผู้ขาย + GP */
+  marketplaceGpPercent: number;
+  /** % ของ GP ที่คืนให้ผู้ขาย (ส่วนที่เหลือเป็นของแพลตฟอร์ม) */
+  marketplaceGpCommissionPercent: number;
 }
 
 export const FEE_DEFAULTS: FeeConfig = {
@@ -46,7 +50,42 @@ export const FEE_DEFAULTS: FeeConfig = {
   promoPercent: 0, promoFree: false,
   promoStart: '', promoEnd: '', promoLabel: '',
   promoVideoUrl: '',
+  marketplaceGpPercent: 20, marketplaceGpCommissionPercent: 30,
 };
+
+export interface MarketplaceGpBreakdown {
+  /** ราคาที่ผู้ขายตั้ง (ราคาฐาน) */
+  sellerPrice: number;
+  gpPercent: number;
+  /** จำนวน GP ที่บวกเข้า (เช่น 20% ของ 100 = 20) */
+  gpAmount: number;
+  /** ราคาที่ผู้บริโภคเห็นในตลาด = sellerPrice + gpAmount */
+  displayPrice: number;
+  commissionPercent: number;
+  /** คอมมิชชั่นคืนผู้ขาย (% ของ GP) */
+  sellerCommission: number;
+  /** รายได้ผู้ขายเมื่อขายได้ = sellerPrice + sellerCommission */
+  sellerReceive: number;
+  /** ส่วนที่แพลตฟอร์มได้ = gpAmount − sellerCommission */
+  platformKeep: number;
+}
+
+/** คำนวณ GP ตลาดขาย — บวก GP เข้าราคาผู้ขาย แล้วแบ่ง GP ให้ผู้ขาย/แพลตฟอร์ม */
+export function computeMarketplaceGp(config: FeeConfig, sellerPrice: number): MarketplaceGpBreakdown {
+  const base = Math.max(0, Math.round(Number(sellerPrice) || 0));
+  const gpPercent = Math.min(100, Math.max(0, Number(config.marketplaceGpPercent) || 0));
+  const commissionPercent = Math.min(100, Math.max(0, Number(config.marketplaceGpCommissionPercent) || 0));
+  const gpAmount = Math.round(base * gpPercent / 100);
+  const displayPrice = base + gpAmount;
+  const sellerCommission = Math.round(gpAmount * commissionPercent / 100);
+  const platformKeep = gpAmount - sellerCommission;
+  return {
+    sellerPrice: base, gpPercent, gpAmount, displayPrice,
+    commissionPercent, sellerCommission,
+    sellerReceive: base + sellerCommission,
+    platformKeep,
+  };
+}
 
 /** โปรโมชันค่าสมัครกำลังใช้งานอยู่กับ scope นี้ไหม (เช็คทั้ง toggle + ขอบเขต + ช่วงวันที่) */
 export function isPromoActive(c: FeeConfig, scope: 'seller' | 'middleman'): boolean {

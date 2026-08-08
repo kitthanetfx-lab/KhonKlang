@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../_lib/notify';
 import { readServiceControlsConfig } from '../_lib/appConfig';
-import { syncDealLedger } from '../_lib/financeLedger';
+import { syncDealLedger, readFeesConfig } from '../_lib/financeLedger';
+import { computeMarketplaceGp } from '@/lib/fees';
 
 // แนบ images: string[] (file_id เรียงตาม position) ให้แต่ละดีล — แทน imageFileIds JSON blob เดิมบน deals row
 async function attachImages<T extends { id: string }>(db: ReturnType<typeof getAdminClient>, deals: T[]): Promise<(T & { images: string[] })[]> {
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
   try {
     const me = await verifyUser(req);
     const body = await req.json();
-    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent } = body;
+    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent, listGrossPrice } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isBuyer = creatorRole === 'buyer';
 
@@ -94,6 +95,17 @@ export async function POST(req: NextRequest) {
 
     const name = profile?.display_name || '';
     const dealNumberSeed = crypto.randomUUID();
+
+    let dealPrice = Math.max(0, Math.round(Number(price)));
+    let storedGross: number | null = null;
+    if (!isBuyer && source === 'listing') {
+      const fees = await readFeesConfig(db);
+      const gross = listGrossPrice != null ? Number(listGrossPrice) : dealPrice;
+      const gp = computeMarketplaceGp(fees, gross);
+      dealPrice = gp.displayPrice;
+      storedGross = gp.sellerPrice;
+    }
+
     const { data: doc, error } = await db.from('deals').insert({
       id: dealNumberSeed,
       deal_number: `KKL-${dealNumberSeed.replace(/-/g, '').slice(-8).toUpperCase()}`,
@@ -101,7 +113,8 @@ export async function POST(req: NextRequest) {
       seller_name: isBuyer ? '' : name,
       buyer_id: isBuyer ? me.id : null,
       buyer_name: isBuyer ? name : '',
-      title, description: description || '', price: Number(price),
+      title, description: description || '', price: dealPrice,
+      list_gross_price: storedGross,
       category: category || '', condition: condition || '', location: location || '',
       selling_mode: sellingMode || 'normal',
       source: source === 'listing' ? 'listing' : 'private',

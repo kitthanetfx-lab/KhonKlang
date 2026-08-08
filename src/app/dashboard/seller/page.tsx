@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { isCertifiedMode } from '@/lib/listingMode';
+import { computeMarketplaceGp, FEE_DEFAULTS, type FeeConfig } from '@/lib/fees';
 
 interface Deal {
   id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
@@ -80,6 +81,7 @@ export default function SellerDashboard() {
   const [location, setLocation] = useState('');
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [feeConfig, setFeeConfig] = useState<FeeConfig>(FEE_DEFAULTS);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
   const [postDone, setPostDone] = useState(false);
@@ -119,6 +121,7 @@ export default function SellerDashboard() {
           if (shopData.stats) setShopStats(shopData.stats);
         }
         await fetchDeals(headers);
+        fetch('/api/fees').then(r => r.json()).then(d => { if (d.fees) setFeeConfig(d.fees); }).catch(() => {});
       } catch { router.replace('/login'); }
       finally { setLoading(false); }
     })();
@@ -207,7 +210,11 @@ export default function SellerDashboard() {
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, price: Number(price), category, condition, location, sellingMode: 'direct,escrow,chat', imageFileIds: images.map(i => i.fileId), creatorRole: 'seller', source: 'listing' }),
+        body: JSON.stringify({
+          title, description, price: Number(price), listGrossPrice: Number(price),
+          category, condition, location, sellingMode: 'direct,escrow,chat',
+          imageFileIds: images.map(i => i.fileId), creatorRole: 'seller', source: 'listing',
+        }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
       setPostDone(true);
@@ -224,6 +231,7 @@ export default function SellerDashboard() {
   const activeDeals = deals.filter(d => d.seller_id === myId && ACTIVE_STATUSES.includes(d.status));
   const historyDeals = deals.filter(d => d.seller_id === myId && DONE_STATUSES.includes(d.status));
   const totalRev = historyDeals.filter(d => d.status === 'completed').reduce((s, d) => s + (d.price || 0), 0);
+  const gpPreview = price && Number(price) > 0 ? computeMarketplaceGp(feeConfig, Number(price)) : null;
 
   if (loading) return (
     <div className="dash-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -328,6 +336,18 @@ export default function SellerDashboard() {
           <div className="form-section shop-edit-panel">
             <h3 style={{ marginBottom: 12 }}>ตั้งค่าป้ายร้าน</h3>
             <div className="form-field">
+              <label>แบนเนอร์ร้าน</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                {shopBannerUrl && (
+                  <img src={shopBannerUrl} alt="" style={{ width: 120, height: 48, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }} />
+                )}
+                <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                  {shopImageUploading === 'banner' ? 'กำลังอัปโหลด...' : shopBannerUrl ? 'เปลี่ยนแบนเนอร์' : 'อัปโหลดแบนเนอร์'}
+                  <input type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadShopImage('banner', f); e.target.value = ''; }} />
+                </label>
+              </div>
+            </div>
+            <div className="form-field">
               <label>ชื่อร้าน</label>
               <input type="text" value={shopName} onChange={e => setShopName(e.target.value)} placeholder="เช่น Kitt IT Shop" maxLength={120} />
             </div>
@@ -410,7 +430,7 @@ export default function SellerDashboard() {
 
             <div className="form-row-2">
               <div className="form-field" style={{ margin: 0 }}>
-                <label>ราคา (บาท) *</label>
+                <label>ราคาที่คุณต้องการได้ (บาท) *</label>
                 <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" min="0" />
               </div>
               <div className="form-field" style={{ margin: 0 }}>
@@ -421,6 +441,31 @@ export default function SellerDashboard() {
                 </select>
               </div>
             </div>
+
+            {gpPreview && (
+              <div className="gp-preview-box">
+                <div className="gp-preview-row gp-preview-row--muted">
+                  <span>ราคาที่คุณตั้ง</span>
+                  <span>฿{gpPreview.sellerPrice.toLocaleString()}</span>
+                </div>
+                <div className="gp-preview-row gp-preview-row--muted">
+                  <span>บวก GP {gpPreview.gpPercent}%</span>
+                  <span>+฿{gpPreview.gpAmount.toLocaleString()}</span>
+                </div>
+                <div className="gp-preview-row">
+                  <span>ราคาที่ผู้บริโภคเห็นในตลาด</span>
+                  <strong>฿{gpPreview.displayPrice.toLocaleString()}</strong>
+                </div>
+                <div className="gp-preview-row gp-preview-row--accent">
+                  <span>คอมมิชชั่นคืนคุณ ({gpPreview.commissionPercent}% ของ GP)</span>
+                  <strong>+฿{gpPreview.sellerCommission.toLocaleString()}</strong>
+                </div>
+                <div className="gp-preview-row gp-preview-row--total">
+                  <span>รายได้คุณเมื่อขายได้</span>
+                  <strong>฿{gpPreview.sellerReceive.toLocaleString()}</strong>
+                </div>
+              </div>
+            )}
 
             <div className="form-field">
               <label>สภาพสินค้า *</label>

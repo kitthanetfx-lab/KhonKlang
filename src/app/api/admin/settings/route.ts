@@ -21,6 +21,7 @@ const NUM_DEFAULTS = {
   meetupFeePercent: 0, meetupFeeMin: 50,
   sellerRegFee: 199, middlemanRegFee: 499,
   promoPercent: 0,
+  marketplaceGpPercent: 20, marketplaceGpCommissionPercent: 30,
 };
 const COMPANY_DEFAULTS = {
   companyPromptPay: '', companyBankName: '', companyBankAcct: '', companyBankHolder: '', companyQrFileId: '',
@@ -59,6 +60,8 @@ const COLUMN_OF: Record<string, string> = {
   promoEnabled: 'promo_enabled', promoScope: 'promo_scope', promoPercent: 'promo_percent', promoFree: 'promo_free',
   promoStart: 'promo_start', promoEnd: 'promo_end', promoLabel: 'promo_label',
   promoVideoUrl: 'promo_video_url',
+  marketplaceGpPercent: 'marketplace_gp_percent',
+  marketplaceGpCommissionPercent: 'marketplace_gp_commission_percent',
 };
 
 type FeeConfigKey = keyof FeeConfig;

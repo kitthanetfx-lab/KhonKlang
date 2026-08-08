@@ -100,6 +100,8 @@ export async function readFeesConfig(db: SupabaseClient): Promise<FeeConfig> {
     promoEnd: data.promo_end || '',
     promoLabel: data.promo_label || '',
     promoVideoUrl: data.promo_video_url || '',
+    marketplaceGpPercent: data.marketplace_gp_percent != null ? Number(data.marketplace_gp_percent) : FEE_DEFAULTS.marketplaceGpPercent,
+    marketplaceGpCommissionPercent: data.marketplace_gp_commission_percent != null ? Number(data.marketplace_gp_commission_percent) : FEE_DEFAULTS.marketplaceGpCommissionPercent,
   };
 }
 
