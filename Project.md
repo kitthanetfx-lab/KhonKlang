@@ -1,5 +1,35 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-08 (15:00)
+
+### แยกประกาศขาย vs ดีล + แอดมินดีล 5 หมวด + layout การ์ดใหม่
+
+**โจทย์**:
+1. ตัด「ตัวเลือกสำหรับผู้ซื้อ」ออกจากหน้าลงขาย — ประกาศ ≠ ดีล
+2. แยกแอดมิน「ดีล & ข้อพิพาท」เป็น 5 หมวด (ดีลซื้อขาย / ตลาด / ประกันเดินทาง / ฝากขาย / ออนไซต์) แต่ละหมวดมีแท็บสถานะเดียวกัน
+3. รวม onsite_jobs เข้าหน้าเดียว + จัด layout การ์ดดีล ①–④
+
+**แก้ไข**:
+1. **`src/app/dashboard/seller/page.tsx`** — ลบ listingMode UI; ลงประกาศเป็น marketplace listing อย่างเดียว
+2. **`src/lib/adminDealCategory.ts`** (ใหม่) — กฎหมวดดีล + กรองประกาศ `posted`/`waiting_*` ออกจากแอดมิน
+3. **`src/app/api/_lib/adminDealQueue.ts`**, **`src/app/api/admin/deals/route.ts`** — `?category=` + นับจำนวนแยกหมวด
+4. **`src/app/admin/deals/page.tsx`** — เลือกหมวด 5 แบบ, แท็บสถานะ, การ์ด ① ข้อมูลดีล ② ค่าสินค้า ③ สลิป ④ พัสดุ, รองรับออนไซต์
+5. **`src/app/admin/onsite-jobs/page.tsx`** — redirect → `/admin/deals?category=onsite`
+6. **`src/app/admin/layout.tsx`** — ลบเมนู「งานนัดออนไซต์」แยก (รวมในดีลแล้ว)
+
+**หมายเหตุ**: หมวด「ฝากขาย」เตรียมไว้ว่าง — รอ flow จริงในอนาคต
+
+### ไฟล์ที่แก้ไข (2026-08-08 15:00)
+- `src/lib/adminDealCategory.ts` (ใหม่)
+- `src/app/dashboard/seller/page.tsx`
+- `src/app/api/_lib/adminDealQueue.ts`
+- `src/app/api/admin/deals/route.ts`
+- `src/app/admin/deals/page.tsx`
+- `src/app/admin/onsite-jobs/page.tsx`
+- `src/app/admin/layout.tsx`
+
+---
+
 ## 2026-08-08 (14:00)
 
 ### ร้านของฉัน + SlipOK skip + ข้อมูลร้าน public

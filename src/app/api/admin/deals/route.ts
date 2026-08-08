@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { deleteDealById } from '../../_lib/deleteDeal';
-import { getAdminDealCounts, loadAdminDealSnapshot } from '../../_lib/adminDealQueue';
+import {
+  getAdminDealCounts,
+  loadAdminDealSnapshot,
+  dealMatchesStatusTab,
+  type AdminDealSnapshot,
+} from '../../_lib/adminDealQueue';
 import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
+import {
+  dealMatchesCategory,
+  isBareListing,
+  onsiteMatchesTab,
+  parseAdminDealCategory,
+  type AdminStatusTab,
+} from '@/lib/adminDealCategory';
+import { readFeesConfig } from '../../_lib/financeLedger';
 
 async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string | null) {
   if (!uid) return null;
@@ -17,23 +30,38 @@ async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string |
   return { bankName, bankAcct, bankOwner };
 }
 
-/** นับจำนวนดีลทุก tab พร้อมกัน: ?filter=counts */
-async function getCounts(db: ReturnType<typeof getAdminClient>) {
-  return getAdminDealCounts(db);
+/** นับจำนวนดีลทุก tab พร้อมกัน: ?filter=counts&category=trade */
+async function getCounts(db: ReturnType<typeof getAdminClient>, category?: string | null) {
+  return getAdminDealCounts(db, category);
 }
 
-/** รายการดีลสำหรับแอดมิน: ?filter=disputed | active | completed | meetup_refund | counts */
+/** รายการดีลสำหรับแอดมิน: ?filter=disputed&category=trade | counts */
 export async function GET(req: NextRequest) {
   try {
     await verifyAdmin(req);
     const db = getAdminClient();
     const filter = req.nextUrl.searchParams.get('filter') || 'disputed';
+    const category = parseAdminDealCategory(req.nextUrl.searchParams.get('category'));
 
     if (filter === 'counts') {
-      const counts = await getCounts(db);
+      const counts = await getCounts(db, category);
       return NextResponse.json({ counts });
     }
-    let query = db.from('deals').select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(200);
+
+    const statusTab = filter as AdminStatusTab;
+
+    if (category === 'consign') {
+      return NextResponse.json({ documents: [], total: 0 });
+    }
+
+    if (category === 'onsite') {
+      const { data } = await db.from('onsite_jobs').select('*').order('created_at', { ascending: false }).limit(200);
+      const jobs = (data || []).filter(j => onsiteMatchesTab(j, statusTab));
+      return NextResponse.json({ documents: jobs, total: jobs.length, kind: 'onsite' });
+    }
+
+    const fees = await readFeesConfig(db);
+    let query = db.from('deals').select('*').order('created_at', { ascending: false }).limit(300);
     if (filter === 'disputed') query = query.eq('status', 'disputed');
     else if (filter === 'completed') query = query.eq('status', 'completed');
     else if (filter === 'meetup_refund') query = query.eq('deal_type', 'meetup').eq('status', 'completed');
@@ -41,9 +69,10 @@ export async function GET(req: NextRequest) {
     else if (filter === 'pay_seller') query = query.eq('status', 'completed').neq('deal_type', 'meetup');
     else if (filter === 'refund_pending') query = query.eq('status', 'cancelled').neq('deal_type', 'meetup');
     else if (filter === 'middleman_fee') query = query.eq('status', 'completed').not('middleman_id', 'is', null);
-    else if (filter === 'active') query = query.neq('status', 'completed');
-    const { data, count } = await query;
-    const deals = data || [];
+    else if (filter === 'active') query = query.not('status', 'in', '(completed,cancelled,disputed)');
+
+    const { data } = await query;
+    let deals = (data || []).filter(d => !isBareListing(d) && dealMatchesCategory(d, category));
 
     // ดึง deal_meetup / deal_price_state ของทุกดีลที่เกี่ยวข้อง มาแนบ — แทน priceData/meetupData JSON blob เดิม
     const dealIds = deals.map(d => d.id);
@@ -96,13 +125,24 @@ export async function GET(req: NextRequest) {
     }));
 
     // กรองเพิ่มฝั่ง JS เพราะต้องเช็คฟิลด์ที่อยู่ใน deal_price_state/deal_meetup (join แล้วถึงรู้)
-    const jsFiltered = filter === 'pay_seller' || filter === 'refund_pending' || filter === 'middleman_fee' || filter === 'meetup_refund';
     if (filter === 'pay_seller') documents = documents.filter(d => !d.priceState?.payout_slip_file_id);
     else if (filter === 'refund_pending') documents = documents.filter(d => !!d.payment_slip_file_id && !d.priceState?.refund_slip_file_id);
     else if (filter === 'middleman_fee') documents = documents.filter(d => !d.priceState?.middleman_fee_sent_at);
     else if (filter === 'meetup_refund') documents = documents.filter(d => !d.meetup?.refund_outcome);
 
-    return NextResponse.json({ documents, total: jsFiltered ? documents.length : (count || 0) });
+    if (filter === 'active') {
+      const snapshots: AdminDealSnapshot[] = documents.map(d => ({
+        deal: d,
+        priceState: d.priceState,
+        meetup: d.meetup,
+      }));
+      documents = snapshots
+        .filter(s => dealMatchesStatusTab(s, 'active', fees))
+        .map(s => documents.find(d => d.id === s.deal.id)!)
+        .filter(Boolean);
+    }
+
+    return NextResponse.json({ documents, total: documents.length, kind: 'deal' });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;
     return NextResponse.json({ error: String(err) }, { status });

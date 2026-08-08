@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
-import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2, Banknote } from 'lucide-react';
+import { Handshake, Loader2, AlertTriangle, CheckCircle2, ExternalLink, RotateCcw, Trash2, Banknote, XCircle } from 'lucide-react';
 import { dealCode } from '@/lib/dealNumber';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees, computeSimpleDealShare, simpleCreatorSide, SIMPLE_CREATOR_SIDE_LABEL, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { splitDealFeeComponents } from '@/lib/financeLedger';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
+import { ADMIN_DEAL_CATEGORIES, type AdminDealCategory, parseAdminDealCategory } from '@/lib/adminDealCategory';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -66,6 +67,35 @@ interface DealReview {
   created_at: string;
 }
 
+interface OnsiteJob {
+  id: string;
+  item_description: string;
+  item_price?: string;
+  max_budget?: string;
+  status: string;
+  buyer_name?: string;
+  seller_province?: string;
+  seller_location?: string;
+  middleman_name?: string;
+  middleman_tier?: string;
+  middleman_deposit?: string;
+  travel_fee?: string;
+  service_fee?: string;
+  report_notes?: string;
+  created_at: string;
+}
+
+const ONSITE_STATUS_LABEL: Record<string, { label: string; cls: string }> = {
+  open: { label: 'เปิดรับงาน', cls: 'bg-green-100 text-green-700' },
+  quoted: { label: 'มีใบเสนอราคา', cls: 'bg-blue-100 text-blue-700' },
+  accepted: { label: 'รับงานแล้ว', cls: 'bg-indigo-100 text-indigo-700' },
+  in_progress: { label: 'กำลังทำงาน', cls: 'bg-amber-100 text-amber-700' },
+  completed: { label: 'เสร็จสมบูรณ์', cls: 'bg-teal-100 text-teal-700' },
+  cancelled: { label: 'ยกเลิก', cls: 'bg-gray-100 text-gray-600' },
+};
+
+const CATEGORY_KEYS = new Set(ADMIN_DEAL_CATEGORIES.map(c => c.k));
+
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   disputed:   { label: 'มีปัญหา/ข้อพิพาท', cls: 'bg-red-100 text-red-700' },
   completed:  { label: 'เสร็จสมบูรณ์', cls: 'bg-green-100 text-green-700' },
@@ -91,26 +121,37 @@ const TAB_KEYS = new Set(TABS.map(t => t.k));
 function AdminDealsInner() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
+  const categoryFromUrl = searchParams.get('category');
+  const [category, setCategory] = useState<AdminDealCategory>(() => {
+    const parsed = parseAdminDealCategory(categoryFromUrl);
+    return CATEGORY_KEYS.has(parsed) ? parsed : 'trade';
+  });
   const [tab, setTab] = useState(() => (tabFromUrl && TAB_KEYS.has(tabFromUrl) ? tabFromUrl : 'active'));
   const [deals, setDeals] = useState<Deal[] | null>(null);
+  const [onsiteJobs, setOnsiteJobs] = useState<OnsiteJob[] | null>(null);
   const [acting, setActing] = useState('');
   const [fees, setFees] = useState<FeeConfig>(FEE_DEFAULTS);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
-  const loadCounts = useCallback(async () => {
+  const loadCounts = useCallback(async (cat: AdminDealCategory) => {
     try {
       const headers = await authHeaders();
-      const r = await fetch('/api/admin/deals?filter=counts', { headers });
+      const r = await fetch(`/api/admin/deals?filter=counts&category=${cat}`, { headers });
       const d = await r.json();
       if (d.counts) setCounts(d.counts);
     } catch { /* ไม่ต้อง alert */ }
   }, []);
 
   useEffect(() => {
-    void loadCounts();
-    const t = window.setInterval(() => void loadCounts(), 30000);
+    void loadCounts(category);
+    const t = window.setInterval(() => void loadCounts(category), 30000);
     return () => window.clearInterval(t);
-  }, [loadCounts]);
+  }, [loadCounts, category]);
+
+  useEffect(() => {
+    const parsed = parseAdminDealCategory(categoryFromUrl);
+    if (categoryFromUrl && CATEGORY_KEYS.has(parsed)) setCategory(parsed);
+  }, [categoryFromUrl]);
 
   useEffect(() => { fetch('/api/fees').then(r => r.json()).then(d => { if (d.fees) setFees(d.fees); }).catch(() => {}); }, []);
 
@@ -168,20 +209,25 @@ function AdminDealsInner() {
     }
   }
 
-  const load = useCallback(async (filter: string) => {
+  const load = useCallback(async (filter: string, cat: AdminDealCategory) => {
     setDeals(null);
+    setOnsiteJobs(null);
     try {
       const headers = await authHeaders();
-      const r = await fetch(`/api/admin/deals?filter=${filter}`, { headers });
+      const r = await fetch(`/api/admin/deals?filter=${filter}&category=${cat}`, { headers });
       const d = await r.json();
-      setDeals(d.documents || []);
-    } catch { setDeals([]); }
+      if (d.kind === 'onsite') setOnsiteJobs(d.documents || []);
+      else setDeals(d.documents || []);
+    } catch {
+      setDeals([]);
+      setOnsiteJobs([]);
+    }
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => { void load(tab); }, 0);
+    const timer = window.setTimeout(() => { void load(tab, category); }, 0);
     return () => window.clearTimeout(timer);
-  }, [tab, load]);
+  }, [tab, category, load]);
 
   async function act(id: string, action: string, promptMsg?: string) {
     let note = '';
@@ -195,7 +241,7 @@ function AdminDealsInner() {
         body: JSON.stringify({ id, action, note }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) load(tab);
+      if (r.ok) load(tab, category);
       else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
     } finally { setActing(''); }
   }
@@ -212,7 +258,7 @@ function AdminDealsInner() {
         body: JSON.stringify({ id, action: 'delete_deal' }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { load(tab); loadCounts(); } else alert(d.error || `ลบไม่สำเร็จ (${r.status})`);
+      if (r.ok) { load(tab, category); loadCounts(category); } else alert(d.error || `ลบไม่สำเร็จ (${r.status})`);
     } finally { setActing(''); }
   }
 
@@ -229,7 +275,7 @@ function AdminDealsInner() {
         body: JSON.stringify({ id, action: 'verify_meetup_slip', whichSlip: side, ok, note }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { load(tab); loadCounts(); } else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
+      if (r.ok) { load(tab, category); loadCounts(category); } else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
     } finally { setActing(''); }
   }
 
@@ -254,7 +300,7 @@ function AdminDealsInner() {
         body: JSON.stringify({ id, action: 'verify_payment_slip', whichSlip: side, ok, note }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { load(tab); loadCounts(); } else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
+      if (r.ok) { load(tab, category); loadCounts(category); } else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
     } finally { setActing(''); }
   }
 
@@ -294,7 +340,7 @@ function AdminDealsInner() {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { alert(d.error || 'บันทึกไม่สำเร็จ'); return; }
-      load(tab);
+      load(tab, category);
     } finally { setActing(''); }
   }
 
@@ -332,7 +378,7 @@ function AdminDealsInner() {
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { alert(data.error || 'บันทึกไม่สำเร็จ'); return; }
-      load(tab);
+      load(tab, category);
     } finally { setActing(''); }
   }
 
@@ -447,13 +493,43 @@ function AdminDealsInner() {
     return role || '-';
   }
 
+  async function onsiteAct(id: string, action: string, promptMsg: string) {
+    const note = window.prompt(promptMsg);
+    if (note === null) return;
+    setActing(id);
+    try {
+      const headers = await authHeaders();
+      const r = await fetch('/api/admin/onsite-jobs', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action, note }),
+      });
+      if (r.ok) { load(tab, category); loadCounts(category); }
+    } finally { setActing(''); }
+  }
+
+  const activeCategoryMeta = ADMIN_DEAL_CATEGORIES.find(c => c.k === category);
+  const isOnsite = category === 'onsite';
+  const isLoading = isOnsite ? onsiteJobs === null : deals === null;
+  const isEmpty = isOnsite ? (onsiteJobs !== null && onsiteJobs.length === 0) : (deals !== null && deals.length === 0);
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center gap-2 mb-1">
         <Handshake size={22} className="text-blue-600" />
         <h1 className="text-xl font-bold">ดีล & ข้อพิพาท</h1>
       </div>
-      <p className="text-sm text-gray-500 mb-5">จัดการดีลที่มีปัญหา ตัดสินข้อพิพาท และยืนยันการคืนเงินประกันนัดรับ</p>
+      <p className="text-sm text-gray-500 mb-4">แยกหมวดดีล — ประกาศขายที่ยังไม่เริ่มซื้อขายจะไม่แสดงที่นี่</p>
+
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {ADMIN_DEAL_CATEGORIES.map(c => (
+          <button key={c.k} type="button" onClick={() => { setCategory(c.k); setTab('active'); }}
+            className={`px-3 py-2 rounded-xl text-sm font-semibold transition-all ${category === c.k ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800'}`}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {activeCategoryMeta && <p className="text-xs text-gray-500 mb-4">{activeCategoryMeta.desc}</p>}
 
       <div className="flex gap-2 mb-5 flex-wrap">
         {TABS.map(t => {
@@ -473,11 +549,77 @@ function AdminDealsInner() {
         })}
       </div>
 
-      {deals === null && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
-      {deals !== null && deals.length === 0 && (
+      {isLoading && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
+      {isEmpty && (
         <div className="text-center py-16 text-gray-400"><CheckCircle2 size={36} className="mx-auto mb-2 opacity-40" /><p>ไม่มีรายการในหมวดนี้</p></div>
       )}
 
+      {isOnsite && onsiteJobs && onsiteJobs.length > 0 && (
+        <div className="space-y-3">
+          {onsiteJobs.map(j => {
+            const st = ONSITE_STATUS_LABEL[j.status] || { label: j.status, cls: 'bg-gray-100 text-gray-600' };
+            const canCancel = !['completed', 'cancelled'].includes(j.status);
+            return (
+              <div key={j.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+                <div className="bg-orange-50 dark:bg-orange-950/30 border-b border-orange-100 dark:border-orange-900 px-4 py-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold text-orange-700 uppercase tracking-wide mb-1">① ข้อมูลงานออนไซต์</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.label}</span>
+                        {j.seller_province && <span className="text-xs text-gray-500">📍 {j.seller_province}</span>}
+                        {Number(j.max_budget) > 0 && <span className="font-mono text-sm font-bold text-green-600">งบ ฿{Number(j.max_budget).toLocaleString()}</span>}
+                      </div>
+                      <p className="font-semibold mt-1 text-gray-900 dark:text-gray-100">{j.item_description}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        ผู้ว่าจ้าง: {j.buyer_name || '-'}{j.middleman_name ? ` · คนกลาง: ${j.middleman_name}` : ' · ยังไม่มีคนกลางรับงาน'}
+                        · สร้างเมื่อ: {formatDealCreatedAt(j.created_at)}
+                      </p>
+                    </div>
+                    <Link href={`/onsite/${j.id}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">
+                      <ExternalLink size={12} /> เปิดงาน
+                    </Link>
+                  </div>
+                </div>
+                {(Number(j.middleman_deposit) > 0 || Number(j.travel_fee) > 0 || Number(j.service_fee) > 0) && (
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                    <p className="text-[11px] font-bold text-orange-700 uppercase tracking-wide mb-2">② ค่าบริการ + มัดจำ</p>
+                    <p className="text-xs text-gray-600">
+                      มัดจำคนกลาง ฿{Number(j.middleman_deposit || 0).toLocaleString()} · ค่าเดินทาง ฿{Number(j.travel_fee || 0).toLocaleString()} · ค่าบริการ ฿{Number(j.service_fee || 0).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+                {j.report_notes && (
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">③ บันทึก</p>
+                    <p className="text-xs text-gray-600">📝 {j.report_notes}</p>
+                  </div>
+                )}
+                <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
+                  {canCancel && (
+                    <button onClick={() => onsiteAct(j.id, 'cancel', 'เหตุผลยกเลิกงาน + คืนเงินผู้ว่าจ้าง:')} disabled={!!acting}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 disabled:opacity-50">
+                      {acting === j.id ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />} ยกเลิก + คืนเงิน
+                    </button>
+                  )}
+                  {j.status === 'in_progress' && (
+                    <button onClick={() => onsiteAct(j.id, 'complete', 'หมายเหตุการปิดงานแทน:')} disabled={!!acting}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 flex items-center gap-1 disabled:opacity-50">
+                      {acting === j.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} ปิดงานแทน
+                    </button>
+                  )}
+                  <button onClick={() => onsiteAct(j.id, 'mark_refunded', 'หมายเหตุการคืนมัดจำ:')} disabled={!!acting}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50">
+                    <RotateCcw size={14} /> บันทึกคืนมัดจำ
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!isOnsite && deals && deals.length > 0 && (
       <div className="space-y-3">
         {(deals || []).map(d => {
           const st = statusBadge(d);
@@ -498,115 +640,116 @@ function AdminDealsInner() {
             && (!!d.meetup?.buyer_slip || !!d.meetup?.seller_slip)
             && !(d.meetup?.buyer_slip_verified_at && d.meetup?.seller_slip_verified_at);
           return (
-            <div key={d.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">{dealCode(d.id)}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.label}</span>
-                    {d.deal_type === 'meetup' && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">นัดรับ</span>}
-                    {d.deal_type === 'simple' && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">แบบง่าย</span>}
-                    <span className="font-mono text-sm font-bold text-green-600">฿{Number(d.price || 0).toLocaleString()}</span>
-                  </div>
-                  <p className="font-semibold mt-1 text-gray-900 dark:text-gray-100">{d.title}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    ผู้ขาย: {d.seller_name || '-'} · ผู้ซื้อ: {d.buyer_name || '-'} {d.middleman_name ? `· คนกลาง: ${d.middleman_name}` : ''}
-                    · สร้างเมื่อ: {formatDealCreatedAt(d.created_at)}
-                  </p>
-                  {renderSimpleSharePanel(d)}
-                  {d.reject_reason && <p className="text-xs text-red-500 mt-1">เหตุ: {d.reject_reason}</p>}
-                  {refund && (
-                    <p className="text-xs mt-1 text-gray-500">
-                      เงินประกัน ฿{refund.deposit.toLocaleString()}/ฝ่าย · {refund.bothMet ? 'เจอกันสำเร็จ' : 'ยังไม่ครบ'} ·
-                      {refund.refundedAt ? <span className="text-green-600"> ✅ คืนเงินแล้ว</span> : <span className="text-amber-600"> ⏳ ยังไม่คืนเงิน</span>}
-                    </p>
-                  )}
-                  {/* เลขบัญชี + ยอดโอนสำหรับ meetup refund — เฉพาะตอนถึงขั้นคืนเงิน (completed) */}
-                  {refund && refundStage && !refund.refundedAt && refund.outcome !== 'frozen' && (
-                    <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs space-y-1">
-                      <p className="font-semibold text-amber-800">
-                        💰 ยอดโอนคืน: ฝ่ายละ ฿{refund.deposit.toLocaleString()}
-                        {!refund.outcome && <span className="ml-1 text-amber-600">(รวม ฿{(refund.deposit * 2).toLocaleString()})</span>}
-                      </p>
-                      {d.buyerBank?.bankAcct
-                        ? <p className="text-blue-700">🛍️ ผู้ซื้อ ({d.buyer_name || '-'}): <span className="font-mono font-semibold">{d.buyerBank.bankName} {d.buyerBank.bankAcct}</span> เจ้าของ: {d.buyerBank.bankOwner || '-'}</p>
-                        : <p className="text-red-600">⚠️ ผู้ซื้อ ({d.buyer_name || '-'}): ยังไม่ผูกบัญชีธนาคาร — ติดต่อก่อนโอน</p>
-                      }
-                      {d.sellerBank?.bankAcct
-                        ? <p className="text-blue-700">🛒 ผู้ขาย ({d.seller_name || '-'}): <span className="font-mono font-semibold">{d.sellerBank.bankName} {d.sellerBank.bankAcct}</span> เจ้าของ: {d.sellerBank.bankOwner || '-'}</p>
-                        : <p className="text-red-600">⚠️ ผู้ขาย ({d.seller_name || '-'}): ยังไม่ผูกบัญชีธนาคาร — ติดต่อก่อนโอน</p>
-                      }
+            <div key={d.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+              <div className="bg-slate-50 dark:bg-slate-900/50 border-b border-gray-200 dark:border-gray-800 px-4 py-3">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">① ข้อมูลดีล</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">{dealCode(d.id)}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.label}</span>
+                      {d.deal_type === 'meetup' && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">นัดรับ</span>}
+                      {d.deal_type === 'simple' && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">แบบง่าย</span>}
+                      <span className="font-mono text-sm font-bold text-green-600">฿{Number(d.price || 0).toLocaleString()}</span>
                     </div>
-                  )}
-                  {d.deal_type !== 'meetup' && (d.status === 'completed' || d.status === 'disputed') && !d.priceState?.payout_slip_file_id && (
-                    d.sellerBank?.bankAcct
-                      ? <p className="text-xs mt-1 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 โอนให้ผู้ขาย: {d.sellerBank.bankName} {d.sellerBank.bankAcct} ({d.sellerBank.bankOwner || '-'})</p>
-                      : <p className="text-xs mt-1 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ ผู้ขายยังไม่ผูกบัญชีธนาคาร — ติดต่อผู้ขายก่อนโอนเงิน</p>
-                  )}
-                  {d.deal_type !== 'meetup' && (d.status === 'cancelled' || d.status === 'disputed') && !d.priceState?.refund_slip_file_id && (
-                    d.buyerBank?.bankAcct
-                      ? <p className="text-xs mt-1 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 คืนให้ผู้ซื้อ: {d.buyerBank.bankName} {d.buyerBank.bankAcct} ({d.buyerBank.bankOwner || '-'})</p>
-                      : <p className="text-xs mt-1 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ ผู้ซื้อยังไม่ผูกบัญชีธนาคาร — ติดต่อผู้ซื้อก่อนคืนเงิน</p>
-                  )}
-                  {d.status === 'completed' && d.middleman_id && !d.priceState?.middleman_fee_sent_at && middlemanNetFee(d) > 0 && (
-                    d.middlemanBank?.bankAcct
-                      ? <p className="text-xs mt-1 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 โอนค่าบริการให้คนกลาง ฿{middlemanNetFee(d).toLocaleString()}: {d.middlemanBank.bankName} {d.middlemanBank.bankAcct} ({d.middlemanBank.bankOwner || '-'})</p>
-                      : <p className="text-xs mt-1 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ คนกลางยังไม่ผูกบัญชีธนาคาร — ติดต่อคนกลางก่อนโอนค่าบริการ ฿{middlemanNetFee(d).toLocaleString()}</p>
-                  )}
+                    <p className="font-semibold mt-1.5 text-gray-900 dark:text-gray-100">{d.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      ผู้ขาย: {d.seller_name || '-'} · ผู้ซื้อ: {d.buyer_name || '-'} {d.middleman_name ? `· คนกลาง: ${d.middleman_name}` : ''}
+                      · สร้างเมื่อ: {formatDealCreatedAt(d.created_at)}
+                    </p>
+                    {d.reject_reason && <p className="text-xs text-red-500 mt-1">เหตุ: {d.reject_reason}</p>}
+                    {refund && (
+                      <p className="text-xs mt-1 text-gray-500">
+                        เงินประกัน ฿{refund.deposit.toLocaleString()}/ฝ่าย · {refund.bothMet ? 'เจอกันสำเร็จ' : 'ยังไม่ครบ'} ·
+                        {refund.refundedAt ? <span className="text-green-600"> ✅ คืนเงินแล้ว</span> : <span className="text-amber-600"> ⏳ ยังไม่คืนเงิน</span>}
+                      </p>
+                    )}
+                  </div>
+                  <Link href={`/deal/${d.id}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">
+                    <ExternalLink size={12} /> เปิดดีล
+                  </Link>
                 </div>
-                <Link href={`/deal/${d.id}`} target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">
-                  <ExternalLink size={12} /> เปิดดีล
-                </Link>
+              </div>
+
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                <p className="text-[11px] font-bold text-orange-700 uppercase tracking-wide mb-2">② ค่าสินค้า + คอมมิชชั่น / บัญชีโอน</p>
+                {renderSimpleSharePanel(d)}
+                {refund && refundStage && !refund.refundedAt && refund.outcome !== 'frozen' && (
+                  <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs space-y-1">
+                    <p className="font-semibold text-amber-800">
+                      💰 ยอดโอนคืน: ฝ่ายละ ฿{refund.deposit.toLocaleString()}
+                      {!refund.outcome && <span className="ml-1 text-amber-600">(รวม ฿{(refund.deposit * 2).toLocaleString()})</span>}
+                    </p>
+                    {d.buyerBank?.bankAcct
+                      ? <p className="text-blue-700">🛍️ ผู้ซื้อ: <span className="font-mono font-semibold">{d.buyerBank.bankName} {d.buyerBank.bankAcct}</span></p>
+                      : <p className="text-red-600">⚠️ ผู้ซื้อยังไม่ผูกบัญชีธนาคาร</p>}
+                    {d.sellerBank?.bankAcct
+                      ? <p className="text-blue-700">🛒 ผู้ขาย: <span className="font-mono font-semibold">{d.sellerBank.bankName} {d.sellerBank.bankAcct}</span></p>
+                      : <p className="text-red-600">⚠️ ผู้ขายยังไม่ผูกบัญชีธนาคาร</p>}
+                  </div>
+                )}
+                {d.deal_type !== 'meetup' && (d.status === 'completed' || d.status === 'disputed') && !d.priceState?.payout_slip_file_id && (
+                  d.sellerBank?.bankAcct
+                    ? <p className="text-xs mt-2 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 โอนให้ผู้ขาย: {d.sellerBank.bankName} {d.sellerBank.bankAcct}</p>
+                    : <p className="text-xs mt-2 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ ผู้ขายยังไม่ผูกบัญชีธนาคาร</p>
+                )}
+                {d.deal_type !== 'meetup' && (d.status === 'cancelled' || d.status === 'disputed') && !d.priceState?.refund_slip_file_id && (
+                  d.buyerBank?.bankAcct
+                    ? <p className="text-xs mt-2 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 คืนให้ผู้ซื้อ: {d.buyerBank.bankName} {d.buyerBank.bankAcct}</p>
+                    : <p className="text-xs mt-2 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ ผู้ซื้อยังไม่ผูกบัญชีธนาคาร</p>
+                )}
+                {d.status === 'completed' && d.middleman_id && !d.priceState?.middleman_fee_sent_at && middlemanNetFee(d) > 0 && (
+                  d.middlemanBank?.bankAcct
+                    ? <p className="text-xs mt-2 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 โอนค่าคนกลาง ฿{middlemanNetFee(d).toLocaleString()}: {d.middlemanBank.bankName} {d.middlemanBank.bankAcct}</p>
+                    : <p className="text-xs mt-2 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ คนกลางยังไม่ผูกบัญชีธนาคาร</p>
+                )}
               </div>
 
               {slips.length > 0 && (
-                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                  <p className="text-[11px] font-bold text-indigo-700 uppercase tracking-wide mb-2">③ สลิปชำระเงิน</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {slips.map(s => (
                     <a key={s.fileId} href={fileUrl(s.fileId)} target="_blank" rel="noreferrer" className="block">
                       <img src={fileUrl(s.fileId)} alt={s.label} className="w-full h-20 object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
                       <p className="text-[10px] text-gray-400 mt-0.5 truncate">{s.label}</p>
                     </a>
                   ))}
+                  </div>
                 </div>
               )}
 
               {(trackingRows.length > 0 || parcelEvidence.length > 0) && (
-                <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-3 space-y-3">
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-blue-50/40 dark:bg-blue-950/20">
+                  <p className="text-[11px] font-bold text-blue-800 uppercase tracking-wide mb-2">④ ข้อมูลพัสดุ + หลักฐาน</p>
                   {trackingRows.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-blue-900">ข้อมูลพัสดุ</p>
-                      <div className="grid gap-2">
-                        {trackingRows.map(row => (
-                          <div key={`${d.id}-${row.label}-${row.trackingNumber}`} className="rounded-xl border border-blue-100 bg-white px-3 py-2 text-xs text-gray-700">
-                            <div className="font-semibold text-gray-900">{row.label}</div>
-                            <div className="mt-1">ผู้ให้บริการ: <span className="font-semibold">{row.provider}</span></div>
-                            <div>เลขพัสดุ: <span className="font-mono font-semibold">{row.trackingNumber}</span></div>
-                            {row.url && (
-                              <a href={row.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-blue-600 hover:underline">
-                                <ExternalLink size={12} /> เช็คพัสดุ
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                    <div className="grid gap-2 mb-3">
+                      {trackingRows.map(row => (
+                        <div key={`${d.id}-${row.label}-${row.trackingNumber}`} className="rounded-xl border border-blue-100 bg-white px-3 py-2 text-xs text-gray-700">
+                          <div className="font-semibold text-gray-900">{row.label}</div>
+                          <div className="mt-1">ผู้ให้บริการ: <span className="font-semibold">{row.provider}</span></div>
+                          <div>เลขพัสดุ: <span className="font-mono font-semibold">{row.trackingNumber}</span></div>
+                          {row.url && (
+                            <a href={row.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-blue-600 hover:underline">
+                              <ExternalLink size={12} /> เช็คพัสดุ
+                            </a>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                   {parcelEvidence.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-blue-900">หลักฐานทั้งหมดในดีล</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {parcelEvidence.map(item => (
-                          <a key={item.id} href={fileUrl(item.file_id)} target="_blank" rel="noreferrer" className="block">
-                            {item.file_name?.match(/\.(mp4|mov|avi|webm)$/i) ? (
-                              <video src={fileUrl(item.file_id)} className="w-full h-20 object-cover rounded-lg border border-blue-100 bg-white" />
-                            ) : (
-                              <img src={fileUrl(item.file_id)} alt={item.label} className="w-full h-20 object-cover rounded-lg border border-blue-100 bg-white" />
-                            )}
-                            <p className="text-[10px] text-gray-500 mt-1 leading-4">{item.label}</p>
-                            {item.uploader_name && <p className="text-[10px] text-gray-400 truncate">{item.uploader_name}</p>}
-                          </a>
-                        ))}
-                      </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {parcelEvidence.map(item => (
+                        <a key={item.id} href={fileUrl(item.file_id)} target="_blank" rel="noreferrer" className="block">
+                          {item.file_name?.match(/\.(mp4|mov|avi|webm)$/i) ? (
+                            <video src={fileUrl(item.file_id)} className="w-full h-20 object-cover rounded-lg border border-blue-100 bg-white" />
+                          ) : (
+                            <img src={fileUrl(item.file_id)} alt={item.label} className="w-full h-20 object-cover rounded-lg border border-blue-100 bg-white" />
+                          )}
+                          <p className="text-[10px] text-gray-500 mt-1 leading-4">{item.label}</p>
+                        </a>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -659,7 +802,7 @@ function AdminDealsInner() {
                 </div>
               )}
 
-              <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
                 {d.status === 'disputed' && (
                   <>
                     <button onClick={() => act(d.id, 'resolve_dispute', 'บันทึกผลการตัดสิน (ปล่อยเงินให้ผู้ขาย/ดำเนินการต่อ):')} disabled={!!acting}
@@ -821,7 +964,8 @@ function AdminDealsInner() {
           );
         })}
         </div>
-      </div>
+      )}
+    </div>
   );
 }
 

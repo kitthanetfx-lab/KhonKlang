@@ -7,7 +7,7 @@ import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase'
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
-import { DEFAULT_LISTING_MODE, isCertifiedMode, ListingModeState, serializeListingMode } from '@/lib/listingMode';
+import { isCertifiedMode } from '@/lib/listingMode';
 
 interface Deal {
   id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
@@ -56,7 +56,6 @@ export default function SellerDashboard() {
   const [category, setCategory] = useState('');
   const [condition, setCondition] = useState('');
   const [location, setLocation] = useState('');
-  const [listingMode, setListingMode] = useState<ListingModeState>(DEFAULT_LISTING_MODE);
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [uploading, setUploading] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -145,18 +144,17 @@ export default function SellerDashboard() {
   async function handlePost() {
     if (!title || !price) { setPostError('กรุณากรอกชื่อสินค้าและราคา'); return; }
     if (!condition) { setPostError('กรุณาเลือกสภาพสินค้า'); return; }
-    if (!listingMode.direct && !listingMode.escrow) { setPostError('กรุณาเลือกอย่างน้อย ซื้อทันที หรือ ซื้อผ่านคนกลาง'); return; }
     setPosting(true); setPostError('');
     try {
       const headers = await authHeaders();
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, price: Number(price), category, condition, location, sellingMode: serializeListingMode(listingMode), imageFileIds: images.map(i => i.fileId), creatorRole: 'seller', source: 'listing' }),
+        body: JSON.stringify({ title, description, price: Number(price), category, condition, location, sellingMode: 'direct,escrow,chat', imageFileIds: images.map(i => i.fileId), creatorRole: 'seller', source: 'listing' }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
       setPostDone(true);
-      setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation(''); setListingMode(DEFAULT_LISTING_MODE); setImages([]);
+      setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation(''); setImages([]);
       await fetchDeals(headers);
       setTimeout(() => { setPostDone(false); setTab('active'); }, 1800);
     } catch (err: unknown) {
@@ -195,7 +193,9 @@ export default function SellerDashboard() {
           </div>
           <span className={`sb ${STATUS_CLS[deal.status] || 'sb-gray'}`}>{STATUS_LABEL[deal.status] || deal.status}</span>
         </div>
-        <Link href={`/deal/${deal.id}`} className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }}>💬 เข้าห้องดีล →</Link>
+        <Link href={deal.status === 'posted' ? `/marketplace/${deal.id}` : `/deal/${deal.id}`} className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }}>
+          {deal.status === 'posted' ? '📋 ดูประกาศ →' : '💬 เข้าห้องดีล →'}
+        </Link>
       </div>
     );
   }
@@ -318,28 +318,6 @@ export default function SellerDashboard() {
                 <option value="">เลือกจังหวัด...</option>
                 {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
-            </div>
-
-            <div className="form-field">
-              <label>ตัวเลือกสำหรับผู้ซื้อ</label>
-              <div className="mode-opts">
-                <button type="button" className={`mode-opt${listingMode.direct ? ' sel' : ''}`} onClick={() => setListingMode(prev => ({ ...prev, direct: !prev.direct }))}>
-                  <div className="mode-opt-icon">🛒</div>
-                  <div><div className="mode-opt-t">ซื้อทันที</div><div className="mode-opt-d">แสดงปุ่มหยิบใส่ตะกร้าและซื้อทันทีแบบอีคอมเมิร์ซ</div></div>
-                </button>
-                <button type="button" className={`mode-opt${listingMode.escrow ? ' sel' : ''}`} onClick={() => setListingMode(prev => ({ ...prev, escrow: !prev.escrow }))}>
-                  <div className="mode-opt-icon">🤝</div>
-                  <div><div className="mode-opt-t">ซื้อผ่านคนกลาง</div><div className="mode-opt-d">แสดงปุ่มเข้าห้องดีล 3 ฝ่าย เพื่อซื้อขายอย่างปลอดภัย</div></div>
-                </button>
-                <button type="button" className={`mode-opt${listingMode.chat ? ' sel' : ''}`} onClick={() => setListingMode(prev => ({ ...prev, chat: !prev.chat }))}>
-                  <div className="mode-opt-icon">💬</div>
-                  <div><div className="mode-opt-t">แชทกับผู้ขาย</div><div className="mode-opt-d">แสดงปุ่มให้ผู้ซื้อทักแชทกับผู้ขายก่อนตัดสินใจ</div></div>
-                </button>
-                <button type="button" className={`mode-opt${listingMode.certified ? ' sel' : ''}`} onClick={() => setListingMode(prev => ({ ...prev, certified: !prev.certified, escrow: true }))}>
-                  <div className="mode-opt-icon">⭐</div>
-                  <div><div className="mode-opt-t">Glanghub Certified</div><div className="mode-opt-d">เพิ่มป้าย Certified และบังคับเปิดการซื้อผ่านคนกลาง</div></div>
-                </button>
-              </div>
             </div>
 
             <div className="form-field">

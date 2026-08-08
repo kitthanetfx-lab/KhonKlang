@@ -7,7 +7,7 @@ import { supabase, authHeaders } from '@/lib/supabase';
 import { useAppPreferences } from '@/components/AppPreferences';
 import {
   LayoutDashboard, Store, Shield, Users, Settings, SlidersHorizontal,
-  LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, MapPin, Wallet, MessageCircle, Banknote,
+  LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, Wallet, MessageCircle, Banknote,
 } from 'lucide-react';
 
 function getAdminNav(locale: 'th' | 'en') {
@@ -21,7 +21,6 @@ function getAdminNav(locale: 'th' | 'en') {
         { href: '/admin/scam-reports', icon: ShieldAlert, label: 'รายงานคนโกง' },
         { href: '/admin/finance', icon: Wallet, label: 'การเงิน' },
         { href: '/admin/deals', icon: Handshake, label: 'ดีล & ข้อพิพาท' },
-        { href: '/admin/onsite-jobs', icon: MapPin, label: 'งานนัดออนไซต์' },
         { href: '/admin/moderate', icon: EyeOff, label: 'ตรวจสอบเนื้อหา' },
         { href: '/admin/users', icon: Users, label: 'ผู้ใช้ทั้งหมด' },
         { href: '/admin/service-controls', icon: SlidersHorizontal, label: 'ควบคุมบริการ' },
@@ -36,7 +35,6 @@ function getAdminNav(locale: 'th' | 'en') {
         { href: '/admin/scam-reports', icon: ShieldAlert, label: 'Scam Reports' },
         { href: '/admin/finance', icon: Wallet, label: 'Finance' },
         { href: '/admin/deals', icon: Handshake, label: 'Deals & Disputes' },
-        { href: '/admin/onsite-jobs', icon: MapPin, label: 'On-site Jobs' },
         { href: '/admin/moderate', icon: EyeOff, label: 'Moderation' },
         { href: '/admin/users', icon: Users, label: 'Users' },
         { href: '/admin/service-controls', icon: SlidersHorizontal, label: 'Service Controls' },
