@@ -3859,6 +3859,21 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 }
 
 /* ── Marketplace auction ── */
+.mkt-auction-entry {
+  background: #f5f3ff !important;
+  border-color: #ddd6fe !important;
+  color: #6d28d9 !important;
+  font-weight: 700;
+}
+.mkt-hero--auction {
+  background: linear-gradient(180deg, #f5f3ff 0%, var(--surface) 100%);
+}
+.mkt-hero--auction .gradient-text {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 .mkt-mode-tabs {
   display: flex;
   gap: 6px;

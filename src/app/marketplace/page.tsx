@@ -10,8 +10,6 @@ import { Nav, Footer, useReveal } from '@/components/Site';
 import { isCertifiedMode } from '@/lib/listingMode';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
-import { AuctionCountdown } from '@/components/AuctionCountdown';
-import type { AuctionPublic } from '@/lib/auction';
 
 interface Listing {
   id: string;
@@ -30,7 +28,6 @@ interface Listing {
   status: string;
   buyer_id: string;
   created_at: string;
-  auction?: AuctionPublic;
 }
 
 function imgUrl(fileId: string) {
@@ -78,7 +75,6 @@ export default function Marketplace() {
   const [province,   setProvince]   = useState('');
   const [certified,  setCertified]  = useState(false);
   const [sort,       setSort]       = useState('ล่าสุด');
-  const [marketMode, setMarketMode] = useState<'all' | 'fixed' | 'auction'>('all');
 
   useReveal();
   const controls = useServiceControls();
@@ -109,10 +105,10 @@ export default function Marketplace() {
 
   const marketListings = listings
     .filter(d => d.status === 'posted')
+    .filter(d => d.deal_type !== 'auction')
     .filter(d => d.source === 'listing' || (!d.source && !!d.selling_mode && d.selling_mode !== 'normal'));
 
   let filtered = marketListings
-    .filter(d => marketMode === 'all' || (marketMode === 'auction' ? d.deal_type === 'auction' : d.deal_type !== 'auction'))
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)
     .filter(d => !province || d.location === province)
     .filter(d => !certified || isCertifiedMode(d.selling_mode))
@@ -122,13 +118,6 @@ export default function Marketplace() {
     );
   if (sort === 'ราคา: น้อย→มาก') filtered = [...filtered].sort((a, b) => a.price - b.price);
   else if (sort === 'ราคา: มาก→น้อย') filtered = [...filtered].sort((a, b) => b.price - a.price);
-  else if (sort === 'ปิดประมูลเร็วสุด') {
-    filtered = [...filtered].sort((a, b) => {
-      const ea = a.auction?.endsAt ? new Date(a.auction.endsAt).getTime() : Infinity;
-      const eb = b.auction?.endsAt ? new Date(b.auction.endsAt).getTime() : Infinity;
-      return ea - eb;
-    });
-  }
 
   function clearFilters() {
     setCat('ทั้งหมด');
@@ -142,18 +131,16 @@ export default function Marketplace() {
   }
 
   function ListingCard({ listing, idx }: { listing: Listing; idx: number }) {
-    const isAuction = listing.deal_type === 'auction' && listing.auction;
     const isCertified = isCertifiedMode(listing.selling_mode);
     const firstImg    = getFirstImage(listing);
     const isMyDeal    = listing.seller_id === myId || listing.buyer_id === myId;
     const c1 = CARD_BG[idx % 3 === 0 ? 0 : 2], c2 = CARD_BG[(idx % 5) + 1];
     const detailHref = `/marketplace/${listing.id}`;
-    const showPrice = isAuction ? listing.auction!.leadingPrice : (listing.price || 0);
 
     return (
       <Link
         href={detailHref}
-        className={`lc-card reveal${isCertified ? ' lc-card--certified' : ''}${isAuction ? ' lc-card--auction' : ''}`}
+        className={`lc-card reveal${isCertified ? ' lc-card--certified' : ''}`}
         style={{ ['--d' as string]: `${Math.min(idx * 30, 300)}ms` }}
         aria-label={`ดูรายละเอียด ${listing.title}`}
       >
@@ -164,27 +151,13 @@ export default function Marketplace() {
           {firstImg
             ? <img src={firstImg} alt={listing.title} loading="lazy" />
             : <Icon name="package" size={40} style={{ color: 'rgba(255,255,255,0.25)' }} />}
-          <span className={`lc-badge${isAuction ? ' lc-badge--auction' : ''}`}>
-            {isAuction ? '🔨 ประมูล' : isCertified ? '⭐ Certified' : 'Escrow'}
+          <span className="lc-badge">
+            {isCertified ? '⭐ Certified' : 'Escrow'}
           </span>
-          {isAuction && listing.auction!.phase === 'live' && (
-            <span className="lc-auction-timer">
-              <AuctionCountdown endsAt={listing.auction!.endsAt} endedAt={listing.auction!.endedAt} />
-            </span>
-          )}
         </div>
         <div className="lc-body">
-          <div className="lc-price">
-            {isAuction && listing.auction!.bidCount > 0 ? 'ปัจจุบัน ' : isAuction ? 'เริ่ม ' : ''}
-            ฿{showPrice.toLocaleString()}
-          </div>
+          <div className="lc-price">฿{(listing.price || 0).toLocaleString()}</div>
           <h3 className="lc-title">{listing.title}</h3>
-          {isAuction && (
-            <div className="lc-auction-meta">
-              <span>👥 {listing.auction!.uniqueBidderCount} คน</span>
-              <span>{listing.auction!.currentBidderName ? `🏆 ${listing.auction!.currentBidderName}` : 'ยังไม่มี bid'}</span>
-            </div>
-          )}
           <div className="lc-meta">
             {listing.location && <span>📍 {listing.location}</span>}
             {listing.condition && <span>{listing.condition}</span>}
@@ -230,6 +203,9 @@ export default function Marketplace() {
               <Link href="/dashboard/seller" className="btn btn-primary btn-sm">
                 <Icon name="store" size={15} /> ลงขาย
               </Link>
+              <Link href="/marketplace/auctions" className="btn btn-soft btn-sm mkt-auction-entry">
+                🔨 โซนประมูล
+              </Link>
               <Link href="/wanted" className="btn btn-ghost btn-sm">
                 📢 หาสินค้า
               </Link>
@@ -267,11 +243,6 @@ export default function Marketplace() {
 
       <div id="mkt-results" className="container mkt-feed">
         <div className="mkt-toolbar">
-          <div className="mkt-mode-tabs">
-            {([['all', 'ทั้งหมด'], ['fixed', 'สินค้า'], ['auction', '🔨 ประมูล']] as const).map(([k, l]) => (
-              <button key={k} type="button" className={`mkt-mode-tab${marketMode === k ? ' active' : ''}`} onClick={() => setMarketMode(k)}>{l}</button>
-            ))}
-          </div>
           <span className="mkt-count">
             {loading ? 'กำลังโหลด…' : (
               <>แสดง <b>{filtered.length}</b> รายการ{cat !== 'ทั้งหมด' ? ` · ${cat}` : ''}</>
@@ -296,7 +267,7 @@ export default function Marketplace() {
             <label className="mkt-filter-pill">
               <span className="mkt-filter-label">เรียง</span>
               <select value={sort} onChange={e => setSort(e.target.value)} aria-label="เรียงลำดับ">
-                {['ล่าสุด', 'ราคา: น้อย→มาก', 'ราคา: มาก→น้อย', ...(marketMode !== 'fixed' ? ['ปิดประมูลเร็วสุด'] as const : [])].map(s => <option key={s}>{s}</option>)}
+                {['ล่าสุด', 'ราคา: น้อย→มาก', 'ราคา: มาก→น้อย'].map(s => <option key={s}>{s}</option>)}
               </select>
             </label>
           </div>

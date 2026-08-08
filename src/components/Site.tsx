@@ -151,6 +151,8 @@ export function Nav({ active }: { active?: string }) {
   const scrolled = useScrolled();
   const pathname = usePathname() || '';
   const isAct = (p: string) => pathname === p || pathname.startsWith(p + '/');
+  const isMarketplace = pathname === '/marketplace' || (pathname.startsWith('/marketplace/') && !pathname.startsWith('/marketplace/auctions'));
+  const isAuctionPage = pathname === '/marketplace/auctions' || pathname.startsWith('/marketplace/auctions/');
   const navRegister = getNavRegister(locale);
   const navServices = getNavServices(locale);
   const [drawer, setDrawer] = useState(false);
@@ -206,7 +208,8 @@ export function Nav({ active }: { active?: string }) {
             <button className={`nav-link ${isAct('/service') ? 'is-active' : ''}`} aria-haspopup="true">{locale === 'th' ? 'บริการผ่านคนกลาง' : 'Escrow Services'} <Icon name="chevronDown" size={16} /></button>
             <div className="dropdown-menu" style={{ minWidth: 290 }}>{navServices.map(it => <DropItem key={it.t} it={it} />)}</div>
           </div>
-          <Link className={`nav-link ${active === 'market' || isAct('/marketplace') ? 'is-active' : ''}`} href="/marketplace"><Icon name="store" size={17} /> {locale === 'th' ? 'ตลาด' : 'Marketplace'}</Link>
+          <Link className={`nav-link ${active === 'market' || isMarketplace ? 'is-active' : ''}`} href="/marketplace"><Icon name="store" size={17} /> {locale === 'th' ? 'ตลาด' : 'Marketplace'}</Link>
+          <Link className={`nav-link ${active === 'auction' || isAuctionPage ? 'is-active' : ''}`} href="/marketplace/auctions"><Icon name="clock" size={17} /> {locale === 'th' ? 'ประมูล' : 'Auctions'}</Link>
           <Link className={`nav-link ${isAct('/check-scam') ? 'is-active' : ''}`} href="/check-scam"><Icon name="search" size={17} /> {locale === 'th' ? 'เช็คคนโกง' : 'Scam Check'}</Link>
         </div>
         {user && <MessengerIcon />}
@@ -276,7 +279,8 @@ export function Nav({ active }: { active?: string }) {
           <Link key={s.t} className={`drawer-link ${isAct(s.href) ? 'active' : ''}`} href={s.href} onClick={() => setDrawer(false)}><Icon name={s.icon} /> {s.t}</Link>
         ))}
         <div className="drawer-sep" />
-        <Link className={`drawer-link ${isAct('/marketplace') ? 'active' : ''}`} href="/marketplace" onClick={() => setDrawer(false)}><Icon name="store" /> {locale === 'th' ? 'ตลาด' : 'Marketplace'}</Link>
+        <Link className={`drawer-link ${isMarketplace ? 'active' : ''}`} href="/marketplace" onClick={() => setDrawer(false)}><Icon name="store" /> {locale === 'th' ? 'ตลาด' : 'Marketplace'}</Link>
+        <Link className={`drawer-link ${isAuctionPage ? 'active' : ''}`} href="/marketplace/auctions" onClick={() => setDrawer(false)}><Icon name="clock" /> {locale === 'th' ? 'ประมูล' : 'Auctions'}</Link>
         <Link className={`drawer-link ${isAct('/wanted') ? 'active' : ''}`} href="/wanted" onClick={() => setDrawer(false)}><Icon name="bell" /> {locale === 'th' ? 'ประกาศหาสินค้า' : 'Wanted Board'}</Link>
         <Link className={`drawer-link ${isAct('/check-scam') ? 'active' : ''}`} href="/check-scam" onClick={() => setDrawer(false)}><Icon name="search" /> {locale === 'th' ? 'เช็คคนโกง' : 'Scam Check'}</Link>
         <div className="drawer-sep" />
