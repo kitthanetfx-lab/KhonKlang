@@ -4,6 +4,7 @@ import { notifyUsers } from '../_lib/notify';
 import { readServiceControlsConfig } from '../_lib/appConfig';
 import { syncDealLedger, readFeesConfig } from '../_lib/financeLedger';
 import { computeMarketplaceGp } from '@/lib/fees';
+import { attachAuctions, syncExpiredAuctions } from '../_lib/auctionSync';
 
 // แนบ images: string[] (file_id เรียงตาม position) ให้แต่ละดีล — แทน imageFileIds JSON blob เดิมบน deals row
 async function attachImages<T extends { id: string }>(db: ReturnType<typeof getAdminClient>, deals: T[]): Promise<(T & { images: string[] })[]> {
@@ -26,8 +27,10 @@ export async function GET(req: NextRequest) {
 
     const authHeader = req.headers.get('authorization') || req.headers.get('x-session-jwt');
     if (role === 'buyer' && !authHeader) {
+      await syncExpiredAuctions(db);
       const { data } = await db.from('deals').select('*').eq('status', 'posted').order('created_at', { ascending: false }).limit(100);
-      return NextResponse.json({ deals: await attachImages(db, data || []) });
+      const withImages = await attachImages(db, data || []);
+      return NextResponse.json({ deals: await attachAuctions(db, withImages) });
     }
 
     const me = await verifyUser(req);
@@ -43,6 +46,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (role === 'buyer') {
+      await syncExpiredAuctions(db);
       const [posted, mine] = await Promise.all([
         db.from('deals').select('*').eq('status', 'posted').order('created_at', { ascending: false }).limit(100),
         db.from('deals').select('*').eq('buyer_id', me.id).order('created_at', { ascending: false }).limit(100),
@@ -52,11 +56,13 @@ export async function GET(req: NextRequest) {
         if (seen.has(d.id)) return false;
         seen.add(d.id); return true;
       });
-      return NextResponse.json({ deals: await attachImages(db, unique) });
+      const withImages = await attachImages(db, unique);
+      return NextResponse.json({ deals: await attachAuctions(db, withImages) });
     }
 
     const { data } = await db.from('deals').select('*').eq('seller_id', me.id).order('created_at', { ascending: false }).limit(100);
-    return NextResponse.json({ deals: await attachImages(db, data || []) });
+    const withImages = await attachImages(db, data || []);
+    return NextResponse.json({ deals: await attachAuctions(db, withImages) });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;
     return NextResponse.json({ error: String(err) }, { status });
@@ -67,8 +73,9 @@ export async function POST(req: NextRequest) {
   try {
     const me = await verifyUser(req);
     const body = await req.json();
-    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent, listGrossPrice } = body;
+    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent, listGrossPrice, auctionData } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
+    const isAuction = dealType === 'auction';
     const isBuyer = creatorRole === 'buyer';
 
     const db = getAdminClient();
@@ -106,6 +113,8 @@ export async function POST(req: NextRequest) {
       storedGross = gp.sellerPrice;
     }
 
+    const resolvedDealType = dealType === 'meetup' ? 'meetup' : dealType === 'simple' ? 'simple' : dealType === 'auction' ? 'auction' : 'normal';
+
     const { data: doc, error } = await db.from('deals').insert({
       id: dealNumberSeed,
       deal_number: `KKL-${dealNumberSeed.replace(/-/g, '').slice(-8).toUpperCase()}`,
@@ -116,13 +125,27 @@ export async function POST(req: NextRequest) {
       title, description: description || '', price: dealPrice,
       list_gross_price: storedGross,
       category: category || '', condition: condition || '', location: location || '',
-      selling_mode: sellingMode || 'normal',
+      selling_mode: isAuction ? 'escrow,chat' : (sellingMode || 'normal'),
       source: source === 'listing' ? 'listing' : 'private',
-      deal_type: dealType === 'meetup' ? 'meetup' : dealType === 'simple' ? 'simple' : 'normal',
+      deal_type: resolvedDealType,
       status: isBuyer ? 'waiting_seller' : 'posted',
       creator_id: me.id,
     }).select().single();
     if (error || !doc) throw new Error(error?.message || 'create deal failed');
+
+    if (isAuction && source === 'listing') {
+      const ad = auctionData || {};
+      const bidIncrement = Math.max(1, Math.round(Number(ad.bidIncrement) || 10));
+      const durationHours = Math.max(1, Math.min(720, Math.round(Number(ad.durationHours) || 72)));
+      const endsAt = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+      const { error: aErr } = await db.from('deal_auction').insert({
+        deal_id: doc.id,
+        display_start_price: dealPrice,
+        bid_increment: bidIncrement,
+        ends_at: endsAt,
+      });
+      if (aErr) throw new Error(aErr.message);
+    }
 
     if (dealType === 'meetup' && meetupData) {
       let parsed: Record<string, unknown> = {};

@@ -9,6 +9,8 @@ import { runAutoSlipVerification } from '../../_lib/slipAutoVerify';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide } from '@/lib/fees';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
+import { finalizeAuction } from '../../_lib/auctionSync';
+import { rowToAuctionPublic, type AuctionRow } from '@/lib/auction';
 
 // หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
 async function getAdminIds(db: SupabaseClient): Promise<string[]> {
@@ -77,7 +79,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { data: deal, error } = await db.from('deals').select('*').eq('id', id).single();
     if (error || !deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
 
+    if (deal.deal_type === 'auction') {
+      await finalizeAuction(db, id);
+    }
+
     let current = deal;
+    if (deal.deal_type === 'auction') {
+      const { data: refreshed } = await db.from('deals').select('*').eq('id', id).single();
+      if (refreshed) current = refreshed;
+    }
     // Self-heal: ทั้งสองฝ่าย (และคนกลางถ้ามี) ยอมรับครบแล้วแต่สถานะค้างที่ขั้นยอมรับ
     // (เกิดได้จาก race ตอนสองฝ่ายกดยอมรับพร้อมกัน) → ดันไปขั้นคุย/เก็บหลักฐานก่อนโอนเงิน
     if (['buyer_joined', 'terms_pending'].includes(String(deal.status))
@@ -157,6 +167,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
+    let auction = null;
+    let auctionBids: unknown[] = [];
+    if (current.deal_type === 'auction') {
+      const [auctionRes, bidsRes] = await Promise.all([
+        db.from('deal_auction').select('*').eq('deal_id', id).maybeSingle(),
+        db.from('auction_bids').select('*').eq('deal_id', id).order('created_at', { ascending: false }).limit(20),
+      ]);
+      if (auctionRes.data) auction = rowToAuctionPublic(auctionRes.data as AuctionRow);
+      auctionBids = bidsRes.data || [];
+    }
+
     return NextResponse.json({
       deal: { ...current, images: (imagesRes.data || []).map(r => r.file_id) },
       priceState: psWithDefaults,
@@ -166,6 +187,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       simpleShare,
       buyerShipping,
       sellerShop,
+      auction,
+      auctionBids,
     });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

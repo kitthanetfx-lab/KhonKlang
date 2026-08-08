@@ -9,12 +9,13 @@ import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { isCertifiedMode } from '@/lib/listingMode';
 import { computeMarketplaceGp, FEE_DEFAULTS, type FeeConfig } from '@/lib/fees';
+import { AUCTION_DURATION_OPTIONS } from '@/lib/auction';
 
 interface Deal {
   id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
   title: string; description: string; price: number; category: string; condition: string;
   location: string; selling_mode: string; images: string[]; status: string;
-  reject_reason: string; created_at: string;
+  reject_reason: string; created_at: string; deal_type?: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -54,7 +55,8 @@ export default function SellerDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [deals, setDeals] = useState<Deal[]>([]);
-  const [tab, setTab] = useState<'post' | 'active' | 'history'>('post');
+  const [tab, setTab] = useState<'active' | 'history'>('active');
+  const [postModal, setPostModal] = useState<null | 'pick' | 'listing' | 'auction'>(null);
   const [myId, setMyId] = useState('');
 
   const [shopName, setShopName] = useState('');
@@ -85,6 +87,19 @@ export default function SellerDashboard() {
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
   const [postDone, setPostDone] = useState(false);
+  const [bidIncrement, setBidIncrement] = useState('10');
+  const [durationHours, setDurationHours] = useState(72);
+
+  function resetListingForm() {
+    setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation('');
+    setImages([]); setPostError(''); setBidIncrement('10'); setDurationHours(72);
+  }
+
+  function closePostModal() {
+    setPostModal(null);
+    resetListingForm();
+    setPostDone(false);
+  }
 
   useEffect(() => {
     const r = document.documentElement;
@@ -218,9 +233,36 @@ export default function SellerDashboard() {
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
       setPostDone(true);
-      setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation(''); setImages([]);
+      resetListingForm();
       await fetchDeals(headers);
-      setTimeout(() => { setPostDone(false); setTab('active'); }, 1800);
+      setTimeout(() => { setPostDone(false); closePostModal(); setTab('active'); }, 1800);
+    } catch (err: unknown) {
+      setPostError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+    } finally { setPosting(false); }
+  }
+
+  async function handlePostAuction() {
+    if (!title || !price) { setPostError('กรุณากรอกชื่อสินค้าและราคาเริ่มต้น'); return; }
+    if (!condition) { setPostError('กรุณาเลือกสภาพสินค้า'); return; }
+    const inc = Math.max(1, Math.round(Number(bidIncrement) || 10));
+    setPosting(true); setPostError('');
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title, description, price: Number(price), listGrossPrice: Number(price),
+          category, condition, location, creatorRole: 'seller', source: 'listing',
+          dealType: 'auction', imageFileIds: images.map(i => i.fileId),
+          auctionData: { bidIncrement: inc, durationHours },
+        }),
+      });
+      if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
+      setPostDone(true);
+      resetListingForm();
+      await fetchDeals(headers);
+      setTimeout(() => { setPostDone(false); closePostModal(); setTab('active'); }, 1800);
     } catch (err: unknown) {
       setPostError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally { setPosting(false); }
@@ -252,6 +294,7 @@ export default function SellerDashboard() {
                 <span className="deal-card-price">฿{(deal.price || 0).toLocaleString()}</span>
                 {deal.condition && <span>{deal.condition}</span>}
                 {deal.location && <span>📍 {deal.location}</span>}
+                {deal.deal_type === 'auction' && <span style={{ color: '#7c3aed', fontWeight: 700 }}>🔨 ประมูล</span>}
                 {isCertifiedMode(deal.selling_mode) && <span style={{ color: 'var(--amber-500)', fontWeight: 700 }}>⭐ Certified</span>}
               </div>
             </div>
@@ -270,7 +313,7 @@ export default function SellerDashboard() {
       <header className="dash-header">
         <button onClick={() => router.back()} className="dash-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
         <div className="dash-head-info"><div className="dash-head-title">🏪 ร้านของฉัน</div></div>
-        <div className="dash-head-actions"><button className="btn btn-primary btn-sm" onClick={() => setTab('post')}>+ ลงขาย</button></div>
+        <div className="dash-head-actions"><button className="btn btn-primary btn-sm" onClick={() => { setPostError(''); setPostDone(false); setPostModal('pick'); }}>+ ลงขาย</button></div>
       </header>
 
       <section className="dash-body" style={{ paddingBottom: 0 }}>
@@ -378,125 +421,176 @@ export default function SellerDashboard() {
       </section>
 
       <nav className="dash-tabs-wrap">
-        {([{ k: 'post', l: '+ ลงขาย' }, { k: 'active', l: `กำลังขาย (${activeDeals.length})` }, { k: 'history', l: `ประวัติ (${historyDeals.length})` }] as const).map(({ k, l }) => (
+        {([{ k: 'active', l: `กำลังขาย (${activeDeals.length})` }, { k: 'history', l: `ประวัติ (${historyDeals.length})` }] as const).map(({ k, l }) => (
           <button key={k} className={`dash-tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
         ))}
       </nav>
 
       <main className="dash-body">
-        {tab !== 'post' && (
-          <div className="dash-stats">
-            <div className="dash-stat"><div className="dash-stat-val">{activeDeals.length}</div><div className="dash-stat-lbl">กำลังขาย</div></div>
-            <div className="dash-stat"><div className="dash-stat-val">{historyDeals.filter(d => d.status === 'completed').length}</div><div className="dash-stat-lbl">เสร็จสิ้น</div></div>
-            <div className="dash-stat"><div className="dash-stat-val" style={{ fontSize: 17 }}>฿{totalRev.toLocaleString()}</div><div className="dash-stat-lbl">รายได้รวม</div></div>
-          </div>
-        )}
+        <div className="dash-stats">
+          <div className="dash-stat"><div className="dash-stat-val">{activeDeals.length}</div><div className="dash-stat-lbl">กำลังขาย</div></div>
+          <div className="dash-stat"><div className="dash-stat-val">{historyDeals.filter(d => d.status === 'completed').length}</div><div className="dash-stat-lbl">เสร็จสิ้น</div></div>
+          <div className="dash-stat"><div className="dash-stat-val" style={{ fontSize: 17 }}>฿{totalRev.toLocaleString()}</div><div className="dash-stat-lbl">รายได้รวม</div></div>
+        </div>
 
         {tab === 'active' && (activeDeals.length === 0 ? (
           <div className="dash-empty">
             <div className="dash-empty-icon">📦</div>
             <p>ยังไม่มีประกาศที่กำลังดำเนินการ</p>
-            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setTab('post')}>+ ลงประกาศใหม่</button>
+            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setPostModal('pick')}>+ ลงประกาศใหม่</button>
           </div>
         ) : activeDeals.map(d => <DealCard key={d.id} deal={d} />))}
 
-        {tab === 'post' && (
-          <div className="form-section">
-            <h3 style={{ marginBottom: 20 }}>ลงขายสินค้า</h3>
-            {postDone && <div style={{ background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 18, color: 'var(--green-700)', fontWeight: 600 }}>✅ ลงประกาศสำเร็จ!</div>}
-            {postError && <div style={{ background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 18, color: '#b22441' }}>⚠️ {postError}</div>}
-
-            <div className="form-field">
-              <label>รูปภาพสินค้า</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                {images.map(img => (
-                  <div key={img.fileId} style={{ position: 'relative' }}>
-                    <img src={img.url} alt={img.name} style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 'var(--r-md)' }} />
-                    <button onClick={() => removeImage(img.fileId)} style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%', background: 'var(--rose-500)', color: '#fff', border: 'none', fontSize: 14, cursor: 'pointer' }}>×</button>
-                  </div>
-                ))}
-                <label className="img-upload-box" style={{ width: 80, height: 80, padding: 0, margin: 0 }}>
-                  <span style={{ fontSize: 22 }}>{uploading ? '⏳' : '📷'}</span>
-                  <span style={{ fontSize: 11 }}>{uploading ? 'กำลังอัป...' : 'เพิ่มรูป'}</span>
-                  <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImageUpload(e.target.files)} />
-                </label>
-              </div>
-            </div>
-
-            <div className="form-field">
-              <label>ชื่อสินค้า / บริการ *</label>
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="เช่น iPhone 15 Pro Max 256GB สีดำ" />
-            </div>
-
-            <div className="form-row-2">
-              <div className="form-field" style={{ margin: 0 }}>
-                <label>ราคาที่คุณต้องการได้ (บาท) *</label>
-                <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" min="0" />
-              </div>
-              <div className="form-field" style={{ margin: 0 }}>
-                <label>หมวดหมู่</label>
-                <select value={category} onChange={e => setCategory(e.target.value)}>
-                  <option value="">เลือก...</option>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {gpPreview && (
-              <div className="gp-preview-box">
-                <div className="gp-preview-row gp-preview-row--muted">
-                  <span>ราคาที่คุณตั้ง</span>
-                  <span>฿{gpPreview.sellerPrice.toLocaleString()}</span>
-                </div>
-                <div className="gp-preview-row gp-preview-row--muted">
-                  <span>บวก GP {gpPreview.gpPercent}%</span>
-                  <span>+฿{gpPreview.gpAmount.toLocaleString()}</span>
-                </div>
-                <div className="gp-preview-row">
-                  <span>ราคาที่ผู้บริโภคเห็นในตลาด</span>
-                  <strong>฿{gpPreview.displayPrice.toLocaleString()}</strong>
-                </div>
-                <div className="gp-preview-row gp-preview-row--accent">
-                  <span>คอมมิชชั่นคืนคุณ ({gpPreview.commissionPercent}% ของ GP)</span>
-                  <strong>+฿{gpPreview.sellerCommission.toLocaleString()}</strong>
-                </div>
-                <div className="gp-preview-row gp-preview-row--total">
-                  <span>รายได้คุณเมื่อขายได้</span>
-                  <strong>฿{gpPreview.sellerReceive.toLocaleString()}</strong>
-                </div>
-              </div>
-            )}
-
-            <div className="form-field">
-              <label>สภาพสินค้า *</label>
-              <div className="cond-chips">
-                {CONDITIONS.map(c => (
-                  <button key={c} type="button" className={`cond-chip${condition === c ? ' sel' : ''}`} onClick={() => setCondition(c)}>{c}</button>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-field">
-              <label>จังหวัดที่ตั้งสินค้า</label>
-              <select value={location} onChange={e => setLocation(e.target.value)}>
-                <option value="">เลือกจังหวัด...</option>
-                {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-
-            <div className="form-field">
-              <label>รายละเอียดเพิ่มเติม</label>
-              <textarea rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="รายละเอียดสินค้า สภาพ อุปกรณ์ที่มา เงื่อนไข..." />
-            </div>
-
-            <button className="btn btn-primary btn-block" style={{ marginTop: 4 }} onClick={handlePost} disabled={posting || postDone || uploading}>
-              {posting ? 'กำลังลงประกาศ...' : 'ลงประกาศ'}
-            </button>
-          </div>
-        )}
-
         {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.id} deal={d} />))}
       </main>
+
+      {postModal && (
+        <div className="seller-modal-backdrop" onClick={closePostModal}>
+          <div className="seller-modal" onClick={e => e.stopPropagation()}>
+            <button type="button" className="seller-modal-close" onClick={closePostModal} aria-label="ปิด">×</button>
+
+            {postModal === 'pick' && (
+              <>
+                <h3 className="seller-modal-title">เลือกประเภทการลงขาย</h3>
+                <p className="seller-modal-sub">เลือกรูปแบบที่ต้องการลงในตลาด</p>
+                <div className="seller-modal-pick-grid">
+                  <button type="button" className="seller-modal-pick" onClick={() => { setPostError(''); setPostModal('listing'); }}>
+                    <span className="seller-modal-pick-ic">🛒</span>
+                    <strong>ลงขายสินค้า</strong>
+                    <span>ราคาตายตัว แสดงในตลาดทันที</span>
+                  </button>
+                  <button type="button" className="seller-modal-pick seller-modal-pick--auction" onClick={() => { setPostError(''); setPostModal('auction'); }}>
+                    <span className="seller-modal-pick-ic">🔨</span>
+                    <strong>ลงสินค้าประมูล</strong>
+                    <span>เปิดรับ bid มีเวลานับถอยหลัง</span>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {(postModal === 'listing' || postModal === 'auction') && (
+              <div className="seller-modal-form">
+                <button type="button" className="seller-modal-back-link" onClick={() => setPostModal('pick')}>← เลือกประเภทอื่น</button>
+                <h3 className="seller-modal-title">{postModal === 'auction' ? 'ลงสินค้าประมูล' : 'ลงขายสินค้า'}</h3>
+                {postDone && <div className="shop-alert shop-alert--ok">✅ ลงประกาศสำเร็จ!</div>}
+                {postError && <div className="shop-alert shop-alert--err">⚠️ {postError}</div>}
+
+                <div className="form-field">
+                  <label>รูปภาพสินค้า</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                    {images.map(img => (
+                      <div key={img.fileId} style={{ position: 'relative' }}>
+                        <img src={img.url} alt={img.name} style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 'var(--r-md)' }} />
+                        <button type="button" onClick={() => removeImage(img.fileId)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--rose-500)', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer' }}>×</button>
+                      </div>
+                    ))}
+                    <label className="img-upload-box" style={{ width: 72, height: 72, padding: 0, margin: 0 }}>
+                      <span style={{ fontSize: 20 }}>{uploading ? '⏳' : '📷'}</span>
+                      <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImageUpload(e.target.files)} />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-field">
+                  <label>ชื่อสินค้า / บริการ *</label>
+                  <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="เช่น iPhone 15 Pro Max 256GB สีดำ" />
+                </div>
+
+                <div className="form-row-2">
+                  <div className="form-field" style={{ margin: 0 }}>
+                    <label>{postModal === 'auction' ? 'ราคาเริ่มต้นที่ต้องการได้ (บาท) *' : 'ราคาที่คุณต้องการได้ (บาท) *'}</label>
+                    <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" min="0" />
+                  </div>
+                  <div className="form-field" style={{ margin: 0 }}>
+                    <label>หมวดหมู่</label>
+                    <select value={category} onChange={e => setCategory(e.target.value)}>
+                      <option value="">เลือก...</option>
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {postModal === 'auction' && (
+                  <div className="form-row-2">
+                    <div className="form-field" style={{ margin: 0 }}>
+                      <label>บิทครั้งละ (บาท) *</label>
+                      <input type="number" value={bidIncrement} onChange={e => setBidIncrement(e.target.value)} min="1" placeholder="10" />
+                    </div>
+                    <div className="form-field" style={{ margin: 0 }}>
+                      <label>ระยะเวลาประมูล</label>
+                      <select value={durationHours} onChange={e => setDurationHours(Number(e.target.value))}>
+                        {AUCTION_DURATION_OPTIONS.map(o => (
+                          <option key={o.hours} value={o.hours}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {gpPreview && (
+                  <div className="gp-preview-box">
+                    <div className="gp-preview-row gp-preview-row--muted">
+                      <span>ราคาที่คุณตั้ง</span>
+                      <span>฿{gpPreview.sellerPrice.toLocaleString()}</span>
+                    </div>
+                    <div className="gp-preview-row gp-preview-row--muted">
+                      <span>บวก GP {gpPreview.gpPercent}%</span>
+                      <span>+฿{gpPreview.gpAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="gp-preview-row">
+                      <span>{postModal === 'auction' ? 'ราคาเริ่มประมูลที่ผู้บริโภคเห็น' : 'ราคาที่ผู้บริโภคเห็นในตลาด'}</span>
+                      <strong>฿{gpPreview.displayPrice.toLocaleString()}</strong>
+                    </div>
+                    {postModal === 'listing' && (
+                      <>
+                        <div className="gp-preview-row gp-preview-row--accent">
+                          <span>คอมมิชชั่นคืนคุณ ({gpPreview.commissionPercent}% ของ GP)</span>
+                          <strong>+฿{gpPreview.sellerCommission.toLocaleString()}</strong>
+                        </div>
+                        <div className="gp-preview-row gp-preview-row--total">
+                          <span>รายได้คุณเมื่อขายได้</span>
+                          <strong>฿{gpPreview.sellerReceive.toLocaleString()}</strong>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="form-field">
+                  <label>สภาพสินค้า *</label>
+                  <div className="cond-chips">
+                    {CONDITIONS.map(c => (
+                      <button key={c} type="button" className={`cond-chip${condition === c ? ' sel' : ''}`} onClick={() => setCondition(c)}>{c}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-field">
+                  <label>จังหวัดที่ตั้งสินค้า</label>
+                  <select value={location} onChange={e => setLocation(e.target.value)}>
+                    <option value="">เลือกจังหวัด...</option>
+                    {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label>รายละเอียดเพิ่มเติม</label>
+                  <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="รายละเอียดสินค้า..." />
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary btn-block"
+                  onClick={postModal === 'auction' ? handlePostAuction : handlePost}
+                  disabled={posting || postDone || uploading}
+                >
+                  {posting ? 'กำลังลงประกาศ...' : postModal === 'auction' ? 'เปิดประมูล' : 'ลงประกาศ'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

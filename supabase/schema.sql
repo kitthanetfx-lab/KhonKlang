@@ -23,7 +23,7 @@ create type approval_status as enum ('pending_review', 'approved', 'rejected');
 create type middleman_tier as enum ('Bronze', 'Silver', 'Gold', 'Platinum');
 
 create type deal_source as enum ('listing', 'private');
-create type deal_type as enum ('normal', 'meetup', 'simple');
+create type deal_type as enum ('normal', 'meetup', 'simple', 'auction');
 create type fee_payer as enum ('buyer', 'seller', 'split');
 create type deal_status as enum (
   'posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending',
@@ -271,6 +271,34 @@ create table deal_meetup (
 );
 create trigger trg_deal_meetup_updated_at before update on deal_meetup
   for each row execute function set_updated_at();
+
+-- 4b2. deal_auction — ประมูลตลาด (deal_type = 'auction')
+create table deal_auction (
+  deal_id               uuid primary key references deals(id) on delete cascade,
+  display_start_price   integer not null check (display_start_price >= 0),
+  bid_increment         integer not null check (bid_increment > 0),
+  ends_at               timestamptz not null,
+  current_bid           integer check (current_bid is null or current_bid >= 0),
+  current_bidder_id     uuid references profiles(id) on delete set null,
+  current_bidder_name   text not null default '',
+  bid_count             integer not null default 0,
+  unique_bidder_count   integer not null default 0,
+  ended_at              timestamptz,
+  updated_at            timestamptz not null default now()
+);
+create index idx_deal_auction_ends on deal_auction(ends_at) where ended_at is null;
+create trigger trg_deal_auction_updated_at before update on deal_auction
+  for each row execute function set_updated_at();
+
+create table auction_bids (
+  id            uuid primary key default gen_random_uuid(),
+  deal_id       uuid not null references deals(id) on delete cascade,
+  bidder_id     uuid not null references profiles(id) on delete cascade,
+  bidder_name   text not null default '',
+  amount        integer not null check (amount > 0),
+  created_at    timestamptz not null default now()
+);
+create index idx_auction_bids_deal on auction_bids(deal_id, created_at desc);
 
 -- 4c. deal_images — replaces `imageFileIds` JSON array
 create table deal_images (
@@ -783,6 +811,12 @@ create policy deal_meetup_participant on deal_meetup
       and (d.buyer_id = auth.uid() or d.seller_id = auth.uid() or d.middleman_id = auth.uid())
     )
   );
+
+alter table deal_auction enable row level security;
+create policy deal_auction_read_all on deal_auction for select using (true);
+
+alter table auction_bids enable row level security;
+create policy auction_bids_read_all on auction_bids for select using (true);
 
 alter table deal_images enable row level security;
 create policy deal_images_participant on deal_images

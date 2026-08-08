@@ -3787,3 +3787,171 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   .admin-fee-tier-grid { grid-template-columns: 1fr; }
   .admin-fee-fields { grid-template-columns: 1fr; }
 }
+
+/* ── Seller listing modal ── */
+.seller-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(15, 23, 42, .55);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.seller-modal {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-lg);
+  padding: 20px 18px 18px;
+}
+.seller-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+}
+.seller-modal-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0 0 4px;
+}
+.seller-modal-sub { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+.seller-modal-pick-grid { display: grid; gap: 10px; }
+.seller-modal-pick {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.seller-modal-pick strong { font-size: 15px; color: var(--ink); }
+.seller-modal-pick span:last-child { font-size: 12px; color: var(--muted); }
+.seller-modal-pick-ic { font-size: 26px; margin-bottom: 2px; }
+.seller-modal-pick--auction { border-color: color-mix(in srgb, #7c3aed 30%, var(--line)); background: #f5f3ff; }
+.seller-modal-form { display: grid; gap: 0; }
+.seller-modal-back-link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+/* ── Marketplace auction ── */
+.mkt-mode-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.mkt-mode-tab {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+}
+.mkt-mode-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.lc-card--auction { border-color: color-mix(in srgb, #7c3aed 22%, var(--line)); }
+.lc-badge--auction { background: #7c3aed !important; }
+.lc-auction-timer {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  background: rgba(0,0,0,.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+.lc-auction-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--ink-2);
+  margin: 4px 0 6px;
+}
+.badge-purple {
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+}
+.mkt-auction-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 14px;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+}
+.mkt-auction-stat-lbl {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.mkt-auction-stat strong { font-size: 14px; color: var(--ink); }
+.mkt-auction-countdown .is-live { color: #7c3aed; font-weight: 800; }
+.mkt-bid-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.mkt-bid-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.mkt-bid-row input {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  font-size: 16px;
+}
+.mkt-bid-error { color: #b22441; font-size: 13px; margin: 8px 0 0; }
+.mkt-bid-history {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.mkt-bid-history h3 { font-size: 15px; margin: 0 0 10px; }
+.mkt-bid-history ul { list-style: none; margin: 0; padding: 0; }
+.mkt-bid-history li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.mkt-bid-history time { color: var(--muted); font-size: 11px; white-space: nowrap; }
+@media (max-width: 640px) {
+  .mkt-auction-panel { grid-template-columns: 1fr; }
+}
