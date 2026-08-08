@@ -281,25 +281,26 @@ export default function Marketplace() {
         <div className="container mkt-hero-inner">
           <div className="mkt-hero-top">
             <div className="mkt-hero-copy">
-              <div className="kicker">{isAuction ? 'โซนประมูล' : 'ตลาดคนกลาง'}</div>
               <div className="mkt-mode-tabs reveal" role="tablist" aria-label="โซนตลาด">
                 <button
                   type="button"
                   role="tab"
                   aria-selected={!isAuction}
-                  className={`mkt-mode-tab${!isAuction ? ' active' : ''}`}
+                  className={`mkt-mode-tab mkt-mode-tab--listing${!isAuction ? ' active' : ''}`}
                   onClick={() => setZone('listing')}
                 >
-                  <Icon name="store" size={14} /> ขายสินค้า
+                  <Icon name="store" size={16} />
+                  <span>ตลาดซื้อขาย</span>
                 </button>
                 <button
                   type="button"
                   role="tab"
                   aria-selected={isAuction}
-                  className={`mkt-mode-tab${isAuction ? ' active' : ''}`}
+                  className={`mkt-mode-tab mkt-mode-tab--auction${isAuction ? ' active' : ''}`}
                   onClick={() => setZone('auction')}
                 >
-                  🔨 โซนประมูล
+                  <span className="mkt-mode-tab-ic" aria-hidden>🔨</span>
+                  <span>ตลาดประมูล</span>
                 </button>
               </div>
               <h1 className="mkt-headline reveal">
@@ -410,7 +411,7 @@ export default function Marketplace() {
               )}
               {isAuction ? (
                 <button type="button" className="btn btn-soft btn-sm" onClick={() => setZone('listing')}>
-                  <Icon name="store" size={15} /> ดูขายสินค้า
+                  <Icon name="store" size={15} /> ดูตลาดซื้อขาย
                 </button>
               ) : (
                 <Link href="/wanted" className="btn btn-primary btn-sm">📢 ลงประกาศหาสินค้านี้</Link>
