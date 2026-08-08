@@ -16,7 +16,7 @@ type HeaderAccountActionsProps = {
 const profileItems = [
   { icon: 'user', t: 'เข้าสู่โปรไฟล์', d: 'ดูและแก้ไขข้อมูลบัญชี', href: '/profile' },
   { icon: 'clock', t: 'ดีลของฉัน / ประวัติ', d: 'ประวัติซื้อขายทุกบทบาท + กล่องข้อความ', href: '/orders' },
-  { icon: 'store', t: 'บอร์ดผู้ขาย', d: 'จัดการประกาศและดีลของคุณ', href: '/dashboard/seller' },
+  { icon: 'store', t: 'ร้านของฉัน', d: 'ตั้งค่าร้านและลงขายสินค้า', href: '/dashboard/seller' },
   { icon: 'handCoins', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' },
 ] as const;
 
@@ -45,13 +45,13 @@ export function HeaderAccountActions({ className = '', showNotify = true }: Head
     ? [
         { icon: 'user', t: 'เข้าสู่โปรไฟล์', d: 'ดูและแก้ไขข้อมูลบัญชี', href: '/profile' },
         { icon: 'clock', t: 'ดีลของฉัน / ประวัติ', d: 'ประวัติซื้อขายทุกบทบาท + กล่องข้อความ', href: '/orders' },
-        { icon: 'store', t: 'บอร์ดผู้ขาย', d: 'จัดการประกาศและดีลของคุณ', href: '/dashboard/seller' },
+        { icon: 'store', t: 'ร้านของฉัน', d: 'ตั้งค่าร้านและลงขายสินค้า', href: '/dashboard/seller' },
         { icon: 'handCoins', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' },
       ]
     : [
         { icon: 'user', t: 'Profile', d: 'View and edit your account details', href: '/profile' },
         { icon: 'clock', t: 'My Deals / History', d: 'Transaction history and inbox', href: '/orders' },
-        { icon: 'store', t: 'Seller Board', d: 'Manage your listings and deals', href: '/dashboard/seller' },
+        { icon: 'store', t: 'My Shop', d: 'Manage your shop and listings', href: '/dashboard/seller' },
         { icon: 'handCoins', t: 'Middleman Board', d: 'Deals currently under your care', href: '/dashboard/middleman' },
       ];
   const displayName = user?.prefs?.displayName || user?.name || (locale === 'th' ? 'บัญชีของฉัน' : 'My account');

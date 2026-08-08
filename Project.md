@@ -1,5 +1,39 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-08 (14:00)
+
+### ร้านของฉัน + SlipOK skip + ข้อมูลร้าน public
+
+**โจทย์**:
+1. เปลี่ยน「บอร์ดผู้ขาย」→「ร้านของฉัน」
+2. หน้า `/dashboard/seller` — ตั้งชื่อร้าน ที่ตั้ง ที่อยู่ แสดง/ไม่แสดง + ลงขาย
+3. ยังไม่ตั้ง SlipOK → ข้าม auto verify (ไม่ตีไม่ผ่าน)
+
+**แก้ไข**:
+1. **`supabase/migrations/0024_seller_shop.sql`** — `shop_*` ใน profiles
+2. **`src/app/api/seller/shop/route.ts`** — GET/PATCH ข้อมูลร้าน
+3. **`src/app/dashboard/seller/page.tsx`** — UI ร้าน + ลงขาย
+4. **`src/app/api/deals/[id]/route.ts`**, **`src/app/marketplace/[id]/page.tsx`** — แสดงร้านเมื่อ shop_public
+5. **`src/lib/slipok.ts`**, **`src/app/api/_lib/slipAutoVerify.ts`** — `isSlipokConfigured()` ข้าม auto
+6. เปลี่ยนชื่อเมนูใน Site, HeaderAccountActions, profile
+
+**งานฝั่งผู้ใช้**: รัน migration `0024_seller_shop.sql`
+
+### ไฟล์ที่แก้ไข (2026-08-08 14:00)
+- `supabase/migrations/0024_seller_shop.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/app/api/seller/shop/route.ts` (ใหม่)
+- `src/app/dashboard/seller/page.tsx`
+- `src/app/api/deals/[id]/route.ts`
+- `src/app/marketplace/[id]/page.tsx`
+- `src/lib/slipok.ts`
+- `src/app/api/_lib/slipAutoVerify.ts`
+- `src/components/Site.tsx`
+- `src/components/HeaderAccountActions.tsx`
+- `src/app/profile/page.tsx`
+
+---
+
 ## 2026-08-07 (15:05)
 
 ### LINE แจ้งแชทลูกค้า + ขอโทรกลับ (กลุ่มแยกจากดีล) + ลบ self-grant Admin

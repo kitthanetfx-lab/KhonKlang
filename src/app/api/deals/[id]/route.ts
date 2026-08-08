@@ -136,6 +136,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // public view — ไม่ส่งข้อมูลส่วนตัวผู้ซื้อ
     }
 
+    let sellerShop: { name: string; location: string; address: string } | null = null;
+    if (current.seller_id && ['posted', 'waiting_seller', 'waiting_buyer'].includes(String(current.status))) {
+      const { data: sp } = await db.from('profiles')
+        .select('shop_name, shop_location, shop_address, shop_public')
+        .eq('id', current.seller_id)
+        .maybeSingle();
+      if (sp?.shop_public && String(sp.shop_name || '').trim()) {
+        sellerShop = {
+          name: String(sp.shop_name).trim(),
+          location: String(sp.shop_location || '').trim(),
+          address: String(sp.shop_address || '').trim(),
+        };
+      }
+    }
+
     return NextResponse.json({
       deal: { ...current, images: (imagesRes.data || []).map(r => r.file_id) },
       priceState: psWithDefaults,
@@ -144,6 +159,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       buyerBank, sellerBank, middlemanBank,
       simpleShare,
       buyerShipping,
+      sellerShop,
     });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

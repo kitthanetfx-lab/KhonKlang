@@ -5,6 +5,7 @@ import {
   dealSlipPublicUrl,
   isSlipImageFile,
   verifySlipByFileId,
+  isSlipokConfigured,
   type SlipInfo,
   type SlipResult,
 } from '@/lib/slipok';
@@ -223,6 +224,7 @@ export async function runAutoSlipVerification(
   const controls = await readServiceControlsConfig(db);
   const dealPrice = Number(deal.price || 0);
   if (!shouldAutoVerifySlip(controls, dealPrice)) return deal;
+  if (!isSlipokConfigured()) return deal;
 
   const { data: priceState } = await db.from('deal_price_state').select('*').eq('deal_id', dealId).maybeSingle();
   const fees = await readFeesConfig(db);

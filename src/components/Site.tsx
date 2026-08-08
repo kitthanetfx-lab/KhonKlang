@@ -180,13 +180,13 @@ export function Nav({ active }: { active?: string }) {
     ? [
         { icon: 'user', tint: '', t: 'เข้าสู่โปรไฟล์', d: 'ดูและแก้ไขข้อมูลบัญชี', href: '/profile' },
         { icon: 'clock', tint: 'amber', t: 'ดีลของฉัน / ประวัติ', d: 'ประวัติซื้อขายทุกบทบาท + กล่องข้อความ', href: '/orders' },
-        { icon: 'store', tint: '', t: 'บอร์ดผู้ขาย', d: 'จัดการประกาศและดีลของคุณ', href: '/dashboard/seller' },
+        { icon: 'store', tint: '', t: 'ร้านของฉัน', d: 'ตั้งค่าร้านและลงขายสินค้า', href: '/dashboard/seller' },
         { icon: 'handCoins', tint: 'green', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' },
       ]
     : [
         { icon: 'user', tint: '', t: 'Profile', d: 'View and edit your account details', href: '/profile' },
         { icon: 'clock', tint: 'amber', t: 'My Deals / History', d: 'All transactions and message history', href: '/orders' },
-        { icon: 'store', tint: '', t: 'Seller Board', d: 'Manage your listings and deals', href: '/dashboard/seller' },
+        { icon: 'store', tint: '', t: 'My Shop', d: 'Manage your shop and listings', href: '/dashboard/seller' },
         { icon: 'handCoins', tint: 'green', t: 'Middleman Board', d: 'See deals currently under your care', href: '/dashboard/middleman' },
       ];
 

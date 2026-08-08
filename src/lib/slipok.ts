@@ -57,10 +57,14 @@ export function isSlipImageFile(fileId: string): boolean {
   return ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'webp';
 }
 
+export function isSlipokConfigured(): boolean {
+  return Boolean(process.env.SLIPOK_BRANCH_ID?.trim() && process.env.SLIPOK_API_KEY?.trim());
+}
+
 /** ตรวจสลิปจาก URL รูป public (ตามเอกสาร SlipOK ใช้ field url) */
 export async function verifySlipByUrl(imageUrl: string, expectedAmount?: number): Promise<SlipResult> {
-  const branchId = process.env.SLIPOK_BRANCH_ID;
-  const apiKey = process.env.SLIPOK_API_KEY;
+  const branchId = process.env.SLIPOK_BRANCH_ID?.trim();
+  const apiKey = process.env.SLIPOK_API_KEY?.trim();
   if (!branchId || !apiKey) {
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }

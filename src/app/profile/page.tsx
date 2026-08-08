@@ -446,7 +446,7 @@ function ProfilePage() {
         {!locked && <div className="pf-links">
           {sellerStatus === 'approved' && (
             <Link href="/dashboard/seller" className="pf-link">
-              <div className="pf-link-left"><div className="pf-link-icon" style={{ background: 'var(--blue-50)' }}>🛒</div><div><span className="pf-link-t">บอร์ดผู้ขาย</span><span className="pf-link-d">จัดการประกาศและดีลของคุณ</span></div></div>
+              <div className="pf-link-left"><div className="pf-link-icon" style={{ background: 'var(--blue-50)' }}>🏪</div><div><span className="pf-link-t">ร้านของฉัน</span><span className="pf-link-d">ตั้งค่าร้านและลงขายสินค้า</span></div></div>
               <span style={{ color: 'var(--faint)', fontSize: 18 }}>›</span>
             </Link>
           )}

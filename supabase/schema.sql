@@ -107,6 +107,11 @@ create table profiles (
   review_score          numeric(3,2) not null default 0,   -- denormalized avg, kept in sync by trigger on reviews
   review_count          integer not null default 0,
 
+  shop_name             text,
+  shop_location         text,
+  shop_address          text,
+  shop_public           boolean not null default false,
+
   -- Optional manual-merge pointer, kept only as an escape hatch. Prefer
   -- Supabase's native auth.identities linking over re-implementing the old
   -- phone-matching auto-link logic — see SCHEMA_DESIGN.md §Auth.

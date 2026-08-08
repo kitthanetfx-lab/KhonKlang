@@ -39,8 +39,16 @@ export default function SellerDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [deals, setDeals] = useState<Deal[]>([]);
-  const [tab, setTab] = useState<'active' | 'post' | 'history'>('active');
+  const [tab, setTab] = useState<'post' | 'active' | 'history'>('post');
   const [myId, setMyId] = useState('');
+
+  const [shopName, setShopName] = useState('');
+  const [shopLocation, setShopLocation] = useState('');
+  const [shopAddress, setShopAddress] = useState('');
+  const [shopPublic, setShopPublic] = useState(false);
+  const [shopSaving, setShopSaving] = useState(false);
+  const [shopSaved, setShopSaved] = useState(false);
+  const [shopError, setShopError] = useState('');
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -74,6 +82,15 @@ export default function SellerDashboard() {
         if (profile?.seller_status !== 'approved') { router.replace('/register/seller'); return; }
         setMyId(user.id);
         const headers = await authHeaders();
+        const shopRes = await fetch('/api/seller/shop', { headers }).catch(() => null);
+        if (shopRes?.ok) {
+          const shopData = await shopRes.json();
+          const s = shopData.shop || {};
+          setShopName(s.shopName || '');
+          setShopLocation(s.shopLocation || '');
+          setShopAddress(s.shopAddress || '');
+          setShopPublic(Boolean(s.shopPublic));
+        }
         await fetchDeals(headers);
       } catch { router.replace('/login'); }
       finally { setLoading(false); }
@@ -102,6 +119,28 @@ export default function SellerDashboard() {
     } finally { setUploading(false); }
   }
   function removeImage(fileId: string) { setImages(prev => prev.filter(i => i.fileId !== fileId)); }
+
+  async function saveShop() {
+    setShopSaving(true);
+    setShopSaved(false);
+    setShopError('');
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/seller/shop', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shopName, shopLocation, shopAddress, shopPublic }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
+      setShopSaved(true);
+      setTimeout(() => setShopSaved(false), 2000);
+    } catch (err: unknown) {
+      setShopError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setShopSaving(false);
+    }
+  }
 
   async function handlePost() {
     if (!title || !price) { setPostError('กรุณากรอกชื่อสินค้าและราคา'); return; }
@@ -165,12 +204,42 @@ export default function SellerDashboard() {
     <div className="dash-root">
       <header className="dash-header">
         <button onClick={() => router.back()} className="dash-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
-        <div className="dash-head-info"><div className="dash-head-title">🛒 บอร์ดผู้ขาย</div></div>
-        <div className="dash-head-actions"><button className="btn btn-primary btn-sm" onClick={() => setTab('post')}>+ ลงประกาศ</button></div>
+        <div className="dash-head-info"><div className="dash-head-title">🏪 ร้านของฉัน</div></div>
+        <div className="dash-head-actions"><button className="btn btn-primary btn-sm" onClick={() => setTab('post')}>+ ลงขาย</button></div>
       </header>
 
+      <section className="dash-body" style={{ paddingBottom: 0 }}>
+        <div className="form-section" style={{ marginBottom: 0 }}>
+          <h3 style={{ marginBottom: 12 }}>ข้อมูลร้าน</h3>
+          {shopError && <div style={{ background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 14, color: '#b22441' }}>⚠️ {shopError}</div>}
+          {shopSaved && <div style={{ background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 14, color: 'var(--green-700)', fontWeight: 600 }}>✅ บันทึกข้อมูลร้านแล้ว</div>}
+          <div className="form-field">
+            <label>ชื่อร้าน</label>
+            <input type="text" value={shopName} onChange={e => setShopName(e.target.value)} placeholder="เช่น ร้านของฉัน by Kitthanet" maxLength={120} />
+          </div>
+          <div className="form-field">
+            <label>ที่ตั้งร้าน (จังหวัด)</label>
+            <select value={shopLocation} onChange={e => setShopLocation(e.target.value)}>
+              <option value="">เลือกจังหวัด...</option>
+              {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div className="form-field">
+            <label>ที่อยู่ร้าน (รายละเอียด)</label>
+            <textarea rows={2} value={shopAddress} onChange={e => setShopAddress(e.target.value)} placeholder="เลขที่ ซอย แขวง/ตำบล..." maxLength={500} />
+          </div>
+          <label className="filter-row" style={{ cursor: 'pointer', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 14 }} onClick={() => setShopPublic(v => !v)}>
+            <span>แสดงข้อมูลร้านต่อผู้ซื้อในหน้าสินค้า</span>
+            <input type="checkbox" checked={shopPublic} readOnly />
+          </label>
+          <button type="button" className="btn btn-soft btn-sm" onClick={saveShop} disabled={shopSaving}>
+            {shopSaving ? 'กำลังบันทึก...' : 'บันทึกข้อมูลร้าน'}
+          </button>
+        </div>
+      </section>
+
       <nav className="dash-tabs-wrap">
-        {([{ k: 'active', l: `กำลังขาย (${activeDeals.length})` }, { k: 'post', l: '+ ลงประกาศ' }, { k: 'history', l: `ประวัติ (${historyDeals.length})` }] as const).map(({ k, l }) => (
+        {([{ k: 'post', l: '+ ลงขาย' }, { k: 'active', l: `กำลังขาย (${activeDeals.length})` }, { k: 'history', l: `ประวัติ (${historyDeals.length})` }] as const).map(({ k, l }) => (
           <button key={k} className={`dash-tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
         ))}
       </nav>
@@ -194,7 +263,7 @@ export default function SellerDashboard() {
 
         {tab === 'post' && (
           <div className="form-section">
-            <h3 style={{ marginBottom: 20 }}>ลงประกาศสินค้าใหม่</h3>
+            <h3 style={{ marginBottom: 20 }}>ลงขายสินค้า</h3>
             {postDone && <div style={{ background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 18, color: 'var(--green-700)', fontWeight: 600 }}>✅ ลงประกาศสำเร็จ!</div>}
             {postError && <div style={{ background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 18, color: '#b22441' }}>⚠️ {postError}</div>}
 

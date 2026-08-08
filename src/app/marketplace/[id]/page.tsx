@@ -37,6 +37,7 @@ export default function MarketplaceDetailPage() {
   const listingId = params.id as string;
 
   const [listing, setListing] = useState<ListingDetail | null>(null);
+  const [sellerShop, setSellerShop] = useState<{ name: string; location: string; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [myId, setMyId] = useState('');
@@ -63,6 +64,7 @@ export default function MarketplaceDetailPage() {
           return;
         }
         setListing(data.deal || null);
+        setSellerShop(data.sellerShop || null);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
       } finally {
@@ -215,6 +217,14 @@ export default function MarketplaceDetailPage() {
               </div>
 
               {listing.description && <p className="mkt-detail-desc">{listing.description}</p>}
+
+              {sellerShop && (
+                <div className="mkt-detail-note-card" style={{ background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb, var(--accent) 24%, var(--line))' }}>
+                  <div className="mkt-detail-note-title">🏪 {sellerShop.name}</div>
+                  {sellerShop.location && <p style={{ margin: '4px 0 0', fontSize: 14 }}>📍 {sellerShop.location}</p>}
+                  {sellerShop.address && <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--ink-2)' }}>{sellerShop.address}</p>}
+                </div>
+              )}
 
               <div className="mkt-detail-actions">
                 {isOwner ? (
