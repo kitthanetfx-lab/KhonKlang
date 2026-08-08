@@ -2,7 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
@@ -10,6 +11,10 @@ import { Nav, Footer, useReveal } from '@/components/Site';
 import { isCertifiedMode } from '@/lib/listingMode';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
+import { AuctionCountdown } from '@/components/AuctionCountdown';
+import type { AuctionPublic } from '@/lib/auction';
+
+type Zone = 'listing' | 'auction';
 
 interface Listing {
   id: string;
@@ -28,6 +33,7 @@ interface Listing {
   status: string;
   buyer_id: string;
   created_at: string;
+  auction?: AuctionPublic;
 }
 
 function imgUrl(fileId: string) {
@@ -56,35 +62,50 @@ const PROVINCES = [
   'อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี',
 ];
 const CARD_BG = ['#0d1b3e','#2f6bf0','#10a566','#6841d9','#e89211','#0d9aa6'];
+const AUCTION_CARD_BG = ['#4c1d95','#7c3aed','#6d28d9','#5b21b6','#9333ea','#8b5cf6'];
 
 export default function Marketplace() {
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [myId,     setMyId]     = useState('');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const zone: Zone = searchParams.get('zone') === 'auction' ? 'auction' : 'listing';
 
-  const [search,     setSearch]     = useState('');
-  const [cat,        setCat]        = useState(() => {
-    if (typeof window === 'undefined') return 'ทั้งหมด';
-    try {
-      const c = new URLSearchParams(window.location.search).get('cat');
-      return c && CATS.includes(c) ? c : 'ทั้งหมด';
-    } catch {
-      return 'ทั้งหมด';
-    }
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [myId, setMyId] = useState('');
+
+  const [search, setSearch] = useState('');
+  const [cat, setCat] = useState(() => {
+    const c = searchParams.get('cat');
+    return c && CATS.includes(c) ? c : 'ทั้งหมด';
   });
-  const [province,   setProvince]   = useState('');
-  const [certified,  setCertified]  = useState(false);
-  const [sort,       setSort]       = useState('ล่าสุด');
+  const [province, setProvince] = useState('');
+  const [certified, setCertified] = useState(false);
+  const [listingSort, setListingSort] = useState('ล่าสุด');
+  const [auctionSort, setAuctionSort] = useState('ปิดเร็วสุด');
 
   useReveal();
   const controls = useServiceControls();
 
+  const setZone = useCallback((next: Zone) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === 'auction') params.set('zone', 'auction');
+    else params.delete('zone');
+    const qs = params.toString();
+    router.replace(qs ? `/marketplace?${qs}` : '/marketplace', { scroll: false });
+  }, [router, searchParams]);
+
   useEffect(() => {
     const r = document.documentElement;
-    r.style.setProperty('--accent', '#2f6bf0');
-    r.style.setProperty('--accent-strong', '#1f54d6');
-    r.style.setProperty('--accent-soft', '#eef4ff');
-  }, []);
+    if (zone === 'auction') {
+      r.style.setProperty('--accent', '#7c3aed');
+      r.style.setProperty('--accent-strong', '#6d28d9');
+      r.style.setProperty('--accent-soft', '#f5f3ff');
+    } else {
+      r.style.setProperty('--accent', '#2f6bf0');
+      r.style.setProperty('--accent-strong', '#1f54d6');
+      r.style.setProperty('--accent-soft', '#eef4ff');
+    }
+  }, [zone]);
 
   useEffect(() => {
     (async () => {
@@ -108,7 +129,10 @@ export default function Marketplace() {
     .filter(d => d.deal_type !== 'auction')
     .filter(d => d.source === 'listing' || (!d.source && !!d.selling_mode && d.selling_mode !== 'normal'));
 
-  let filtered = marketListings
+  const auctions = listings
+    .filter(d => d.status === 'posted' && d.deal_type === 'auction' && d.auction);
+
+  let filteredListings = marketListings
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)
     .filter(d => !province || d.location === province)
     .filter(d => !certified || isCertifiedMode(d.selling_mode))
@@ -116,8 +140,29 @@ export default function Marketplace() {
       d.title.toLowerCase().includes(search.toLowerCase()) ||
       (d.description || '').toLowerCase().includes(search.toLowerCase())
     );
-  if (sort === 'ราคา: น้อย→มาก') filtered = [...filtered].sort((a, b) => a.price - b.price);
-  else if (sort === 'ราคา: มาก→น้อย') filtered = [...filtered].sort((a, b) => b.price - a.price);
+  if (listingSort === 'ราคา: น้อย→มาก') filteredListings = [...filteredListings].sort((a, b) => a.price - b.price);
+  else if (listingSort === 'ราคา: มาก→น้อย') filteredListings = [...filteredListings].sort((a, b) => b.price - a.price);
+
+  let filteredAuctions = auctions
+    .filter(d => cat === 'ทั้งหมด' || d.category === cat)
+    .filter(d => !province || d.location === province)
+    .filter(d => !search ||
+      d.title.toLowerCase().includes(search.toLowerCase()) ||
+      (d.description || '').toLowerCase().includes(search.toLowerCase())
+    );
+  if (auctionSort === 'ราคา: น้อย→มาก') {
+    filteredAuctions = [...filteredAuctions].sort((a, b) => (a.auction?.leadingPrice || 0) - (b.auction?.leadingPrice || 0));
+  } else if (auctionSort === 'ราคา: มาก→น้อย') {
+    filteredAuctions = [...filteredAuctions].sort((a, b) => (b.auction?.leadingPrice || 0) - (a.auction?.leadingPrice || 0));
+  } else {
+    filteredAuctions = [...filteredAuctions].sort((a, b) => {
+      const ea = a.auction?.endsAt ? new Date(a.auction.endsAt).getTime() : Infinity;
+      const eb = b.auction?.endsAt ? new Date(b.auction.endsAt).getTime() : Infinity;
+      return ea - eb;
+    });
+  }
+
+  const filtered = zone === 'auction' ? filteredAuctions : filteredListings;
 
   function clearFilters() {
     setCat('ทั้งหมด');
@@ -132,14 +177,13 @@ export default function Marketplace() {
 
   function ListingCard({ listing, idx }: { listing: Listing; idx: number }) {
     const isCertified = isCertifiedMode(listing.selling_mode);
-    const firstImg    = getFirstImage(listing);
-    const isMyDeal    = listing.seller_id === myId || listing.buyer_id === myId;
+    const firstImg = getFirstImage(listing);
+    const isMyDeal = listing.seller_id === myId || listing.buyer_id === myId;
     const c1 = CARD_BG[idx % 3 === 0 ? 0 : 2], c2 = CARD_BG[(idx % 5) + 1];
-    const detailHref = `/marketplace/${listing.id}`;
 
     return (
       <Link
-        href={detailHref}
+        href={`/marketplace/${listing.id}`}
         className={`lc-card reveal${isCertified ? ' lc-card--certified' : ''}`}
         style={{ ['--d' as string]: `${Math.min(idx * 30, 300)}ms` }}
         aria-label={`ดูรายละเอียด ${listing.title}`}
@@ -172,6 +216,50 @@ export default function Marketplace() {
     );
   }
 
+  function AuctionCard({ listing, idx }: { listing: Listing; idx: number }) {
+    const a = listing.auction!;
+    const firstImg = listing.images?.[0] ? imgUrl(listing.images[0]) : '';
+    const c1 = AUCTION_CARD_BG[idx % AUCTION_CARD_BG.length];
+    const c2 = AUCTION_CARD_BG[(idx + 2) % AUCTION_CARD_BG.length];
+
+    return (
+      <Link
+        href={`/marketplace/${listing.id}`}
+        className="lc-card lc-card--auction reveal"
+        style={{ ['--d' as string]: `${Math.min(idx * 30, 300)}ms` }}
+      >
+        <div className="lc-img" style={firstImg ? undefined : { background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)` }}>
+          {firstImg ? <img src={firstImg} alt={listing.title} loading="lazy" /> : <span style={{ fontSize: 40 }}>🔨</span>}
+          <span className="lc-badge lc-badge--auction">ประมูล</span>
+          {a.phase === 'live' && (
+            <span className="lc-auction-timer">
+              <AuctionCountdown endsAt={a.endsAt} endedAt={a.endedAt} />
+            </span>
+          )}
+        </div>
+        <div className="lc-body">
+          <div className="lc-price">
+            {a.bidCount > 0 ? 'ปัจจุบัน ' : 'เริ่ม '}
+            ฿{a.leadingPrice.toLocaleString()}
+          </div>
+          <h3 className="lc-title">{listing.title}</h3>
+          <div className="lc-auction-meta">
+            <span>👥 {a.uniqueBidderCount} คน</span>
+            <span>{a.currentBidderName ? `🏆 ${a.currentBidderName}` : 'ยังไม่มี bid'}</span>
+            <span>+฿{a.bidIncrement.toLocaleString()}/bid</span>
+          </div>
+          <div className="lc-meta">
+            {listing.location && <span>📍 {listing.location}</span>}
+            {listing.condition && <span>{listing.condition}</span>}
+          </div>
+          {(listing.seller_id === myId || listing.buyer_id === myId) && (
+            <span className="lc-mine">{listing.seller_id === myId ? 'ของคุณ' : 'เข้าร่วมแล้ว'}</span>
+          )}
+        </div>
+      </Link>
+    );
+  }
+
   if (!controls.loading && !controls.isEnabled('marketplace')) {
     return (
       <ServiceDisabledNotice
@@ -183,26 +271,51 @@ export default function Marketplace() {
     );
   }
 
+  const isAuction = zone === 'auction';
+
   return (
     <>
       <Nav active="market" />
 
-      <section className="mkt-hero">
+      <section className={`mkt-hero${isAuction ? ' mkt-hero--auction' : ''}`}>
         <div className="container mkt-hero-inner">
           <div className="mkt-hero-top">
             <div className="mkt-hero-copy">
-              <div className="kicker">ตลาดคนกลาง</div>
+              <div className="kicker">{isAuction ? 'โซนประมูล' : 'ตลาดคนกลาง'}</div>
+              <div className="mkt-mode-tabs reveal" role="tablist" aria-label="โซนตลาด">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={!isAuction}
+                  className={`mkt-mode-tab${!isAuction ? ' active' : ''}`}
+                  onClick={() => setZone('listing')}
+                >
+                  <Icon name="store" size={14} /> ขายสินค้า
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={isAuction}
+                  className={`mkt-mode-tab${isAuction ? ' active' : ''}`}
+                  onClick={() => setZone('auction')}
+                >
+                  🔨 โซนประมูล
+                </button>
+              </div>
               <h1 className="mkt-headline reveal">
-                ซื้อขายได้ทุกหมวด <span className="gradient-text">มั่นใจทุกมูลค่า</span>
+                {isAuction ? (
+                  <>ประมูลสินค้า <span className="gradient-text">แบบ real-time</span></>
+                ) : (
+                  <>ซื้อขายได้ทุกหมวด <span className="gradient-text">มั่นใจทุกมูลค่า</span></>
+                )}
               </h1>
               <p className="mkt-sub reveal" style={{ ['--d' as string]: '60ms' }}>
-                ทุกรายการปลอดภัยด้วย Escrow — พักเงินจนได้ของตรงปก
+                {isAuction
+                  ? 'นับถอยหลัง · ดูผู้นำ · bid ได้ทันที — ปิดประมูลแล้วเข้าดีล escrow อัตโนมัติ'
+                  : 'ทุกรายการปลอดภัยด้วย Escrow — พักเงินจนได้ของตรงปก'}
               </p>
             </div>
             <div className="mkt-hero-actions reveal" style={{ ['--d' as string]: '80ms' }}>
-              <Link href="/marketplace/auctions" className="btn btn-soft btn-sm mkt-auction-entry">
-                🔨 โซนประมูล
-              </Link>
               <Link href="/wanted" className="btn btn-ghost btn-sm">
                 📢 หาสินค้า
               </Link>
@@ -213,7 +326,7 @@ export default function Marketplace() {
             <Icon name="search" size={18} style={{ color: 'var(--faint)', flexShrink: 0 }} />
             <input
               type="search"
-              placeholder="ค้นหา iPhone, รถมือสอง, ไอดีเกม…"
+              placeholder={isAuction ? 'ค้นหาสินค้าประมูล…' : 'ค้นหา iPhone, รถมือสอง, ไอดีเกม…'}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -241,7 +354,9 @@ export default function Marketplace() {
       <div id="mkt-results" className="container mkt-feed">
         <div className="mkt-toolbar">
           <span className="mkt-count">
-            {loading ? 'กำลังโหลด…' : (
+            {loading ? 'กำลังโหลด…' : isAuction ? (
+              <>🔨 ประมูล <b>{filtered.length}</b> รายการ</>
+            ) : (
               <>แสดง <b>{filtered.length}</b> รายการ{cat !== 'ทั้งหมด' ? ` · ${cat}` : ''}</>
             )}
           </span>
@@ -253,18 +368,27 @@ export default function Marketplace() {
                 {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </label>
-            <button
-              type="button"
-              className={`mkt-filter-chip${certified ? ' is-active' : ''}`}
-              onClick={() => setCertified(c => !c)}
-              aria-pressed={certified}
-            >
-              ⭐ Certified
-            </button>
+            {!isAuction && (
+              <button
+                type="button"
+                className={`mkt-filter-chip${certified ? ' is-active' : ''}`}
+                onClick={() => setCertified(c => !c)}
+                aria-pressed={certified}
+              >
+                ⭐ Certified
+              </button>
+            )}
             <label className="mkt-filter-pill">
               <span className="mkt-filter-label">เรียง</span>
-              <select value={sort} onChange={e => setSort(e.target.value)} aria-label="เรียงลำดับ">
-                {['ล่าสุด', 'ราคา: น้อย→มาก', 'ราคา: มาก→น้อย'].map(s => <option key={s}>{s}</option>)}
+              <select
+                value={isAuction ? auctionSort : listingSort}
+                onChange={e => isAuction ? setAuctionSort(e.target.value) : setListingSort(e.target.value)}
+                aria-label="เรียงลำดับ"
+              >
+                {(isAuction
+                  ? ['ปิดเร็วสุด', 'ราคา: น้อย→มาก', 'ราคา: มาก→น้อย', 'ล่าสุด']
+                  : ['ล่าสุด', 'ราคา: น้อย→มาก', 'ราคา: มาก→น้อย']
+                ).map(s => <option key={s}>{s}</option>)}
               </select>
             </label>
           </div>
@@ -276,16 +400,29 @@ export default function Marketplace() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="mkt-empty">
-            <div className="mkt-empty-ic"><Icon name="search" size={32} /></div>
-            <p>ไม่พบสินค้าที่ตรงกับที่ค้นหา</p>
+            <div className="mkt-empty-ic">
+              {isAuction ? '🔨' : <Icon name="search" size={32} />}
+            </div>
+            <p>{isAuction ? 'ยังไม่มีรายการประมูล' : 'ไม่พบสินค้าที่ตรงกับที่ค้นหา'}</p>
             <div className="mkt-empty-actions">
-              <button type="button" className="btn btn-soft btn-sm" onClick={clearFilters}>ล้างตัวกรอง</button>
-              <Link href="/wanted" className="btn btn-primary btn-sm">📢 ลงประกาศหาสินค้านี้</Link>
+              {!isAuction && (
+                <button type="button" className="btn btn-soft btn-sm" onClick={clearFilters}>ล้างตัวกรอง</button>
+              )}
+              {isAuction ? (
+                <button type="button" className="btn btn-soft btn-sm" onClick={() => setZone('listing')}>
+                  <Icon name="store" size={15} /> ดูขายสินค้า
+                </button>
+              ) : (
+                <Link href="/wanted" className="btn btn-primary btn-sm">📢 ลงประกาศหาสินค้านี้</Link>
+              )}
             </div>
           </div>
         ) : (
           <div className="mkt-grid">
-            {filtered.map((item, i) => <ListingCard key={item.id} listing={item} idx={i} />)}
+            {isAuction
+              ? filteredAuctions.map((item, i) => <AuctionCard key={item.id} listing={item} idx={i} />)
+              : filteredListings.map((item, i) => <ListingCard key={item.id} listing={item} idx={i} />)
+            }
           </div>
         )}
       </div>

@@ -240,7 +240,7 @@ export default function MarketplaceDetailPage() {
       <div className="mkt-detail-shell">
         <div className="container">
           <div className="mkt-detail-top">
-            <Link href={isAuction ? '/marketplace/auctions' : '/marketplace'} className="btn btn-ghost btn-sm"><Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} /> {isAuction ? 'กลับโซนประมูล' : 'กลับสู่ตลาด'}</Link>
+            <Link href={isAuction ? '/marketplace?zone=auction' : '/marketplace'} className="btn btn-ghost btn-sm"><Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} /> {isAuction ? 'กลับโซนประมูล' : 'กลับสู่ตลาด'}</Link>
             <Link href="/cart" className="btn btn-soft btn-sm"><Icon name="package" size={16} /> ตะกร้า {cartCount > 0 ? `(${cartCount})` : ''}</Link>
           </div>
 
