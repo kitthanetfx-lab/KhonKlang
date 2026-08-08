@@ -3435,3 +3435,145 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .sw-send:hover:not(:disabled) { background: var(--accent-strong); transform: translateY(-1px); }
 .sw-send:disabled { opacity: .45; cursor: not-allowed; }
 .sw-send:focus-visible { outline: none; box-shadow: var(--ring); }
+
+/* ── Shop sign / ป้ายร้าน ── */
+.shop-sign-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--sh-sm);
+  margin-bottom: 16px;
+}
+.shop-sign-banner {
+  position: relative;
+  height: 120px;
+  background: linear-gradient(135deg, #2f6bf0 0%, #6366f1 55%, #8b5cf6 100%);
+  background-size: cover;
+  background-position: center;
+}
+.shop-sign-banner-fallback {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(47,107,240,.9) 0%, rgba(99,102,241,.85) 100%);
+}
+.shop-sign-body {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 0 16px 14px;
+  margin-top: -36px;
+  position: relative;
+  flex-wrap: wrap;
+}
+.shop-sign-avatar-wrap { position: relative; flex-shrink: 0; }
+.shop-sign-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  object-fit: cover;
+  border: 3px solid var(--surface);
+  box-shadow: var(--sh-sm);
+  background: var(--surface-2);
+}
+.shop-sign-avatar--empty {
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+}
+.shop-sign-info { flex: 1; min-width: 0; padding-top: 40px; }
+.shop-sign-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.2;
+  margin: 0;
+}
+.shop-sign-tagline { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+.shop-sign-loc { font-size: 13px; color: var(--ink-2); margin: 6px 0 0; }
+.shop-sign-addr { font-size: 12px; color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
+.shop-sign-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 40px;
+  margin-left: auto;
+}
+.shop-sign-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.shop-sign-stat { text-align: center; min-width: 0; }
+.shop-sign-stat-val {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1.1;
+}
+.shop-sign-stat-lbl {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.25;
+}
+.shop-sign-stat--rating .shop-sign-stat-val { color: #d97706; }
+.shop-sign-stat--rating .shop-sign-stat-lbl { font-size: 9px; letter-spacing: .02em; }
+.shop-sign-upload {
+  position: absolute;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255,255,255,.92);
+  color: var(--ink);
+  border-radius: var(--r-pill);
+  padding: 6px 10px;
+  box-shadow: var(--sh-xs);
+}
+.shop-sign-upload--banner { right: 10px; bottom: 10px; }
+.shop-sign-upload--avatar { right: -4px; bottom: -4px; border-radius: 50%; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; font-size: 12px; }
+.shop-edit-panel { margin-top: 0; margin-bottom: 8px; }
+.shop-public-toggle {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.shop-alert {
+  border-radius: var(--r-md);
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.shop-alert--err { background: #fdeef1; border: 1px solid #fbd5dd; color: #b22441; }
+.shop-alert--ok { background: var(--green-50); border: 1px solid var(--green-100); color: var(--green-700); }
+.shop-public-page { max-width: 960px; margin: 0 auto; }
+.shop-listings-section { padding: 8px 16px 32px; }
+.shop-listings-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0 0 14px;
+  color: var(--ink);
+}
+.shop-listings-grid { margin-top: 0; }
+@media (max-width: 640px) {
+  .shop-sign-stats { grid-template-columns: repeat(3, 1fr); }
+  .shop-sign-body { flex-direction: column; }
+  .shop-sign-actions { padding-top: 0; margin-left: 0; width: 100%; }
+  .shop-sign-info { padding-top: 8px; }
+}

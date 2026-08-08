@@ -298,6 +298,9 @@ function SellerForm() {
   const [sellerType, setSellerType] = useState('');
   const [fullNameId, setFullNameId] = useState('');
   const [idNumber, setIdNumber]     = useState('');
+  const [shopName, setShopName]     = useState('');
+  const [shopTagline, setShopTagline] = useState('');
+  const [shopLogoFile, setShopLogoFile] = useState<File | null>(null);
 
   // Step 2 — branches
   const [branches, setBranches] = useState<BranchData[]>([newBranch('สาขาหลัก')]);
@@ -338,6 +341,8 @@ function SellerForm() {
         if (profile?.bank_acct)  setBankAcct(profile.bank_acct);
         if (profile?.bank_name)  setBankName(profile.bank_name);
         if (profile?.bank_owner) setBankOwner(profile.bank_owner);
+        if (profile?.shop_name) setShopName(profile.shop_name);
+        if (profile?.shop_tagline) setShopTagline(profile.shop_tagline);
         if (profile?.seller_status) {
           setExistingStatus(profile.seller_status);
         } else {
@@ -414,6 +419,17 @@ function SellerForm() {
       });
       setError('');
 
+      let shopAvatarFileId = '';
+      if (shopLogoFile) {
+        const headers = await authHeaders();
+        const form = new FormData();
+        form.append('file', shopLogoFile);
+        const up = await fetch('/api/upload-deal', { method: 'POST', headers, body: form });
+        const upData = await up.json().catch(() => ({}));
+        if (!up.ok) throw new Error(upData.error || 'อัปโหลดโลโก้ร้านไม่สำเร็จ');
+        shopAvatarFileId = upData.fileId || '';
+      }
+
       const headers = await authHeaders();
       // Build address string from branches
       const address  = branches.map(b => `[${b.label}] ${branchToString(b)}`).filter(s => s.length > 10).join(' / ');
@@ -430,6 +446,9 @@ function SellerForm() {
         bookbankFileId:    fileIds.bookbank,
         companyCertFileId: fileIds.companyCert,
         slipFileId:        fileIds.slip,
+        shopName:          shopName.trim(),
+        shopTagline:       shopTagline.trim(),
+        shopAvatarFileId,
       };
       const res = await fetch('/api/register/seller', {
         method: 'POST',
@@ -559,6 +578,28 @@ function SellerForm() {
                 <label htmlFor="seller-id-number" className="block text-sm font-medium mb-1.5 opacity-75">เลขประจำตัวประชาชน <span className="text-red-500">*</span></label>
                 <input id="seller-id-number" name="idNumber" className={ic} value={idNumber} onChange={e => setIdNumber(e.target.value.replace(/\D/g,'').slice(0,13))} placeholder="1234567890123" maxLength={13} inputMode="numeric" />
                 <p className="text-xs text-gray-400 mt-1">ตัวเลข 13 หลัก ไม่ต้องใส่ขีด</p>
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/60 dark:bg-blue-950/20 p-4 space-y-4">
+                <div>
+                  <h3 className="font-semibold text-sm">🏪 ป้ายร้าน (ตั้งตอนนี้หรือแก้ทีหลังได้)</h3>
+                  <p className="text-xs text-gray-500 mt-1">ชื่อร้านและโลโก้จะแสดงในหน้าร้าน public เมื่อได้รับการอนุมัติ</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 opacity-75">ชื่อร้าน</label>
+                  <input className={ic} value={shopName} onChange={e => setShopName(e.target.value)} placeholder="เช่น Kitt IT Shop" maxLength={120} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 opacity-75">คำโปรยร้าน</label>
+                  <input className={ic} value={shopTagline} onChange={e => setShopTagline(e.target.value)} placeholder="เช่น ของมือสองคุณภาพ ส่งไวทั่วไทย" maxLength={200} />
+                </div>
+                <FileUpload
+                  label="โลโก้ร้าน (ไม่บังคับ)"
+                  accept="image/*"
+                  hint="PNG/JPG แนะนำ 512×512 px"
+                  file={shopLogoFile}
+                  onChange={setShopLogoFile}
+                />
               </div>
             </div>
           )}

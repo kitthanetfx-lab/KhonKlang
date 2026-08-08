@@ -111,6 +111,9 @@ create table profiles (
   shop_location         text,
   shop_address          text,
   shop_public           boolean not null default false,
+  shop_avatar_file_id   text,
+  shop_banner_file_id   text,
+  shop_tagline          text,
 
   -- Optional manual-merge pointer, kept only as an escape hatch. Prefer
   -- Supabase's native auth.identities linking over re-implementing the old

@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
       bankAcct, bankName, bankOwner,
       companyBankAcct, companyBankName,
       idCardFileId, companyCertFileId, bookbankFileId, slipFileId,
+      shopName, shopTagline, shopAvatarFileId,
     } = body;
 
     if (!sellerType || !fullNameId || !idNumber) {
@@ -71,13 +72,17 @@ export async function POST(req: NextRequest) {
     if (error) throw new Error(error.message);
     await syncSellerApplicationLedger(db, doc as Record<string, unknown>);
 
-    // Save bank info + status to profile (visible in profile page)
-    await db.from('profiles').update({
+    // Save bank info + status + ข้อมูลร้านเบื้องต้น to profile
+    const profileUpdate: Record<string, unknown> = {
       seller_status: 'pending_review',
       bank_acct: bankAcct || '',
       bank_name: bankName || '',
       bank_owner: bankOwner || '',
-    }).eq('id', me.id);
+    };
+    if (shopName != null && String(shopName).trim()) profileUpdate.shop_name = String(shopName).trim().slice(0, 120);
+    if (shopTagline != null && String(shopTagline).trim()) profileUpdate.shop_tagline = String(shopTagline).trim().slice(0, 200);
+    if (shopAvatarFileId) profileUpdate.shop_avatar_file_id = String(shopAvatarFileId).trim();
+    await db.from('profiles').update(profileUpdate).eq('id', me.id);
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {

@@ -136,17 +136,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // public view — ไม่ส่งข้อมูลส่วนตัวผู้ซื้อ
     }
 
-    let sellerShop: { name: string; location: string; address: string } | null = null;
+    let sellerShop: {
+      sellerId: string; name: string; location: string; address: string;
+      tagline: string; avatarFileId: string;
+    } | null = null;
     if (current.seller_id && ['posted', 'waiting_seller', 'waiting_buyer'].includes(String(current.status))) {
       const { data: sp } = await db.from('profiles')
-        .select('shop_name, shop_location, shop_address, shop_public')
+        .select('shop_name, shop_tagline, shop_location, shop_address, shop_public, shop_avatar_file_id')
         .eq('id', current.seller_id)
         .maybeSingle();
       if (sp?.shop_public && String(sp.shop_name || '').trim()) {
         sellerShop = {
+          sellerId: current.seller_id,
           name: String(sp.shop_name).trim(),
           location: String(sp.shop_location || '').trim(),
           address: String(sp.shop_address || '').trim(),
+          tagline: String(sp.shop_tagline || '').trim(),
+          avatarFileId: String(sp.shop_avatar_file_id || '').trim(),
         };
       }
     }

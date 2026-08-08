@@ -31,7 +31,21 @@ const CATEGORIES = ['สินค้าทั่วไป', 'อิเล็ก�
 const CONDITIONS = ['ของใหม่', 'มือสองสภาพดี', 'มือสองมีตำหนิ'];
 const PROVINCES = ['กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
+interface ShopStats {
+  listingCount: number;
+  soldCount: number;
+  boughtCount: number;
+  successfulDeals: number;
+  reviewScore: number;
+  reviewCount: number;
+}
+
 function imgUrl(fileId: string) { return fileViewUrl(DEAL_BUCKET, fileId); }
+
+function stars(score: number) {
+  const full = Math.round(score);
+  return '★'.repeat(Math.min(5, full)) + '☆'.repeat(Math.max(0, 5 - full));
+}
 
 interface UploadedImage { fileId: string; url: string; name: string; }
 
@@ -43,9 +57,17 @@ export default function SellerDashboard() {
   const [myId, setMyId] = useState('');
 
   const [shopName, setShopName] = useState('');
+  const [shopTagline, setShopTagline] = useState('');
   const [shopLocation, setShopLocation] = useState('');
   const [shopAddress, setShopAddress] = useState('');
   const [shopPublic, setShopPublic] = useState(false);
+  const [shopAvatarFileId, setShopAvatarFileId] = useState('');
+  const [shopBannerFileId, setShopBannerFileId] = useState('');
+  const [shopAvatarUrl, setShopAvatarUrl] = useState('');
+  const [shopBannerUrl, setShopBannerUrl] = useState('');
+  const [shopStats, setShopStats] = useState<ShopStats | null>(null);
+  const [shopEditOpen, setShopEditOpen] = useState(false);
+  const [shopImageUploading, setShopImageUploading] = useState('');
   const [shopSaving, setShopSaving] = useState(false);
   const [shopSaved, setShopSaved] = useState(false);
   const [shopError, setShopError] = useState('');
@@ -86,9 +108,15 @@ export default function SellerDashboard() {
           const shopData = await shopRes.json();
           const s = shopData.shop || {};
           setShopName(s.shopName || '');
+          setShopTagline(s.shopTagline || '');
           setShopLocation(s.shopLocation || '');
           setShopAddress(s.shopAddress || '');
           setShopPublic(Boolean(s.shopPublic));
+          setShopAvatarFileId(s.shopAvatarFileId || '');
+          setShopBannerFileId(s.shopBannerFileId || '');
+          if (s.shopAvatarFileId) setShopAvatarUrl(fileViewUrl(DEAL_BUCKET, s.shopAvatarFileId));
+          if (s.shopBannerFileId) setShopBannerUrl(fileViewUrl(DEAL_BUCKET, s.shopBannerFileId));
+          if (shopData.stats) setShopStats(shopData.stats);
         }
         await fetchDeals(headers);
       } catch { router.replace('/login'); }
@@ -119,6 +147,30 @@ export default function SellerDashboard() {
   }
   function removeImage(fileId: string) { setImages(prev => prev.filter(i => i.fileId !== fileId)); }
 
+  async function uploadShopImage(kind: 'avatar' | 'banner', file: File) {
+    setShopImageUploading(kind);
+    setShopError('');
+    try {
+      const headers = await authHeaders();
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/upload-deal', { method: 'POST', headers, body: fd });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'อัปโหลดไม่สำเร็จ');
+      if (kind === 'avatar') {
+        setShopAvatarFileId(d.fileId);
+        setShopAvatarUrl(d.url || fileViewUrl(DEAL_BUCKET, d.fileId));
+      } else {
+        setShopBannerFileId(d.fileId);
+        setShopBannerUrl(d.url || fileViewUrl(DEAL_BUCKET, d.fileId));
+      }
+    } catch (err: unknown) {
+      setShopError(err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ');
+    } finally {
+      setShopImageUploading('');
+    }
+  }
+
   async function saveShop() {
     setShopSaving(true);
     setShopSaved(false);
@@ -128,11 +180,16 @@ export default function SellerDashboard() {
       const res = await fetch('/api/seller/shop', {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shopName, shopLocation, shopAddress, shopPublic }),
+        body: JSON.stringify({
+          shopName, shopTagline, shopLocation, shopAddress, shopPublic,
+          shopAvatarFileId, shopBannerFileId,
+        }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
+      if (d.stats) setShopStats(d.stats);
       setShopSaved(true);
+      setShopEditOpen(false);
       setTimeout(() => setShopSaved(false), 2000);
     } catch (err: unknown) {
       setShopError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
@@ -209,33 +266,95 @@ export default function SellerDashboard() {
       </header>
 
       <section className="dash-body" style={{ paddingBottom: 0 }}>
-        <div className="form-section" style={{ marginBottom: 0 }}>
-          <h3 style={{ marginBottom: 12 }}>ข้อมูลร้าน</h3>
-          {shopError && <div style={{ background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 14, color: '#b22441' }}>⚠️ {shopError}</div>}
-          {shopSaved && <div style={{ background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-md)', padding: '10px 16px', marginBottom: 14, color: 'var(--green-700)', fontWeight: 600 }}>✅ บันทึกข้อมูลร้านแล้ว</div>}
-          <div className="form-field">
-            <label>ชื่อร้าน</label>
-            <input type="text" value={shopName} onChange={e => setShopName(e.target.value)} placeholder="เช่น ร้านของฉัน by Kitthanet" maxLength={120} />
+        {shopError && <div className="shop-alert shop-alert--err">⚠️ {shopError}</div>}
+        {shopSaved && <div className="shop-alert shop-alert--ok">✅ บันทึกป้ายร้านแล้ว</div>}
+
+        <div className="shop-sign-card">
+          <div
+            className="shop-sign-banner"
+            style={shopBannerUrl ? { backgroundImage: `url(${shopBannerUrl})` } : undefined}
+          >
+            {!shopBannerUrl && <div className="shop-sign-banner-fallback" />}
+            {shopEditOpen && (
+              <label className="shop-sign-upload shop-sign-upload--banner">
+                {shopImageUploading === 'banner' ? '⏳' : '📷 เปลี่ยนแบนเนอร์'}
+                <input type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadShopImage('banner', f); e.target.value = ''; }} />
+              </label>
+            )}
           </div>
-          <div className="form-field">
-            <label>ที่ตั้งร้าน (จังหวัด)</label>
-            <select value={shopLocation} onChange={e => setShopLocation(e.target.value)}>
-              <option value="">เลือกจังหวัด...</option>
-              {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
+          <div className="shop-sign-body">
+            <div className="shop-sign-avatar-wrap">
+              {shopAvatarUrl ? (
+                <img src={shopAvatarUrl} alt="" className="shop-sign-avatar" />
+              ) : (
+                <div className="shop-sign-avatar shop-sign-avatar--empty">🏪</div>
+              )}
+              {shopEditOpen && (
+                <label className="shop-sign-upload shop-sign-upload--avatar">
+                  {shopImageUploading === 'avatar' ? '⏳' : '📷'}
+                  <input type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadShopImage('avatar', f); e.target.value = ''; }} />
+                </label>
+              )}
+            </div>
+            <div className="shop-sign-info">
+              <h2 className="shop-sign-name">{shopName || 'ตั้งชื่อร้านของคุณ'}</h2>
+              {shopTagline && <p className="shop-sign-tagline">{shopTagline}</p>}
+              {shopLocation && <p className="shop-sign-loc">📍 {shopLocation}</p>}
+            </div>
+            <div className="shop-sign-actions">
+              {shopPublic && shopName && myId && (
+                <Link href={`/shop/${myId}`} className="btn btn-ghost btn-sm" target="_blank">ดูหน้าร้าน ↗</Link>
+              )}
+              <button type="button" className="btn btn-soft btn-sm" onClick={() => setShopEditOpen(v => !v)}>
+                {shopEditOpen ? 'ปิดการแก้ไข' : '✏️ แก้ป้ายร้าน'}
+              </button>
+            </div>
           </div>
-          <div className="form-field">
-            <label>ที่อยู่ร้าน (รายละเอียด)</label>
-            <textarea rows={2} value={shopAddress} onChange={e => setShopAddress(e.target.value)} placeholder="เลขที่ ซอย แขวง/ตำบล..." maxLength={500} />
-          </div>
-          <label className="filter-row" style={{ cursor: 'pointer', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 14 }} onClick={() => setShopPublic(v => !v)}>
-            <span>แสดงข้อมูลร้านต่อผู้ซื้อในหน้าสินค้า</span>
-            <input type="checkbox" checked={shopPublic} readOnly />
-          </label>
-          <button type="button" className="btn btn-soft btn-sm" onClick={saveShop} disabled={shopSaving}>
-            {shopSaving ? 'กำลังบันทึก...' : 'บันทึกข้อมูลร้าน'}
-          </button>
+          {shopStats && (
+            <div className="shop-sign-stats">
+              <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.listingCount}</span><span className="shop-sign-stat-lbl">สินค้าในร้าน</span></div>
+              <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.soldCount}</span><span className="shop-sign-stat-lbl">ขายแล้ว</span></div>
+              <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.boughtCount}</span><span className="shop-sign-stat-lbl">ซื้อสำเร็จ</span></div>
+              <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.successfulDeals}</span><span className="shop-sign-stat-lbl">ดีลสำเร็จ</span></div>
+              <div className="shop-sign-stat shop-sign-stat--rating">
+                <span className="shop-sign-stat-val">{shopStats.reviewScore > 0 ? shopStats.reviewScore.toFixed(1) : '—'}</span>
+                <span className="shop-sign-stat-lbl">{shopStats.reviewCount > 0 ? `${stars(shopStats.reviewScore)} (${shopStats.reviewCount})` : 'ยังไม่มีรีวิว'}</span>
+              </div>
+            </div>
+          )}
         </div>
+
+        {shopEditOpen && (
+          <div className="form-section shop-edit-panel">
+            <h3 style={{ marginBottom: 12 }}>ตั้งค่าป้ายร้าน</h3>
+            <div className="form-field">
+              <label>ชื่อร้าน</label>
+              <input type="text" value={shopName} onChange={e => setShopName(e.target.value)} placeholder="เช่น Kitt IT Shop" maxLength={120} />
+            </div>
+            <div className="form-field">
+              <label>คำโปรยร้าน</label>
+              <input type="text" value={shopTagline} onChange={e => setShopTagline(e.target.value)} placeholder="เช่น ของมือสองคุณภาพ ส่งไวทั่วไทย" maxLength={200} />
+            </div>
+            <div className="form-field">
+              <label>ที่ตั้งร้าน (จังหวัด)</label>
+              <select value={shopLocation} onChange={e => setShopLocation(e.target.value)}>
+                <option value="">เลือกจังหวัด...</option>
+                {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <label>ที่อยู่ร้าน (รายละเอียด)</label>
+              <textarea rows={2} value={shopAddress} onChange={e => setShopAddress(e.target.value)} placeholder="เลขที่ ซอย แขวง/ตำบล..." maxLength={500} />
+            </div>
+            <label className="filter-row shop-public-toggle" onClick={() => setShopPublic(v => !v)}>
+              <span>เปิดหน้าร้าน public ให้ผู้ซื้อเข้าชมได้</span>
+              <input type="checkbox" checked={shopPublic} readOnly />
+            </label>
+            <button type="button" className="btn btn-primary btn-sm" onClick={saveShop} disabled={shopSaving}>
+              {shopSaving ? 'กำลังบันทึก...' : 'บันทึกป้ายร้าน'}
+            </button>
+          </div>
+        )}
       </section>
 
       <nav className="dash-tabs-wrap">

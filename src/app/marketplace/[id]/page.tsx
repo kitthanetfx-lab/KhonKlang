@@ -37,7 +37,10 @@ export default function MarketplaceDetailPage() {
   const listingId = params.id as string;
 
   const [listing, setListing] = useState<ListingDetail | null>(null);
-  const [sellerShop, setSellerShop] = useState<{ name: string; location: string; address: string } | null>(null);
+  const [sellerShop, setSellerShop] = useState<{
+    sellerId?: string; name: string; location: string; address: string;
+    tagline?: string; avatarFileId?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [myId, setMyId] = useState('');
@@ -219,11 +222,21 @@ export default function MarketplaceDetailPage() {
               {listing.description && <p className="mkt-detail-desc">{listing.description}</p>}
 
               {sellerShop && (
-                <div className="mkt-detail-note-card" style={{ background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb, var(--accent) 24%, var(--line))' }}>
-                  <div className="mkt-detail-note-title">🏪 {sellerShop.name}</div>
-                  {sellerShop.location && <p style={{ margin: '4px 0 0', fontSize: 14 }}>📍 {sellerShop.location}</p>}
-                  {sellerShop.address && <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--ink-2)' }}>{sellerShop.address}</p>}
-                </div>
+                <Link href={`/shop/${sellerShop.sellerId || listing.seller_id}`} className="mkt-detail-note-card shop-detail-link" style={{ background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb, var(--accent) 24%, var(--line))', textDecoration: 'none', display: 'block' }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    {sellerShop.avatarFileId ? (
+                      <img src={fileViewUrl(DEAL_BUCKET, sellerShop.avatarFileId)} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--surface)', display: 'grid', placeItems: 'center', fontSize: 22 }}>🏪</div>
+                    )}
+                    <div>
+                      <div className="mkt-detail-note-title">🏪 {sellerShop.name}</div>
+                      {sellerShop.tagline && <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--ink-2)' }}>{sellerShop.tagline}</p>}
+                      {sellerShop.location && <p style={{ margin: '4px 0 0', fontSize: 14 }}>📍 {sellerShop.location}</p>}
+                    </div>
+                  </div>
+                  <p style={{ margin: '10px 0 0', fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>เข้าชมหน้าร้าน →</p>
+                </Link>
               )}
 
               <div className="mkt-detail-actions">

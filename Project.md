@@ -1,5 +1,43 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-08 (15:35)
+
+### ป้ายร้านสวย + หน้าร้าน public + สถิติจากกิจกรรมจริง
+
+**โจทย์**:
+1. โลโก้ + แบนเนอร์ร้าน — ผู้ขายเลือกเอง
+2. หน้าร้าน public `/shop/[sellerId]`
+3. สมัครผู้ขายขั้น 1 — ชื่อร้าน + โลโก้ (แก้ทีหลังได้)
+4. สถิติ: สินค้าในร้าน, ขายแล้ว, ซื้อสำเร็จ, ดีลสำเร็จ, คะแนนดาว — ดึงจาก deals/reviews
+
+**แก้ไข**:
+1. **`supabase/migrations/0025_shop_sign.sql`** — `shop_avatar_file_id`, `shop_banner_file_id`, `shop_tagline`
+2. **`src/lib/shopStats.ts`** — คำนวณสถิติร้าน
+3. **`src/app/api/seller/shop/route.ts`**, **`src/app/api/shop/[sellerId]/route.ts`**
+4. **`src/app/dashboard/seller/page.tsx`** — storefront card + แก้ป้ายร้าน
+5. **`src/app/shop/[sellerId]/page.tsx`** — หน้าร้าน public + grid สินค้า
+6. **`src/app/register/seller/page.tsx`**, **`src/app/api/register/seller/route.ts`**
+7. **`src/app/marketplace/[id]/page.tsx`** — ลิงก์เข้าหน้าร้าน
+8. **`src/app/globals.css`** — `.shop-sign-*`
+
+**งานฝั่งผู้ใช้**: รัน migration `0025_shop_sign.sql`
+
+### ไฟล์ที่แก้ไข (2026-08-08 15:35)
+- `supabase/migrations/0025_shop_sign.sql` (ใหม่)
+- `supabase/schema.sql`
+- `src/lib/shopStats.ts` (ใหม่)
+- `src/app/api/seller/shop/route.ts`
+- `src/app/api/shop/[sellerId]/route.ts` (ใหม่)
+- `src/app/dashboard/seller/page.tsx`
+- `src/app/shop/[sellerId]/page.tsx` (ใหม่)
+- `src/app/register/seller/page.tsx`
+- `src/app/api/register/seller/route.ts`
+- `src/app/marketplace/[id]/page.tsx`
+- `src/app/api/deals/[id]/route.ts`
+- `src/app/globals.css`
+
+---
+
 ## 2026-08-08 (15:00)
 
 ### แยกประกาศขาย vs ดีล + แอดมินดีล 5 หมวด + layout การ์ดใหม่
