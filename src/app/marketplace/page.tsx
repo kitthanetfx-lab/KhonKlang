@@ -200,9 +200,6 @@ export default function Marketplace() {
               </p>
             </div>
             <div className="mkt-hero-actions reveal" style={{ ['--d' as string]: '80ms' }}>
-              <Link href="/dashboard/seller" className="btn btn-primary btn-sm">
-                <Icon name="store" size={15} /> ลงขาย
-              </Link>
               <Link href="/marketplace/auctions" className="btn btn-soft btn-sm mkt-auction-entry">
                 🔨 โซนประมูล
               </Link>

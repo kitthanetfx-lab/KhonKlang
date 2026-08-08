@@ -165,9 +165,6 @@ export default function MarketplaceAuctionsPage() {
               <Link href="/marketplace" className="btn btn-ghost btn-sm">
                 <Icon name="store" size={15} /> กลับตลาดสินค้า
               </Link>
-              <Link href="/dashboard/seller" className="btn btn-primary btn-sm">
-                🔨 ลงประมูล
-              </Link>
             </div>
           </div>
 
@@ -213,7 +210,6 @@ export default function MarketplaceAuctionsPage() {
             <div className="mkt-empty-ic">🔨</div>
             <p>ยังไม่มีรายการประมูล</p>
             <div className="mkt-empty-actions">
-              <Link href="/dashboard/seller" className="btn btn-primary btn-sm">ลงประมูลสินค้า</Link>
               <Link href="/marketplace" className="btn btn-soft btn-sm">ดูตลาดสินค้า</Link>
             </div>
           </div>
