@@ -109,6 +109,28 @@ export function isActiveMarketplaceBuyerOrder(deal: MarketplaceDealState): boole
   return (MARKETPLACE_ORDER_ACTIVE_STATUSES as readonly string[]).includes(s);
 }
 
+export type MarketplaceCheckoutPhase = 'address' | 'payment' | 'status';
+
+/** ขั้นหน้า checkout ตลาด (Shopee-style) */
+export function marketplaceCheckoutPhase(
+  deal: MarketplaceDealState,
+  shippingConfirmed: boolean,
+): MarketplaceCheckoutPhase {
+  const s = String(deal.status || '');
+  if (isMarketplaceCheckoutActive(deal) && !shippingConfirmed) return 'address';
+  if (isMarketplaceCheckoutActive(deal) && shippingConfirmed) return 'payment';
+  if (['payment_uploaded', 'packing', 'shipped_to_buyer', 'delivered', 'completed', 'cancelled', 'disputed'].includes(s)) {
+    return 'status';
+  }
+  return shippingConfirmed ? 'payment' : 'address';
+}
+
+export function marketplaceCheckoutStepIndex(phase: MarketplaceCheckoutPhase): number {
+  if (phase === 'address') return 1;
+  if (phase === 'payment') return 2;
+  return 3;
+}
+
 export function marketplaceOrderStatusLabel(status: string): string {
   const map: Record<string, string> = {
     posted: 'รอโอนเงิน',

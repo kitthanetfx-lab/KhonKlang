@@ -65,7 +65,7 @@ export default function MarketplaceOrdersPage() {
               <Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} /> กลับตลาด
             </Link>
             <h1><Icon name="shoppingCart" size={24} /> คำสั่งซื้อของฉัน</h1>
-            <p>รายการสั่งซื้อจากตลาดซื้อขาย — กดเพื่อดูสถานะและโอนเงิน</p>
+            <p>รายการสั่งซื้อจากตลาดซื้อขาย — กดเพื่อดูสถานะและชำระเงิน</p>
           </div>
 
           {error && <p className="rv-error">{error}</p>}
@@ -113,7 +113,7 @@ export default function MarketplaceOrdersPage() {
 }
 
 function OrderCard({ order }: { order: MarketplaceOrder }) {
-  const href = `/deal/${order.id}?tab=steps`;
+  const href = `/marketplace/checkout/${order.id}`;
   const thumb = order.imageFileId ? imgUrl(order.imageFileId) : '';
   return (
     <Link href={href} className="mkt-order-card">

@@ -1,5 +1,27 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (02:05)
+
+### ตลาด — checkout แบบ Shopee (ที่อยู่ → ชำระเงิน → ติดตาม)
+
+**Flow ใหม่ (ผู้ซื้อ)**:
+1. กดซื้อ → `/marketplace/checkout/[id]`
+2. ยืนยันที่อยู่จัดส่ง (ดึงจากโปรไฟล์ + แก้ไข/เพิ่มได้)
+3. ชำระเงิน (โอน + อัปสลิป)
+4. ติดตามสถานะในหน้า checkout / คำสั่งซื้อ
+
+**ไม่ใช้ห้องดีลคนกลาง** — ผู้ซื้อตลาดที่เข้า `/deal/[id]` จะ redirect ไป checkout อัตโนมัติ
+
+**ไฟล์**:
+- **`/marketplace/checkout/[id]`** — หน้า checkout 3 ขั้น
+- **`GET/PATCH /api/marketplace/checkout/[id]`** — โหลดออเดอร์ + ยืนยัน/แก้ที่อยู่
+- **`MarketplaceShippingSection`** — ฟอร์มที่อยู่จากโปรไฟล์
+- **`MarketplaceOrderStatusSection`** — ติดตามสถานะ + ยืนยันรับสินค้า
+- **`0030_marketplace_shipping_confirmed.sql`** — `buyer_shipping_confirmed_at` บน `deal_price_state`
+- **`profileAddress.ts`** — parse/build ที่อยู่โปรไฟล์
+
+---
+
 ## 2026-08-10 (01:50)
 
 ### แยก flow ตลาด — โอนเงิน + คำสั่งซื้อ + ไอคอนตะกร้า

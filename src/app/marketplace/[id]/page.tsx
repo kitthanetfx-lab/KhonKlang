@@ -146,7 +146,7 @@ export default function MarketplaceDetailPage() {
         alert(data.error || 'ยังไม่สามารถซื้อได้');
         return;
       }
-      router.push(`/deal/${listing.id}?tab=steps`);
+      router.push(`/marketplace/checkout/${listing.id}`);
     } finally {
       setJoining(false);
     }
@@ -365,7 +365,7 @@ export default function MarketplaceDetailPage() {
                   </div>
                 ) : buyState === 'continue_checkout' ? (
                   <>
-                    <Link href={`/deal/${listing.id}?tab=steps`} className="btn btn-primary btn-lg">
+                    <Link href={`/marketplace/checkout/${listing.id}`} className="btn btn-primary btn-lg">
                       {listing.status === 'payment_uploaded' ? 'ดูสถานะการสั่งซื้อ →' : 'ดำเนินการโอนเงิน →'}
                     </Link>
                     {canSellerChat && (
@@ -402,7 +402,7 @@ export default function MarketplaceDetailPage() {
                       </button>
                     )}
                     <p className="mkt-detail-escrow-note">
-                      เมื่อกดซื้อขาย แล้วระบบจะเข้าสู่ระบบซื้อขายผ่านกลาง และเงินจะไม่ถึงมือผู้ขาย หากสินค้ายังไม่ถึงมือผู้รับ
+                      เมื่อกดซื้อ ระบบจะพาไปยืนยันที่อยู่จัดส่งและชำระเงิน — ไม่มีคนกลาง ผู้ขายจัดส่งตรงถึงคุณ
                     </p>
                   </>
                 ) : (

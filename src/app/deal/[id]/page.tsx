@@ -688,6 +688,14 @@ export default function DealRoom() {
     })();
   }, [dealId, fetchDeal]);
 
+  // ผู้ซื้อตลาด — ไปหน้า checkout แบบ Shopee ไม่ใช่ห้องดีลคนกลาง
+  useEffect(() => {
+    if (!deal || !myId || loading || authLoading) return;
+    if (!isMarketplaceOrder(deal)) return;
+    if (deal.buyer_id !== myId) return;
+    router.replace(`/marketplace/checkout/${deal.id}`);
+  }, [deal, myId, loading, authLoading, router]);
+
   useEffect(() => {
     let active = true;
     (async () => {

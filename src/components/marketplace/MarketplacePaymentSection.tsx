@@ -48,7 +48,7 @@ export function MarketplacePaymentSection({ deal, myRole, awaitingSlip, onUpload
           </div>
         )}
         <div className="mkt-pay-row mkt-pay-row-total">
-          <span>ผู้ซื้อ {deal.buyer_name || ''} โอนเข้าศูนย์กลาง</span>
+          <span>ยอดที่ต้องชำระ</span>
           <span>฿{buyerShouldPay.toLocaleString()}</span>
         </div>
         <p className="mkt-pay-note">
@@ -75,10 +75,10 @@ export function MarketplacePaymentSection({ deal, myRole, awaitingSlip, onUpload
 
       {awaitingSlip && myRole === 'buyer' && (
         <div className="mkt-pay-bank-box">
-          <div className="mkt-pay-bank-title">🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
+          <div className="mkt-pay-bank-title">🏦 ชำระเงินผ่านโอนธนาคาร</div>
           <PaymentMethods
             amount={buyerShouldPay}
-            note={`โอน ฿${buyerShouldPay.toLocaleString()} เข้าบัญชีกลาง (ราคาสินค้า${shipCost > 0 ? ' + ค่าขนส่ง' : ''}) — เงินพักไว้จนกว่าคุณยืนยันรับสินค้า`}
+            note={`โอน ฿${buyerShouldPay.toLocaleString()} (ราคาสินค้า${shipCost > 0 ? ' + ค่าขนส่ง' : ''}) แล้วอัปโหลดสลิป`}
           />
           <button type="button" className="btn btn-green btn-block" style={{ marginTop: 12 }} onClick={() => inputRef.current?.click()}>
             📎 โอนแล้ว — อัปโหลดสลิป
@@ -87,11 +87,11 @@ export function MarketplacePaymentSection({ deal, myRole, awaitingSlip, onUpload
       )}
 
       {deal.status === 'payment_uploaded' && myRole === 'buyer' && (
-        <div className="dr-slip-status">✅ ส่งสลิปแล้ว — รอศูนย์กลางยืนยันรับเงิน</div>
+        <div className="dr-slip-status">✅ ส่งสลิปแล้ว — รอตรวจสอบการชำระเงิน</div>
       )}
 
       {awaitingSlip && myRole === 'seller' && (
-        <p className="mkt-pay-wait-seller">รอผู้ซื้อโอนเงินเข้าระบบพักเงินของบริษัท</p>
+        <p className="mkt-pay-wait-seller">รอผู้ซื้อชำระเงิน</p>
       )}
 
       <input
