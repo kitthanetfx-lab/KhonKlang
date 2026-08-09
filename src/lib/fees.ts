@@ -29,6 +29,10 @@ export interface FeeConfig {
   marketplaceGpPercent: number;
   /** % ของ GP ที่คืนให้ผู้ขาย (ส่วนที่เหลือเป็นของแพลตฟอร์ม) */
   marketplaceGpCommissionPercent: number;
+  /** GP% หักจากราคาประมูลสุดท้าย (ผู้ชนะจ่ายเต็มจำนวน bid) */
+  auctionGpPercent: number;
+  /** % ของ GP ประมูลที่คืนให้ผู้ขาย */
+  auctionGpCommissionPercent: number;
 }
 
 export const FEE_DEFAULTS: FeeConfig = {
@@ -51,6 +55,7 @@ export const FEE_DEFAULTS: FeeConfig = {
   promoStart: '', promoEnd: '', promoLabel: '',
   promoVideoUrl: '',
   marketplaceGpPercent: 20, marketplaceGpCommissionPercent: 30,
+  auctionGpPercent: 20, auctionGpCommissionPercent: 30,
 };
 
 export interface MarketplaceGpBreakdown {
@@ -84,6 +89,35 @@ export function computeMarketplaceGp(config: FeeConfig, sellerPrice: number): Ma
     commissionPercent, sellerCommission,
     sellerReceive: base + sellerCommission,
     platformKeep,
+  };
+}
+
+export interface AuctionGpBreakdown {
+  /** ราคาประมูลสุดท้าย — ผู้ชนะจ่ายเต็มจำนวน */
+  finalPrice: number;
+  gpPercent: number;
+  /** GP ที่หักจากราคาปิด */
+  gpAmount: number;
+  commissionPercent: number;
+  /** คืนผู้ขาย (% ของ GP) */
+  sellerCommission: number;
+  /** ผู้ขายได้รับจริง = finalPrice − gpAmount + sellerCommission */
+  sellerReceive: number;
+  platformKeep: number;
+}
+
+/** คำนวณ GP ตลาดประมูล — หักจากราคาปิดประมูล (ไม่บวกตอนเปิดประมูล) */
+export function computeAuctionGp(config: FeeConfig, finalPrice: number): AuctionGpBreakdown {
+  const gross = Math.max(0, Math.round(Number(finalPrice) || 0));
+  const gpPercent = Math.min(100, Math.max(0, Number(config.auctionGpPercent) || 0));
+  const commissionPercent = Math.min(100, Math.max(0, Number(config.auctionGpCommissionPercent) || 0));
+  const gpAmount = Math.round(gross * gpPercent / 100);
+  const sellerCommission = Math.round(gpAmount * commissionPercent / 100);
+  const platformKeep = gpAmount - sellerCommission;
+  const sellerReceive = gross - gpAmount + sellerCommission;
+  return {
+    finalPrice: gross, gpPercent, gpAmount, commissionPercent,
+    sellerCommission, sellerReceive, platformKeep,
   };
 }
 

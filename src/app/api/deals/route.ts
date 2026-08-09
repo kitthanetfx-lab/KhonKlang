@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
 
     let dealPrice = Math.max(0, Math.round(Number(price)));
     let storedGross: number | null = null;
-    if (!isBuyer && source === 'listing') {
+    if (!isBuyer && source === 'listing' && !isAuction) {
       const fees = await readFeesConfig(db);
       const gross = listGrossPrice != null ? Number(listGrossPrice) : dealPrice;
       const gp = computeMarketplaceGp(fees, gross);

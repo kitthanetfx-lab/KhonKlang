@@ -22,6 +22,7 @@ const NUM_DEFAULTS = {
   sellerRegFee: 199, middlemanRegFee: 499,
   promoPercent: 0,
   marketplaceGpPercent: 20, marketplaceGpCommissionPercent: 30,
+  auctionGpPercent: 20, auctionGpCommissionPercent: 30,
 };
 const COMPANY_DEFAULTS = {
   companyPromptPay: '', companyBankName: '', companyBankAcct: '', companyBankHolder: '', companyQrFileId: '',
@@ -62,6 +63,8 @@ const COLUMN_OF: Record<string, string> = {
   promoVideoUrl: 'promo_video_url',
   marketplaceGpPercent: 'marketplace_gp_percent',
   marketplaceGpCommissionPercent: 'marketplace_gp_commission_percent',
+  auctionGpPercent: 'auction_gp_percent',
+  auctionGpCommissionPercent: 'auction_gp_commission_percent',
 };
 
 type FeeConfigKey = keyof FeeConfig;

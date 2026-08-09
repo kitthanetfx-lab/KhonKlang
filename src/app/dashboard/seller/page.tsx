@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { isCertifiedMode } from '@/lib/listingMode';
-import { computeMarketplaceGp, FEE_DEFAULTS, type FeeConfig } from '@/lib/fees';
+import { computeMarketplaceGp, computeAuctionGp, FEE_DEFAULTS, type FeeConfig } from '@/lib/fees';
 import { AUCTION_DURATION_OPTIONS } from '@/lib/auction';
 
 interface Deal {
@@ -273,7 +273,8 @@ export default function SellerDashboard() {
   const activeDeals = deals.filter(d => d.seller_id === myId && ACTIVE_STATUSES.includes(d.status));
   const historyDeals = deals.filter(d => d.seller_id === myId && DONE_STATUSES.includes(d.status));
   const totalRev = historyDeals.filter(d => d.status === 'completed').reduce((s, d) => s + (d.price || 0), 0);
-  const gpPreview = price && Number(price) > 0 ? computeMarketplaceGp(feeConfig, Number(price)) : null;
+  const listingGpPreview = price && Number(price) > 0 && postModal === 'listing' ? computeMarketplaceGp(feeConfig, Number(price)) : null;
+  const auctionGpPreview = price && Number(price) > 0 && postModal === 'auction' ? computeAuctionGp(feeConfig, Number(price)) : null;
 
   if (loading) return (
     <div className="dash-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -498,7 +499,7 @@ export default function SellerDashboard() {
 
                 <div className="form-row-2">
                   <div className="form-field" style={{ margin: 0 }}>
-                    <label>{postModal === 'auction' ? 'ราคาเริ่มต้นที่ต้องการได้ (บาท) *' : 'ราคาที่คุณต้องการได้ (บาท) *'}</label>
+                    <label>{postModal === 'auction' ? 'ราคาเริ่มประมูล (บาท) *' : 'ราคาที่คุณต้องการได้ (บาท) *'}</label>
                     <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" min="0" />
                   </div>
                   <div className="form-field" style={{ margin: 0 }}>
@@ -527,32 +528,56 @@ export default function SellerDashboard() {
                   </div>
                 )}
 
-                {gpPreview && (
+                {listingGpPreview && (
                   <div className="gp-preview-box">
                     <div className="gp-preview-row gp-preview-row--muted">
                       <span>ราคาที่คุณตั้ง</span>
-                      <span>฿{gpPreview.sellerPrice.toLocaleString()}</span>
+                      <span>฿{listingGpPreview.sellerPrice.toLocaleString()}</span>
                     </div>
                     <div className="gp-preview-row gp-preview-row--muted">
-                      <span>บวก GP {gpPreview.gpPercent}%</span>
-                      <span>+฿{gpPreview.gpAmount.toLocaleString()}</span>
+                      <span>บวก GP {listingGpPreview.gpPercent}%</span>
+                      <span>+฿{listingGpPreview.gpAmount.toLocaleString()}</span>
                     </div>
                     <div className="gp-preview-row">
-                      <span>{postModal === 'auction' ? 'ราคาเริ่มประมูลที่ผู้บริโภคเห็น' : 'ราคาที่ผู้บริโภคเห็นในตลาด'}</span>
-                      <strong>฿{gpPreview.displayPrice.toLocaleString()}</strong>
+                      <span>ราคาที่ผู้บริโภคเห็นในตลาด</span>
+                      <strong>฿{listingGpPreview.displayPrice.toLocaleString()}</strong>
                     </div>
-                    {postModal === 'listing' && (
-                      <>
-                        <div className="gp-preview-row gp-preview-row--accent">
-                          <span>คอมมิชชั่นคืนคุณ ({gpPreview.commissionPercent}% ของ GP)</span>
-                          <strong>+฿{gpPreview.sellerCommission.toLocaleString()}</strong>
-                        </div>
-                        <div className="gp-preview-row gp-preview-row--total">
-                          <span>รายได้คุณเมื่อขายได้</span>
-                          <strong>฿{gpPreview.sellerReceive.toLocaleString()}</strong>
-                        </div>
-                      </>
-                    )}
+                    <div className="gp-preview-row gp-preview-row--accent">
+                      <span>คอมมิชชั่นคืนคุณ ({listingGpPreview.commissionPercent}% ของ GP)</span>
+                      <strong>+฿{listingGpPreview.sellerCommission.toLocaleString()}</strong>
+                    </div>
+                    <div className="gp-preview-row gp-preview-row--total">
+                      <span>รายได้คุณเมื่อขายได้</span>
+                      <strong>฿{listingGpPreview.sellerReceive.toLocaleString()}</strong>
+                    </div>
+                  </div>
+                )}
+
+                {auctionGpPreview && (
+                  <div className="gp-preview-box">
+                    <div className="gp-preview-row gp-preview-row--muted">
+                      <span>ราคาเปิดประมูล (ผู้ซื้อ bid จากราคานี้)</span>
+                      <span>฿{Number(price).toLocaleString()}</span>
+                    </div>
+                    <p className="gp-preview-row gp-preview-row--muted" style={{ fontSize: 12, margin: '0 0 6px' }}>
+                      ตัวอย่างถ้าปิดที่ ฿{auctionGpPreview.finalPrice.toLocaleString()}
+                    </p>
+                    <div className="gp-preview-row">
+                      <span>ผู้ชนะจ่าย</span>
+                      <strong>฿{auctionGpPreview.finalPrice.toLocaleString()}</strong>
+                    </div>
+                    <div className="gp-preview-row gp-preview-row--muted">
+                      <span>หัก GP {auctionGpPreview.gpPercent}%</span>
+                      <span>−฿{auctionGpPreview.gpAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="gp-preview-row gp-preview-row--accent">
+                      <span>คืนคุณ ({auctionGpPreview.commissionPercent}% ของ GP)</span>
+                      <strong>+฿{auctionGpPreview.sellerCommission.toLocaleString()}</strong>
+                    </div>
+                    <div className="gp-preview-row gp-preview-row--total">
+                      <span>คุณได้รับสุทธิ</span>
+                      <strong>฿{auctionGpPreview.sellerReceive.toLocaleString()}</strong>
+                    </div>
                   </div>
                 )}
 

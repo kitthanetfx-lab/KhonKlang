@@ -544,6 +544,8 @@ create table fee_config (
   promo_label             text not null default '',
   marketplace_gp_percent  numeric(5,2) not null default 20,
   marketplace_gp_commission_percent numeric(5,2) not null default 30,
+  auction_gp_percent  numeric(5,2) not null default 20,
+  auction_gp_commission_percent numeric(5,2) not null default 30,
   -- Slip verification (SlipOK) — admin-configurable instead of env-var-only.
   -- Store the API key via Supabase Vault in production; this column exists
   -- so the settings UI has somewhere to read/write it through an RPC that

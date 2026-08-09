@@ -1,5 +1,20 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-09 (13:25)
+
+### แยก GP ตลาดซื้อขาย / ประมูล + หัก GP จากราคาปิดประมูล
+
+**แก้ไข**:
+1. **`0028_auction_gp.sql`** — คอลัมน์ `auction_gp_percent`, `auction_gp_commission_percent` (+ ensure marketplace GP columns)
+2. **`computeAuctionGp()`** — หัก GP จากราคาปิดประมูล (ผู้ชนะจ่ายเต็ม bid)
+3. **ลงประมูล** — ไม่บวก GP ตอนเปิดประมูล (ราคาเปิด = ราคา bid เริ่ม)
+4. **`finalizeAuction`** — บันทึกราคาชนะ + แจ้ง seller ยอดสุทธิหลัง GP
+5. **Admin settings** — การ์ด GP แยก 2 ชุด + preview คนละแบบ
+
+**งานฝั่งผู้ใช้**: รัน migration `0026_marketplace_gp.sql` และ `0028_auction_gp.sql` ใน Supabase
+
+---
+
 ## 2026-08-09 (12:50)
 
 ### ปรับ UX/UI หน้าแอดมิน — design system + ค่าธรรมเนียม

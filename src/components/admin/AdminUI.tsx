@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
-import type { MarketplaceGpBreakdown } from '@/lib/fees';
+import type { MarketplaceGpBreakdown, AuctionGpBreakdown } from '@/lib/fees';
 
 /* ── Page shell ── */
 
@@ -251,6 +251,36 @@ export function AdminGpPreview({ preview, examplePrice = 100 }: { preview: Marke
           <strong>฿{preview.sellerReceive.toLocaleString()}</strong>
         </div>
         <div className="gp-preview-row gp-preview-row--total">
+          <span>แพลตฟอร์มได้</span>
+          <strong>฿{preview.platformKeep.toLocaleString()}</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AdminAuctionGpPreview({ preview, examplePrice = 100 }: { preview: AuctionGpBreakdown; examplePrice?: number }) {
+  return (
+    <div className="admin-gp-preview">
+      <div className="admin-gp-preview__title">ตัวอย่างปิดประมูลที่ ฿{examplePrice.toLocaleString()}</div>
+      <div className="gp-preview-box">
+        <div className="gp-preview-row">
+          <span>ผู้ชนะจ่าย (ราคาปิด)</span>
+          <strong>฿{preview.finalPrice.toLocaleString()}</strong>
+        </div>
+        <div className="gp-preview-row gp-preview-row--muted">
+          <span>หัก GP {preview.gpPercent}%</span>
+          <span>−฿{preview.gpAmount.toLocaleString()}</span>
+        </div>
+        <div className="gp-preview-row gp-preview-row--accent">
+          <span>คืนผู้ขาย ({preview.commissionPercent}% ของ GP)</span>
+          <strong>+฿{preview.sellerCommission.toLocaleString()}</strong>
+        </div>
+        <div className="gp-preview-row gp-preview-row--total">
+          <span>ผู้ขายได้รับสุทธิ</span>
+          <strong>฿{preview.sellerReceive.toLocaleString()}</strong>
+        </div>
+        <div className="gp-preview-row gp-preview-row--muted">
           <span>แพลตฟอร์มได้</span>
           <strong>฿{preview.platformKeep.toLocaleString()}</strong>
         </div>

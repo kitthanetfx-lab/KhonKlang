@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { Settings, ShoppingCart, Zap, Search, MapPin, Car, RotateCcw, Wallet, Tag, Store, Shield, Gavel } from 'lucide-react';
 import { THAI_BANKS } from '@/lib/banks';
-import { computeMarketplaceGp, type FeeConfig } from '@/lib/fees';
+import { computeMarketplaceGp, computeAuctionGp, type FeeConfig } from '@/lib/fees';
 import {
   AdminPage,
   AdminPageHeader,
@@ -19,6 +19,7 @@ import {
   AdminField,
   AdminPills,
   AdminGpPreview,
+  AdminAuctionGpPreview,
   AdminSectionNote,
   AdminLoading,
 } from '@/components/admin/AdminUI';
@@ -32,12 +33,14 @@ type NumKey = Exclude<keyof FeeConfig, StrKey | BoolKey>;
 type PercentKey =
   | 'escrowFeePercent' | 'middlemanFeePercent' | 'platformCutPercent'
   | 'simpleFeePercent' | 'simpleShareTier1Percent' | 'simpleShareTier2Percent' | 'simpleShareTier3Percent'
-  | 'meetupFeePercent' | 'promoPercent' | 'marketplaceGpPercent' | 'marketplaceGpCommissionPercent';
+  | 'meetupFeePercent' | 'promoPercent' | 'marketplaceGpPercent' | 'marketplaceGpCommissionPercent'
+  | 'auctionGpPercent' | 'auctionGpCommissionPercent';
 
 const PERCENT_KEYS = new Set<PercentKey>([
   'escrowFeePercent', 'middlemanFeePercent', 'platformCutPercent',
   'simpleFeePercent', 'simpleShareTier1Percent', 'simpleShareTier2Percent', 'simpleShareTier3Percent',
   'meetupFeePercent', 'promoPercent', 'marketplaceGpPercent', 'marketplaceGpCommissionPercent',
+  'auctionGpPercent', 'auctionGpCommissionPercent',
 ]);
 
 function isPercentKey(k: NumKey): k is PercentKey {
@@ -97,8 +100,17 @@ export default function SettingsPage() {
     return computeMarketplaceGp(fees, 100);
   }, [fees]);
 
-  const gpHint = fees
+  const auctionGpPreview = useMemo(() => {
+    if (!fees) return null;
+    return computeAuctionGp(fees, 100);
+  }, [fees]);
+
+  const marketplaceGpHint = fees
     ? `ผู้ขายตั้ง 100 + GP ${fees.marketplaceGpPercent}% → ลูกค้าเห็น ${100 + Math.round(100 * fees.marketplaceGpPercent / 100)} | คืนผู้ขาย ${fees.marketplaceGpCommissionPercent}% ของ GP`
+    : '';
+
+  const auctionGpHint = fees
+    ? `ปิดประมูลที่ 100 → หัก GP ${fees.auctionGpPercent}% = ฿${Math.round(100 * fees.auctionGpPercent / 100)} | คืนผู้ขาย ${fees.auctionGpCommissionPercent}% ของ GP`
     : '';
 
   function setField(k: NumKey, v: string) {
@@ -261,11 +273,11 @@ export default function SettingsPage() {
             </AdminCard>
           </div>
 
-          <div className="admin-grid admin-grid--1">
+          <div className="admin-grid">
             <AdminCard
-              title="GP ตลาดซื้อขาย & ตลาดประมูล"
+              title="GP ตลาดซื้อขาย"
               icon={<Store size={18} className="text-indigo-600" />}
-              hint={gpHint}
+              hint={marketplaceGpHint}
               featured="indigo"
             >
               <AdminFieldGrid>
@@ -273,10 +285,21 @@ export default function SettingsPage() {
                 {numField('marketplaceGpCommissionPercent', 'คืนผู้ขาย (% ของ GP)', '%')}
               </AdminFieldGrid>
               {gpPreview && <AdminGpPreview preview={gpPreview} />}
-              <AdminSectionNote>
-                <Gavel size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-                ตลาดประมูลใช้ GP ชุดเดียวกับตลาดซื้อขาย — ราคาเริ่มประมูล = ราคาฐาน + GP
-              </AdminSectionNote>
+              <AdminSectionNote>ราคาในตลาด = ราคาผู้ขาย + GP (ผู้ซื้อจ่ายราคารวม GP)</AdminSectionNote>
+            </AdminCard>
+
+            <AdminCard
+              title="GP ตลาดประมูล"
+              icon={<Gavel size={18} className="text-violet-600" />}
+              hint={auctionGpHint}
+              featured="purple"
+            >
+              <AdminFieldGrid>
+                {numField('auctionGpPercent', 'GP หักจากราคาปิด', '%')}
+                {numField('auctionGpCommissionPercent', 'คืนผู้ขาย (% ของ GP)', '%')}
+              </AdminFieldGrid>
+              {auctionGpPreview && <AdminAuctionGpPreview preview={auctionGpPreview} />}
+              <AdminSectionNote>ผู้ชนะจ่ายราคา bid เต็มจำนวน — GP หักจากราคาปิดประมูล (ไม่บวกตอนเปิดประมูล)</AdminSectionNote>
             </AdminCard>
           </div>
 

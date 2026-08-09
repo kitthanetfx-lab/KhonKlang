@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { rowToAuctionPublic, type AuctionRow } from '@/lib/auction';
+import { computeAuctionGp } from '@/lib/fees';
+import { readFeesConfig } from './financeLedger';
 import { notifyUsers } from './notify';
 
 /** แนบข้อมูลประมูลให้รายการ deals */
@@ -42,22 +44,27 @@ export async function finalizeAuction(db: SupabaseClient, dealId: string) {
   if (!deal || deal.status !== 'posted') return auction;
 
   if (auction.current_bidder_id && auction.current_bid != null) {
+    const winningBid = Math.round(Number(auction.current_bid));
+    const fees = await readFeesConfig(db);
+    const gp = computeAuctionGp(fees, winningBid);
+
     await db.from('deals').update({
       buyer_id: auction.current_bidder_id,
       buyer_name: auction.current_bidder_name || '',
-      price: Math.round(Number(auction.current_bid)),
+      price: winningBid,
+      list_gross_price: winningBid,
       status: 'buyer_joined',
     }).eq('id', dealId);
 
     await notifyUsers(db, [auction.current_bidder_id as string], {
       title: '🔨 คุณชนะประมูล!',
-      body: `"${deal.title}" — ราคาที่ชนะ ฿${Number(auction.current_bid).toLocaleString()} เข้าห้องดีลเพื่อดำเนินการต่อ`,
+      body: `"${deal.title}" — ราคาที่ชนะ ฿${winningBid.toLocaleString()} เข้าห้องดีลเพื่อดำเนินการต่อ`,
       link: `/deal/${dealId}`,
     });
     if (deal.seller_id) {
       await notifyUsers(db, [deal.seller_id as string], {
         title: '🔨 ประมูลของคุณปิดแล้ว',
-        body: `"${deal.title}" ขายได้ ฿${Number(auction.current_bid).toLocaleString()} โดย ${auction.current_bidder_name || 'ผู้ชนะ'}`,
+        body: `"${deal.title}" ขายได้ ฿${winningBid.toLocaleString()} (สุทธิ ~฿${gp.sellerReceive.toLocaleString()}) โดย ${auction.current_bidder_name || 'ผู้ชนะ'}`,
         link: `/deal/${dealId}`,
       });
     }
