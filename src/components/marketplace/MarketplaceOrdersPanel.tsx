@@ -28,7 +28,7 @@ function imgUrl(fileId: string) {
 }
 
 function OrderCard({ order }: { order: MarketplaceOrder }) {
-  const href = `/marketplace/checkout/${order.id}`;
+  const href = `/cart/checkout/${order.id}`;
   const thumb = order.imageFileId ? imgUrl(order.imageFileId) : '';
   return (
     <Link href={href} className="mkt-order-card">

@@ -1,5 +1,16 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (02:32)
+
+### checkout ย้ายออกจาก /marketplace — ไม่ highlight ตลาด
+
+- **`/cart/checkout/[id]`** — URL checkout ใหม่ (อยู่ใต้ตะกร้า)
+- **`/marketplace/checkout/[id]`** → redirect ไป `/cart/checkout/[id]`
+- Nav: checkout/orders ไม่ทำให้แท็บ「ตลาด」active
+- ไอคอน 🛒 highlight เมื่ออยู่ `/cart/*`
+
+---
+
 ## 2026-08-10 (02:25)
 
 ### ย้ายคำสั่งซื้อเข้าตะกร้า — ไม่ปนกับหน้าตลาด

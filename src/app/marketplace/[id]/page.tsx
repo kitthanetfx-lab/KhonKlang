@@ -146,7 +146,7 @@ export default function MarketplaceDetailPage() {
         alert(data.error || 'ยังไม่สามารถซื้อได้');
         return;
       }
-      router.push(`/marketplace/checkout/${listing.id}`);
+      router.push(`/cart/checkout/${listing.id}`);
     } finally {
       setJoining(false);
     }
@@ -365,7 +365,7 @@ export default function MarketplaceDetailPage() {
                   </div>
                 ) : buyState === 'continue_checkout' ? (
                   <>
-                    <Link href={`/marketplace/checkout/${listing.id}`} className="btn btn-primary btn-lg">
+                    <Link href={`/cart/checkout/${listing.id}`} className="btn btn-primary btn-lg">
                       {listing.status === 'payment_uploaded' ? 'ดูสถานะการสั่งซื้อ →' : 'ดำเนินการโอนเงิน →'}
                     </Link>
                     {canSellerChat && (

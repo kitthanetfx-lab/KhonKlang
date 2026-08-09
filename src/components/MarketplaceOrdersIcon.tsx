@@ -2,11 +2,14 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
+import { usePathname } from 'next/navigation';
+import { authHeaders } from '@/lib/supabase';
 import { Icon } from './Icon';
 
 /** ไอคอนตะกร้า — จำนวนคำสั่งซื้อตลาดที่ยังดำเนินการ */
 export function MarketplaceOrdersIcon() {
+  const pathname = usePathname() || '';
+  const isCartActive = pathname === '/cart' || pathname.startsWith('/cart/');
   const [count, setCount] = useState(0);
 
   const load = useCallback(async () => {
@@ -36,7 +39,7 @@ export function MarketplaceOrdersIcon() {
   return (
     <Link
       href="/cart?tab=orders"
-      className="nb-btn"
+      className={`nb-btn${isCartActive ? ' nb-btn-active' : ''}`}
       style={{ position: 'relative', flex: '0 0 auto' }}
       aria-label={count > 0 ? `คำสั่งซื้อ ${count} รายการ` : 'คำสั่งซื้อของฉัน'}
     >

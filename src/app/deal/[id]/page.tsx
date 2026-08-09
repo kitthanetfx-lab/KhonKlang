@@ -693,7 +693,7 @@ export default function DealRoom() {
     if (!deal || !myId || loading || authLoading) return;
     if (!isMarketplaceOrder(deal)) return;
     if (deal.buyer_id !== myId) return;
-    router.replace(`/marketplace/checkout/${deal.id}`);
+    router.replace(`/cart/checkout/${deal.id}`);
   }, [deal, myId, loading, authLoading, router]);
 
   useEffect(() => {
