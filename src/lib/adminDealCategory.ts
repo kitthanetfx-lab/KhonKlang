@@ -52,6 +52,17 @@ export type AdminStatusTab =
   | 'disputed'
   | 'completed';
 
+export function getAdminCategoryLabel(category: AdminDealCategory | null): string {
+  if (!category) return 'ดีลซื้อขาย';
+  return ADMIN_DEAL_CATEGORIES.find(c => c.k === category)?.label || 'ดีลซื้อขาย';
+}
+
+/** ลิงก์หน้าแอดมินดีล — ตรงหมวด + แท็บสถานะ */
+export function adminDealsPagePath(category: AdminDealCategory | null, tab: AdminStatusTab): string {
+  const cat = category || 'trade';
+  return `/admin/deals?category=${cat}&tab=${tab}`;
+}
+
 export type OnsiteJobRow = {
   status: string;
   report_notes?: string | null;

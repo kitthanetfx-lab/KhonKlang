@@ -19,6 +19,7 @@ import { compressVideo, isVideoFile, VIDEO_UPLOAD_HINT } from '@/lib/videoCompre
 import { FeeConfig, FEE_DEFAULTS, computeDealFees, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
+import { isDirectShipOrder, isMarketplaceOrder, marketplaceShippingCost } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
 
@@ -240,6 +241,7 @@ interface Deal {
   middleman_confirmed_payment: boolean; buyer_confirmed_check: boolean;
   payment_slip_file_id: string; tracking_to_middleman: string; tracking_to_middleman_provider?: string; tracking_to_buyer: string; tracking_to_buyer_provider?: string;
   deal_type?: string; fee_payer?: string;
+  source?: string; shipping_cost?: number; buyer_shipping_provider?: string;
 }
 
 interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
@@ -1363,6 +1365,8 @@ export default function DealRoom() {
 
   const isMeetup = deal.deal_type === 'meetup';
   const isSimple = deal.deal_type === 'simple';
+  const isMarketplaceCheckout = isMarketplaceOrder(deal);
+  const isDirectShipFlow = isSimple || isMarketplaceCheckout;
   const isAdminUser = user?.prefs?.role === 'admin';
   const myRole: DealRole = !deal || !myId
     ? (myId ? 'guest' : '')
@@ -1954,7 +1958,8 @@ export default function DealRoom() {
           // sellerShare = ยอดที่ผู้ขายต้องจ่าย — ใช้สูตร Math.round(fb.total/2) เหมือน sellerShouldPay กันต่างกัน 1 บาท
           const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
           const buyerShare = fb.total - sellerShare;
-          const buyerTotal = deal!.price + buyerShare;
+          const shipCost = isMarketplaceOrder(deal!) ? marketplaceShippingCost(deal!) : 0;
+          const buyerTotal = deal!.price + shipCost + buyerShare;
           const sellerNet = Math.max(deal!.price, 0);
           const hasMm = !!deal!.middleman_id;
           const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
@@ -1985,6 +1990,9 @@ export default function DealRoom() {
               <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', margin: '4px 0 12px', fontSize: 13 }}>
                 <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 สรุปยอด · ค่าบริการ: {fpName}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ราคาสินค้า</span><span>฿{deal!.price.toLocaleString()}</span></div>
+                {shipCost > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ค่าขนส่ง</span><span>฿{shipCost.toLocaleString()}</span></div>
+                )}
                 {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
                 {/* แถวผู้ซื้อ — bold เฉพาะเมื่อดู role ผู้ซื้อ, มิฉะนั้น muted */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'buyer' ? 700 : 400, color: myRole === 'buyer' ? 'var(--ink)' : 'var(--muted)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
@@ -2048,7 +2056,7 @@ export default function DealRoom() {
                     </div>
               )}
               
-              {deal!.status === 'payment_uploaded' && myRole === 'buyer' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — {isSimple ? 'รอศูนย์กลางยืนยันรับเงิน' : 'รอคนกลางยืนยัน'}</div>}
+              {deal!.status === 'payment_uploaded' && myRole === 'buyer' && <div className="dr-slip-status">✅ ส่งสลิปแล้ว — {isDirectShipFlow ? 'รอศูนย์กลางยืนยันรับเงิน' : 'รอคนกลางยืนยัน'}</div>}
             </>
           );
         })()}
@@ -2305,13 +2313,13 @@ export default function DealRoom() {
     const canUp = ((myRole === 'seller' || myRole === 'buyer') && ['packing', 'shipped_to_middleman', 'payment_pending', 'payment_uploaded'].includes(deal!.status)) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
     // โหมดง่าย: ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่องเมื่อของมาถึง
     const canBuyerUnbox = isSimple && myRole === 'buyer' && deal!.status === 'shipped_to_buyer';
-    const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: isSimple ? '📬 วิดีโอก่อนแกะกล่อง (ผู้ซื้อ)' : '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)', chat: '💬 หลักฐานจากแชท', chat_text: '💬 ข้อความแชท', call: '📹 วิดีโอคอลที่บันทึก', other: '📎 หลักฐาน' };
+    const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: isDirectShipFlow ? '📬 วิดีโอก่อนแกะกล่อง (ผู้ซื้อ)' : '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)', chat: '💬 หลักฐานจากแชท', chat_text: '💬 ข้อความแชท', call: '📹 วิดีโอคอลที่บันทึก', other: '📎 หลักฐาน' };
     const items = evidence;
     // simple flow: อัปอะไรก็ได้ ไม่ต้องเลือกประเภท — เลือกประเภทเฉพาะ regular (ผู้ขาย/คนกลาง ในขั้น packing/receive/check)
     const needsTypeSelect = !isSimple && canUp && (myRole === 'seller' || myRole === 'middleman') && ['packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking'].includes(deal!.status);
     return (
       <div className="dr-evid-inner">
-        {isSimple && myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status) && (
+        {isDirectShipFlow && myRole === 'seller' && ['packing', 'shipped_to_middleman'].includes(deal!.status) && (
           <div className="dr-card" style={{ background: '#fff8ef', borderColor: '#ffe0b2' }}>
             <div style={{ fontSize: 13, color: '#8a5a00', lineHeight: 1.6 }}>⚡ ถ่ายวิดีโอทุกขั้นตอน เก็บจุดสำคัญ เช่น Serial Number และเลขชิป หากมีผลเทสต้องถ่ายประกอบ และเลขซีเรียลบนตัวสินค้ากับกล่อง/เอกสารต้องตรงกัน</div>
           </div>
@@ -2424,6 +2432,45 @@ export default function DealRoom() {
     if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 8 : 7, outcome: 'cancelled' };
     if (s === 'disputed') return { step: 7, outcome: 'disputed' };
     return { step: 1 };
+  }
+
+  const MARKETPLACE_WZ_STEPS = [2, 4, 5, 6, 7, 8] as const;
+  const MARKETPLACE_WZ_TITLES = ['โอนเงิน', 'รอทีมงานยืนยัน', 'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์'];
+
+  function getMarketplaceCheckoutStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
+    const s = deal!.status;
+    const pd: DealPriceState = priceState || {};
+    if (['payment_pending', 'payment_uploaded'].includes(s)) {
+      if (!deal!.payment_slip_file_id) return { step: 2 };
+      if (s === 'payment_uploaded') return { step: 4 };
+      return { step: 2 };
+    }
+    if (s === 'packing') return { step: 5 };
+    if (s === 'shipped_to_buyer') return { step: 6 };
+    if (s === 'completed') return { step: pd.payout_slip_file_id ? 8 : 7, outcome: 'success' };
+    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 8 : 7, outcome: 'cancelled' };
+    if (s === 'disputed') return { step: 7, outcome: 'disputed' };
+    return { step: 2 };
+  }
+
+  function renderMarketplaceProgress(step: number) {
+    const idx = MARKETPLACE_WZ_STEPS.indexOf(step as typeof MARKETPLACE_WZ_STEPS[number]);
+    const display = Math.max(1, idx >= 0 ? idx + 1 : 1);
+    const total = MARKETPLACE_WZ_TITLES.length;
+    const title = MARKETPLACE_WZ_TITLES[display - 1] || MARKETPLACE_WZ_TITLES[0];
+    return (
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+          <b style={{ fontSize: 13, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>ขั้นที่ {display} จาก {total} · {title}</b>
+          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{Math.round((display / total) * 100)}%</span>
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {MARKETPLACE_WZ_TITLES.map((t, i) => (
+            <div key={t} style={{ flex: 1, height: 6, borderRadius: 4, background: i + 1 < display ? 'var(--green-500)' : i + 1 === display ? 'var(--accent)' : 'var(--line)', transition: 'background .3s' }} />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   function getRegularStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
@@ -5216,6 +5263,36 @@ export default function DealRoom() {
     );
   }
 
+  function renderMarketplaceWizard() {
+    const { step: actualStep, outcome } = getMarketplaceCheckoutStep();
+    const step = Math.min(wzViewStep ?? actualStep, actualStep);
+    const isReviewing = step < actualStep;
+    return (
+      <div className="dr-inner">
+        <DealFlowBrand className="dr-brand-slot" />
+        {step >= 2 && renderMarketplaceProgress(step)}
+        {isReviewing && (
+          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '8px 12px', marginBottom: 12, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>
+            👀 กำลังดูขั้นตอนที่ผ่านมาแล้ว (ดูอย่างเดียว)
+          </div>
+        )}
+        <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
+          {step === 2 && renderPaymentSection()}
+          {step === 4 && renderWizardStep4()}
+          {step === 5 && renderWizardStep5()}
+          {step === 6 && renderWizardStep6()}
+          {step === 7 && renderWizardStep7(outcome)}
+          {step === 8 && renderWizardStep8(outcome)}
+        </div>
+        {step >= 2 && step < actualStep && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+            <button type="button" className="btn btn-primary" onClick={() => setWzViewStep(actualStep)}>กลับขั้นปัจจุบัน →</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // ─── Main render ─────────────────────────────────────────────────────────
   return (
     <div className="dr-root">
@@ -5286,7 +5363,7 @@ export default function DealRoom() {
           </nav>
           )}
           {/* Regular deal: แถบแชท + หลักฐาน ซ่อนในโหมด wizard แต่ยังเข้าถึงได้ผ่านปุ่มลิงก์ */}
-          {!isSimple && !isMeetup && (
+          {!isSimple && !isMeetup && !isMarketplaceCheckout && (
           <nav className="dr-tabs" style={{ display: 'none' }}>
             {(['steps', 'evidence'] as const).map(k => (
               <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
@@ -5297,9 +5374,10 @@ export default function DealRoom() {
           )}
 
           <main className="dr-body">
-            {tab === 'steps' && isSimple && renderSimpleWizard()}
+            {tab === 'steps' && isMarketplaceCheckout && renderMarketplaceWizard()}
+            {tab === 'steps' && isSimple && !isMarketplaceCheckout && renderSimpleWizard()}
             {tab === 'steps' && isMeetup && renderMeetupWizard()}
-            {tab === 'steps' && !isSimple && !isMeetup && renderRegularWizard()}
+            {tab === 'steps' && !isSimple && !isMeetup && !isMarketplaceCheckout && renderRegularWizard()}
 
             {/* กล่องแชทลอย — เรียกจากปุ่ม 💬 ในแถบลอยด้านล่าง (floatChatOpen) */}
             {floatChatOpen && (

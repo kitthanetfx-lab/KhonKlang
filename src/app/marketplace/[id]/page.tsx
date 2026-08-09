@@ -145,7 +145,7 @@ export default function MarketplaceDetailPage() {
         alert(data.error || 'ยังไม่สามารถซื้อได้');
         return;
       }
-      router.push(`/deal/${listing.id}`);
+      router.push(`/deal/${listing.id}?tab=steps`);
     } finally {
       setJoining(false);
     }

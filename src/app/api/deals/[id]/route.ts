@@ -9,6 +9,7 @@ import { runAutoSlipVerification } from '../../_lib/slipAutoVerify';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide, computeMarketplaceGp } from '@/lib/fees';
 import { getLogisticsProviderLabel, sanitizeShippingProviders } from '@/lib/logistics';
+import { isDirectShipOrder, isMarketplaceOrder } from '@/lib/marketplaceOrder';
 import { finalizeAuction } from '../../_lib/auctionSync';
 import { rowToAuctionPublic, type AuctionRow } from '@/lib/auction';
 
@@ -283,14 +284,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           }
           updates.buyer_shipping_provider = chosen;
         }
-        const newStatus = deal.seller_id ? 'buyer_joined' : 'waiting_seller';
-        updates = { ...updates, buyer_id: me.id, buyer_name: myName, status: newStatus };
         const shipLabel = updates.buyer_shipping_provider
           ? getLogisticsProviderLabel(String(updates.buyer_shipping_provider))
           : '';
-        systemMsg = shipLabel
-          ? `${myName} เข้าร่วมเป็นผู้ซื้อ · ขนส่ง: ${shipLabel}`
-          : `${myName} เข้าร่วมเป็นผู้ซื้อ`;
+        if (isMarketplaceOrder(deal)) {
+          updates = {
+            ...updates,
+            buyer_id: me.id,
+            buyer_name: myName,
+            status: 'payment_pending',
+            seller_accepted_terms: true,
+            buyer_accepted_terms: true,
+            fee_payer: deal.fee_payer || 'buyer',
+          };
+          systemMsg = shipLabel
+            ? `${myName} สั่งซื้อจากตลาด · ขนส่ง: ${shipLabel} — รอโอนเงิน`
+            : `${myName} สั่งซื้อจากตลาด — รอโอนเงิน`;
+          if (deal.seller_id && deal.seller_id !== me.id) {
+            await notifyUsers(db, [deal.seller_id], {
+              title: '🛒 มีคนสั่งซื้อสินค้าในตลาด',
+              body: `${myName} สั่งซื้อ "${deal.title || 'สินค้า'}" — รอผู้ซื้อโอนเงิน`,
+              link: `/deal/${id}`,
+            }).catch(() => {});
+          }
+        } else {
+          const newStatus = deal.seller_id ? 'buyer_joined' : 'waiting_seller';
+          updates = { ...updates, buyer_id: me.id, buyer_name: myName, status: newStatus };
+          systemMsg = shipLabel
+            ? `${myName} เข้าร่วมเป็นผู้ซื้อ · ขนส่ง: ${shipLabel}`
+            : `${myName} เข้าร่วมเป็นผู้ซื้อ`;
+        }
         break;
       }
       case 'join_as_seller': {
@@ -460,7 +483,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!trackingNumber) return NextResponse.json({ error: 'กรุณากรอกเลขพัสดุ' }, { status: 400 });
         if (!trackingProvider) return NextResponse.json({ error: 'กรุณาเลือกผู้ให้บริการขนส่ง' }, { status: 400 });
         const providerLabel = getLogisticsProviderLabel(trackingProvider);
-        if (deal.deal_type === 'simple') {
+        if (isDirectShipOrder(deal)) {
           updates = {
             status: 'shipped_to_buyer',
             tracking_to_buyer: trackingNumber,

@@ -59,7 +59,7 @@ export default function SellerDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [deals, setDeals] = useState<Deal[]>([]);
-  const [tab, setTab] = useState<'active' | 'history'>('active');
+  const [tab, setTab] = useState<'selling' | 'packing' | 'shipping' | 'done' | 'history'>('selling');
   const [postModal, setPostModal] = useState<null | 'pick' | 'listing' | 'auction'>(null);
   const [myId, setMyId] = useState('');
 
@@ -247,7 +247,7 @@ export default function SellerDashboard() {
       setPostDone(true);
       resetListingForm();
       await fetchDeals(headers);
-      setTimeout(() => { setPostDone(false); closePostModal(); setTab('active'); }, 1800);
+      setTimeout(() => { setPostDone(false); closePostModal(); setTab('selling'); }, 1800);
     } catch (err: unknown) {
       setPostError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally { setPosting(false); }
@@ -277,7 +277,7 @@ export default function SellerDashboard() {
       setPostDone(true);
       resetListingForm();
       await fetchDeals(headers);
-      setTimeout(() => { setPostDone(false); closePostModal(); setTab('active'); }, 1800);
+      setTimeout(() => { setPostDone(false); closePostModal(); setTab('selling'); }, 1800);
     } catch (err: unknown) {
       setPostError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally { setPosting(false); }
@@ -320,17 +320,25 @@ export default function SellerDashboard() {
       setPostDone(true);
       resetListingForm();
       await fetchDeals(headers);
-      setTimeout(() => { setPostDone(false); closePostModal(); setTab('active'); }, 1800);
+      setTimeout(() => { setPostDone(false); closePostModal(); setTab('selling'); }, 1800);
     } catch (err: unknown) {
       setPostError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
     } finally { setPosting(false); }
   }
 
-  const ACTIVE_STATUSES = ['posted', 'buyer_joined', 'terms_pending', 'payment_pending', 'payment_uploaded', 'packing', 'shipped_to_middleman', 'middleman_received', 'middleman_checking', 'shipped_to_buyer', 'delivered'];
-  const DONE_STATUSES = ['completed', 'cancelled', 'disputed'];
-  const activeDeals = deals.filter(d => d.seller_id === myId && ACTIVE_STATUSES.includes(d.status));
-  const historyDeals = deals.filter(d => d.seller_id === myId && DONE_STATUSES.includes(d.status));
-  const totalRev = historyDeals.filter(d => d.status === 'completed').reduce((s, d) => s + (d.price || 0), 0);
+  const SELLING_STATUSES = ['posted', 'payment_pending', 'payment_uploaded', 'buyer_joined', 'terms_pending'];
+  const PACKING_STATUSES = ['packing'];
+  const SHIPPING_STATUSES = ['shipped_to_buyer', 'delivered'];
+  const DONE_STATUSES = ['completed'];
+  const HISTORY_STATUSES = ['cancelled', 'disputed', 'shipped_to_middleman', 'middleman_received', 'middleman_checking'];
+
+  const myListings = deals.filter(d => d.seller_id === myId);
+  const sellingDeals = myListings.filter(d => SELLING_STATUSES.includes(d.status));
+  const packingDeals = myListings.filter(d => d.source === 'listing' && PACKING_STATUSES.includes(d.status));
+  const shippingDeals = myListings.filter(d => d.source === 'listing' && SHIPPING_STATUSES.includes(d.status));
+  const doneDeals = myListings.filter(d => d.source === 'listing' && DONE_STATUSES.includes(d.status));
+  const historyDeals = myListings.filter(d => HISTORY_STATUSES.includes(d.status) || (d.source !== 'listing' && DONE_STATUSES.includes(d.status)));
+  const totalRev = myListings.filter(d => d.status === 'completed').reduce((s, d) => s + (d.price || 0), 0);
   const listingGpPreview = price && Number(price) > 0 && postModal === 'listing' ? computeMarketplaceGp(feeConfig, Number(price)) : null;
   const auctionGpPreview = price && Number(price) > 0 && postModal === 'auction' ? computeAuctionGp(feeConfig, Number(price)) : null;
 
@@ -485,25 +493,38 @@ export default function SellerDashboard() {
       </section>
 
       <nav className="dash-tabs-wrap">
-        {([{ k: 'active', l: `กำลังขาย (${activeDeals.length})` }, { k: 'history', l: `ประวัติ (${historyDeals.length})` }] as const).map(({ k, l }) => (
+        {([
+          { k: 'selling', l: `กำลังขาย (${sellingDeals.length})` },
+          { k: 'packing', l: `ขอแพคกิ้ง (${packingDeals.length})` },
+          { k: 'shipping', l: `เตรียมจัดส่ง (${shippingDeals.length})` },
+          { k: 'done', l: `สำเร็จ (${doneDeals.length})` },
+          { k: 'history', l: `ประวัติ (${historyDeals.length})` },
+        ] as const).map(({ k, l }) => (
           <button key={k} className={`dash-tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
         ))}
       </nav>
 
       <main className="dash-body">
         <div className="dash-stats">
-          <div className="dash-stat"><div className="dash-stat-val">{activeDeals.length}</div><div className="dash-stat-lbl">กำลังขาย</div></div>
-          <div className="dash-stat"><div className="dash-stat-val">{historyDeals.filter(d => d.status === 'completed').length}</div><div className="dash-stat-lbl">เสร็จสิ้น</div></div>
+          <div className="dash-stat"><div className="dash-stat-val">{packingDeals.length}</div><div className="dash-stat-lbl">รอแพค</div></div>
+          <div className="dash-stat"><div className="dash-stat-val">{shippingDeals.length}</div><div className="dash-stat-lbl">กำลังส่ง</div></div>
+          <div className="dash-stat"><div className="dash-stat-val">{doneDeals.length}</div><div className="dash-stat-lbl">สำเร็จ</div></div>
           <div className="dash-stat"><div className="dash-stat-val" style={{ fontSize: 17 }}>฿{totalRev.toLocaleString()}</div><div className="dash-stat-lbl">รายได้รวม</div></div>
         </div>
 
-        {tab === 'active' && (activeDeals.length === 0 ? (
+        {tab === 'selling' && (sellingDeals.length === 0 ? (
           <div className="dash-empty">
             <div className="dash-empty-icon">📦</div>
             <p>ยังไม่มีประกาศที่กำลังดำเนินการ</p>
             <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setPostModal('pick')}>+ ลงประกาศใหม่</button>
           </div>
-        ) : activeDeals.map(d => <DealCard key={d.id} deal={d} />))}
+        ) : sellingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+
+        {tab === 'packing' && (packingDeals.length === 0 ? <div className="dash-empty"><p>ไม่มีสินค้ารอแพค</p></div> : packingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+
+        {tab === 'shipping' && (shippingDeals.length === 0 ? <div className="dash-empty"><p>ไม่มีสินค้ารอจัดส่ง</p></div> : shippingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+
+        {tab === 'done' && (doneDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีออเดอร์สำเร็จ</p></div> : doneDeals.map(d => <DealCard key={d.id} deal={d} />))}
 
         {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.id} deal={d} />))}
       </main>

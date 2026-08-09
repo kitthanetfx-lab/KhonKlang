@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AdminDealSnapshot, AdminQueueStep } from '@/app/api/_lib/adminDealQueue';
 import { DEAL_BUCKET, fileViewUrl } from '@/lib/supabase';
+import { adminDealsPagePath, getAdminCategoryLabel, getDealCategory } from '@/lib/adminDealCategory';
 
 const STEP_LABELS: Record<AdminQueueStep, string> = {
   confirm_pay: '⚡ ยืนยันรับเงิน',
@@ -61,6 +62,8 @@ function buildNotifyText(
   const { deal } = snap;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
   const label = STEP_LABELS[step];
+  const category = getDealCategory(deal);
+  const catLabel = getAdminCategoryLabel(category);
   const num = deal.deal_number || deal.id.slice(0, 8).toUpperCase();
   const title = deal.title || 'ดีล';
   const price = Number(deal.price || 0).toLocaleString('th-TH');
@@ -68,7 +71,7 @@ function buildNotifyText(
   const seller = deal.seller_name?.trim() || '-';
 
   const lines = [
-    `[กลางฮับ] ${label}`,
+    `[กลางฮับ · ${catLabel}] ${label}`,
     `${num} · ${title}`,
     `ผู้ขาย: ${seller}`,
     `ผู้ซื้อ: ${buyer}`,
@@ -81,7 +84,7 @@ function buildNotifyText(
     }
   }
 
-  lines.push(`${appUrl}/admin/deals?tab=${step}`);
+  lines.push(`${appUrl}${adminDealsPagePath(category, step)}`);
   return lines.join('\n').slice(0, 5000);
 }
 
@@ -160,9 +163,15 @@ export async function notifyAdminLineSlipCheck(params: {
   const num = String(deal.deal_number || String(deal.id || '').slice(0, 8).toUpperCase());
   const title = String(deal.title || 'ดีล');
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
+  const category = getDealCategory({
+    source: String(deal.source || ''),
+    status: String(deal.status || ''),
+    deal_type: String(deal.deal_type || ''),
+  });
+  const catLabel = getAdminCategoryLabel(category);
 
   const lines = [
-    `[กลางฮับ] ${evaluation.pass ? '✅' : '⚠️'} ตรวจสลิปอัตโนมัติ — ${sideLabel}`,
+    `[กลางฮับ · ${catLabel}] ${evaluation.pass ? '✅' : '⚠️'} ตรวจสลิปอัตโนมัติ — ${sideLabel}`,
     `${num} · ${title}`,
     evaluation.pass ? 'ผล: ผ่าน' : `ผล: ไม่ผ่าน — ${evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน'}`,
   ];
@@ -176,7 +185,7 @@ export async function notifyAdminLineSlipCheck(params: {
     if (slip.transDate || slip.transTime) lines.push(`เวลาโอน: ${[slip.transDate, slip.transTime].filter(Boolean).join(' ')}`);
   }
   if (evaluation.warnings.length) lines.push(`หมายเหตุ: ${evaluation.warnings.join(' · ')}`);
-  lines.push(`${appUrl}/admin/deals?tab=confirm_pay`);
+  lines.push(`${appUrl}${adminDealsPagePath(category, 'confirm_pay')}`);
 
   const messages: LineMessage[] = [{ type: 'text', text: lines.join('\n').slice(0, 5000) }];
   if (slipUrl && messages.length < 5) {
@@ -190,12 +199,18 @@ export async function notifyAdminLineAutoApproved(deal: Record<string, unknown>)
   const num = String(deal.deal_number || String(deal.id || '').slice(0, 8).toUpperCase());
   const title = String(deal.title || 'ดีล');
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
+  const category = getDealCategory({
+    source: String(deal.source || ''),
+    status: String(deal.status || ''),
+    deal_type: String(deal.deal_type || ''),
+  });
+  const catLabel = getAdminCategoryLabel(category);
   await sendLineAdminMessages([{
     type: 'text',
     text: [
-      '[กลางฮับ] ✅ อนุมัติรับเงินอัตโนมัติ — เริ่มแพ็คได้',
+      `[กลางฮับ · ${catLabel}] ✅ อนุมัติรับเงินอัตโนมัติ — เริ่มแพ็คได้`,
       `${num} · ${title}`,
-      `${appUrl}/admin/deals?tab=confirm_pay`,
+      `${appUrl}${adminDealsPagePath(category, 'confirm_pay')}`,
     ].join('\n').slice(0, 5000),
   }]);
 }
