@@ -1093,18 +1093,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
+    let skipConfirmPayLine = false;
     if (action === 'upload_payment' || action === 'upload_middleman_fee' || action === 'seller_fee_paid') {
       try {
         const trigger = action === 'upload_payment' ? 'buyer' : 'seller';
-        const autoUpdated = await runAutoSlipVerification(db, id, trigger);
-        if (autoUpdated && typeof autoUpdated === 'object') updated = autoUpdated as typeof updated;
+        const autoResult = await runAutoSlipVerification(db, id, trigger);
+        updated = autoResult.deal as typeof updated;
+        skipConfirmPayLine = autoResult.skipConfirmPayLine;
       } catch (err) {
         console.error('[slipAutoVerify]', err);
       }
     }
 
     await syncDealLedger(db, updated as Record<string, unknown>).catch(() => {});
-    await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated);
+    await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated, {
+      skipSteps: skipConfirmPayLine ? ['confirm_pay'] : [],
+    });
     // คืน evidence list ล่าสุดด้วย — กัน frontend re-fetch ทับ optimistic update จนภาพหาย
     let latestEvidence: unknown[] | undefined;
     if (evidenceInsert || action === 'delete_evidence') {

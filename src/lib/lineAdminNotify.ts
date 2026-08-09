@@ -151,14 +151,16 @@ export async function notifyAdminLineSteps(
   }
 }
 
-/** แจ้ง LINE ผลตรวจสลิปอัตโนมัติ (ผ่าน/ไม่ผ่าน) */
-export async function notifyAdminLineSlipCheck(params: {
+/** แจ้ง LINE ครั้งเดียว — ผลตรวจสลิป (ผ่าน/ไม่ผ่าน) + สถานะอนุมัติอัตโนมัติ */
+export async function notifyAdminLineSlipResult(params: {
   deal: Record<string, unknown>;
   side: 'buyer' | 'seller';
   evaluation: { pass: boolean; reasons: string[]; warnings: string[]; slip?: { amount?: number; transRef?: string; receiverAccount?: string; senderName?: string; transDate?: string; transTime?: string } };
   slipUrl?: string;
+  autoApproved?: boolean;
+  expectedAmount?: number;
 }): Promise<void> {
-  const { deal, side, evaluation, slipUrl } = params;
+  const { deal, side, evaluation, slipUrl, autoApproved, expectedAmount } = params;
   const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
   const num = String(deal.deal_number || String(deal.id || '').slice(0, 8).toUpperCase());
   const title = String(deal.title || 'ดีล');
@@ -169,12 +171,36 @@ export async function notifyAdminLineSlipCheck(params: {
     deal_type: String(deal.deal_type || ''),
   });
   const catLabel = getAdminCategoryLabel(category);
+  const buyer = String(deal.buyer_name || '-').trim() || '-';
+  const seller = String(deal.seller_name || '-').trim() || '-';
+  const price = Number(deal.price || 0).toLocaleString('th-TH');
+
+  let headline: string;
+  if (evaluation.pass && autoApproved) {
+    headline = `✅ ตรวจสลิป${sideLabel} — ผ่าน · อนุมัติอัตโนมัติแล้ว (เริ่มแพ็คได้)`;
+  } else if (evaluation.pass) {
+    headline = `✅ ตรวจสลิป${sideLabel} — ผ่าน · รอแอดมินยืนยัน`;
+  } else {
+    headline = `⚠️ ตรวจสลิป${sideLabel} — ไม่ผ่าน · รอแอดมินตรวจมือ`;
+  }
 
   const lines = [
-    `[กลางฮับ · ${catLabel}] ${evaluation.pass ? '✅' : '⚠️'} ตรวจสลิปอัตโนมัติ — ${sideLabel}`,
+    `[กลางฮับ · ${catLabel}] ${headline}`,
     `${num} · ${title}`,
-    evaluation.pass ? 'ผล: ผ่าน' : `ผล: ไม่ผ่าน — ${evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน'}`,
+    `ผู้ขาย: ${seller}`,
+    `ผู้ซื้อ: ${buyer}`,
+    `มูลค่าสินค้า ฿${price}`,
   ];
+
+  if (expectedAmount != null && expectedAmount > 0) {
+    lines.push(`ยอดที่ต้องโอน: ฿${Math.round(expectedAmount).toLocaleString('th-TH')}`);
+  }
+
+  if (evaluation.pass) {
+    lines.push('ผล: ผ่าน');
+  } else {
+    lines.push(`ผล: ไม่ผ่าน — ${evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน'}`);
+  }
 
   const slip = evaluation.slip;
   if (slip) {
@@ -185,13 +211,25 @@ export async function notifyAdminLineSlipCheck(params: {
     if (slip.transDate || slip.transTime) lines.push(`เวลาโอน: ${[slip.transDate, slip.transTime].filter(Boolean).join(' ')}`);
   }
   if (evaluation.warnings.length) lines.push(`หมายเหตุ: ${evaluation.warnings.join(' · ')}`);
-  lines.push(`${appUrl}${adminDealsPagePath(category, 'confirm_pay')}`);
+
+  const adminTab = autoApproved ? 'active' : 'confirm_pay';
+  lines.push(`${appUrl}${adminDealsPagePath(category, adminTab)}`);
 
   const messages: LineMessage[] = [{ type: 'text', text: lines.join('\n').slice(0, 5000) }];
   if (slipUrl && messages.length < 5) {
     messages.push({ type: 'image', originalContentUrl: slipUrl, previewImageUrl: slipUrl });
   }
   await sendLineAdminMessages(messages);
+}
+
+/** @deprecated ใช้ notifyAdminLineSlipResult แทน — คงไว้เพื่อ backward compat */
+export async function notifyAdminLineSlipCheck(params: {
+  deal: Record<string, unknown>;
+  side: 'buyer' | 'seller';
+  evaluation: { pass: boolean; reasons: string[]; warnings: string[]; slip?: { amount?: number; transRef?: string; receiverAccount?: string; senderName?: string; transDate?: string; transTime?: string } };
+  slipUrl?: string;
+}): Promise<void> {
+  await notifyAdminLineSlipResult({ ...params, autoApproved: false });
 }
 
 /** แจ้ง LINE เมื่อระบบอนุมัติรับเงินอัตโนมัติครบทุกสลิป */

@@ -9,13 +9,14 @@ import {
   type SlipInfo,
   type SlipResult,
 } from '@/lib/slipok';
-import { notifyAdminLineSlipCheck, notifyAdminLineAutoApproved } from '@/lib/lineAdminNotify';
+import { notifyAdminLineSlipResult } from '@/lib/lineAdminNotify';
 import { readFeesConfig, syncDealLedger } from '@/app/api/_lib/financeLedger';
 import { readServiceControlsConfig } from '@/app/api/_lib/appConfig';
 import { shouldAutoVerifySlip } from '@/lib/serviceControls';
 import { notifyUsers } from '@/app/api/_lib/notify';
 import { maybeNotifyAdminLineQueues } from '@/app/api/_lib/adminLineNotifyHook';
 import { loadAdminDealSnapshot, type AdminDealRow } from '@/app/api/_lib/adminDealQueue';
+import { isMarketplaceOrder, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
 
 export type SlipSide = 'buyer' | 'seller';
 
@@ -132,6 +133,13 @@ function computeExpectedAmounts(
   priceState: Record<string, unknown> | null,
   fees: FeeConfig,
 ) {
+  if (isMarketplaceOrder(deal)) {
+    return {
+      buyer: marketplaceBuyerPayAmount(deal),
+      seller: 0,
+      sellerRequired: false,
+    };
+  }
   const price = Number(deal.price) || 0;
   const feeBreakdown = computeDealFees(fees, price, String(deal.deal_type || ''));
   const feePayer = splitFeeByPayer(feeBreakdown.total, String(priceState?.proposed_fee_payer || deal.fee_payer || 'split'));
@@ -207,24 +215,31 @@ async function tryAutoApprove(db: SupabaseClient, dealId: string, deal: Record<s
 
   await syncDealLedger(db, updated as Record<string, unknown>).catch(() => {});
   await maybeNotifyAdminLineQueues(db, before, updated);
-  await notifyAdminLineAutoApproved(updated as Record<string, unknown>);
   return updated;
 }
 
-/** ตรวจสลิปอัตโนมัติหลังอัปสลิป — แยกผู้ซื้อ/ผู้ขาย */
+/** ตรวจสลิปอัตโนมัติหลังอัปสลิป — แจ้ง LINE ครั้งเดียว (ผ่าน/ไม่ผ่าน) */
 export async function runAutoSlipVerification(
   db: SupabaseClient,
   dealId: string,
   trigger: 'buyer' | 'seller' | 'both' = 'both',
-): Promise<Record<string, unknown> | null> {
+): Promise<{ deal: Record<string, unknown>; skipConfirmPayLine: boolean }> {
   const { data: deal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
-  if (!deal || deal.deal_type === 'meetup') return deal;
-  if (!['payment_pending', 'payment_uploaded'].includes(String(deal.status))) return deal;
+  if (!deal || deal.deal_type === 'meetup') {
+    return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+  }
+  if (!['payment_pending', 'payment_uploaded', 'posted'].includes(String(deal.status))) {
+    return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+  }
 
   const controls = await readServiceControlsConfig(db);
   const dealPrice = Number(deal.price || 0);
-  if (!shouldAutoVerifySlip(controls, dealPrice)) return deal;
-  if (!isSlipokConfigured()) return deal;
+  if (!shouldAutoVerifySlip(controls, dealPrice)) {
+    return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+  }
+  if (!isSlipokConfigured()) {
+    return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+  }
 
   const { data: priceState } = await db.from('deal_price_state').select('*').eq('deal_id', dealId).maybeSingle();
   const fees = await readFeesConfig(db);
@@ -237,6 +252,9 @@ export async function runAutoSlipVerification(
   if (trigger === 'both' || trigger === 'buyer') sides.push('buyer');
   if (trigger === 'both' || trigger === 'seller') sides.push('seller');
 
+  type PendingNotify = { side: SlipSide; evaluation: SlipCheckEvaluation; fileId: string; expected: number };
+  const pendingNotify: PendingNotify[] = [];
+
   for (const side of sides) {
     const fileId = side === 'buyer' ? String(deal.payment_slip_file_id || '') : String(priceState?.seller_fee_slip || '');
     const alreadyVerified = side === 'buyer' ? !!deal.payment_slip_verified_at : !!priceState?.seller_fee_slip_verified_at;
@@ -248,12 +266,7 @@ export async function runAutoSlipVerification(
     const evaluation = await verifyOneSide(deal, fileId, expected, companyBankAcct);
     const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
 
-    await notifyAdminLineSlipCheck({
-      deal: latestDeal,
-      side,
-      evaluation,
-      slipUrl: isSlipImageFile(fileId) ? dealSlipPublicUrl(fileId) : '',
-    });
+    pendingNotify.push({ side, evaluation, fileId, expected });
 
     if (evaluation.pass) {
       await markSideVerified(db, dealId, side);
@@ -274,8 +287,22 @@ export async function runAutoSlipVerification(
 
   const { data: freshDeal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
   const { data: freshPrice } = await db.from('deal_price_state').select('*').eq('deal_id', dealId).maybeSingle();
-  if (!freshDeal) return latestDeal;
+  if (!freshDeal) return { deal: latestDeal, skipConfirmPayLine: pendingNotify.length > 0 };
 
   const approved = await tryAutoApprove(db, dealId, freshDeal, freshPrice);
-  return approved || freshDeal;
+  const finalDeal = (approved || freshDeal) as Record<string, unknown>;
+
+  if (pendingNotify.length > 0) {
+    const primary = pendingNotify[pendingNotify.length - 1];
+    await notifyAdminLineSlipResult({
+      deal: finalDeal,
+      side: primary.side,
+      evaluation: primary.evaluation,
+      slipUrl: isSlipImageFile(primary.fileId) ? dealSlipPublicUrl(primary.fileId) : '',
+      autoApproved: !!approved,
+      expectedAmount: primary.expected,
+    });
+  }
+
+  return { deal: finalDeal, skipConfirmPayLine: pendingNotify.length > 0 };
 }
