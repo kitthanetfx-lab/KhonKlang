@@ -1257,7 +1257,16 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .mkt-detail-meta span { display: inline-flex; align-items: center; gap: 6px; }
 .mkt-detail-desc { color: var(--ink-2); line-height: 1.8; font-size: 15px; }
 .mkt-detail-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
-@media (min-width: 640px){ .mkt-detail-actions { flex-direction: row; flex-wrap: wrap; } .mkt-detail-actions .btn { flex: 1 1 220px; } }
+.mkt-detail-actions .btn-primary { width: 100%; }
+.mkt-detail-shipping { display: flex; align-items: baseline; gap: 10px; font-size: 15px; color: var(--muted); }
+.mkt-detail-shipping strong { color: var(--ink); font-size: 17px; }
+.mkt-shipping-pick { margin-top: 4px; }
+.mkt-shipping-pick-lbl { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 8px; }
+.mkt-shipping-pick-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.mkt-shipping-chip { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); font-size: 13px; font-weight: 600; cursor: pointer; }
+.mkt-shipping-chip.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.mkt-detail-escrow-note { margin: 4px 0 0; padding: 14px 16px; border-radius: var(--r-lg); background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); font-size: 14px; line-height: 1.65; width: 100%; }
+@media (min-width: 640px){ .mkt-detail-actions { flex-direction: row; flex-wrap: wrap; } .mkt-detail-actions .btn-soft { flex: 1 1 220px; } .mkt-detail-escrow-note { flex-basis: 100%; } }
 .mkt-detail-note { display: grid; gap: 12px; margin-top: 8px; }
 .mkt-detail-note-card { padding: 16px 18px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); }
 .mkt-detail-note-card.escrow { background: linear-gradient(135deg, #eef4ff 0%, #edf8f2 100%); border-color: color-mix(in srgb, var(--accent) 24%, var(--line)); }
@@ -4240,4 +4249,52 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .mkt-bid-history time { color: var(--muted); font-size: 11px; white-space: nowrap; }
 @media (max-width: 640px) {
   .mkt-auction-panel { grid-template-columns: 1fr; }
+}
+
+/* ── Shipping carrier picker ── */
+.carrier-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: rgba(15, 23, 42, .55);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.carrier-picker {
+  width: min(440px, 100%);
+  max-height: min(85vh, 640px);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
+  padding: 18px;
+}
+.carrier-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.carrier-picker-head h3 { margin: 0; font-size: 18px; }
+.carrier-picker-close { width: 32px; height: 32px; border: none; border-radius: 50%; background: var(--surface-2); cursor: pointer; font-size: 22px; line-height: 1; }
+.carrier-picker-sub { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.carrier-picker-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
+.carrier-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.carrier-picker-item.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.carrier-picker-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.seller-shipping-pick { width: 100%; justify-content: center; }
+.seller-shipping-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.seller-shipping-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 600;
 }

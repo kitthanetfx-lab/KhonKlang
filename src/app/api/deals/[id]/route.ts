@@ -7,8 +7,8 @@ import { loadAdminDealSnapshot } from '../../_lib/adminDealQueue';
 import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
 import { runAutoSlipVerification } from '../../_lib/slipAutoVerify';
 import { getTierCreditLimit } from '@/lib/financeLedger';
-import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide } from '@/lib/fees';
-import { getLogisticsProviderLabel } from '@/lib/logistics';
+import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide, computeMarketplaceGp } from '@/lib/fees';
+import { getLogisticsProviderLabel, sanitizeShippingProviders } from '@/lib/logistics';
 import { finalizeAuction } from '../../_lib/auctionSync';
 import { rowToAuctionPublic, type AuctionRow } from '@/lib/auction';
 
@@ -275,9 +275,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'ไม่สามารถเป็นผู้ซื้อได้' }, { status: 400 });
         if (deal.buyer_id)
           return NextResponse.json({ error: 'มีผู้ซื้อแล้ว' }, { status: 400 });
+        const allowedProviders = sanitizeShippingProviders(deal.shipping_providers);
+        if (allowedProviders.length > 0) {
+          const chosen = String(body.shippingProvider || '').trim();
+          if (!chosen || !allowedProviders.includes(chosen)) {
+            return NextResponse.json({ error: 'กรุณาเลือกขนส่ง' }, { status: 400 });
+          }
+          updates.buyer_shipping_provider = chosen;
+        }
         const newStatus = deal.seller_id ? 'buyer_joined' : 'waiting_seller';
-        updates = { buyer_id: me.id, buyer_name: myName, status: newStatus };
-        systemMsg = `${myName} เข้าร่วมเป็นผู้ซื้อ`;
+        updates = { ...updates, buyer_id: me.id, buyer_name: myName, status: newStatus };
+        const shipLabel = updates.buyer_shipping_provider
+          ? getLogisticsProviderLabel(String(updates.buyer_shipping_provider))
+          : '';
+        systemMsg = shipLabel
+          ? `${myName} เข้าร่วมเป็นผู้ซื้อ · ขนส่ง: ${shipLabel}`
+          : `${myName} เข้าร่วมเป็นผู้ซื้อ`;
         break;
       }
       case 'join_as_seller': {
@@ -808,6 +821,70 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
         priceUpdates = { seller_fee_slip: String(body.fileId), seller_fee_slip_verified_at: null };
         systemMsg = 'ผู้ขายโอนค่าบริการส่วนของตนแล้ว — รอศูนย์กลางตรวจสอบ';
+        break;
+      }
+      case 'update_listing': {
+        if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (deal.source !== 'listing' || deal.status !== 'posted' || deal.buyer_id) {
+          return NextResponse.json({ error: 'แก้ไขได้เฉพาะประกาศที่ยังไม่มีผู้ซื้อ' }, { status: 400 });
+        }
+        const nextTitle = String(body.title || deal.title || '').trim();
+        if (!nextTitle) return NextResponse.json({ error: 'กรุณากรอกชื่อสินค้า' }, { status: 400 });
+        const nextCondition = String(body.condition || deal.condition || '').trim();
+        if (!nextCondition) return NextResponse.json({ error: 'กรุณาเลือกสภาพสินค้า' }, { status: 400 });
+        const nextShippingProviders = sanitizeShippingProviders(body.shippingProviders ?? deal.shipping_providers);
+        if (nextShippingProviders.length === 0) {
+          return NextResponse.json({ error: 'กรุณาเลือกขนส่งอย่างน้อย 1 รายการ' }, { status: 400 });
+        }
+        const nextShippingCost = Math.max(0, Math.round(Number(body.shippingCost ?? deal.shipping_cost) || 0));
+        const isAuctionListing = deal.deal_type === 'auction';
+        let nextPrice = Number(deal.price) || 0;
+        let nextGross: number | null = deal.list_gross_price ?? null;
+        if (body.price != null) {
+          const gross = Math.max(0, Math.round(Number(body.price)));
+          if (isAuctionListing) {
+            nextPrice = gross;
+            nextGross = null;
+          } else {
+            const fees = await readFeesConfig(db);
+            const gp = computeMarketplaceGp(fees, gross);
+            nextPrice = gp.displayPrice;
+            nextGross = gp.sellerPrice;
+          }
+        }
+        updates = {
+          title: nextTitle,
+          description: body.description != null ? String(body.description) : deal.description,
+          category: body.category != null ? String(body.category) : deal.category,
+          condition: nextCondition,
+          location: body.location != null ? String(body.location) : deal.location,
+          price: nextPrice,
+          list_gross_price: nextGross,
+          shipping_cost: nextShippingCost,
+          shipping_providers: nextShippingProviders,
+        };
+        if (Array.isArray(body.imageFileIds)) {
+          await db.from('deal_images').delete().eq('deal_id', id);
+          const fileIds = body.imageFileIds.filter((f: unknown): f is string => typeof f === 'string' && f.length > 0);
+          if (fileIds.length) {
+            await db.from('deal_images').insert(fileIds.map((fileId: string, position: number) => ({ deal_id: id, file_id: fileId, position })));
+          }
+        }
+        if (isAuctionListing && body.auctionData && typeof body.auctionData === 'object') {
+          const ad = body.auctionData as Record<string, unknown>;
+          const auctionPatch: Record<string, unknown> = {};
+          if (ad.bidIncrement != null) auctionPatch.bid_increment = Math.max(1, Math.round(Number(ad.bidIncrement) || 10));
+          if (ad.durationHours != null) {
+            const hours = Math.max(1, Math.min(720, Math.round(Number(ad.durationHours) || 72)));
+            auctionPatch.ends_at = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+          }
+          if (body.price != null) auctionPatch.display_start_price = nextPrice;
+          if (Object.keys(auctionPatch).length) {
+            await db.from('deal_auction').update(auctionPatch).eq('deal_id', id);
+          }
+        }
+        writeChatMsg = false;
+        systemMsg = '';
         break;
       }
       default:

@@ -10,12 +10,16 @@ import { Icon } from '@/components/Icon';
 import { isCertifiedMode } from '@/lib/listingMode';
 import { computeMarketplaceGp, computeAuctionGp, FEE_DEFAULTS, type FeeConfig } from '@/lib/fees';
 import { AUCTION_DURATION_OPTIONS } from '@/lib/auction';
+import { ShippingCarrierPicker } from '@/components/ShippingCarrierPicker';
+import { getLogisticsProviderLabel } from '@/lib/logistics';
 
 interface Deal {
   id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
-  title: string; description: string; price: number; category: string; condition: string;
+  title: string; description: string; price: number; list_gross_price?: number | null;
+  category: string; condition: string;
   location: string; selling_mode: string; images: string[]; status: string;
-  reject_reason: string; created_at: string; deal_type?: string;
+  reject_reason: string; created_at: string; deal_type?: string; source?: string;
+  shipping_cost?: number; shipping_providers?: string[];
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -89,10 +93,15 @@ export default function SellerDashboard() {
   const [postDone, setPostDone] = useState(false);
   const [bidIncrement, setBidIncrement] = useState('10');
   const [durationHours, setDurationHours] = useState(72);
+  const [shippingCost, setShippingCost] = useState('0');
+  const [shippingProviders, setShippingProviders] = useState<string[]>([]);
+  const [carrierPickerOpen, setCarrierPickerOpen] = useState(false);
+  const [editDealId, setEditDealId] = useState('');
 
   function resetListingForm() {
     setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation('');
     setImages([]); setPostError(''); setBidIncrement('10'); setDurationHours(72);
+    setShippingCost('0'); setShippingProviders([]); setEditDealId('');
   }
 
   function closePostModal() {
@@ -219,6 +228,8 @@ export default function SellerDashboard() {
   async function handlePost() {
     if (!title || !price) { setPostError('กรุณากรอกชื่อสินค้าและราคา'); return; }
     if (!condition) { setPostError('กรุณาเลือกสภาพสินค้า'); return; }
+    if (shippingProviders.length === 0) { setPostError('กรุณาเลือกขนส่งอย่างน้อย 1 รายการ'); return; }
+    if (editDealId) { await handleUpdateListing(); return; }
     setPosting(true); setPostError('');
     try {
       const headers = await authHeaders();
@@ -227,7 +238,8 @@ export default function SellerDashboard() {
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title, description, price: Number(price), listGrossPrice: Number(price),
-          category, condition, location, sellingMode: 'direct,escrow,chat',
+          category, condition, location, sellingMode: 'escrow,chat',
+          shippingCost: Number(shippingCost) || 0, shippingProviders,
           imageFileIds: images.map(i => i.fileId), creatorRole: 'seller', source: 'listing',
         }),
       });
@@ -244,6 +256,8 @@ export default function SellerDashboard() {
   async function handlePostAuction() {
     if (!title || !price) { setPostError('กรุณากรอกชื่อสินค้าและราคาเริ่มต้น'); return; }
     if (!condition) { setPostError('กรุณาเลือกสภาพสินค้า'); return; }
+    if (shippingProviders.length === 0) { setPostError('กรุณาเลือกขนส่งอย่างน้อย 1 รายการ'); return; }
+    if (editDealId) { await handleUpdateListing(); return; }
     const inc = Math.max(1, Math.round(Number(bidIncrement) || 10));
     setPosting(true); setPostError('');
     try {
@@ -254,6 +268,7 @@ export default function SellerDashboard() {
         body: JSON.stringify({
           title, description, price: Number(price), listGrossPrice: Number(price),
           category, condition, location, creatorRole: 'seller', source: 'listing',
+          shippingCost: Number(shippingCost) || 0, shippingProviders,
           dealType: 'auction', imageFileIds: images.map(i => i.fileId),
           auctionData: { bidIncrement: inc, durationHours },
         }),
@@ -265,6 +280,49 @@ export default function SellerDashboard() {
       setTimeout(() => { setPostDone(false); closePostModal(); setTab('active'); }, 1800);
     } catch (err: unknown) {
       setPostError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+    } finally { setPosting(false); }
+  }
+
+  function openEditListing(deal: Deal) {
+    setEditDealId(deal.id);
+    setTitle(deal.title);
+    setDescription(deal.description || '');
+    setPrice(String(deal.list_gross_price ?? deal.price ?? ''));
+    setCategory(deal.category || '');
+    setCondition(deal.condition || '');
+    setLocation(deal.location || '');
+    setShippingCost(String(deal.shipping_cost ?? 0));
+    setShippingProviders(Array.isArray(deal.shipping_providers) ? deal.shipping_providers : []);
+    setImages((deal.images || []).map(fileId => ({ fileId, url: imgUrl(fileId), name: '' })));
+    setPostError('');
+    setPostDone(false);
+    setPostModal(deal.deal_type === 'auction' ? 'auction' : 'listing');
+  }
+
+  async function handleUpdateListing() {
+    if (!editDealId) return;
+    setPosting(true); setPostError('');
+    try {
+      const headers = await authHeaders();
+      const inc = Math.max(1, Math.round(Number(bidIncrement) || 10));
+      const res = await fetch(`/api/deals/${editDealId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_listing',
+          title, description, price: Number(price), category, condition, location,
+          shippingCost: Number(shippingCost) || 0, shippingProviders,
+          imageFileIds: images.map(i => i.fileId),
+          ...(postModal === 'auction' ? { auctionData: { bidIncrement: inc, durationHours } } : {}),
+        }),
+      });
+      if (!res.ok) { const d = await res.json(); setPostError(d.error || 'บันทึกไม่สำเร็จ'); return; }
+      setPostDone(true);
+      resetListingForm();
+      await fetchDeals(headers);
+      setTimeout(() => { setPostDone(false); closePostModal(); setTab('active'); }, 1800);
+    } catch (err: unknown) {
+      setPostError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
     } finally { setPosting(false); }
   }
 
@@ -302,9 +360,14 @@ export default function SellerDashboard() {
           </div>
           <span className={`sb ${STATUS_CLS[deal.status] || 'sb-gray'}`}>{STATUS_LABEL[deal.status] || deal.status}</span>
         </div>
-        <Link href={deal.status === 'posted' ? `/marketplace/${deal.id}` : `/deal/${deal.id}`} className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }}>
-          {deal.status === 'posted' ? '📋 ดูประกาศ →' : '💬 เข้าห้องดีล →'}
-        </Link>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignSelf: 'flex-start' }}>
+          {deal.status === 'posted' && deal.source === 'listing' && (
+            <button type="button" className="btn btn-soft btn-sm" onClick={() => openEditListing(deal)}>✏️ แก้ไข</button>
+          )}
+          <Link href={deal.status === 'posted' ? `/marketplace/${deal.id}` : `/deal/${deal.id}`} className="btn btn-ghost btn-sm">
+            {deal.status === 'posted' ? '📋 ดูประกาศ →' : '💬 เข้าห้องดีล →'}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -471,9 +534,11 @@ export default function SellerDashboard() {
 
             {(postModal === 'listing' || postModal === 'auction') && (
               <div className="seller-modal-form">
-                <button type="button" className="seller-modal-back-link" onClick={() => setPostModal('pick')}>← เลือกประเภทอื่น</button>
-                <h3 className="seller-modal-title">{postModal === 'auction' ? 'ลงสินค้าประมูล' : 'ลงขายสินค้า'}</h3>
-                {postDone && <div className="shop-alert shop-alert--ok">✅ ลงประกาศสำเร็จ!</div>}
+                <button type="button" className="seller-modal-back-link" onClick={() => { setEditDealId(''); setPostModal('pick'); }}>← เลือกประเภทอื่น</button>
+                <h3 className="seller-modal-title">
+                  {editDealId ? 'แก้ไขประกาศ' : postModal === 'auction' ? 'ลงสินค้าประมูล' : 'ลงขายสินค้า'}
+                </h3>
+                {postDone && <div className="shop-alert shop-alert--ok">{editDealId ? '✅ บันทึกการแก้ไขแล้ว!' : '✅ ลงประกาศสำเร็จ!'}</div>}
                 {postError && <div className="shop-alert shop-alert--err">⚠️ {postError}</div>}
 
                 <div className="form-field">
@@ -581,6 +646,28 @@ export default function SellerDashboard() {
                   </div>
                 )}
 
+                <div className="form-row-2">
+                  <div className="form-field" style={{ margin: 0 }}>
+                    <label>ค่าขนส่ง (บาท)</label>
+                    <input type="number" value={shippingCost} onChange={e => setShippingCost(e.target.value)} placeholder="0" min="0" />
+                  </div>
+                  <div className="form-field" style={{ margin: 0 }}>
+                    <label>ขนส่งที่รองรับ *</label>
+                    <button type="button" className="btn btn-soft btn-block seller-shipping-pick" onClick={() => setCarrierPickerOpen(true)}>
+                      {shippingProviders.length > 0
+                        ? `เลือกแล้ว ${shippingProviders.length} รายการ`
+                        : 'เลือกขนส่ง...'}
+                    </button>
+                  </div>
+                </div>
+                {shippingProviders.length > 0 && (
+                  <div className="seller-shipping-chips">
+                    {shippingProviders.map(id => (
+                      <span key={id} className="seller-shipping-chip">{getLogisticsProviderLabel(id)}</span>
+                    ))}
+                  </div>
+                )}
+
                 <div className="form-field">
                   <label>สภาพสินค้า *</label>
                   <div className="cond-chips">
@@ -609,13 +696,26 @@ export default function SellerDashboard() {
                   onClick={postModal === 'auction' ? handlePostAuction : handlePost}
                   disabled={posting || postDone || uploading}
                 >
-                  {posting ? 'กำลังลงประกาศ...' : postModal === 'auction' ? 'เปิดประมูล' : 'ลงประกาศ'}
+                  {posting
+                    ? (editDealId ? 'กำลังบันทึก...' : 'กำลังลงประกาศ...')
+                    : editDealId
+                      ? 'บันทึกการแก้ไข'
+                      : postModal === 'auction'
+                        ? 'เปิดประมูล'
+                        : 'ลงประกาศ'}
                 </button>
               </div>
             )}
           </div>
         </div>
       )}
+
+      <ShippingCarrierPicker
+        open={carrierPickerOpen}
+        selected={shippingProviders}
+        onClose={() => setCarrierPickerOpen(false)}
+        onConfirm={next => { setShippingProviders(next); setCarrierPickerOpen(false); }}
+      />
     </div>
   );
 }

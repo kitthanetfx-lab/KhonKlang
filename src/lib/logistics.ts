@@ -77,6 +77,14 @@ export const TH_LOGISTICS_PROVIDERS: LogisticsProvider[] = [
   },
 ];
 
+const PROVIDER_ID_SET = new Set(TH_LOGISTICS_PROVIDERS.map(item => item.id));
+
+/** กรอง id ขนส่งให้เหลือเฉพาะที่ระบบรองรับ (ไม่ซ้ำ) */
+export function sanitizeShippingProviders(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.filter((id): id is string => typeof id === 'string' && PROVIDER_ID_SET.has(id)))];
+}
+
 export function getLogisticsProvider(providerId?: string | null): LogisticsProvider | null {
   if (!providerId) return null;
   return TH_LOGISTICS_PROVIDERS.find(item => item.id === providerId) || null;

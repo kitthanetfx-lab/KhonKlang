@@ -8,8 +8,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Nav, Footer } from '@/components/Site';
 import { Icon } from '@/components/Icon';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
-import { addToCart, getCartCount } from '@/lib/cart';
-import { isCertifiedMode, supportsDirectPurchase, supportsEscrowPurchase, supportsSellerChat } from '@/lib/listingMode';
+import { isCertifiedMode, supportsSellerChat } from '@/lib/listingMode';
+import { getLogisticsProviderLabel } from '@/lib/logistics';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import type { AuctionPublic } from '@/lib/auction';
 
@@ -26,6 +26,8 @@ interface ListingDetail {
   location: string;
   selling_mode: string;
   deal_type?: string;
+  shipping_cost?: number;
+  shipping_providers?: string[];
   images: string[];
   status: string;
 }
@@ -56,9 +58,8 @@ export default function MarketplaceDetailPage() {
   const [myId, setMyId] = useState('');
   const [hdrs, setHdrs] = useState<Record<string, string>>({});
   const [mainImage, setMainImage] = useState('');
-  const [cartCount, setCartCount] = useState(0);
   const [joining, setJoining] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [selectedShipping, setSelectedShipping] = useState('');
   const [auction, setAuction] = useState<AuctionPublic | null>(null);
   const [auctionBids, setAuctionBids] = useState<AuctionBid[]>([]);
   const [bidAmount, setBidAmount] = useState('');
@@ -76,15 +77,10 @@ export default function MarketplaceDetailPage() {
     setSellerShop(data.sellerShop || null);
     setAuction(data.auction || null);
     setAuctionBids(data.auctionBids || []);
+    const providers = Array.isArray(data.deal?.shipping_providers) ? data.deal.shipping_providers : [];
+    setSelectedShipping(prev => (prev && providers.includes(prev) ? prev : providers[0] || ''));
     if (data.auction?.minNextBid) setBidAmount(String(data.auction.minNextBid));
   }
-
-  useEffect(() => {
-    const syncCart = () => setCartCount(getCartCount());
-    syncCart();
-    window.addEventListener('khonklang-cart-updated', syncCart);
-    return () => window.removeEventListener('khonklang-cart-updated', syncCart);
-  }, []);
 
   useEffect(() => {
     (async () => {
@@ -122,26 +118,15 @@ export default function MarketplaceDetailPage() {
 
   const displayImage = mainImage || images[0] || '';
 
-  function pushToCart(goToCart = false) {
-    if (!listing) return;
-    setAdding(true);
-    addToCart({
-      dealId: listing.id,
-      title: listing.title,
-      price: listing.price,
-      imageUrl: images[0] || '',
-      sellerName: listing.seller_name || 'ผู้ขาย',
-      location: listing.location || '',
-    });
-    setCartCount(getCartCount());
-    setAdding(false);
-    if (goToCart) router.push('/cart');
-  }
-
   async function buyViaEscrow() {
     if (!listing) return;
     if (!myId) {
       router.push(`/login?returnTo=${encodeURIComponent(`/marketplace/${listing.id}`)}`);
+      return;
+    }
+    const providers = listing.shipping_providers || [];
+    if (providers.length > 0 && !selectedShipping) {
+      alert('กรุณาเลือกขนส่ง');
       return;
     }
     setJoining(true);
@@ -150,11 +135,14 @@ export default function MarketplaceDetailPage() {
       const res = await fetch(`/api/deals/${listing.id}`, {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'join_as_buyer' }),
+        body: JSON.stringify({
+          action: 'join_as_buyer',
+          ...(selectedShipping ? { shippingProvider: selectedShipping } : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || 'ยังไม่สามารถซื้อผ่านคนกลางได้');
+        alert(data.error || 'ยังไม่สามารถซื้อได้');
         return;
       }
       router.push(`/deal/${listing.id}`);
@@ -229,10 +217,10 @@ export default function MarketplaceDetailPage() {
 
   const isOwner = listing.seller_id === myId;
   const isAuction = listing.deal_type === 'auction' && auction;
-  const canDirectBuy = !isAuction && supportsDirectPurchase(listing.selling_mode);
-  const canEscrowBuy = !isAuction && supportsEscrowPurchase(listing.selling_mode);
   const canSellerChat = supportsSellerChat(listing.selling_mode);
   const displayPrice = isAuction ? auction.leadingPrice : (listing.price || 0);
+  const shippingProviders = listing.shipping_providers || [];
+  const shippingCost = listing.shipping_cost ?? 0;
 
   return (
     <>
@@ -241,7 +229,6 @@ export default function MarketplaceDetailPage() {
         <div className="container">
           <div className="mkt-detail-top">
             <Link href={isAuction ? '/marketplace?zone=auction' : '/marketplace'} className="btn btn-ghost btn-sm"><Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} /> {isAuction ? 'กลับตลาดประมูล' : 'กลับตลาดซื้อขาย'}</Link>
-            <Link href="/cart" className="btn btn-soft btn-sm"><Icon name="package" size={16} /> ตะกร้า {cartCount > 0 ? `(${cartCount})` : ''}</Link>
           </div>
 
           <div className="mkt-detail-grid">
@@ -277,6 +264,12 @@ export default function MarketplaceDetailPage() {
                 {isAuction && auction.bidCount > 0 ? 'ราคาปัจจุบัน ' : isAuction ? 'ราคาเริ่ม ' : ''}
                 ฿{displayPrice.toLocaleString()}
               </div>
+              {!isAuction && (
+                <div className="mkt-detail-shipping">
+                  <span>ค่าขนส่ง</span>
+                  <strong>{shippingCost > 0 ? `฿${shippingCost.toLocaleString()}` : 'ฟรี'}</strong>
+                </div>
+              )}
 
               {isAuction && (
                 <div className="mkt-auction-panel">
@@ -358,32 +351,34 @@ export default function MarketplaceDetailPage() {
                   )
                 ) : (
                   <>
-                    {canDirectBuy && (
-                      <>
-                        <button type="button" className="btn btn-ghost btn-lg" onClick={() => pushToCart(false)} disabled={adding}>
-                          <Icon name="package" size={18} /> {adding ? 'กำลังเพิ่ม...' : 'หยิบใส่ตะกร้า'}
-                        </button>
-                        <button type="button" className="btn btn-primary btn-lg" onClick={() => pushToCart(true)}>
-                          ซื้อทันที
-                        </button>
-                      </>
+                    {shippingProviders.length > 0 && (
+                      <div className="mkt-shipping-pick">
+                        <div className="mkt-shipping-pick-lbl">เลือกขนส่ง</div>
+                        <div className="mkt-shipping-pick-list">
+                          {shippingProviders.map(id => (
+                            <button
+                              key={id}
+                              type="button"
+                              className={`mkt-shipping-chip${selectedShipping === id ? ' active' : ''}`}
+                              onClick={() => setSelectedShipping(id)}
+                            >
+                              {getLogisticsProviderLabel(id)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                    {canEscrowBuy && (
-                      <button type="button" className="btn btn-dark btn-lg" onClick={buyViaEscrow} disabled={joining}>
-                        <Icon name="shieldCheck" size={18} /> {joining ? 'กำลังเข้าห้องดีล...' : 'ซื้อขายผ่านคนกลาง'}
-                      </button>
-                    )}
+                    <button type="button" className="btn btn-primary btn-lg" onClick={buyViaEscrow} disabled={joining}>
+                      {joining ? 'กำลังเข้าระบบซื้อขาย...' : 'ซื้อทันที'}
+                    </button>
                     {canSellerChat && (
                       <button type="button" className="btn btn-soft btn-lg" onClick={sellerChatHref}>
                         <Icon name="chat" size={18} /> แชทกับผู้ขาย
                       </button>
                     )}
-                    <Link href={`/service/meetup?step=2&role=buyer&title=${encodeURIComponent(listing.title)}&price=${listing.price}&inviteUserId=${listing.seller_id}`} className="btn btn-soft btn-lg">
-                      🚗 นัดรับ + ประกันเดินทาง
-                    </Link>
-                    <Link href={`/messages?to=${listing.seller_id}&name=${encodeURIComponent(listing.seller_name || 'ผู้ขาย')}`} className="btn btn-ghost btn-lg">
-                      <Icon name="message" size={18} /> ฝากข้อความถึงผู้ขาย
-                    </Link>
+                    <p className="mkt-detail-escrow-note">
+                      เมื่อกดซื้อขาย แล้วระบบจะเข้าสู่ระบบซื้อขายผ่านกลาง และเงินจะไม่ถึงมือผู้ขาย หากสินค้ายังไม่ถึงมือผู้รับ
+                    </p>
                   </>
                 )}
               </div>
@@ -403,18 +398,6 @@ export default function MarketplaceDetailPage() {
                 </div>
               )}
 
-              {!isAuction && (
-              <div className="mkt-detail-note">
-                <div className="mkt-detail-note-card">
-                  <div className="mkt-detail-note-title">ซื้อโดยไม่ผ่านคนกลาง</div>
-                  <p>เหมาะกับสินค้าทั่วไปที่คุณต้องการ checkout แบบรวดเร็ว เพิ่มลงตะกร้าหรือซื้อทันทีได้เลย</p>
-                </div>
-                <div className="mkt-detail-note-card escrow">
-                  <div className="mkt-detail-note-title">ซื้อขายผ่านคนกลาง</div>
-                  <p>เหมาะกับสินค้ามูลค่าสูงหรืออยากให้มีคนกลางตรวจสอบ โดยจะพาไปห้องดีล 3 ฝ่ายทันที</p>
-                </div>
-              </div>
-              )}
             </section>
           </div>
         </div>

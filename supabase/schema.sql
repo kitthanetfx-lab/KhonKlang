@@ -195,6 +195,9 @@ create table deals (
   tracking_to_buyer         text,
   tracking_to_buyer_provider text,
   reject_reason             text,
+  shipping_cost             integer not null default 0 check (shipping_cost >= 0),
+  shipping_providers        text[] not null default '{}',
+  buyer_shipping_provider   text,
 
   wanted_post_id            uuid references wanted_posts(id),
 

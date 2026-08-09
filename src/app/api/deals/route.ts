@@ -4,6 +4,7 @@ import { notifyUsers } from '../_lib/notify';
 import { readServiceControlsConfig } from '../_lib/appConfig';
 import { syncDealLedger, readFeesConfig } from '../_lib/financeLedger';
 import { computeMarketplaceGp } from '@/lib/fees';
+import { sanitizeShippingProviders } from '@/lib/logistics';
 import { attachAuctions, syncExpiredAuctions } from '../_lib/auctionSync';
 
 // แนบ images: string[] (file_id เรียงตาม position) ให้แต่ละดีล — แทน imageFileIds JSON blob เดิมบน deals row
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
   try {
     const me = await verifyUser(req);
     const body = await req.json();
-    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent, listGrossPrice, auctionData } = body;
+    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent, listGrossPrice, auctionData, shippingCost, shippingProviders } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isAuction = dealType === 'auction';
     const isBuyer = creatorRole === 'buyer';
@@ -102,6 +103,16 @@ export async function POST(req: NextRequest) {
       }
     } else if (!dealType && serviceIntent !== 'safezone' && !serviceControls.tradeOnline.enabled) {
       return NextResponse.json({ error: serviceControls.tradeOnline.note || 'บริการซื้อขายผ่านกลางถูกปิดชั่วคราว' }, { status: 403 });
+    }
+
+    let listingShippingCost = 0;
+    let listingShippingProviders: string[] = [];
+    if (source === 'listing') {
+      listingShippingCost = Math.max(0, Math.round(Number(shippingCost) || 0));
+      listingShippingProviders = sanitizeShippingProviders(shippingProviders);
+      if (listingShippingProviders.length === 0) {
+        return NextResponse.json({ error: 'กรุณาเลือกขนส่งอย่างน้อย 1 รายการ' }, { status: 400 });
+      }
     }
 
     const name = profile?.display_name || '';
@@ -134,6 +145,8 @@ export async function POST(req: NextRequest) {
       deal_type: resolvedDealType,
       status: isBuyer ? 'waiting_seller' : 'posted',
       creator_id: me.id,
+      shipping_cost: source === 'listing' ? listingShippingCost : 0,
+      shipping_providers: source === 'listing' ? listingShippingProviders : [],
     }).select().single();
     if (error || !doc) throw new Error(error?.message || 'create deal failed');
 
