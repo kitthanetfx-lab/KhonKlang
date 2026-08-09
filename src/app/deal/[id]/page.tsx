@@ -19,7 +19,7 @@ import { compressVideo, isVideoFile, VIDEO_UPLOAD_HINT } from '@/lib/videoCompre
 import { FeeConfig, FEE_DEFAULTS, computeDealFees, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
-import { isDirectShipOrder, isMarketplaceOrder, marketplaceShippingCost } from '@/lib/marketplaceOrder';
+import { isDirectShipOrder, isMarketplaceOrder, marketplaceShippingCost, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
 
@@ -325,7 +325,8 @@ const SIMPLE_TIMELINE = [
 const SIMPLE_STATUS_LABEL: Record<string, string> = {
   buyer_joined: 'รอยอมรับเงื่อนไข', payment_uploaded: 'รอศูนย์กลางยืนยัน', packing: 'ผู้ขายแพ็ค+ส่งตรง', shipped_to_buyer: 'จัดส่งถึงผู้ซื้อ',
 };
-function statusText(d: { status: string; deal_type?: string }) {
+function statusText(d: { status: string; deal_type?: string; source?: string; buyer_id?: string | null }) {
+  if (isMarketplaceOrder(d) && d.status === 'posted' && d.buyer_id) return 'รอโอนเงิน';
   if (d.deal_type === 'simple' && SIMPLE_STATUS_LABEL[d.status]) return SIMPLE_STATUS_LABEL[d.status];
   return STEP_LABEL[d.status];
 }
@@ -1946,7 +1947,11 @@ export default function DealRoom() {
   // ─── Payment section ─────────────────────────────────────────────────────
   function renderPaymentSection() {
     if (deal!.deal_type === 'meetup') return null;
-    if (!['payment_pending', 'payment_uploaded'].includes(deal!.status)) return null;
+    const inPaymentPhase = ['payment_pending', 'payment_uploaded'].includes(deal!.status)
+      || isMarketplaceCheckoutActive(deal!);
+    if (!inPaymentPhase) return null;
+    const awaitingBuyerSlip = !deal!.payment_slip_file_id
+      && (deal!.status === 'payment_pending' || isMarketplaceCheckoutActive(deal!));
     return (
         <div className="dr-card dr-pay-card">
         {(() => {
@@ -2028,7 +2033,7 @@ export default function DealRoom() {
                 ], { marginBottom: 12 })
               )}
 
-              {deal!.status === 'payment_pending' && myRole === 'buyer' && (
+              {awaitingBuyerSlip && myRole === 'buyer' && (
                 <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
                   <div style={{ fontWeight: 700, color: '#075985', marginBottom: 6 }}>🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
                   <PaymentMethods amount={buyerShouldPay} note={
@@ -2041,12 +2046,12 @@ export default function DealRoom() {
                   <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
                 </div>
               )}
-              {deal!.status === 'payment_pending' && myRole !== 'buyer' && myRole !== 'seller' && (
+              {awaitingBuyerSlip && myRole !== 'buyer' && myRole !== 'seller' && (
                 <div style={{ fontSize: 13, color: 'var(--muted)' }}>รอผู้ซื้อโอนเงินเข้าระบบพักเงินของบริษัท</div>
               )}
 
               {/* ผู้ขายโอนค่าบริการส่วนของตน — ทันที แยกจากยอดสินค้า */}
-              {myRole === 'seller' && sellerShouldPay > 0 && ['payment_pending', 'payment_uploaded'].includes(deal!.status) && (
+              {myRole === 'seller' && sellerShouldPay > 0 && (['payment_pending', 'payment_uploaded'].includes(deal!.status) || isMarketplaceCheckoutActive(deal!)) && (
                 pd.seller_fee_slip
                   ? <div className="dr-slip-status">✅ คุณโอนค่าบริการ ฿{sellerShouldPay.toLocaleString()} แล้ว — รอศูนย์กลางตรวจสอบ</div>
                   : <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
