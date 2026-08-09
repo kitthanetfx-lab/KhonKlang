@@ -9,7 +9,7 @@ import { runAutoSlipVerification } from '../../_lib/slipAutoVerify';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide, computeMarketplaceGp } from '@/lib/fees';
 import { getLogisticsProviderLabel, sanitizeShippingProviders } from '@/lib/logistics';
-import { isDirectShipOrder, isMarketplaceOrder } from '@/lib/marketplaceOrder';
+import { isDirectShipOrder, isMarketplaceOrder, canJoinMarketplaceAsBuyer, isMarketplaceSold } from '@/lib/marketplaceOrder';
 import { finalizeAuction } from '../../_lib/auctionSync';
 import { rowToAuctionPublic, type AuctionRow } from '@/lib/auction';
 
@@ -88,6 +88,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (deal.deal_type === 'auction') {
       const { data: refreshed } = await db.from('deals').select('*').eq('id', id).single();
       if (refreshed) current = refreshed;
+    }
+    // ตลาด: payment_pending โดยไม่มีสลิป = checkout ค้าง → คืน posted (ยังขายได้)
+    if (isMarketplaceOrder(current) && current.status === 'payment_pending' && !current.payment_slip_file_id) {
+      const { data: fixed } = await db.from('deals').update({ status: 'posted' }).eq('id', id).select().single();
+      if (fixed) current = fixed;
     }
     // Self-heal: ทั้งสองฝ่าย (และคนกลางถ้ามี) ยอมรับครบแล้วแต่สถานะค้างที่ขั้นยอมรับ
     // (เกิดได้จาก race ตอนสองฝ่ายกดยอมรับพร้อมกัน) → ดันไปขั้นคุย/เก็บหลักฐานก่อนโอนเงิน
@@ -270,10 +275,57 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break;
       }
       case 'join_as_buyer': {
-        if (!['posted', 'waiting_buyer'].includes(deal.status))
-          return NextResponse.json({ error: 'Deal not available' }, { status: 400 });
         if (isSeller || isMiddleman)
           return NextResponse.json({ error: 'ไม่สามารถเป็นผู้ซื้อได้' }, { status: 400 });
+
+        if (isMarketplaceOrder(deal)) {
+          const joinCheck = canJoinMarketplaceAsBuyer(deal, me.id);
+          if (!joinCheck.ok)
+            return NextResponse.json({ error: joinCheck.error || 'สินค้านี้ไม่พร้อมขายแล้ว' }, { status: 400 });
+          const allowedProviders = sanitizeShippingProviders(deal.shipping_providers);
+          if (allowedProviders.length > 0) {
+            const chosen = String(body.shippingProvider || '').trim();
+            if (!chosen || !allowedProviders.includes(chosen)) {
+              return NextResponse.json({ error: 'กรุณาเลือกขนส่ง' }, { status: 400 });
+            }
+            updates.buyer_shipping_provider = chosen;
+          }
+          const shipLabel = updates.buyer_shipping_provider
+            ? getLogisticsProviderLabel(String(updates.buyer_shipping_provider))
+            : '';
+          const takingOver = !!deal.buyer_id && deal.buyer_id !== me.id;
+          const isResume = deal.buyer_id === me.id;
+          updates = {
+            ...updates,
+            buyer_id: me.id,
+            buyer_name: myName,
+            status: 'posted',
+            seller_accepted_terms: true,
+            buyer_accepted_terms: true,
+            fee_payer: deal.fee_payer || 'buyer',
+            ...(takingOver ? { payment_slip_file_id: null, payment_slip_verified_at: null } : {}),
+          };
+          if (isResume && !takingOver) {
+            systemMsg = shipLabel
+              ? `${myName} ดำเนินการสั่งซื้อต่อ · ขนส่ง: ${shipLabel}`
+              : `${myName} ดำเนินการสั่งซื้อต่อ`;
+          } else {
+            systemMsg = shipLabel
+              ? `${myName} สั่งซื้อจากตลาด · ขนส่ง: ${shipLabel} — รอโอนเงิน`
+              : `${myName} สั่งซื้อจากตลาด — รอโอนเงิน`;
+            if (deal.seller_id && deal.seller_id !== me.id) {
+              await notifyUsers(db, [deal.seller_id], {
+                title: takingOver ? '🛒 มีผู้ซื้อใหม่ (แทนที่คำสั่งเดิม)' : '🛒 มีคนสั่งซื้อสินค้าในตลาด',
+                body: `${myName} สั่งซื้อ "${deal.title || 'สินค้า'}" — รอผู้ซื้อโอนเงิน`,
+                link: `/deal/${id}`,
+              }).catch(() => {});
+            }
+          }
+          break;
+        }
+
+        if (!['posted', 'waiting_buyer'].includes(deal.status))
+          return NextResponse.json({ error: 'สินค้านี้ไม่พร้อมขายแล้ว' }, { status: 400 });
         if (deal.buyer_id)
           return NextResponse.json({ error: 'มีผู้ซื้อแล้ว' }, { status: 400 });
         const allowedProviders = sanitizeShippingProviders(deal.shipping_providers);
@@ -287,27 +339,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const shipLabel = updates.buyer_shipping_provider
           ? getLogisticsProviderLabel(String(updates.buyer_shipping_provider))
           : '';
-        if (isMarketplaceOrder(deal)) {
-          updates = {
-            ...updates,
-            buyer_id: me.id,
-            buyer_name: myName,
-            status: 'payment_pending',
-            seller_accepted_terms: true,
-            buyer_accepted_terms: true,
-            fee_payer: deal.fee_payer || 'buyer',
-          };
-          systemMsg = shipLabel
-            ? `${myName} สั่งซื้อจากตลาด · ขนส่ง: ${shipLabel} — รอโอนเงิน`
-            : `${myName} สั่งซื้อจากตลาด — รอโอนเงิน`;
-          if (deal.seller_id && deal.seller_id !== me.id) {
-            await notifyUsers(db, [deal.seller_id], {
-              title: '🛒 มีคนสั่งซื้อสินค้าในตลาด',
-              body: `${myName} สั่งซื้อ "${deal.title || 'สินค้า'}" — รอผู้ซื้อโอนเงิน`,
-              link: `/deal/${id}`,
-            }).catch(() => {});
-          }
-        } else {
+        {
           const newStatus = deal.seller_id ? 'buyer_joined' : 'waiting_seller';
           updates = { ...updates, buyer_id: me.id, buyer_name: myName, status: newStatus };
           systemMsg = shipLabel
@@ -398,6 +430,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // (admin จะเช็คเองว่าผู้ขายอัปสลิปค่าบริการครบไหนก่อนกดยืนยัน → packing)
         if (!isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
+        if (isMarketplaceOrder(deal)) {
+          if (!['posted', 'payment_pending'].includes(deal.status)) {
+            return NextResponse.json({ error: 'ไม่สามารถอัปสลิปในขั้นตอนนี้ได้' }, { status: 400 });
+          }
+        }
         updates = { payment_slip_file_id: String(body.fileId), payment_slip_verified_at: null, status: 'payment_uploaded' };
         systemMsg = 'ผู้ซื้ออัปโหลดหลักฐานการโอนเงินแล้ว';
         break;
@@ -537,6 +574,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'cancel': {
         if (!isSeller && !isMiddleman && !isBuyer)
           return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (isMarketplaceOrder(deal) && !isMarketplaceSold(deal)) {
+          if (deal.status === 'payment_uploaded') {
+            return NextResponse.json({ error: 'อัปสลิปแล้ว รอตรวจ — ติดต่อทีมงานหากต้องการยกเลิก' }, { status: 400 });
+          }
+          if (['posted', 'payment_pending'].includes(deal.status)) {
+            updates = {
+              status: 'posted',
+              buyer_id: null,
+              buyer_name: null,
+              buyer_shipping_provider: null,
+              payment_slip_file_id: null,
+              payment_slip_verified_at: null,
+              buyer_accepted_terms: false,
+              reject_reason: body.reason || '',
+            };
+            systemMsg = `ยกเลิกคำสั่งซื้อ${body.reason ? ': ' + body.reason : ''} — เปิดขายต่อบนตลาด`;
+            break;
+          }
+        }
         updates = { status: 'cancelled', reject_reason: body.reason || '' };
         systemMsg = `ยกเลิกดีล${body.reason ? ': ' + body.reason : ''}`;
         break;

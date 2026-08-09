@@ -1,5 +1,25 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (01:20)
+
+### ตลาด — ล็อกสินค้าเมื่อเข้า packing เท่านั้น (ไม่ล็อกตอนกดซื้อ)
+
+**Flow ใหม่**:
+1. กดซื้อ → คง **`posted`** + บันทึกผู้ซื้อ/ขนส่ง → ไปหน้าโอนเงิน (ยังขายต่อได้ถ้าไม่โอน)
+2. อัปสลิป → **`payment_uploaded`** — จองแล้ว ห้ามซื้อทับ
+3. แอดมินยืนยัน → **`packing`** — ขายแล้ว เอาออกจากตลาด
+4. ยกเลิกก่อนอัปสลิป → คืน **`posted`** ล้างผู้ซื้อ (ไม่เป็น `cancelled`)
+
+**แก้ไข**:
+1. **`marketplaceOrder.ts`** — helper `isMarketplaceSold/Reserved`, `canJoinMarketplaceAsBuyer`, `marketplaceListingBuyState`
+2. **`join_as_buyer`** — ตลาดคง `posted`; ซื้อทับได้ถ้ายังไม่มีสลิป; resume ผู้ซื้อเดิมได้
+3. **`upload_payment` / `cancel`** — รองรับ checkout จาก `posted`
+4. **GET self-heal** — `payment_pending` ตลาดโดยไม่มีสลิป → คืน `posted`
+5. **`/marketplace/[id]`** — ปุ่มตามสถานะ (ซื้อ / โอนเงินต่อ / จองแล้ว / ขายแล้ว)
+6. **แอดมินตีกลับสลิป** — ตลาดคืน `posted` แทน `payment_pending`
+
+---
+
 ## 2026-08-09 (23:58)
 
 ### ตลาดซื้อขาย — ซื้อแล้วโอนเงินทันที + หมวดร้านผู้ขาย + LINE แยกหมวด

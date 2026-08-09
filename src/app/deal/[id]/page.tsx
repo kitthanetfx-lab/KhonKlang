@@ -2440,6 +2440,9 @@ export default function DealRoom() {
   function getMarketplaceCheckoutStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
     const s = deal!.status;
     const pd: DealPriceState = priceState || {};
+    if ((s === 'posted' || s === 'payment_pending') && deal!.buyer_id) {
+      if (!deal!.payment_slip_file_id) return { step: 2 };
+    }
     if (['payment_pending', 'payment_uploaded'].includes(s)) {
       if (!deal!.payment_slip_file_id) return { step: 2 };
       if (s === 'payment_uploaded') return { step: 4 };

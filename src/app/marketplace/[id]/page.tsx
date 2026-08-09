@@ -10,6 +10,7 @@ import { Icon } from '@/components/Icon';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { isCertifiedMode, supportsSellerChat } from '@/lib/listingMode';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
+import { marketplaceListingBuyState } from '@/lib/marketplaceOrder';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import type { AuctionPublic } from '@/lib/auction';
 
@@ -221,6 +222,7 @@ export default function MarketplaceDetailPage() {
   const displayPrice = isAuction ? auction.leadingPrice : (listing.price || 0);
   const shippingProviders = listing.shipping_providers || [];
   const shippingCost = listing.shipping_cost ?? 0;
+  const buyState = marketplaceListingBuyState(listing, myId || undefined);
 
   return (
     <>
@@ -349,7 +351,30 @@ export default function MarketplaceDetailPage() {
                       )}
                     </div>
                   )
-                ) : (
+                ) : buyState === 'sold' || buyState === 'reserved' ? (
+                  <div className="mkt-detail-note-card">
+                    <div className="mkt-detail-note-title">
+                      {buyState === 'sold' ? 'สินค้าขายแล้ว' : 'มีผู้จองแล้ว'}
+                    </div>
+                    <p>{buyState === 'sold' ? 'สินค้านี้กำลังอยู่ในขั้นตอนจัดส่งหรือเสร็จสิ้นแล้ว' : 'ผู้ซื้ออัปสลิปแล้ว รอทีมงานตรวจสอบ'}</p>
+                    {canSellerChat && (
+                      <button type="button" className="btn btn-soft btn-lg" style={{ marginTop: 12 }} onClick={sellerChatHref}>
+                        <Icon name="chat" size={18} /> แชทกับผู้ขาย
+                      </button>
+                    )}
+                  </div>
+                ) : buyState === 'continue_checkout' ? (
+                  <>
+                    <Link href={`/deal/${listing.id}?tab=steps`} className="btn btn-primary btn-lg">
+                      {listing.status === 'payment_uploaded' ? 'ดูสถานะการสั่งซื้อ →' : 'ดำเนินการโอนเงิน →'}
+                    </Link>
+                    {canSellerChat && (
+                      <button type="button" className="btn btn-soft btn-lg" onClick={sellerChatHref}>
+                        <Icon name="chat" size={18} /> แชทกับผู้ขาย
+                      </button>
+                    )}
+                  </>
+                ) : buyState === 'can_buy' ? (
                   <>
                     {shippingProviders.length > 0 && (
                       <div className="mkt-shipping-pick">
@@ -380,6 +405,12 @@ export default function MarketplaceDetailPage() {
                       เมื่อกดซื้อขาย แล้วระบบจะเข้าสู่ระบบซื้อขายผ่านกลาง และเงินจะไม่ถึงมือผู้ขาย หากสินค้ายังไม่ถึงมือผู้รับ
                     </p>
                   </>
+                ) : (
+                  <div className="mkt-detail-note-card">
+                    <div className="mkt-detail-note-title">สินค้าไม่พร้อมขาย</div>
+                    <p>รายการนี้ไม่เปิดขายบนตลาดแล้ว</p>
+                    <Link href="/marketplace" className="btn btn-soft btn-lg" style={{ marginTop: 12 }}>กลับตลาดซื้อขาย</Link>
+                  </div>
                 )}
               </div>
 

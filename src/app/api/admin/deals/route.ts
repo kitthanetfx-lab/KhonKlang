@@ -16,6 +16,7 @@ import {
   type AdminStatusTab,
 } from '@/lib/adminDealCategory';
 import { readFeesConfig } from '../../_lib/financeLedger';
+import { isMarketplaceOrder } from '@/lib/marketplaceOrder';
 
 async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string | null) {
   if (!uid) return null;
@@ -241,8 +242,9 @@ export async function PATCH(req: NextRequest) {
               ? '✅ ศูนย์กลางตรวจสลิปผู้ซื้อแล้ว (ถูกต้อง) — รอตรวจสลิปค่าบริการของผู้ขาย'
               : '✅ ศูนย์กลางตรวจสลิปผู้ซื้อแล้ว (ถูกต้อง)';
           } else {
+            const mkt = isMarketplaceOrder(deal);
             await db.from('deals').update({
-              status: 'payment_pending',
+              status: mkt ? 'posted' : 'payment_pending',
               payment_slip_file_id: null,
               payment_slip_verified_at: null,
               reject_reason: note || null,
