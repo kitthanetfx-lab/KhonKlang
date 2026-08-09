@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { CheckCircle2, Film, Loader2, SlidersHorizontal } from 'lucide-react';
 import {
@@ -12,12 +12,26 @@ import {
   sanitizeServiceControls,
 } from '@/lib/serviceControls';
 import { toYouTubeEmbedUrl } from '@/lib/youtube';
+import {
+  AdminPage,
+  AdminPageHeader,
+  AdminAlert,
+  AdminStickyBar,
+  AdminCard,
+  AdminLoading,
+} from '@/components/admin/AdminUI';
 
 export default function ServiceControlsPage() {
   const [services, setServices] = useState<ServiceControlMap | null>(null);
+  const [savedServices, setSavedServices] = useState<ServiceControlMap | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  const dirty = useMemo(() => {
+    if (!services || !savedServices) return false;
+    return JSON.stringify(services) !== JSON.stringify(savedServices);
+  }, [services, savedServices]);
 
   // ลิงก์วีดีโอโปรโมตหน้าแรก (เก็บแยกใน fee_config ผ่าน /api/admin/settings)
   const [videoUrl, setVideoUrl] = useState('');
@@ -34,6 +48,7 @@ export default function ServiceControlsPage() {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'โหลดสถานะบริการไม่สำเร็จ');
         setServices(sanitizeServiceControls(d.services));
+        setSavedServices(sanitizeServiceControls(d.services));
       } catch (e) {
         setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
       }
@@ -147,6 +162,7 @@ export default function ServiceControlsPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
       setServices(sanitizeServiceControls(d.services));
+      setSavedServices(sanitizeServiceControls(d.services));
       setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -156,48 +172,48 @@ export default function ServiceControlsPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-5">
-      <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><SlidersHorizontal size={20} /> ควบคุมสถานะบริการ</h1>
-        <p className="text-sm text-gray-500 mt-0.5">เปิดหรือปิดบริการแต่ละส่วนได้จากหลังบ้าน พร้อมตั้งข้อความแจ้งผู้ใช้ช่วงเมนเทนแนนซ์หรือเปิดใช้แบบทดลอง</p>
-      </div>
+    <AdminPage className="max-w-4xl">
+      <AdminPageHeader
+        icon={<SlidersHorizontal size={22} />}
+        title="ควบคุมสถานะบริการ"
+        subtitle="เปิดหรือปิดบริการแต่ละส่วน พร้อมตั้งข้อความแจ้งผู้ใช้ช่วงเมนเทนแนนซ์"
+        onSave={save}
+        saving={saving}
+        saved={saved}
+        dirty={dirty}
+        saveLabel="บันทึกสถานะ"
+      />
 
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-3">
-        <div>
-          <h2 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2"><Film size={17} /> วีดีโอแนะนำการใช้งาน (หน้าแรก)</h2>
-          <p className="text-sm text-gray-500 mt-1">วางลิงก์ YouTube รูปแบบไหนก็ได้ (ลิงก์จากแถบที่อยู่, youtu.be, Shorts ฯลฯ) ระบบจะแปลงเป็น embed URL ให้อัตโนมัติตอนบันทึก เพื่อแสดงในช่องวีดีโอเล็ก ๆ บนหน้าแรก ถ้าเว้นว่างจะแสดง placeholder แทน</p>
-        </div>
+      <AdminCard title="วีดีโอแนะนำการใช้งาน (หน้าแรก)" icon={<Film size={18} className="text-violet-600" />} featured="purple"
+        hint="วางลิงก์ YouTube รูปแบบไหนก็ได้ — ระบบแปลงเป็น embed อัตโนมัติ">
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
           <input
             value={videoUrl}
             onChange={e => { setVideoUrl(e.target.value); setVideoSaved(false); }}
             placeholder="https://www.youtube.com/watch?v=... หรือ https://youtu.be/..."
             disabled={!videoLoaded}
-            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm disabled:opacity-50"
+            className="admin-field__input flex-1 disabled:opacity-50"
           />
           <button
             type="button"
             onClick={saveVideoUrl}
             disabled={videoSaving || !videoLoaded}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap"
+            className="admin-btn admin-btn--primary whitespace-nowrap disabled:opacity-50"
           >
-            {videoSaving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} บันทึกลิงก์วีดีโอ
+            {videoSaving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} บันทึกวีดีโอ
           </button>
         </div>
-        {videoSaved && <span className="text-sm text-green-600 flex items-center gap-1"><CheckCircle2 size={14} /> บันทึกแล้ว</span>}
-        {videoError && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">⚠️ {videoError}</div>}
-      </div>
+        {videoSaved && <span className="admin-page__saved" style={{ marginTop: 8 }}><CheckCircle2 size={14} /> บันทึกวีดีโอแล้ว</span>}
+        {videoError && <AdminAlert type="error">⚠️ {videoError}</AdminAlert>}
+      </AdminCard>
 
-      {services === null && !error && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-gray-400" /></div>}
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">⚠️ {error}</div>}
+      {services === null && !error && <AdminLoading />}
+      {error && <AdminAlert type="error">⚠️ {error}</AdminAlert>}
 
       {services && (
         <>
-          <div className="bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-5 space-y-4">
-            <div>
-              <h2 className="font-semibold text-base text-gray-900 dark:text-white">🌐 เปิด / ปิดเว็บไซต์ทั้งหมด</h2>
-              <p className="text-sm text-gray-500 mt-1">ปิดแล้วผู้ใช้ทั่วไปจะถูกพาไปหน้าแจ้งปิดปรับปรุงทันที (แอดมินเข้า /admin ได้ตามปกติ)</p>
-            </div>
+          <AdminCard title="เปิด / ปิดเว็บไซต์ทั้งหมด" icon={<span>🌐</span>} featured="amber"
+            hint="ปิดแล้วผู้ใช้ทั่วไปจะถูกพาไปหน้าแจ้งปิดปรับปรุง (แอดมินเข้า /admin ได้ตามปกติ)">
             <div className="flex items-center gap-2 flex-wrap">
               <button type="button" onClick={() => setSiteMaintenance(false)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${!services.siteMaintenance.enabled ? 'bg-green-600 text-white border-green-600' : 'bg-white dark:bg-gray-900 text-gray-600 border-gray-200 dark:border-gray-700'}`}>
@@ -212,22 +228,17 @@ export default function ServiceControlsPage() {
               </span>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-300">ข้อความแจ้งผู้ใช้เมื่อปิดเว็บ</label>
+              <label className="admin-field__label">ข้อความแจ้งผู้ใช้เมื่อปิดเว็บ</label>
               <input
                 value={services.siteMaintenance.note}
                 onChange={e => setServiceNote('siteMaintenance', e.target.value)}
-                className="mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm"
+                className="admin-field__input mt-1"
               />
             </div>
-          </div>
+          </AdminCard>
 
-          <div className="bg-white dark:bg-gray-900 border border-violet-200 dark:border-violet-900/40 rounded-2xl p-5 space-y-4">
-            <div>
-              <h2 className="font-semibold text-base text-gray-900 dark:text-white">🧾 ตรวจสลิปอัตโนมัติ / แมนนวล</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                โหมดอัตโนมัติเรียก SlipOK เมื่อผู้ใช้อัปสลิป — โหมดแมนนวลให้แอดมินกดตรวจเองในแท็บยืนยันรับเงิน
-              </p>
-            </div>
+          <AdminCard title="ตรวจสลิปอัตโนมัติ / แมนนวล" icon={<span>🧾</span>} featured="purple"
+            hint="โหมดอัตโนมัติเรียก SlipOK — แมนนวลให้แอดมินกดตรวจเองในแท็บยืนยันรับเงิน">
             <div className="flex items-center gap-2 flex-wrap">
               <button type="button" onClick={() => setSlipAutoMode(true)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${services.slipAutoVerify.enabled ? 'bg-green-600 text-white border-green-600' : 'bg-white dark:bg-gray-900 text-gray-600 border-gray-200 dark:border-gray-700'}`}>
@@ -242,10 +253,8 @@ export default function ServiceControlsPage() {
               </span>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-300">
-                มูลค่าดีลเกินกว่านี้ → บังคับแมนนวล (บาท)
-              </label>
-              <p className="text-xs text-gray-500 mt-0.5 mb-1">ใช้ราคาสินค้าในดีล (deal.price) — ว่างหรือ 0 = ไม่จำกัดยอด</p>
+              <label className="admin-field__label">มูลค่าดีลเกินกว่านี้ → บังคับแมนนวล</label>
+              <p className="admin-field__hint mb-2">ใช้ราคาสินค้าในดีล — ว่างหรือ 0 = ไม่จำกัดยอด</p>
               <input
                 type="number"
                 min={0}
@@ -254,18 +263,13 @@ export default function ServiceControlsPage() {
                 onChange={e => setSlipManualThreshold(e.target.value)}
                 placeholder="เช่น 50000"
                 disabled={!services.slipAutoVerify.enabled}
-                className="w-full max-w-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm disabled:opacity-50"
+                className="admin-field__input max-w-xs disabled:opacity-50"
               />
             </div>
-          </div>
+          </AdminCard>
 
           {SERVICE_CONTROL_GROUPS.map(group => (
-            <div key={group} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-4">
-              <div>
-                <h2 className="font-semibold text-base text-gray-900 dark:text-white">{group}</h2>
-                <p className="text-sm text-gray-500 mt-1">เลือกเปิดหรือปิดเฉพาะบริการในหมวดนี้ได้ตามรอบทดลองหรือช่วงบำรุงรักษา</p>
-              </div>
-
+            <AdminCard key={group} title={group} hint="เลือกเปิดหรือปิดเฉพาะบริการในหมวดนี้">
               {group === 'บริการเสริม' && (
                 <div className="rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-950/20 p-4">
                   <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">📅 วันเวลาเปิดให้บริการอีกครั้ง (ทั้งเว็บ)</h3>
@@ -325,17 +329,12 @@ export default function ServiceControlsPage() {
                   );
                 })}
               </div>
-            </div>
+            </AdminCard>
           ))}
 
-          <div className="flex items-center gap-3 sticky bottom-4">
-            <button onClick={save} disabled={saving} className="px-5 py-2.5 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 shadow-lg">
-              {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} บันทึกสถานะบริการ
-            </button>
-            {saved && <span className="text-sm text-green-600 flex items-center gap-1"><CheckCircle2 size={15} /> บันทึกแล้ว</span>}
-          </div>
+          <AdminStickyBar onSave={save} saving={saving} saved={saved} dirty={dirty} label="บันทึกสถานะบริการ" />
         </>
       )}
-    </div>
+    </AdminPage>
   );
 }

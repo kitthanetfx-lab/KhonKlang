@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authHeaders } from '@/lib/supabase';
-import { Users, Store, Shield, Clock, CheckCircle2, TrendingUp, ArrowRight, MapPin } from 'lucide-react';
+import { Users, Store, Shield, Clock, CheckCircle2, TrendingUp, ArrowRight, MapPin, LayoutDashboard } from 'lucide-react';
+import { AdminPage, AdminPageHeader, AdminAlert, AdminLoading } from '@/components/admin/AdminUI';
 
 interface Stats {
   totalUsers: number;
@@ -86,23 +87,20 @@ export default function AdminDashboard() {
     })();
   }, [router]);
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  if (loading) return <AdminLoading />;
 
-  if (error) return <div className="text-red-500 text-sm">{error}</div>;
+  if (error) return <AdminPage><AdminAlert type="error">{error}</AdminAlert></AdminPage>;
   if (!stats) return null;
 
   const pendingTotal = stats.pendingSellers + stats.pendingMiddlemen;
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-xl font-bold">ภาพรวมระบบ</h1>
-        <p className="text-sm text-gray-500 mt-0.5">ข้อมูล ณ วันนี้</p>
-      </div>
+    <AdminPage className="max-w-6xl">
+      <AdminPageHeader
+        icon={<LayoutDashboard size={22} />}
+        title="ภาพรวมระบบ"
+        subtitle="ข้อมูลสรุป ณ วันนี้ — คลิกการ์ดเพื่อไปยังหน้าที่เกี่ยวข้อง"
+      />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -210,6 +208,6 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
-    </div>
+    </AdminPage>
   );
 }

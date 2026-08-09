@@ -1,5 +1,19 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-09 (12:50)
+
+### ปรับ UX/UI หน้าแอดมิน — design system + ค่าธรรมเนียม
+
+**แก้ไข**:
+1. **`src/components/admin/AdminUI.tsx`** — ชุด component ร่วม (PageHeader, Tabs, Card, Field, StickyBar, GpPreview)
+2. **`globals.css`** — Admin design system (การ์ดเด่น, input ใหญ่, sticky save, ซ่อน spinner)
+3. **`/admin/settings`** — GP preview real-time, validate 0–100%, แจ้ง unsaved, sticky บันทึก, จัดกลุ่มใหม่
+4. **`/admin/service-controls`** — ใช้ AdminUI + dirty state + sticky bar
+5. **`/admin` dashboard** — ใช้ AdminPageHeader
+6. **`admin/layout`** — พื้นหลัง `admin-main`
+
+---
+
 ## 2026-08-09 (01:02)
 
 ### เปลี่ยนชื่อแท็บตลาด + เน้น UI สลับ zone
