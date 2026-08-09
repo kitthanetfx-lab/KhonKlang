@@ -163,7 +163,7 @@ export default function MarketplaceCheckoutPage() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'ยกเลิกไม่สำเร็จ');
-      router.push('/marketplace/orders');
+      router.push('/cart?tab=orders');
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'ยกเลิกไม่สำเร็จ');
     } finally {
@@ -174,7 +174,7 @@ export default function MarketplaceCheckoutPage() {
   if (loading) {
     return (
       <>
-        <Nav active="market" />
+        <Nav />
         <div className="mkt-co-shell"><div className="mkt-detail-loading" /></div>
       </>
     );
@@ -183,11 +183,11 @@ export default function MarketplaceCheckoutPage() {
   if (!data) {
     return (
       <>
-        <Nav active="market" />
+        <Nav />
         <div className="mkt-co-shell">
           <div className="container">
             <p className="rv-error">{error || 'ไม่พบคำสั่งซื้อ'}</p>
-            <Link href="/marketplace/orders" className="btn btn-primary">กลับคำสั่งซื้อ</Link>
+            <Link href="/cart?tab=orders" className="btn btn-primary">กลับตะกร้า</Link>
           </div>
         </div>
       </>
@@ -201,12 +201,12 @@ export default function MarketplaceCheckoutPage() {
 
   return (
     <>
-      <Nav active="market" />
+      <Nav />
       <div className="mkt-co-shell">
         <div className="container mkt-co-layout">
           <div className="mkt-co-head">
-            <Link href="/marketplace/orders" className="btn btn-ghost btn-sm">
-              <Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} /> คำสั่งซื้อ
+            <Link href="/cart?tab=orders" className="btn btn-ghost btn-sm">
+              <Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} /> ตะกร้า
             </Link>
             <h1>ยืนยันคำสั่งซื้อ</h1>
           </div>

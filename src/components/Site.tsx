@@ -265,8 +265,8 @@ export function Nav({ active }: { active?: string }) {
                 <Icon name={it.icon} /> {it.t}
               </Link>
             ))}
-            <Link className={`drawer-link ${isAct('/marketplace/orders') ? 'active' : ''}`} href="/marketplace/orders" onClick={() => setDrawer(false)}>
-              <Icon name="shoppingCart" /> {locale === 'th' ? 'คำสั่งซื้อตลาด' : 'Market orders'}
+            <Link className={`drawer-link ${isAct('/cart') ? 'active' : ''}`} href="/cart?tab=orders" onClick={() => setDrawer(false)}>
+              <Icon name="shoppingCart" /> {locale === 'th' ? 'ตะกร้า / คำสั่งซื้อ' : 'Cart / Orders'}
             </Link>
             <button type="button" className="btn btn-ghost btn-block" onClick={() => { setDrawer(false); logout(); }}>{locale === 'th' ? 'ออกจากระบบ' : 'Log out'}</button>
           </>

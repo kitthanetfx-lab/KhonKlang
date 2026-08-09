@@ -87,7 +87,7 @@ export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived
         </button>
       )}
 
-      <Link href="/marketplace/orders" className="btn btn-ghost btn-block" style={{ marginTop: 8 }}>
+      <Link href="/cart?tab=orders" className="btn btn-ghost btn-block" style={{ marginTop: 8 }}>
         ดูคำสั่งซื้อทั้งหมด
       </Link>
     </div>

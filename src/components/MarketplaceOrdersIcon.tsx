@@ -35,7 +35,7 @@ export function MarketplaceOrdersIcon() {
 
   return (
     <Link
-      href="/marketplace/orders"
+      href="/cart?tab=orders"
       className="nb-btn"
       style={{ position: 'relative', flex: '0 0 auto' }}
       aria-label={count > 0 ? `คำสั่งซื้อ ${count} รายการ` : 'คำสั่งซื้อของฉัน'}

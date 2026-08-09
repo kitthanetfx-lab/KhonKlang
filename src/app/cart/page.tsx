@@ -3,12 +3,20 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { Footer, Nav } from '@/components/Site';
 import { Icon } from '@/components/Icon';
+import { MarketplaceOrdersPanel } from '@/components/marketplace/MarketplaceOrdersPanel';
 import { CartItem, clearCart, getCartItems, removeFromCart, updateCartQuantity } from '@/lib/cart';
 
-export default function CartPage() {
+type CartTab = 'cart' | 'orders';
+
+function CartPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab: CartTab = searchParams.get('tab') === 'orders' ? 'orders' : 'cart';
+
   const [items, setItems] = useState<CartItem[]>([]);
   const [submitted, setSubmitted] = useState(false);
 
@@ -25,6 +33,10 @@ export default function CartPage() {
     };
   }, []);
 
+  function setTab(next: CartTab) {
+    router.replace(next === 'orders' ? '/cart?tab=orders' : '/cart');
+  }
+
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items],
@@ -33,7 +45,7 @@ export default function CartPage() {
   if (submitted) {
     return (
       <>
-        <Nav active="market" />
+        <Nav />
         <div className="cart-shell">
           <div className="container">
             <div className="cart-success">
@@ -53,81 +65,117 @@ export default function CartPage() {
 
   return (
     <>
-      <Nav active="market" />
+      <Nav />
       <div className="cart-shell">
-        <div className="container cart-layout">
-          <section>
-            <div className="cart-head">
-              <div>
-                <div className="kicker">ตะกร้าสินค้า</div>
-                <h1 className="mkt-headline" style={{ marginTop: 8 }}>ซื้อโดยไม่ผ่านคนกลาง</h1>
-              </div>
-              <Link href="/marketplace" className="btn btn-ghost">เลือกสินค้าเพิ่ม</Link>
-            </div>
+        <div className="container">
+          <div className="cart-page-head">
+            <h1><Icon name="shoppingCart" size={24} /> ตะกร้า & คำสั่งซื้อ</h1>
+            <Link href="/marketplace" className="btn btn-ghost btn-sm">เลือกสินค้าเพิ่ม</Link>
+          </div>
 
-            {items.length === 0 ? (
-              <div className="mkt-detail-empty">
-                <div className="mkt-empty-ic"><Icon name="package" size={32} /></div>
-                <p>ยังไม่มีสินค้าในตะกร้า</p>
-                <Link href="/marketplace" className="btn btn-primary">ไปหน้าตลาด</Link>
-              </div>
-            ) : (
-              <div className="cart-list">
-                {items.map(item => (
-                  <article key={item.dealId} className="cart-item">
-                    <div className="cart-thumb">
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <div className="mkt-detail-fallback"><Icon name="package" size={32} /></div>
-                      )}
-                    </div>
-                    <div className="cart-info">
-                      <Link href={`/marketplace/${item.dealId}`} className="cart-title">{item.title}</Link>
-                      <div className="cart-meta">
-                        <span>{item.sellerName}</span>
-                        {item.location && <span>📍 {item.location}</span>}
-                      </div>
-                      <div className="cart-row">
-                        <div className="cart-qty">
-                          <button type="button" onClick={() => updateCartQuantity(item.dealId, item.quantity - 1)}>-</button>
-                          <span>{item.quantity}</span>
-                          <button type="button" onClick={() => updateCartQuantity(item.dealId, item.quantity + 1)}>+</button>
+          <div className="cart-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'cart'}
+              className={`cart-tab${tab === 'cart' ? ' active' : ''}`}
+              onClick={() => setTab('cart')}
+            >
+              รายการในตะกร้า {items.length > 0 && `(${items.length})`}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'orders'}
+              className={`cart-tab${tab === 'orders' ? ' active' : ''}`}
+              onClick={() => setTab('orders')}
+            >
+              คำสั่งซื้อของฉัน
+            </button>
+          </div>
+
+          {tab === 'cart' ? (
+            <div className="cart-layout">
+              <section>
+                {items.length === 0 ? (
+                  <div className="mkt-detail-empty">
+                    <div className="mkt-empty-ic"><Icon name="package" size={32} /></div>
+                    <p>ยังไม่มีสินค้าในตะกร้า</p>
+                    <Link href="/marketplace" className="btn btn-primary">ไปหน้าตลาด</Link>
+                  </div>
+                ) : (
+                  <div className="cart-list">
+                    {items.map(item => (
+                      <article key={item.dealId} className="cart-item">
+                        <div className="cart-thumb">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <div className="mkt-detail-fallback"><Icon name="package" size={32} /></div>
+                          )}
                         </div>
-                        <div className="cart-price">฿{(item.price * item.quantity).toLocaleString()}</div>
-                      </div>
-                    </div>
-                    <button type="button" className="cart-remove" onClick={() => removeFromCart(item.dealId)}>ลบ</button>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
+                        <div className="cart-info">
+                          <Link href={`/marketplace/${item.dealId}`} className="cart-title">{item.title}</Link>
+                          <div className="cart-meta">
+                            <span>{item.sellerName}</span>
+                            {item.location && <span>📍 {item.location}</span>}
+                          </div>
+                          <div className="cart-row">
+                            <div className="cart-qty">
+                              <button type="button" onClick={() => updateCartQuantity(item.dealId, item.quantity - 1)}>-</button>
+                              <span>{item.quantity}</span>
+                              <button type="button" onClick={() => updateCartQuantity(item.dealId, item.quantity + 1)}>+</button>
+                            </div>
+                            <div className="cart-price">฿{(item.price * item.quantity).toLocaleString()}</div>
+                          </div>
+                        </div>
+                        <button type="button" className="cart-remove" onClick={() => removeFromCart(item.dealId)}>ลบ</button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
 
-          <aside className="cart-summary">
-            <div className="dr-card">
-              <div className="dr-card-title">สรุปรายการ</div>
-              <div className="cart-summary-row"><span>จำนวนสินค้า</span><b>{items.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น</b></div>
-              <div className="cart-summary-row"><span>ยอดรวมสินค้า</span><b>฿{subtotal.toLocaleString()}</b></div>
-              <div className="cart-summary-row"><span>ค่าคนกลาง</span><b>ไม่มี</b></div>
-              <div className="cart-summary-total"><span>ยอดชำระรวม</span><strong>฿{subtotal.toLocaleString()}</strong></div>
-              <button
-                type="button"
-                className="btn btn-primary btn-block"
-                disabled={!items.length}
-                onClick={() => {
-                  clearCart();
-                  setSubmitted(true);
-                }}
-              >
-                ยืนยันสั่งซื้อทันที
-              </button>
-              <p className="cart-summary-note">MVP รอบนี้เป็น flow ซื้อแบบทั่วไปก่อน ยังไม่เชื่อม order backend และแชทหลังบ้าน</p>
+              <aside className="cart-summary">
+                <div className="dr-card">
+                  <div className="dr-card-title">สรุปรายการ</div>
+                  <div className="cart-summary-row"><span>จำนวนสินค้า</span><b>{items.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น</b></div>
+                  <div className="cart-summary-row"><span>ยอดรวมสินค้า</span><b>฿{subtotal.toLocaleString()}</b></div>
+                  <div className="cart-summary-total"><span>ยอดชำระรวม</span><strong>฿{subtotal.toLocaleString()}</strong></div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-block"
+                    disabled={!items.length}
+                    onClick={() => {
+                      clearCart();
+                      setSubmitted(true);
+                    }}
+                  >
+                    ยืนยันสั่งซื้อทันที
+                  </button>
+                  <p className="cart-summary-note">สินค้าในตะกร้านี้ยังไม่ได้สั่งจริง — กดซื้อจากหน้ารายละเอียดสินค้าเพื่อสร้างคำสั่งซื้อ</p>
+                </div>
+              </aside>
             </div>
-          </aside>
+          ) : (
+            <MarketplaceOrdersPanel />
+          )}
         </div>
       </div>
       <Footer />
     </>
+  );
+}
+
+export default function CartPage() {
+  return (
+    <Suspense fallback={
+      <>
+        <Nav />
+        <div className="cart-shell"><div className="container"><div className="mkt-detail-loading" /></div></div>
+      </>
+    }>
+      <CartPageInner />
+    </Suspense>
   );
 }

@@ -1361,6 +1361,13 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .mkt-co-success { font-size: 14px; color: var(--green-700); font-weight: 600; margin: 8px 0 0; }
 
 .cart-shell { min-height: calc(100vh - 70px); background: linear-gradient(180deg, #f6f8fc 0%, #eef3fb 100%); padding: 28px 0 72px; }
+.cart-page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.cart-page-head h1 { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: clamp(22px, 3vw, 28px); margin: 0; }
+.cart-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 0; }
+.cart-tab { appearance: none; border: none; background: transparent; padding: 10px 16px; font-size: 14px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; transition: color .15s, border-color .15s; }
+.cart-tab:hover { color: var(--accent); }
+.cart-tab.active { color: var(--accent-strong); border-bottom-color: var(--accent); }
+.cart-orders-panel { max-width: 720px; }
 .cart-layout { display: grid; gap: 26px; }
 @media (min-width: 1040px){ .cart-layout { grid-template-columns: minmax(0, 1.1fr) 340px; align-items: start; } }
 .cart-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
