@@ -26,20 +26,29 @@ import {
 type TabId = 'trade' | 'services' | 'members' | 'account';
 type BoolKey = 'promoEnabled' | 'promoFree';
 type StrKey = 'returnShippingBy' | 'companyPromptPay' | 'companyBankName' | 'companyBankAcct' | 'companyBankHolder' | 'companyQrFileId'
-  | 'promoScope' | 'promoStart' | 'promoEnd' | 'promoLabel';
+  | 'promoScope' | 'promoStart' | 'promoEnd' | 'promoLabel' | 'promoVideoUrl';
 type NumKey = Exclude<keyof FeeConfig, StrKey | BoolKey>;
+
+type PercentKey =
+  | 'escrowFeePercent' | 'middlemanFeePercent' | 'platformCutPercent'
+  | 'simpleFeePercent' | 'simpleShareTier1Percent' | 'simpleShareTier2Percent' | 'simpleShareTier3Percent'
+  | 'meetupFeePercent' | 'promoPercent' | 'marketplaceGpPercent' | 'marketplaceGpCommissionPercent';
+
+const PERCENT_KEYS = new Set<PercentKey>([
+  'escrowFeePercent', 'middlemanFeePercent', 'platformCutPercent',
+  'simpleFeePercent', 'simpleShareTier1Percent', 'simpleShareTier2Percent', 'simpleShareTier3Percent',
+  'meetupFeePercent', 'promoPercent', 'marketplaceGpPercent', 'marketplaceGpCommissionPercent',
+]);
+
+function isPercentKey(k: NumKey): k is PercentKey {
+  return PERCENT_KEYS.has(k as PercentKey);
+}
 
 const TIER_KEYS: { tier: number; mult: NumKey; pct: NumKey }[] = [
   { tier: 1, mult: 'simpleShareTier1Multiplier', pct: 'simpleShareTier1Percent' },
   { tier: 2, mult: 'simpleShareTier2Multiplier', pct: 'simpleShareTier2Percent' },
   { tier: 3, mult: 'simpleShareTier3Multiplier', pct: 'simpleShareTier3Percent' },
 ];
-
-const PERCENT_KEYS = new Set<NumKey>([
-  'escrowFeePercent', 'middlemanFeePercent', 'platformCutPercent',
-  'simpleFeePercent', 'simpleShareTier1Percent', 'simpleShareTier2Percent', 'simpleShareTier3Percent',
-  'meetupFeePercent', 'promoPercent', 'marketplaceGpPercent', 'marketplaceGpCommissionPercent',
-]);
 
 const TABS: { id: TabId; label: string; desc: string }[] = [
   { id: 'trade', label: 'ตลาด & GP', desc: 'ดีลผ่านกลาง + ตลาดซื้อขาย' },
@@ -96,7 +105,7 @@ export default function SettingsPage() {
     const num = v === '' ? 0 : Number(v);
     setFees(f => f ? { ...f, [k]: num } : f);
     setSaved(false);
-    if (PERCENT_KEYS.has(k)) {
+    if (isPercentKey(k)) {
       if (num < 0 || num > 100) {
         setFieldErrors(e => ({ ...e, [k]: 'ต้องอยู่ระหว่าง 0–100' }));
       } else {
@@ -141,7 +150,8 @@ export default function SettingsPage() {
       if (v < 0 || v > 100) errs[k] = 'ต้องอยู่ระหว่าง 0–100';
     }
     for (const k of Object.keys(fees) as NumKey[]) {
-      if (typeof fees[k] === 'number' && fees[k] < 0 && !PERCENT_KEYS.has(k)) {
+      const v = fees[k];
+      if (typeof v === 'number' && v < 0 && !isPercentKey(k)) {
         errs[k] = 'ต้องไม่ต่ำกว่า 0';
       }
     }
@@ -190,10 +200,10 @@ export default function SettingsPage() {
         key={k}
         label={label}
         unit={unit}
-        value={fees[k]}
+        value={fees[k] as number}
         onChange={v => setField(k, v)}
         min={0}
-        max={PERCENT_KEYS.has(k) ? 100 : undefined}
+        max={isPercentKey(k) ? 100 : undefined}
         error={fieldErrors[k]}
         hint={hint}
       />
