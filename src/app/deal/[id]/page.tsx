@@ -19,7 +19,8 @@ import { compressVideo, isVideoFile, VIDEO_UPLOAD_HINT } from '@/lib/videoCompre
 import { FeeConfig, FEE_DEFAULTS, computeDealFees, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
-import { isDirectShipOrder, isMarketplaceOrder, marketplaceShippingCost, isMarketplaceCheckoutActive, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
+import { MarketplacePaymentSection } from '@/components/marketplace/MarketplacePaymentSection';
+import { isDirectShipOrder, isMarketplaceOrder, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
 
@@ -242,6 +243,7 @@ interface Deal {
   payment_slip_file_id: string; tracking_to_middleman: string; tracking_to_middleman_provider?: string; tracking_to_buyer: string; tracking_to_buyer_provider?: string;
   deal_type?: string; fee_payer?: string;
   source?: string; shipping_cost?: number; buyer_shipping_provider?: string;
+  list_gross_price?: number | null;
 }
 
 interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
@@ -1944,30 +1946,60 @@ export default function DealRoom() {
     );
   }
 
-  // ─── Payment section ─────────────────────────────────────────────────────
-  function renderPaymentSection() {
-    if (deal!.deal_type === 'meetup') return null;
-    const inPaymentPhase = ['payment_pending', 'payment_uploaded'].includes(deal!.status)
-      || isMarketplaceCheckoutActive(deal!);
-    if (!inPaymentPhase) return null;
-    const awaitingBuyerSlip = !deal!.payment_slip_file_id
+  // ─── ตลาด — โอนเงิน (flow แยกจากดีลผ่านกลาง) ─────────────────────────────
+  function renderMarketplacePaymentSection() {
+    if (!isMarketplaceOrder(deal!)) return null;
+    const show = isMarketplaceCheckoutActive(deal!) || deal!.status === 'payment_uploaded';
+    if (!show) return null;
+    const awaitingSlip = !deal!.payment_slip_file_id
       && (deal!.status === 'payment_pending' || isMarketplaceCheckoutActive(deal!));
+    return (
+      <MarketplacePaymentSection
+        deal={{
+          price: deal!.price,
+          shipping_cost: deal!.shipping_cost,
+          buyer_name: deal!.buyer_name,
+          seller_name: deal!.seller_name,
+          payment_slip_file_id: deal!.payment_slip_file_id,
+          status: deal!.status,
+          list_gross_price: deal!.list_gross_price,
+        }}
+        myRole={myRole}
+        awaitingSlip={awaitingSlip}
+        onUploadSlip={async (file) => {
+          const purl = beginUploadPreview(file);
+          try {
+            const headers = await getAuthHeaders();
+            const prepared = await compressImage(file);
+            const form = new FormData();
+            form.append('file', prepared);
+            const r = await fetch('/api/upload-deal', { method: 'POST', headers, body: form });
+            const d = await r.json();
+            if (r.ok) await doAction('upload_payment', { fileId: d.fileId });
+            else alert(d.error || 'อัปโหลดสลิปไม่สำเร็จ');
+          } finally {
+            endUploadPreview(purl);
+          }
+        }}
+      />
+    );
+  }
+
+  // ─── Payment section (ดีลผ่านกลาง / simple — ไม่รวมตลาด) ─────────────────
+  function renderPaymentSection() {
+    if (deal!.deal_type === 'meetup' || isMarketplaceOrder(deal!)) return null;
+    if (!['payment_pending', 'payment_uploaded'].includes(deal!.status)) return null;
+    const awaitingBuyerSlip = !deal!.payment_slip_file_id && deal!.status === 'payment_pending';
     return (
         <div className="dr-card dr-pay-card">
         {(() => {
           const pd: DealPriceState = priceState || {};
-          const isMkt = isMarketplaceOrder(deal!);
-          const shipCost = isMkt ? marketplaceShippingCost(deal!) : 0;
-          const fb = isMkt
-            ? { lines: [] as { label: string; amount: number }[], total: 0, note: '' }
-            : computeDealFees(feeConfig, deal!.price, deal!.deal_type);
-          const fp = isMkt ? 'buyer' : String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
-          const sellerShare = isMkt ? 0 : (fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0);
+          const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
+          const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
+          const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
           const buyerShare = fb.total - sellerShare;
-          const buyerShouldPay = isMkt ? marketplaceBuyerPayAmount(deal!) : deal!.price + shipCost + buyerShare;
-          const sellerNet = isMkt
-            ? Math.max(0, Math.round(Number((deal! as Deal & { list_gross_price?: number | null }).list_gross_price) || deal!.price))
-            : Math.max(deal!.price, 0);
+          const buyerShouldPay = deal!.price + buyerShare;
+          const sellerNet = Math.max(deal!.price, 0);
           const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
           const fpName = fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
           const isBuyerPaysAll = fp === 'buyer';
@@ -1990,23 +2022,16 @@ export default function DealRoom() {
               <div className="dr-card-title">{payTitle}</div>
               <div className="dr-pay-amount">฿{payAmount.toLocaleString()}</div>
               <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', margin: '4px 0 12px', fontSize: 13 }}>
-                <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 {isMkt ? 'สรุปยอดชำระ' : `สรุปยอด · ค่าบริการ: ${fpName}`}</div>
+                <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 สรุปยอด · ค่าบริการ: {fpName}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ราคาสินค้า</span><span>฿{deal!.price.toLocaleString()}</span></div>
-                {shipCost > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ค่าขนส่ง</span><span>฿{shipCost.toLocaleString()}</span></div>
-                )}
-                {!isMkt && fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
-                {/* แถวผู้ซื้อ — bold เฉพาะเมื่อดู role ผู้ซื้อ, มิฉะนั้น muted */}
+                {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'buyer' ? 700 : 400, color: myRole === 'buyer' ? 'var(--ink)' : 'var(--muted)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
                   <span>ผู้ซื้อ {deal!.buyer_name || ''} โอนเงินเข้าศูนย์กลาง</span>
                   <span>฿{buyerShouldPay.toLocaleString()}</span>
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                  {isMkt
-                    ? `= ราคาสินค้า ฿${deal!.price.toLocaleString()}${shipCost > 0 ? ` + ค่าขนส่ง ฿${shipCost.toLocaleString()}` : ''} (ราคารวมค่าบริการแพลตฟอร์มแล้ว)`
-                    : `= ราคาสินค้า ฿${deal!.price.toLocaleString()}${buyerShare > 0 ? ` + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()}` : ''}`}
+                  {`= ราคาสินค้า ฿${deal!.price.toLocaleString()}${buyerShare > 0 ? ` + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()}` : ''}`}
                 </div>
-                {/* แถวผู้ขาย — bold เฉพาะเมื่อดู role ผู้ขาย */}
                 {sellerShouldPay > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'seller' ? 700 : 400, color: myRole === 'seller' ? 'var(--ink)' : (sellerShare > 0 ? '#8a5a00' : 'var(--muted)'), marginTop: 4 }}>
                     <span>ผู้ขาย {deal!.seller_name || ''} ชำระค่าบริการแยก</span>
@@ -2019,15 +2044,12 @@ export default function DealRoom() {
                 </div>
               </div>
               
-              {/* แสดงสถานะสลิปของแต่ละฝ่าย */}
               {isBuyerPaysAll ? (
-                // กรณี 1: ผู้ซื้อจ่ายทั้งหมด
                 renderParticipantStatusRows([
                   { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: true, doneText: '✅ ไม่ต้องชำระเพิ่ม', waitText: '⏳ รอเงื่อนไขถัดไป' },
                   { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.payment_slip_file_id, doneText: '✅ ส่งสลิปแล้ว', waitText: '⏳ รอส่งสลิป' },
                 ], { marginBottom: 12 })
               ) : (
-                // กรณี 2 & 3: ผู้ขายจ่ายค่ากลาง (ทั้งหมดหรือครึ่งหนึ่ง)
                 renderParticipantStatusRows([
                   { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPaymentDone, doneText: sellerShouldPay > 0 ? '✅ ส่งสลิปแล้ว' : '✅ ไม่ต้องชำระเพิ่ม', waitText: sellerShouldPay > 0 ? '⏳ รอส่งสลิป' : '⏳ รอเงื่อนไขถัดไป' },
                   { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.payment_slip_file_id, doneText: '✅ ส่งสลิปแล้ว', waitText: '⏳ รอส่งสลิป' },
@@ -2038,13 +2060,11 @@ export default function DealRoom() {
                 <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
                   <div style={{ fontWeight: 700, color: '#075985', marginBottom: 6 }}>🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
                   <PaymentMethods amount={buyerShouldPay} note={
-                    isMkt
-                      ? `โอน ฿${buyerShouldPay.toLocaleString()} เข้าบัญชีกลาง (ราคาสินค้า${shipCost > 0 ? ' + ค่าขนส่ง' : ''}) — เงินพักไว้จนกว่าคุณยืนยันรับสินค้า`
-                      : isSellerPaysAll
-                        ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} เข้าบัญชีกลาง (ผู้ขายจ่ายค่าบริการเอง)`
-                        : isSplit
-                          ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()} = ฿${buyerShouldPay.toLocaleString()}`
-                          : `เงินจะพักไว้กับ บริษัท กลางฮับ จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`
+                    isSellerPaysAll
+                      ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} เข้าบัญชีกลาง (ผู้ขายจ่ายค่าบริการเอง)`
+                      : isSplit
+                        ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()} = ฿${buyerShouldPay.toLocaleString()}`
+                        : `เงินจะพักไว้กับ บริษัท กลางฮับ จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`
                   } />
                   <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
                 </div>
@@ -2053,8 +2073,7 @@ export default function DealRoom() {
                 <div style={{ fontSize: 13, color: 'var(--muted)' }}>รอผู้ซื้อโอนเงินเข้าระบบพักเงินของบริษัท</div>
               )}
 
-              {/* ผู้ขายโอนค่าบริการส่วนของตน — ทันที แยกจากยอดสินค้า */}
-              {!isMkt && myRole === 'seller' && sellerShouldPay > 0 && (['payment_pending', 'payment_uploaded'].includes(deal!.status) || isMarketplaceCheckoutActive(deal!)) && (
+              {myRole === 'seller' && sellerShouldPay > 0 && ['payment_pending', 'payment_uploaded'].includes(deal!.status) && (
                 pd.seller_fee_slip
                   ? <div className="dr-slip-status">✅ คุณโอนค่าบริการ ฿{sellerShouldPay.toLocaleString()} แล้ว — รอศูนย์กลางตรวจสอบ</div>
                   : <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
@@ -5288,7 +5307,7 @@ export default function DealRoom() {
           </div>
         )}
         <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
-          {step === 2 && renderPaymentSection()}
+          {step === 2 && renderMarketplacePaymentSection()}
           {step === 4 && renderWizardStep4()}
           {step === 5 && renderWizardStep5()}
           {step === 6 && renderWizardStep6()}

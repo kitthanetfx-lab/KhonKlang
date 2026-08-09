@@ -1274,6 +1274,39 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .mkt-detail-empty { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--sh-sm); min-height: 320px; display: grid; place-items: center; gap: 14px; padding: 32px; text-align: center; color: var(--muted); }
 .mkt-detail-loading { width: 42px; height: 42px; margin: 120px auto 0; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: dashSpin .8s linear infinite; }
 
+/* ตลาด — โอนเงิน (flow แยกจากดีลผ่านกลาง) */
+.mkt-pay-summary { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px; margin: 4px 0 12px; font-size: 13px; }
+.mkt-pay-summary-title { font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+.mkt-pay-row { display: flex; justify-content: space-between; color: var(--muted); padding: 2px 0; gap: 12px; }
+.mkt-pay-row-total { font-weight: 700; color: var(--ink); border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; }
+.mkt-pay-row-muted { color: var(--muted); margin-top: 4px; font-size: 12.5px; }
+.mkt-pay-note { font-size: 11.5px; color: var(--muted); margin: 4px 0 0; line-height: 1.5; }
+.mkt-pay-status-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.mkt-pay-status { display: flex; justify-content: space-between; font-size: 13px; padding: 8px 12px; border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+.mkt-pay-status.ok { background: #f0fdf4; border-color: #bbf7d0; color: var(--green-700); }
+.mkt-pay-bank-box { background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: var(--r-md); padding: 12px 14px; margin-top: 12px; }
+.mkt-pay-bank-title { font-weight: 700; color: #075985; margin-bottom: 6px; }
+.mkt-pay-wait-seller { font-size: 13px; color: var(--muted); margin-top: 12px; }
+
+/* ตลาด — คำสั่งซื้อของฉัน */
+.mkt-orders-shell { min-height: calc(100vh - 70px); background: linear-gradient(180deg, #f6f8fc 0%, #eef3fb 100%); padding: 28px 0 72px; }
+.mkt-orders-head { margin-bottom: 24px; }
+.mkt-orders-head h1 { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: clamp(22px, 3vw, 28px); margin: 12px 0 6px; }
+.mkt-orders-head p { color: var(--muted); font-size: 14px; margin: 0; }
+.mkt-orders-section { margin-bottom: 28px; }
+.mkt-orders-section h2 { font-size: 16px; font-weight: 700; margin: 0 0 12px; color: var(--ink-2); }
+.mkt-orders-list { display: flex; flex-direction: column; gap: 10px; }
+.mkt-order-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); text-decoration: none; color: inherit; box-shadow: var(--sh-xs); transition: border-color .15s, box-shadow .15s; }
+.mkt-order-card:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); box-shadow: var(--sh-sm); }
+.mkt-order-thumb { width: 64px; height: 64px; border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; flex-shrink: 0; color: var(--muted); }
+.mkt-order-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.mkt-order-body { flex: 1; min-width: 0; }
+.mkt-order-title { font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mkt-order-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; color: var(--muted); margin-top: 4px; }
+.mkt-order-status { font-weight: 700; color: var(--amber-600); }
+.mkt-order-status.active { color: var(--accent-strong); }
+.mkt-orders-empty { text-align: center; padding: 48px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); color: var(--muted); display: grid; gap: 12px; justify-items: center; }
+
 .cart-shell { min-height: calc(100vh - 70px); background: linear-gradient(180deg, #f6f8fc 0%, #eef3fb 100%); padding: 28px 0 72px; }
 .cart-layout { display: grid; gap: 26px; }
 @media (min-width: 1040px){ .cart-layout { grid-template-columns: minmax(0, 1.1fr) 340px; align-items: start; } }

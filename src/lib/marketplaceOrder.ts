@@ -96,3 +96,30 @@ export function marketplaceShippingCost(deal: { shipping_cost?: number | null })
 export function marketplaceBuyerPayAmount(deal: { price?: number | null; shipping_cost?: number | null }): number {
   return Math.max(0, Math.round(Number(deal.price) || 0)) + marketplaceShippingCost(deal);
 }
+
+/** สถานะที่ถือว่ามีคำสั่งซื้อตลาด (ผู้ซื้อ) ยังไม่จบ */
+export const MARKETPLACE_ORDER_ACTIVE_STATUSES = [
+  'posted', 'payment_pending', 'payment_uploaded', 'packing', 'shipped_to_buyer', 'delivered',
+] as const;
+
+export function isActiveMarketplaceBuyerOrder(deal: MarketplaceDealState): boolean {
+  if (!isMarketplaceOrder(deal) || !deal.buyer_id) return false;
+  const s = String(deal.status || '');
+  if (['cancelled', 'disputed', 'completed'].includes(s)) return false;
+  return (MARKETPLACE_ORDER_ACTIVE_STATUSES as readonly string[]).includes(s);
+}
+
+export function marketplaceOrderStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    posted: 'รอโอนเงิน',
+    payment_pending: 'รอโอนเงิน',
+    payment_uploaded: 'รอตรวจสลิป',
+    packing: 'กำลังแพ็ค',
+    shipped_to_buyer: 'จัดส่งแล้ว',
+    delivered: 'รอยืนยันรับ',
+    completed: 'สำเร็จ',
+    cancelled: 'ยกเลิก',
+    disputed: 'มีปัญหา',
+  };
+  return map[status] || status;
+}

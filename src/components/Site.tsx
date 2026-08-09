@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Icon } from './Icon';
 import { NotifyBell } from './NotifyBell';
 import { MessengerIcon } from './MessengerIcon';
+import { MarketplaceOrdersIcon } from './MarketplaceOrdersIcon';
 import { InAppBanner } from './InAppBanner';
 import { useAppPreferences } from './AppPreferences';
 import { useUser } from '@/lib/useUser';
@@ -210,6 +211,7 @@ export function Nav({ active }: { active?: string }) {
           <Link className={`nav-link ${active === 'market' || isMarketplace ? 'is-active' : ''}`} href="/marketplace"><Icon name="store" size={17} /> {locale === 'th' ? 'ตลาด' : 'Marketplace'}</Link>
           <Link className={`nav-link ${isAct('/check-scam') ? 'is-active' : ''}`} href="/check-scam"><Icon name="search" size={17} /> {locale === 'th' ? 'เช็คคนโกง' : 'Scam Check'}</Link>
         </div>
+        {user && <MarketplaceOrdersIcon />}
         {user && <MessengerIcon />}
         {user && <NotifyBell />}
         <div className="nav-cta-group">
@@ -263,6 +265,9 @@ export function Nav({ active }: { active?: string }) {
                 <Icon name={it.icon} /> {it.t}
               </Link>
             ))}
+            <Link className={`drawer-link ${isAct('/marketplace/orders') ? 'active' : ''}`} href="/marketplace/orders" onClick={() => setDrawer(false)}>
+              <Icon name="shoppingCart" /> {locale === 'th' ? 'คำสั่งซื้อตลาด' : 'Market orders'}
+            </Link>
             <button type="button" className="btn btn-ghost btn-block" onClick={() => { setDrawer(false); logout(); }}>{locale === 'th' ? 'ออกจากระบบ' : 'Log out'}</button>
           </>
         ) : (

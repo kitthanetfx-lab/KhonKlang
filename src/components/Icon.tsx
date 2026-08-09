@@ -72,6 +72,7 @@ export const ICON_PATHS: Record<string, React.ReactNode> = {
   image: <><rect x="3" y="4" width="18" height="16" rx="2.2"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m3 16.5 5-5 3.5 3.5L17 9.5l4 4.5"/></>,
   /* บ้าน — ใช้กับปุ่มกลับหน้าหลัก */
   home: <><path d="M3.5 11.5 12 4l8.5 7.5"/><path d="M6 10v9.5a1 1 0 0 0 1 1h3.5v-5.5h3v5.5H17a1 1 0 0 0 1-1V10"/></>,
+  shoppingCart: <><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h2.2l1.6 9.6a1 1 0 0 0 1 .85H17.4a1 1 0 0 0 1-.85L20.4 7H6.2"/></>,
 };
 
 export interface IconProps {
