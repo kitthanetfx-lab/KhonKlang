@@ -19,7 +19,7 @@ import { compressVideo, isVideoFile, VIDEO_UPLOAD_HINT } from '@/lib/videoCompre
 import { FeeConfig, FEE_DEFAULTS, computeDealFees, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
-import { isDirectShipOrder, isMarketplaceOrder, marketplaceShippingCost, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
+import { isDirectShipOrder, isMarketplaceOrder, marketplaceShippingCost, isMarketplaceCheckoutActive, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
 
@@ -1956,26 +1956,23 @@ export default function DealRoom() {
         <div className="dr-card dr-pay-card">
         {(() => {
           const pd: DealPriceState = priceState || {};
-          const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
-          // ใช้ค่า fee_payer: ถ้า deal ยอมรับเงื่อนไขแล้ว (deal.fee_payer) ใช้ค่านั้น, ถ้ายังใช้ proposed_fee_payer จากขั้นตกลงราคา
-          // (ห้าม fallback ไป fee_payer_selection_* เพราะ default 'buyer' จะทำให้ผู้ขายเห็นยอด 0 ผิด)
-          const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
-          // sellerShare = ยอดที่ผู้ขายต้องจ่าย — ใช้สูตร Math.round(fb.total/2) เหมือน sellerShouldPay กันต่างกัน 1 บาท
-          const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
+          const isMkt = isMarketplaceOrder(deal!);
+          const shipCost = isMkt ? marketplaceShippingCost(deal!) : 0;
+          const fb = isMkt
+            ? { lines: [] as { label: string; amount: number }[], total: 0, note: '' }
+            : computeDealFees(feeConfig, deal!.price, deal!.deal_type);
+          const fp = isMkt ? 'buyer' : String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
+          const sellerShare = isMkt ? 0 : (fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0);
           const buyerShare = fb.total - sellerShare;
-          const shipCost = isMarketplaceOrder(deal!) ? marketplaceShippingCost(deal!) : 0;
-          const buyerTotal = deal!.price + shipCost + buyerShare;
-          const sellerNet = Math.max(deal!.price, 0);
-          const hasMm = !!deal!.middleman_id;
+          const buyerShouldPay = isMkt ? marketplaceBuyerPayAmount(deal!) : deal!.price + shipCost + buyerShare;
+          const sellerNet = isMkt
+            ? Math.max(0, Math.round(Number((deal! as Deal & { list_gross_price?: number | null }).list_gross_price) || deal!.price))
+            : Math.max(deal!.price, 0);
           const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
           const fpName = fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
           const isBuyerPaysAll = fp === 'buyer';
           const isSellerPaysAll = fp === 'seller';
           const isSplit = fp === 'split';
-
-          // คำนวณยอดที่แต่ละฝ่ายต้องโอน — ใช้ sellerShare ตรงๆ กันค่าไม่ตรงกัน
-          // ผู้ซื้อ = ค่าสินค้า + ค่าบริการส่วนผู้ซื้อ (buyerShare) ทุกกรณี
-          const buyerShouldPay = buyerTotal; // = deal.price + buyerShare (กรณี buyer จ่ายทั้งหมด buyerShare = total)
           const sellerShouldPay = sellerShare;
           
           const payTitle = myRole === 'buyer'
@@ -1993,18 +1990,22 @@ export default function DealRoom() {
               <div className="dr-card-title">{payTitle}</div>
               <div className="dr-pay-amount">฿{payAmount.toLocaleString()}</div>
               <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', margin: '4px 0 12px', fontSize: 13 }}>
-                <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 สรุปยอด · ค่าบริการ: {fpName}</div>
+                <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 {isMkt ? 'สรุปยอดชำระ' : `สรุปยอด · ค่าบริการ: ${fpName}`}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ราคาสินค้า</span><span>฿{deal!.price.toLocaleString()}</span></div>
                 {shipCost > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ค่าขนส่ง</span><span>฿{shipCost.toLocaleString()}</span></div>
                 )}
-                {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
+                {!isMkt && fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
                 {/* แถวผู้ซื้อ — bold เฉพาะเมื่อดู role ผู้ซื้อ, มิฉะนั้น muted */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'buyer' ? 700 : 400, color: myRole === 'buyer' ? 'var(--ink)' : 'var(--muted)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
                   <span>ผู้ซื้อ {deal!.buyer_name || ''} โอนเงินเข้าศูนย์กลาง</span>
                   <span>฿{buyerShouldPay.toLocaleString()}</span>
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>= ราคาสินค้า ฿{deal!.price.toLocaleString()} {buyerShare > 0 ? `+ ค่าบริการส่วนผู้ซื้อ ฿{buyerShare.toLocaleString()}` : ''}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                  {isMkt
+                    ? `= ราคาสินค้า ฿${deal!.price.toLocaleString()}${shipCost > 0 ? ` + ค่าขนส่ง ฿${shipCost.toLocaleString()}` : ''} (ราคารวมค่าบริการแพลตฟอร์มแล้ว)`
+                    : `= ราคาสินค้า ฿${deal!.price.toLocaleString()}${buyerShare > 0 ? ` + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()}` : ''}`}
+                </div>
                 {/* แถวผู้ขาย — bold เฉพาะเมื่อดู role ผู้ขาย */}
                 {sellerShouldPay > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'seller' ? 700 : 400, color: myRole === 'seller' ? 'var(--ink)' : (sellerShare > 0 ? '#8a5a00' : 'var(--muted)'), marginTop: 4 }}>
@@ -2037,11 +2038,13 @@ export default function DealRoom() {
                 <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>
                   <div style={{ fontWeight: 700, color: '#075985', marginBottom: 6 }}>🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
                   <PaymentMethods amount={buyerShouldPay} note={
-                    isSellerPaysAll
-                      ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} เข้าบัญชีกลาง (ผู้ขายจ่ายค่าบริการเอง)`
-                      : isSplit
-                        ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()} = ฿${buyerShouldPay.toLocaleString()}`
-                        : `เงินจะพักไว้กับ บริษัท กลางฮับ จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`
+                    isMkt
+                      ? `โอน ฿${buyerShouldPay.toLocaleString()} เข้าบัญชีกลาง (ราคาสินค้า${shipCost > 0 ? ' + ค่าขนส่ง' : ''}) — เงินพักไว้จนกว่าคุณยืนยันรับสินค้า`
+                      : isSellerPaysAll
+                        ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} เข้าบัญชีกลาง (ผู้ขายจ่ายค่าบริการเอง)`
+                        : isSplit
+                          ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()} = ฿${buyerShouldPay.toLocaleString()}`
+                          : `เงินจะพักไว้กับ บริษัท กลางฮับ จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`
                   } />
                   <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>
                 </div>
@@ -2051,7 +2054,7 @@ export default function DealRoom() {
               )}
 
               {/* ผู้ขายโอนค่าบริการส่วนของตน — ทันที แยกจากยอดสินค้า */}
-              {myRole === 'seller' && sellerShouldPay > 0 && (['payment_pending', 'payment_uploaded'].includes(deal!.status) || isMarketplaceCheckoutActive(deal!)) && (
+              {!isMkt && myRole === 'seller' && sellerShouldPay > 0 && (['payment_pending', 'payment_uploaded'].includes(deal!.status) || isMarketplaceCheckoutActive(deal!)) && (
                 pd.seller_fee_slip
                   ? <div className="dr-slip-status">✅ คุณโอนค่าบริการ ฿{sellerShouldPay.toLocaleString()} แล้ว — รอศูนย์กลางตรวจสอบ</div>
                   : <div style={{ background: '#fff8ef', border: '1px solid #ffe0b2', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 12 }}>

@@ -91,3 +91,8 @@ export function isDirectShipOrder(deal: MarketplaceOrderInput & { deal_type?: st
 export function marketplaceShippingCost(deal: { shipping_cost?: number | null }): number {
   return Math.max(0, Math.round(Number(deal.shipping_cost) || 0));
 }
+
+/** ยอดที่ผู้ซื้อตลาดต้องโอน = ราคาสินค้า (รวม GP แล้ว) + ค่าขนส่ง */
+export function marketplaceBuyerPayAmount(deal: { price?: number | null; shipping_cost?: number | null }): number {
+  return Math.max(0, Math.round(Number(deal.price) || 0)) + marketplaceShippingCost(deal);
+}
