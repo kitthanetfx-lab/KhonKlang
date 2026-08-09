@@ -96,7 +96,11 @@ export async function POST(req: NextRequest) {
     if (serviceIntent === 'safezone' && !serviceControls.meetupSafeZone.enabled) {
       return NextResponse.json({ error: serviceControls.meetupSafeZone.note || 'บริการนัดรับ Safe Zone ถูกปิดชั่วคราว' }, { status: 403 });
     }
-    if (!dealType && serviceIntent !== 'safezone' && !serviceControls.tradeOnline.enabled) {
+    if (source === 'listing') {
+      if (!serviceControls.marketplace.enabled) {
+        return NextResponse.json({ error: serviceControls.marketplace.note || 'โซนตลาดถูกปิดชั่วคราว จึงยังลงประกาศไม่ได้' }, { status: 403 });
+      }
+    } else if (!dealType && serviceIntent !== 'safezone' && !serviceControls.tradeOnline.enabled) {
       return NextResponse.json({ error: serviceControls.tradeOnline.note || 'บริการซื้อขายผ่านกลางถูกปิดชั่วคราว' }, { status: 403 });
     }
 
