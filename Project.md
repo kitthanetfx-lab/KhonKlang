@@ -1,5 +1,14 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (15:00)
+
+### SlipOK 1000 ทุกช่องทาง — กลับ multipart manual + urlencoded
+
+**อาการ**: `storage:ok(80698b) → upload:1000 → signed:1000 → public:1000` — ไฟล์มี แต่ SlipOK ไม่ได้รับ body (FormData บน Vercel ส่งว่าง)
+**แก้**: upload ใช้ multipart manual (Buffer), URL ใช้ urlencoded แล้วค่อย multipart
+
+---
+
 ## 2026-08-10 (14:55)
 
 ### แก้ SlipOK 1000 — ส่ง FormData แทน JSON (สลิปไม่ได้ขาด)

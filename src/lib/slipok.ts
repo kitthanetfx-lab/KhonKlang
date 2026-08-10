@@ -64,6 +64,34 @@ function slipImageMime(fileId: string): string {
   return 'image/jpeg';
 }
 
+function buildMultipartBody(
+  fields: Record<string, string>,
+  file?: { field: string; filename: string; mime: string; data: Buffer },
+): { body: Uint8Array; contentType: string } {
+  const boundary = `----SlipOK${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  const chunks: Buffer[] = [];
+
+  for (const [name, value] of Object.entries(fields)) {
+    chunks.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
+    ));
+  }
+
+  if (file) {
+    chunks.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${file.field}"; filename="${file.filename}"\r\nContent-Type: ${file.mime}\r\n\r\n`,
+    ));
+    chunks.push(file.data);
+    chunks.push(Buffer.from('\r\n'));
+  }
+
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+  return {
+    body: Uint8Array.from(Buffer.concat(chunks)),
+    contentType: `multipart/form-data; boundary=${boundary}`,
+  };
+}
+
 function buildSlipokFormData(opts: {
   url?: string;
   file?: { bytes: Buffer; filename: string; mime: string };
@@ -80,6 +108,14 @@ function buildSlipokFormData(opts: {
     form.append('amount', String(Math.round(opts.expectedAmount)));
   }
   return form;
+}
+
+function slipokTextFields(expectedAmount?: number): Record<string, string> {
+  const fields: Record<string, string> = { log: 'true' };
+  if (expectedAmount != null && expectedAmount > 0) {
+    fields.amount = String(Math.round(expectedAmount));
+  }
+  return fields;
 }
 
 function parseSlipokApiResponse(res: Response, j: Record<string, unknown>, via?: SlipResult['via']): SlipResult {
@@ -129,7 +165,7 @@ async function postSlipok(
     }
     const result = parseSlipokApiResponse(res, j, via);
     if (!result.ok) {
-      console.error('[slipok] verify failed', via, result.code, result.message, 'http', res.status);
+      console.error('[slipok] verify failed', via, result.code, result.message, 'http', res.status, text.slice(0, 120));
     }
     return result;
   } catch (err) {
@@ -253,17 +289,27 @@ export function formatSlipokError(code: string, message?: string): string {
   return (raw || 'สลิปไม่ผ่านการตรวจสอบ') + trail;
 }
 
-/** ตรวจสลิปจาก URL (signed หรือ public) — SlipOK รับ FormData เท่านั้น ไม่ใช่ JSON */
+/** ตรวจสลิปจาก URL — ลอง urlencoded แล้ว multipart (FormData บน Vercel มักส่ง body ว่าง) */
 export async function verifySlipByUrl(imageUrl: string, expectedAmount?: number): Promise<SlipResult> {
   if (!isSlipokConfigured()) {
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
   const via: SlipResult['via'] = imageUrl.includes('token=') ? 'signed_url' : 'public_url';
-  const form = buildSlipokFormData({ url: imageUrl, expectedAmount });
-  return postSlipok(form, {}, via);
+  const fields = { url: imageUrl, ...slipokTextFields(expectedAmount) };
+
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(fields)) params.set(k, v);
+  let last = await postSlipok(params, {}, via);
+  if (last.ok || last.code !== '1000') return last;
+
+  const { body, contentType } = buildMultipartBody(fields);
+  last = await postSlipok(body, { 'Content-Type': contentType }, via);
+  if (last.ok || last.code !== '1000') return last;
+
+  return postSlipok(buildSlipokFormData({ url: imageUrl, expectedAmount }), {}, via);
 }
 
-/** ตรวจสลิปจาก bytes — FormData ตาม SlipOK SDK อย่างเป็นทางการ */
+/** ตรวจสลิปจาก bytes — multipart manual ก่อน (เสถียรบน Node/Vercel) */
 export async function verifySlipByImageBytes(
   imageBytes: Buffer,
   filename: string,
@@ -272,11 +318,21 @@ export async function verifySlipByImageBytes(
   if (!isSlipokConfigured()) {
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
-  const form = buildSlipokFormData({
-    file: { bytes: imageBytes, filename, mime: slipImageMime(filename) },
-    expectedAmount,
+  const mime = slipImageMime(filename);
+  const { body, contentType } = buildMultipartBody(slipokTextFields(expectedAmount), {
+    field: 'files',
+    filename,
+    mime,
+    data: imageBytes,
   });
-  return postSlipok(form, {}, 'upload');
+  let last = await postSlipok(body, { 'Content-Type': contentType }, 'upload');
+  if (last.ok || last.code !== '1000') return last;
+
+  return postSlipok(
+    buildSlipokFormData({ file: { bytes: imageBytes, filename, mime }, expectedAmount }),
+    {},
+    'upload',
+  );
 }
 
 export async function verifySlipByFileId(fileId: string, expectedAmount?: number): Promise<SlipResult> {
