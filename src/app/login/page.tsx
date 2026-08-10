@@ -7,6 +7,8 @@ import { Suspense } from 'react';
 import { InAppBanner } from '@/components/InAppBanner';
 import { detectInApp } from '@/lib/inApp';
 import { isGlanghubApp, nativeGoogleIdToken, isUserCancelled } from '@/lib/nativeAuth';
+import { ResponsiveShell } from '@/components/mobile';
+import { LoginApp } from '@/components/auth/LoginApp';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -23,7 +25,6 @@ function LoginForm() {
 
   const handleLogin = async (provider: 'google') => {
     const safeReturn = returnTo.startsWith('/') ? returnTo : '/register';
-    // แอปมือถือกลางฮับ: Google ห้าม OAuth ใน WebView → ใช้ Native Google Sign-In (จบในแอป)
     if (isGlanghubApp()) {
       try {
         const idToken = await nativeGoogleIdToken();
@@ -38,7 +39,6 @@ function LoginForm() {
       }
       return;
     }
-    // Google ปฏิเสธ OAuth ในเบราว์เซอร์ภายในแอป (LINE/Messenger) — แนะนำ LINE login หรือเปิดเบราว์เซอร์หลัก
     if (detectInApp()) {
       alert('Google ไม่อนุญาตให้ล็อกอินผ่านเบราว์เซอร์ใน LINE/Messenger\n\nแนะนำ: เข้าสู่ระบบด้วย LINE (ใช้ได้เลย) หรือกด "เปิดในเบราว์เซอร์" จากแถบด้านบน');
       return;
@@ -55,9 +55,7 @@ function LoginForm() {
     }
   };
 
-  return (
-    <>
-    <InAppBanner />
+  const desktopLogin = (
     <main className="login-page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div className="login-card">
         <div style={{ position: 'relative', zIndex: 1 }}>
@@ -115,6 +113,22 @@ function LoginForm() {
         </div>
       </div>
     </main>
+  );
+
+  return (
+    <>
+      <InAppBanner />
+      <ResponsiveShell
+        mobile={
+          <LoginApp
+            returnTo={returnTo}
+            error={error}
+            errorMessage={error ? errorMessages[error] : undefined}
+            onGoogleLogin={() => handleLogin('google')}
+          />
+        }
+        desktop={desktopLogin}
+      />
     </>
   );
 }

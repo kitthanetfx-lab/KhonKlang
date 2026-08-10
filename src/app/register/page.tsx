@@ -2,10 +2,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { ResponsiveShell } from '@/components/mobile';
+import { RegisterPickApp } from '@/components/register/RegisterPickApp';
 
 export default function RegisterSelectPage() {
   const controls = useServiceControls();
-  return (
+
+  const desktop = (
     <div className="rsel-page">
       <div className="rsel-inner">
         <div className="rsel-header">
@@ -71,5 +74,12 @@ export default function RegisterSelectPage() {
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <ResponsiveShell
+      mobile={<RegisterPickApp controls={controls} />}
+      desktop={desktop}
+    />
   );
 }

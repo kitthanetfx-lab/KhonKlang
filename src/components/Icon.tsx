@@ -17,6 +17,7 @@ export const ICON_PATHS: Record<string, React.ReactNode> = {
   menu: <path d="M4 7h16M4 12h16M4 17h16"/>,
   x: <path d="M6 6l12 12M18 6 6 18"/>,
   chevronDown: <path d="m6 9 6 6 6-6"/>,
+  chevronLeft: <path d="m15 6-6 6 6 6"/>,
   chevronRight: <path d="m9 6 6 6-6 6"/>,
   arrowRight: <path d="M4 12h15m-6-6 6 6-6 6"/>,
   arrowUpRight: <path d="M7 17 17 7M8 7h9v9"/>,

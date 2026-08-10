@@ -13,6 +13,8 @@ import { Icon } from '@/components/Icon';
 import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { SubPageShell } from '@/components/mobile';
+import { ServiceFlowApp } from '@/components/service/ServiceFlowApp';
 
 const SLIDES = [
   { src: slide1, alt: 'ขั้นตอนที่ 1 ซื้อขายผ่านกลางปลอดภัย' },
@@ -21,6 +23,12 @@ const SLIDES = [
   { src: slide4, alt: 'ขั้นตอนที่ 4 ซื้อขายผ่านกลางปลอดภัย' },
   { src: slide5, alt: 'ขั้นตอนที่ 5 ซื้อขายผ่านกลางปลอดภัย' },
   { src: slide6, alt: 'ขั้นตอนที่ 6 ซื้อขายผ่านกลางปลอดภัย' },
+];
+
+const SUBS = [
+  'ซื้อขายปลอดภัยสูงสุด',
+  'ผ่านคนกลางที่ได้รับการรับรองและมีวงเงินรับประกัน',
+  'ครอบคลุมสินค้าที่ต้องตรวจสอบละเอียด และสินค้ามูลค่าสูง',
 ];
 
 export default function TradeOnline() {
@@ -38,7 +46,9 @@ export default function TradeOnline() {
     return <ServiceDisabledNotice title="ซื้อขายผ่านกลางปลอดภัย" message={controls.message('tradeOnline')} backHref="/service/trade" backLabel="กลับไปหน้าบริการ" />;
   }
 
-  return (
+  const enabled = controls.isEnabled('tradeOnline');
+
+  const desktop = (
     <div className="sub-page service-sub-page svc-simple-page svc-online-page">
       <header className="sub-header">
         <Link href="/service/trade" className="sub-back" aria-label="ย้อนกลับ">
@@ -58,9 +68,7 @@ export default function TradeOnline() {
 
           <div className="svc-simple-hero">
             <h1 className="svc-simple-title">ซื้อขายผ่านกลางปลอดภัย</h1>
-            <p className="svc-simple-sub">ซื้อขายปลอดภัยสูงสุด</p>
-            <p className="svc-simple-sub">ผ่านคนกลางที่ได้รับการรับรองและมีวงเงินรับประกัน</p>
-            <p className="svc-simple-sub">ครอบคลุมสินค้าที่ต้องตรวจสอบละเอียด และสินค้ามูลค่าสูง</p>
+            {SUBS.map(line => <p key={line} className="svc-simple-sub">{line}</p>)}
           </div>
 
           <div className="svc-simple-kicker svc-simple-fade">ขั้นตอนการดำเนินงาน</div>
@@ -97,12 +105,28 @@ export default function TradeOnline() {
           </div>
 
           <div className="svc-simple-cta-wrap svc-simple-fade">
-            {controls.isEnabled('tradeOnline')
+            {enabled
               ? <Link href="/deal/create" className="btn btn-primary btn-block svc-simple-cta">เริ่มสร้างดีล →</Link>
               : <button type="button" className="btn btn-primary btn-block svc-simple-cta" disabled>ปิดให้บริการชั่วคราว</button>}
           </div>
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <SubPageShell title="ซื้อขายปลอดภัย" backHref="/service/trade" right={<HeaderAccountActions />} withBottomNav desktop={desktop}>
+      <ServiceFlowApp
+        title="ซื้อขายผ่านกลางปลอดภัย"
+        subs={SUBS}
+        slides={SLIDES}
+        activeSlide={activeSlide}
+        onSlide={setActiveSlide}
+        alertText="สำคัญ: ผู้ซื้อและผู้ขายควรเตรียมข้อมูลสินค้าให้ครบ เพื่อให้คนกลางตรวจสอบได้ละเอียดและชัดเจนที่สุด"
+        ctaHref="/deal/create"
+        ctaLabel="เริ่มสร้างดีล →"
+        enabled={enabled}
+      />
+    </SubPageShell>
   );
 }

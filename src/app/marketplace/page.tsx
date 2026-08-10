@@ -15,6 +15,7 @@ import { AuctionCountdown } from '@/components/AuctionCountdown';
 import type { AuctionPublic, MyAuctionStatus } from '@/lib/auction';
 import { MY_AUCTION_STATUS_LABEL } from '@/lib/auction';
 import { MarketplaceApp } from '@/components/marketplace/MarketplaceApp';
+import { ResponsiveShell } from '@/components/mobile';
 
 type Zone = 'listing' | 'auction';
 
@@ -357,8 +358,8 @@ export default function Marketplace() {
     <>
       <Nav active="market" />
 
-      {/* มือถือ: โครงแอปแยก — ซ่อนด้วย CSS ≥768px */}
-      <div className="mkt-mobile-shell">
+      <ResponsiveShell
+        mobile={
         <MarketplaceApp
           zone={zone}
           auctionView={auctionView}
@@ -385,10 +386,9 @@ export default function Marketplace() {
           onClearFilters={clearFilters}
           myStatusMap={myAuctionStatusMap}
         />
-      </div>
-
-      {/* เดสก์ท็อป: โครงเดิม — ซ่อนด้วย CSS ≤767px */}
-      <div className="mkt-desktop-shell">
+        }
+        desktop={
+        <>
       <section className={`mkt-hero${isAuction ? ' mkt-hero--auction' : ''}`}>
         <div className="container mkt-container mkt-hero-inner">
           <div className="mkt-hero-top">
@@ -607,11 +607,10 @@ export default function Marketplace() {
           </div>
         )}
       </div>
-      </div>
-
-      <div className="mkt-desktop-shell">
         <Footer />
-      </div>
+        </>
+        }
+      />
     </>
   );
 }

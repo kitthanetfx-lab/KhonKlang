@@ -8,6 +8,8 @@ import { EscrowStage } from '@/components/EscrowStage';
 import { ServiceSlider } from '@/components/ServiceSlider';
 import { useAppPreferences } from '@/components/AppPreferences';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { ResponsiveShell } from '@/components/mobile';
+import { HomeApp } from '@/components/home/HomeApp';
 
 interface SiteStats {
   completedDeals: number; protectedValue: number; middlemen: number; satisfaction: number; reviewCount: number;
@@ -151,38 +153,47 @@ export default function HomePage() {
   return (
     <>
       <Nav active="home" />
-      <Hero stats={stats} controls={controls} locale={locale} />
+      <ResponsiveShell
+        mobile={
+          <HomeApp locale={locale} statItems={statItems} controls={controls} />
+        }
+        desktop={
+          <>
+            <Hero stats={stats} controls={controls} locale={locale} />
 
-      <section className="stats-band">
-        <div className="container stats-grid">
-          {statItems.map(s => (
-            <div key={s.label} className="stat reveal">
-              <div className="stat-v">{s.v < 0 ? '—' : <CountUp to={s.v} prefix={s.pre || ''} suffix={s.suf} />}</div>
-              <div className="stat-l">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+            <section className="stats-band">
+              <div className="container stats-grid">
+                {statItems.map(s => (
+                  <div key={s.label} className="stat reveal">
+                    <div className="stat-v">{s.v < 0 ? '—' : <CountUp to={s.v} prefix={s.pre || ''} suffix={s.suf} />}</div>
+                    <div className="stat-l">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-      <section className="section" style={{ background: 'var(--surface)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
-        <div className="container">
-          <SectionHead kicker={locale === 'th' ? 'บริการผ่านคนกลาง' : 'Escrow Services'} title={locale === 'th' ? 'ทุกปัญหาการซื้อขาย เรามีทางแก้ให้' : 'We design services for real trading problems'} lead={locale === 'th' ? 'เลื่อนดูบริการที่ออกแบบมาแก้ปัญหาที่คนซื้อ–ขายเจอบ่อยที่สุด พร้อมข้อดีที่คุณจะได้รับ' : 'Browse services built to solve the most common buyer-seller risks, with clear benefits for both sides.'} center />
-          <div className="reveal"><ServiceSlider stats={stats} /></div>
-        </div>
-      </section>
+            <section className="section" style={{ background: 'var(--surface)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
+              <div className="container">
+                <SectionHead kicker={locale === 'th' ? 'บริการผ่านคนกลาง' : 'Escrow Services'} title={locale === 'th' ? 'ทุกปัญหาการซื้อขาย เรามีทางแก้ให้' : 'We design services for real trading problems'} lead={locale === 'th' ? 'เลื่อนดูบริการที่ออกแบบมาแก้ปัญหาที่คนซื้อ–ขายเจอบ่อยที่สุด พร้อมข้อดีที่คุณจะได้รับ' : 'Browse services built to solve the most common buyer-seller risks, with clear benefits for both sides.'} center />
+                <div className="reveal"><ServiceSlider stats={stats} /></div>
+              </div>
+            </section>
 
-      <section className="scam-band">
-        <div className="container scam-inner reveal">
-          <div className="scam-ic"><Icon name="search" size={30} /></div>
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <h2 style={{ fontSize: 'clamp(22px,3vw,30px)', color: '#fff' }}>{locale === 'th' ? 'สงสัยว่าจะโดนโกง? เช็คก่อนโอน' : 'Think it might be a scam? Check before you pay'}</h2>
-            <p style={{ color: 'rgba(255,255,255,.78)', marginTop: 8, maxWidth: '52ch' }}>{locale === 'th' ? 'ค้นหาชื่อ เลขบัญชี หรือเบอร์โทรศัพท์จากฐานข้อมูลคนโกง เพื่อความปลอดภัยก่อนทำธุรกรรมทุกครั้ง' : 'Search names, bank accounts, or phone numbers against scam reports before every transaction.'}</p>
-          </div>
-          <Link className="btn btn-lg" href="/check-scam" style={{ background: '#fff', color: '#10224d' }}>{locale === 'th' ? 'ตรวจสอบเลย' : 'Check Now'} <Icon name="arrowRight" size={18} /></Link>
-        </div>
-      </section>
+            <section className="scam-band">
+              <div className="container scam-inner reveal">
+                <div className="scam-ic"><Icon name="search" size={30} /></div>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <h2 style={{ fontSize: 'clamp(22px,3vw,30px)', color: '#fff' }}>{locale === 'th' ? 'สงสัยว่าจะโดนโกง? เช็คก่อนโอน' : 'Think it might be a scam? Check before you pay'}</h2>
+                  <p style={{ color: 'rgba(255,255,255,.78)', marginTop: 8, maxWidth: '52ch' }}>{locale === 'th' ? 'ค้นหาชื่อ เลขบัญชี หรือเบอร์โทรศัพท์จากฐานข้อมูลคนโกง เพื่อความปลอดภัยก่อนทำธุรกรรมทุกครั้ง' : 'Search names, bank accounts, or phone numbers against scam reports before every transaction.'}</p>
+                </div>
+                <Link className="btn btn-lg" href="/check-scam" style={{ background: '#fff', color: '#10224d' }}>{locale === 'th' ? 'ตรวจสอบเลย' : 'Check Now'} <Icon name="arrowRight" size={18} /></Link>
+              </div>
+            </section>
 
-      <Footer />
+            <Footer />
+          </>
+        }
+      />
     </>
   );
 }

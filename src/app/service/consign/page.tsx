@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { SubPageShell } from '@/components/mobile';
+import { ConsignApp } from '@/components/service/ConsignApp';
 
 const STEPS = [
   { icon: '📦', bg: '#eef4ff', t: 'ส่งสินค้าให้คนกลาง', d: 'นำสินค้าฝากไว้ที่คนกลาง พร้อมเอกสารประกอบ' },
@@ -12,13 +14,22 @@ const STEPS = [
   { icon: '✅', bg: '#e9faf2', t: 'โอนเงินให้ผู้ขาย', d: 'ผู้ซื้อยืนยันรับสินค้า ระบบปล่อยเงินหักค่าบริการให้ผู้ขายทันที' },
 ];
 
+const FEE_ROWS: [string, string][] = [
+  ['ค่าฝากขาย', '2–3% ของราคาขาย'],
+  ['ค่าจัดส่ง', 'ตามระยะทางจริง'],
+  ['ค่าถ่ายรูป+ลงขาย', 'ฟรี'],
+  ['ระยะเวลาฝาก', 'สูงสุด 90 วัน'],
+];
+
 export default function ConsignPage() {
   const controls = useServiceControls();
   if (!controls.loading && !controls.isEnabled('consign')) {
     return <ServiceDisabledNotice title="ฝากขายผ่านกลาง" message={controls.message('consign')} />;
   }
 
-  return (
+  const enabled = controls.isEnabled('consign');
+
+  const desktop = (
     <div className="sub-page service-sub-page">
       <header className="sub-header">
         <Link href="/" className="sub-back" aria-label="ย้อนกลับ">
@@ -36,7 +47,7 @@ export default function ConsignPage() {
         </div>
         <div className="fee-card">
           <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 12 }}>💰 ค่าบริการฝากขาย</div>
-          {[['ค่าฝากขาย', '2–3% ของราคาขาย'], ['ค่าจัดส่ง', 'ตามระยะทางจริง'], ['ค่าถ่ายรูป+ลงขาย', 'ฟรี'], ['ระยะเวลาฝาก', 'สูงสุด 90 วัน']].map(([l, v]) => (
+          {FEE_ROWS.map(([l, v]) => (
             <div key={l} className="fee-row"><span className="fee-lbl">{l}</span><span className="fee-val">{v}</span></div>
           ))}
         </div>
@@ -49,10 +60,16 @@ export default function ConsignPage() {
             </div>
           ))}
         </div>
-        {controls.isEnabled('consign')
+        {enabled
           ? <Link href="/marketplace" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>เริ่มฝากขาย →</Link>
           : <button type="button" className="btn btn-primary btn-block" disabled>ปิดให้บริการชั่วคราว</button>}
       </div>
     </div>
+  );
+
+  return (
+    <SubPageShell title="ฝากขายผ่านกลาง" backHref="/" right={<HeaderAccountActions />} withBottomNav desktop={desktop}>
+      <ConsignApp steps={STEPS} feeRows={FEE_ROWS} enabled={enabled} />
+    </SubPageShell>
   );
 }

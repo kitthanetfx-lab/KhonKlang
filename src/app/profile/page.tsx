@@ -10,6 +10,8 @@ import { ProfileConsentModal } from '@/components/ProfileConsentModal';
 import { Icon } from '@/components/Icon';
 import { THAI_BANKS } from '@/lib/banks';
 import { isProfileComplete } from '@/lib/profileComplete';
+import { ResponsiveShell } from '@/components/mobile';
+import { ProfileApp } from '@/components/profile/ProfileApp';
 
 const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -271,12 +273,72 @@ function ProfilePage() {
   const initials = (displayName || 'U').slice(0, 2).toUpperCase();
   const sellerStatus = prefs.seller_status || '', middlemanStatus = prefs.middleman_status || '';
 
-  return (
+  const profileAppProps = {
+    locked,
+    editing,
+    saving,
+    displayName,
+    email,
+    avatarUrl,
+    initials,
+    roleLabel: roleInfo.label,
+    roleCls: roleInfo.cls,
+    sellerApproved: sellerStatus === 'approved',
+    middlemanApproved: middlemanStatus === 'approved',
+    sellerStatus,
+    middlemanStatus,
+    prefs,
+    firstName,
+    lastName,
+    phone,
+    address,
+    lineLinked: Boolean(prefs.line_user_id),
+    editFirst,
+    editLast,
+    editPhone,
+    editAddr,
+    editBankName,
+    editBankAcct,
+    editBankOwner,
+    editBankQr,
+    qrUploading,
+    qrUrl,
+    amphoes: availableAmphoes,
+    tambons: availableTambons,
+    loadingAmph,
+    loadingTamb,
+    error,
+    saveOk,
+    wallet,
+    ledger,
+    ledgerStatusMap: LEDGER_STATUS,
+    baht,
+    onOpenEdit: openEdit,
+    onCancelEdit: cancelEdit,
+    onSave: handleSave,
+    onLogout: logout,
+    onPdpaDelete: () => {
+      const subject = encodeURIComponent('ขอลบข้อมูลส่วนบุคคล (PDPA)');
+      const body = encodeURIComponent('ข้าพเจ้าขอใช้สิทธิ์ลบข้อมูลส่วนบุคคลตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล\nอีเมลบัญชี: ');
+      window.location.href = `mailto:runandyaow002@gmail.com?subject=${subject}&body=${body}`;
+    },
+    onEditFirst: setEditFirst,
+    onEditLast: setEditLast,
+    onEditPhone: setEditPhone,
+    onEditBankName: setEditBankName,
+    onEditBankAcct: setEditBankAcct,
+    onEditBankOwner: setEditBankOwner,
+    onClearBankQr: () => setEditBankQr(''),
+    onUploadBankQr: uploadBankQr,
+    onProvince,
+    onAmphoe,
+    onTambon,
+    onEditAddrField: (field: keyof typeof editAddr, value: string) => setEditAddr(a => ({ ...a, [field]: value })),
+    statusBadge: (status: string) => <StatusBadge status={status} />,
+  };
+
+  const desktopView = (
     <div className="sub-page">
-      {/* สมาชิกใหม่ที่ยังกรอกข้อมูลบังคับไม่ครบ — แจ้งเหตุผลการเก็บข้อมูลก่อนเข้าฟอร์มเสมอ */}
-      {locked && !consentOk && (
-        <ProfileConsentModal onAccept={acceptConsent} onDecline={() => router.replace('/')} />
-      )}
       <header className="sub-header">
         {locked
           ? <span style={{ width: 18, display: 'inline-block' }} />
@@ -519,6 +581,18 @@ function ProfilePage() {
         </button>}
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {locked && !consentOk && (
+        <ProfileConsentModal onAccept={acceptConsent} onDecline={() => router.replace('/')} />
+      )}
+      <ResponsiveShell
+        mobile={<ProfileApp {...profileAppProps} />}
+        desktop={desktopView}
+      />
+    </>
   );
 }
 

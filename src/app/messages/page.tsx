@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { supabase, authHeaders } from '@/lib/supabase';
 import { Nav, Footer } from '@/components/Site';
 import { Icon } from '@/components/Icon';
+import { ResponsiveShell } from '@/components/mobile';
+import { MessagesApp } from '@/components/messages/MessagesApp';
 
 interface Thread { threadId: string; otherId: string; otherName: string; lastContent: string; lastAt: string; fromMe: boolean; unread: number }
 interface Dm { id: string; from_id: string; from_name: string; to_id: string; to_name: string; content: string; created_at: string }
@@ -112,7 +114,7 @@ function MessagesInner() {
     setThreads(prev => (prev || []).map(x => (x.threadId === t.threadId ? { ...x, unread: 0 } : x)));
   }
 
-  return (
+  const desktopView = (
     <>
       <Nav />
       <main className="dm-shell">
@@ -197,6 +199,28 @@ function MessagesInner() {
       </main>
       <Footer />
     </>
+  );
+
+  return (
+    <ResponsiveShell
+      mobile={
+        <MessagesApp
+          threads={threads}
+          active={active}
+          msgs={msgs}
+          myId={myId}
+          input={input}
+          sending={sending}
+          timeAgo={timeAgo}
+          onOpenThread={openThread}
+          onCloseThread={() => setActive(null)}
+          onInput={setInput}
+          onSend={send}
+          bottomRef={bottomRef}
+        />
+      }
+      desktop={desktopView}
+    />
   );
 }
 

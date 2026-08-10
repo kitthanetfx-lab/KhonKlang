@@ -5,29 +5,29 @@ import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { Icon } from '@/components/Icon';
 import { ScamDbSearch } from '@/components/ScamDbSearch';
 import { ScamReportForm } from '@/components/ScamReportForm';
+import { SubPageShell } from '@/components/mobile';
+import { CheckScamApp, type CheckScamTab, type ExternalSite } from '@/components/check-scam/CheckScamApp';
 
-const SITES = [
+const SITES: ExternalSite[] = [
   { name: 'Blacklist Seller', tag: 'ผู้ขายออนไลน์', desc: 'ฐานข้อมูลผู้ขายที่ถูกแบล็คลิสต์จากผู้ซื้อทั่วประเทศ ตรวจสอบชื่อ เบอร์ บัญชีก่อนโอน', bg: 'linear-gradient(135deg,#1a0a0a 0%,#4a0a14 100%)', tagColor: '#ff8080', url: 'https://www.blacklistseller.com/' },
   { name: 'ฉลาดโอน', tag: 'เลขบัญชี / เบอร์โทร', desc: 'ตรวจสอบเลขบัญชีธนาคารและเบอร์โทรศัพท์ว่าเคยถูกร้องเรียนว่าโกงหรือไม่ก่อนโอนเงิน', bg: 'linear-gradient(135deg,#0a1e14 0%,#0a4022 100%)', tagColor: '#80ffb8', url: 'https://www.chaladohn.com/' },
   { name: 'เช็คก่อน (CheckGon)', tag: 'ภาครัฐ', desc: 'ระบบตรวจสอบการโกงออนไลน์โดยภาครัฐ เชื่อถือได้ 100% รองรับทั้งผู้ซื้อและผู้ขาย', bg: 'linear-gradient(135deg,#060e22 0%,#0a2050 100%)', tagColor: '#80b8ff', url: 'https://checkgon.go.th/' },
 ];
 
-type Tab = 'db' | 'web' | 'report';
-
 export default function CheckScamPage() {
-  const [tab, setTab] = useState<Tab>('db');
+  const [tab, setTab] = useState<CheckScamTab>('db');
   const [q, setQ] = useState('');
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
   }, []);
-  function open(site: typeof SITES[0]) {
+  function open(site: ExternalSite) {
     const url = q.trim() ? site.url + '?q=' + encodeURIComponent(q.trim()) : site.url;
     window.open(url, '_blank', 'noopener,noreferrer');
   }
   function openAll() { SITES.forEach(s => open(s)); }
 
-  return (
+  const desktop = (
     <div className="sub-page">
       <header className="sub-header">
         <Link href="/" className="sub-back">←</Link>
@@ -45,7 +45,6 @@ export default function CheckScamPage() {
           </div>
         </div>
 
-        {/* ── เมนูแท็บ ── */}
         <nav className="cs-tabs" aria-label="เมนูเช็คคนโกง">
           <button className={`cs-tab ${tab === 'db' ? 'active' : ''}`} onClick={() => setTab('db')}>
             <Icon name="shieldCheck" size={16} /> ฐานข้อมูลคนกลาง
@@ -96,5 +95,25 @@ export default function CheckScamPage() {
         {tab === 'report' && <ScamReportForm />}
       </div>
     </div>
+  );
+
+  return (
+    <SubPageShell
+      title="เช็คคนโกง"
+      backHref="/"
+      right={<HeaderAccountActions />}
+      withBottomNav
+      desktop={desktop}
+    >
+      <CheckScamApp
+        tab={tab}
+        onTab={setTab}
+        q={q}
+        onQ={setQ}
+        sites={SITES}
+        onOpen={open}
+        onOpenAll={openAll}
+      />
+    </SubPageShell>
   );
 }

@@ -11,6 +11,8 @@ import { MarketplacePaymentSection } from '@/components/marketplace/MarketplaceP
 import { MarketplaceShippingSection } from '@/components/marketplace/MarketplaceShippingSection';
 import { MarketplaceOrderStatusSection } from '@/components/marketplace/MarketplaceOrderStatusSection';
 import { MarketplaceReviewBlock } from '@/components/marketplace/MarketplaceReviewBlock';
+import { CheckoutApp } from '@/components/cart/CheckoutApp';
+import { ResponsiveShell } from '@/components/mobile';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
 import { marketplaceCheckoutStepIndex, type MarketplaceCheckoutPhase } from '@/lib/marketplaceOrder';
@@ -185,11 +187,132 @@ export default function CartCheckoutPage() {
     }
   }
 
+  async function editShipping() {
+    const headers = await authHeaders();
+    const r = await fetch(`/api/marketplace/checkout/${orderId}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'edit_shipping' }),
+    });
+    if (r.ok) await refresh();
+  }
+
+  const stepIdx = data ? marketplaceCheckoutStepIndex(data.phase) : 1;
+  const thumb = data?.imageFileId ? imgUrl(data.imageFileId) : '';
+  const awaitingSlip = data
+    ? !data.order.paymentSlipFileId && ['posted', 'payment_pending'].includes(data.order.status)
+    : false;
+
+  function renderPhaseContent() {
+    if (!data) return null;
+    const { order, profile, phase } = data;
+
+    if (phase === 'address') {
+      return (
+        <MarketplaceShippingSection
+          displayName={profile.displayName}
+          phone={profile.phone}
+          address={profile.address}
+          shippingProviderLabel={order.shippingProviderLabel}
+          saving={saving}
+          onConfirm={confirmShipping}
+        />
+      );
+    }
+
+    if (phase === 'payment') {
+      return (
+        <>
+          <div className="mkt-co-card mkt-co-addr-mini">
+            <div className="mkt-co-card-head">
+              <h2>📍 จัดส่งไปที่</h2>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={editShipping}>แก้ไข</button>
+            </div>
+            <div className="mkt-co-addr-line">{profile.displayName}</div>
+            <div className="mkt-co-addr-line">{profile.phone}</div>
+            <div className="mkt-co-addr-line">{profile.address}</div>
+          </div>
+          <MarketplacePaymentSection
+            deal={{
+              price: order.price,
+              shipping_cost: order.shippingCost,
+              buyer_name: profile.displayName,
+              seller_name: order.sellerName,
+              payment_slip_file_id: order.paymentSlipFileId,
+              status: order.status,
+              list_gross_price: order.listGrossPrice,
+            }}
+            myRole="buyer"
+            awaitingSlip={awaitingSlip}
+            onUploadSlip={uploadSlip}
+          />
+          {!order.paymentSlipFileId && (
+            <button type="button" className="btn btn-ghost btn-block co-app-cancel" disabled={acting} onClick={cancelOrder}>
+              ยกเลิกคำสั่งซื้อ
+            </button>
+          )}
+        </>
+      );
+    }
+
+    if (phase === 'status') {
+      return (
+        <>
+          {order.status === 'completed' && order.sellerId && (
+            <MarketplaceReviewBlock
+              deal={{
+                id: order.id,
+                buyer_id: order.buyerId || '',
+                buyer_name: order.buyerName || profile.displayName,
+                seller_id: order.sellerId,
+                seller_name: order.sellerName,
+                middleman_id: order.middlemanId || '',
+                middleman_name: order.middlemanName || '',
+              }}
+            />
+          )}
+          <MarketplaceOrderStatusSection
+            order={{
+              status: order.status,
+              statusLabel: order.statusLabel,
+              trackingNumber: order.trackingNumber,
+              trackingProvider: order.trackingProvider,
+              paymentSlipFileId: order.paymentSlipFileId,
+              packingSteps: order.packingSteps,
+            }}
+            acting={acting}
+            onConfirmReceived={confirmReceived}
+            onCancel={['posted', 'payment_pending'].includes(order.status) && !order.paymentSlipFileId ? cancelOrder : undefined}
+          />
+        </>
+      );
+    }
+
+    return null;
+  }
+
+  const mobile = (
+    <CheckoutApp
+      loading={loading}
+      error={error}
+      stepIdx={stepIdx}
+      order={data?.order}
+      thumb={thumb}
+    >
+      {renderPhaseContent()}
+    </CheckoutApp>
+  );
+
   if (loading) {
     return (
       <>
         <Nav />
-        <div className="mkt-co-shell"><div className="mkt-detail-loading" /></div>
+        <ResponsiveShell
+          mobile={mobile}
+          desktop={
+            <div className="mkt-co-shell"><div className="mkt-detail-loading" /></div>
+          }
+        />
       </>
     );
   }
@@ -198,158 +321,85 @@ export default function CartCheckoutPage() {
     return (
       <>
         <Nav />
-        <div className="mkt-co-shell">
-          <div className="container">
-            <p className="rv-error">{error || 'ไม่พบคำสั่งซื้อ'}</p>
-            <Link href="/cart?tab=orders" className="btn btn-primary">กลับตะกร้า</Link>
-          </div>
-        </div>
+        <ResponsiveShell
+          mobile={mobile}
+          desktop={
+            <div className="mkt-co-shell">
+              <div className="container">
+                <p className="rv-error">{error || 'ไม่พบคำสั่งซื้อ'}</p>
+                <Link href="/cart?tab=orders" className="btn btn-primary">กลับตะกร้า</Link>
+              </div>
+            </div>
+          }
+        />
       </>
     );
   }
 
-  const { order, profile, phase } = data;
-  const stepIdx = marketplaceCheckoutStepIndex(phase);
-  const thumb = data.imageFileId ? imgUrl(data.imageFileId) : '';
-  const awaitingSlip = !order.paymentSlipFileId && ['posted', 'payment_pending'].includes(order.status);
+  const { order } = data;
 
   return (
     <>
       <Nav />
-      <div className="mkt-co-shell">
-        <div className="container mkt-co-layout">
-          <div className="mkt-co-head">
-            <Link href="/cart?tab=orders" className="btn btn-ghost btn-sm">
-              <Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} /> ตะกร้า
-            </Link>
-            <h1>ยืนยันคำสั่งซื้อ</h1>
-          </div>
-
-          <div className="mkt-co-steps">
-            {STEP_LABELS.map((label, i) => (
-              <div key={label} className={`mkt-co-step${i + 1 <= stepIdx ? ' active' : ''}${i + 1 === stepIdx ? ' current' : ''}`}>
-                <span className="mkt-co-step-num">{i + 1}</span>
-                <span className="mkt-co-step-label">{label}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="mkt-co-grid">
-            <aside className="mkt-co-summary">
-              <div className="mkt-co-product">
-                <div className="mkt-co-product-thumb">
-                  {thumb ? <img src={thumb} alt="" /> : <Icon name="package" size={28} />}
+      <ResponsiveShell
+        mobile={mobile}
+        desktop={
+          <>
+            <div className="mkt-co-shell">
+              <div className="container mkt-co-layout">
+                <div className="mkt-co-head">
+                  <Link href="/cart?tab=orders" className="btn btn-ghost btn-sm">
+                    <Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} /> ตะกร้า
+                  </Link>
+                  <h1>ยืนยันคำสั่งซื้อ</h1>
                 </div>
-                <div>
-                  <div className="mkt-co-product-title">{order.title}</div>
-                  <div className="mkt-co-product-meta">ผู้ขาย: {order.sellerName}</div>
-                  {order.shippingProviderLabel && (
-                    <div className="mkt-co-product-meta">ขนส่ง: {order.shippingProviderLabel}</div>
-                  )}
-                </div>
-              </div>
-              <div className="mkt-co-summary-rows">
-                <div><span>ราคาสินค้า</span><span>฿{order.price.toLocaleString()}</span></div>
-                {order.shippingCost > 0 && (
-                  <div><span>ค่าขนส่ง</span><span>฿{order.shippingCost.toLocaleString()}</span></div>
-                )}
-                <div className="mkt-co-summary-total">
-                  <span>ยอดชำระ</span>
-                  <strong>฿{order.payAmount.toLocaleString()}</strong>
-                </div>
-              </div>
-            </aside>
 
-            <main className="mkt-co-main">
-              {error && <p className="rv-error">{error}</p>}
-
-              {phase === 'address' && (
-                <MarketplaceShippingSection
-                  displayName={profile.displayName}
-                  phone={profile.phone}
-                  address={profile.address}
-                  shippingProviderLabel={order.shippingProviderLabel}
-                  saving={saving}
-                  onConfirm={confirmShipping}
-                />
-              )}
-
-              {phase === 'payment' && (
-                <>
-                  <div className="mkt-co-card mkt-co-addr-mini">
-                    <div className="mkt-co-card-head">
-                      <h2>📍 จัดส่งไปที่</h2>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={async () => {
-                        const headers = await authHeaders();
-                        const r = await fetch(`/api/marketplace/checkout/${orderId}`, {
-                          method: 'PATCH',
-                          headers: { ...headers, 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ action: 'edit_shipping' }),
-                        });
-                        if (r.ok) await refresh();
-                      }}>แก้ไข</button>
+                <div className="mkt-co-steps">
+                  {STEP_LABELS.map((label, i) => (
+                    <div key={label} className={`mkt-co-step${i + 1 <= stepIdx ? ' active' : ''}${i + 1 === stepIdx ? ' current' : ''}`}>
+                      <span className="mkt-co-step-num">{i + 1}</span>
+                      <span className="mkt-co-step-label">{label}</span>
                     </div>
-                    <div className="mkt-co-addr-line">{profile.displayName}</div>
-                    <div className="mkt-co-addr-line">{profile.phone}</div>
-                    <div className="mkt-co-addr-line">{profile.address}</div>
-                  </div>
-                  <MarketplacePaymentSection
-                    deal={{
-                      price: order.price,
-                      shipping_cost: order.shippingCost,
-                      buyer_name: profile.displayName,
-                      seller_name: order.sellerName,
-                      payment_slip_file_id: order.paymentSlipFileId,
-                      status: order.status,
-                      list_gross_price: order.listGrossPrice,
-                    }}
-                    myRole="buyer"
-                    awaitingSlip={awaitingSlip}
-                    onUploadSlip={uploadSlip}
-                  />
-                  {!order.paymentSlipFileId && (
-                    <button type="button" className="btn btn-ghost btn-block" disabled={acting} onClick={cancelOrder} style={{ color: '#b22441', marginTop: 8 }}>
-                      ยกเลิกคำสั่งซื้อ
-                    </button>
-                  )}
-                </>
-              )}
+                  ))}
+                </div>
 
-              {phase === 'status' && (
-                <>
-                  {order.status === 'completed' && order.sellerId && (
-                    <MarketplaceReviewBlock
-                      deal={{
-                        id: order.id,
-                        buyer_id: order.buyerId || '',
-                        buyer_name: order.buyerName || profile.displayName,
-                        seller_id: order.sellerId,
-                        seller_name: order.sellerName,
-                        middleman_id: order.middlemanId || '',
-                        middleman_name: order.middlemanName || '',
-                      }}
-                    />
-                  )}
-                  <MarketplaceOrderStatusSection
-                    order={{
-                      status: order.status,
-                      statusLabel: order.statusLabel,
-                      trackingNumber: order.trackingNumber,
-                      trackingProvider: order.trackingProvider,
-                      paymentSlipFileId: order.paymentSlipFileId,
-                      packingSteps: order.packingSteps,
-                    }}
-                    acting={acting}
-                    onConfirmReceived={confirmReceived}
-                    onCancel={['posted', 'payment_pending'].includes(order.status) && !order.paymentSlipFileId ? cancelOrder : undefined}
-                  />
-                </>
-              )}
-            </main>
-          </div>
-        </div>
-      </div>
-      <Footer />
+                <div className="mkt-co-grid">
+                  <aside className="mkt-co-summary">
+                    <div className="mkt-co-product">
+                      <div className="mkt-co-product-thumb">
+                        {thumb ? <img src={thumb} alt="" /> : <Icon name="package" size={28} />}
+                      </div>
+                      <div>
+                        <div className="mkt-co-product-title">{order.title}</div>
+                        <div className="mkt-co-product-meta">ผู้ขาย: {order.sellerName}</div>
+                        {order.shippingProviderLabel && (
+                          <div className="mkt-co-product-meta">ขนส่ง: {order.shippingProviderLabel}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mkt-co-summary-rows">
+                      <div><span>ราคาสินค้า</span><span>฿{order.price.toLocaleString()}</span></div>
+                      {order.shippingCost > 0 && (
+                        <div><span>ค่าขนส่ง</span><span>฿{order.shippingCost.toLocaleString()}</span></div>
+                      )}
+                      <div className="mkt-co-summary-total">
+                        <span>ยอดชำระ</span>
+                        <strong>฿{order.payAmount.toLocaleString()}</strong>
+                      </div>
+                    </div>
+                  </aside>
+
+                  <main className="mkt-co-main">
+                    {error && <p className="rv-error">{error}</p>}
+                    {renderPhaseContent()}
+                  </main>
+                </div>
+              </div>
+            </div>
+            <Footer />
+          </>
+        }
+      />
     </>
   );
 }
