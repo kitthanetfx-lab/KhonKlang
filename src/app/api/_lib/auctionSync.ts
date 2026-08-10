@@ -48,24 +48,28 @@ export async function finalizeAuction(db: SupabaseClient, dealId: string) {
     const fees = await readFeesConfig(db);
     const gp = computeAuctionGp(fees, winningBid);
 
+    // ชนะแล้วเข้า checkout แบบตลาด (ที่อยู่ → โอน → แพ็ค) ไม่ผ่านคนกลาง
     await db.from('deals').update({
       buyer_id: auction.current_bidder_id,
       buyer_name: auction.current_bidder_name || '',
       price: winningBid,
       list_gross_price: winningBid,
-      status: 'buyer_joined',
+      status: 'posted',
+      seller_accepted_terms: true,
+      buyer_accepted_terms: true,
+      fee_payer: deal.fee_payer || 'buyer',
     }).eq('id', dealId);
 
     await notifyUsers(db, [auction.current_bidder_id as string], {
       title: '🔨 คุณชนะประมูล!',
-      body: `"${deal.title}" — ราคาที่ชนะ ฿${winningBid.toLocaleString()} เข้าห้องดีลเพื่อดำเนินการต่อ`,
-      link: `/deal/${dealId}`,
+      body: `"${deal.title}" — ราคาที่ชนะ ฿${winningBid.toLocaleString()} กรุณาชำระเงิน`,
+      link: `/cart/checkout/${dealId}`,
     });
     if (deal.seller_id) {
       await notifyUsers(db, [deal.seller_id as string], {
         title: '🔨 ประมูลของคุณปิดแล้ว',
-        body: `"${deal.title}" ขายได้ ฿${winningBid.toLocaleString()} (สุทธิ ~฿${gp.sellerReceive.toLocaleString()}) โดย ${auction.current_bidder_name || 'ผู้ชนะ'}`,
-        link: `/deal/${dealId}`,
+        body: `"${deal.title}" ขายได้ ฿${winningBid.toLocaleString()} (สุทธิ ~฿${gp.sellerReceive.toLocaleString()}) โดย ${auction.current_bidder_name || 'ผู้ชนะ'} — รอผู้ซื้อโอนเงิน`,
+        link: `/dashboard/seller`,
       });
     }
   }

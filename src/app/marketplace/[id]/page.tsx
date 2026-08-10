@@ -344,10 +344,14 @@ export default function MarketplaceDetailPage() {
                     </>
                   ) : (
                     <div className="mkt-detail-note-card">
-                      <div className="mkt-detail-note-title">ประมูลปิดแล้ว</div>
+                      <div className="mkt-detail-note-title">
+                        {listing.buyer_id || auction.endedAt ? 'ขายแล้ว · ประมูลปิด' : 'ประมูลปิดแล้ว'}
+                      </div>
                       <p>{auction.currentBidderName ? `ผู้ชนะ: ${auction.currentBidderName} · ฿${(auction.currentBid || displayPrice).toLocaleString()}` : 'ไม่มีผู้ bid'}</p>
-                      {listing.status !== 'posted' && myId && listing.buyer_id === myId && (
-                        <Link href={`/deal/${listing.id}`} className="btn btn-primary btn-lg" style={{ marginTop: 12 }}>เข้าห้องดีล →</Link>
+                      {myId && listing.buyer_id === myId && (
+                        <Link href={`/cart/checkout/${listing.id}`} className="btn btn-primary btn-lg" style={{ marginTop: 12 }}>
+                          ไปชำระเงิน / ติดตามสถานะ →
+                        </Link>
                       )}
                     </div>
                   )

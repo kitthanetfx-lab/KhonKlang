@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { HeaderAccountActions } from '@/components/HeaderAccountActions';
-import { Icon } from '@/components/Icon';
 
 const imgUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -23,11 +22,9 @@ interface ShopData {
   reviewCount: number;
 }
 
-interface ShopStats {
+interface ShopPublicStats {
   listingCount: number;
   soldCount: number;
-  boughtCount: number;
-  successfulDeals: number;
   reviewScore: number;
   reviewCount: number;
 }
@@ -39,6 +36,8 @@ interface Listing {
   condition?: string;
   location?: string;
   images?: string[];
+  deal_type?: string;
+  status?: string;
 }
 
 function stars(score: number) {
@@ -50,8 +49,9 @@ export default function PublicShopPage() {
   const params = useParams();
   const sellerId = String(params.sellerId || '');
   const [shop, setShop] = useState<ShopData | null>(null);
-  const [stats, setStats] = useState<ShopStats | null>(null);
+  const [stats, setStats] = useState<ShopPublicStats | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [sold, setSold] = useState<Listing[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -64,6 +64,7 @@ export default function PublicShopPage() {
         setShop(d.shop);
         setStats(d.stats);
         setListings(d.listings || []);
+        setSold(d.sold || []);
       })
       .catch(err => setError(err instanceof Error ? err.message : 'โหลดไม่สำเร็จ'))
       .finally(() => setLoading(false));
@@ -120,11 +121,9 @@ export default function PublicShopPage() {
             {shop.shopAddress && <p className="shop-sign-addr">{shop.shopAddress}</p>}
           </div>
         </div>
-        <div className="shop-sign-stats">
+        <div className="shop-sign-stats shop-sign-stats--public">
           <div className="shop-sign-stat"><span className="shop-sign-stat-val">{stats.listingCount}</span><span className="shop-sign-stat-lbl">สินค้าในร้าน</span></div>
           <div className="shop-sign-stat"><span className="shop-sign-stat-val">{stats.soldCount}</span><span className="shop-sign-stat-lbl">ขายแล้ว</span></div>
-          <div className="shop-sign-stat"><span className="shop-sign-stat-val">{stats.boughtCount}</span><span className="shop-sign-stat-lbl">ซื้อสำเร็จ</span></div>
-          <div className="shop-sign-stat"><span className="shop-sign-stat-val">{stats.successfulDeals}</span><span className="shop-sign-stat-lbl">ดีลสำเร็จ</span></div>
           <div className="shop-sign-stat shop-sign-stat--rating">
             <span className="shop-sign-stat-val">{stats.reviewScore > 0 ? stats.reviewScore.toFixed(1) : '—'}</span>
             <span className="shop-sign-stat-lbl">{stats.reviewCount > 0 ? `${stars(stats.reviewScore)} (${stats.reviewCount})` : 'ยังไม่มีรีวิว'}</span>
@@ -144,6 +143,7 @@ export default function PublicShopPage() {
                 <Link key={item.id} href={`/marketplace/${item.id}`} className="lc-card mkt-card">
                   <div className="lc-card-img-wrap">
                     {thumb ? <img src={thumb} alt="" className="lc-card-img" /> : <div className="lc-card-img lc-card-img--empty">📦</div>}
+                    {item.deal_type === 'auction' && <span className="shop-card-badge shop-card-badge--auction">ประมูล</span>}
                   </div>
                   <div className="lc-card-body">
                     <div className="lc-card-title">{item.title}</div>
@@ -151,6 +151,32 @@ export default function PublicShopPage() {
                     {item.condition && <div className="lc-card-meta">{item.condition}</div>}
                   </div>
                 </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="shop-listings-section">
+        <h2 className="shop-listings-title">ขายแล้ว ({sold.length})</h2>
+        {sold.length === 0 ? (
+          <div className="dash-empty"><p>ยังไม่มีสินค้าที่ขายแล้ว</p></div>
+        ) : (
+          <div className="mkt-grid shop-listings-grid">
+            {sold.map(item => {
+              const thumb = item.images?.[0] ? imgUrl(item.images[0]) : '';
+              return (
+                <div key={item.id} className="lc-card mkt-card shop-card--sold">
+                  <div className="lc-card-img-wrap">
+                    {thumb ? <img src={thumb} alt="" className="lc-card-img" /> : <div className="lc-card-img lc-card-img--empty">📦</div>}
+                    <span className="shop-card-badge shop-card-badge--sold">ขายแล้ว</span>
+                  </div>
+                  <div className="lc-card-body">
+                    <div className="lc-card-title">{item.title}</div>
+                    <div className="lc-card-price">฿{(item.price || 0).toLocaleString()}</div>
+                    {item.condition && <div className="lc-card-meta">{item.condition}</div>}
+                  </div>
+                </div>
               );
             })}
           </div>

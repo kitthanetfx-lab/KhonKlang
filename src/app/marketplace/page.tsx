@@ -129,8 +129,10 @@ export default function Marketplace() {
     .filter(d => d.deal_type !== 'auction')
     .filter(d => d.source === 'listing' || (!d.source && !!d.selling_mode && d.selling_mode !== 'normal'));
 
+  // ประมูลที่ปิด/มีผู้ชนะแล้ว — เอาออกจากตลาด (ไปขึ้นบอร์ดผู้ขาย + หน้าร้าน)
   const auctions = listings
-    .filter(d => d.status === 'posted' && d.deal_type === 'auction' && d.auction);
+    .filter(d => d.status === 'posted' && d.deal_type === 'auction' && d.auction)
+    .filter(d => !d.buyer_id && !d.auction?.endedAt);
 
   let filteredListings = marketListings
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)

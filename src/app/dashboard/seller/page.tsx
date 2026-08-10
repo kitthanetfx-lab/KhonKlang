@@ -12,6 +12,12 @@ import { computeMarketplaceGp, computeAuctionGp, FEE_DEFAULTS, type FeeConfig } 
 import { AUCTION_DURATION_OPTIONS } from '@/lib/auction';
 import { ShippingCarrierPicker } from '@/components/ShippingCarrierPicker';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
+import { SellerPackingPanel } from '@/components/seller/SellerPackingPanel';
+import {
+  isListingStoreOrder,
+  sellerListingStatusLabel,
+  sellerListingStatusClass,
+} from '@/lib/marketplaceOrder';
 
 interface Deal {
   id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
@@ -20,6 +26,8 @@ interface Deal {
   location: string; selling_mode: string; images: string[]; status: string;
   reject_reason: string; created_at: string; deal_type?: string; source?: string;
   shipping_cost?: number; shipping_providers?: string[];
+  buyer_id?: string | null;
+  payment_slip_file_id?: string | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -61,6 +69,7 @@ export default function SellerDashboard() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [tab, setTab] = useState<'selling' | 'packing' | 'shipping' | 'done' | 'history'>('selling');
   const [postModal, setPostModal] = useState<null | 'pick' | 'listing' | 'auction'>(null);
+  const [packingDealId, setPackingDealId] = useState('');
   const [myId, setMyId] = useState('');
 
   const [shopName, setShopName] = useState('');
@@ -333,12 +342,14 @@ export default function SellerDashboard() {
   const HISTORY_STATUSES = ['cancelled', 'disputed', 'shipped_to_middleman', 'middleman_received', 'middleman_checking'];
 
   const myListings = deals.filter(d => d.seller_id === myId);
-  const sellingDeals = myListings.filter(d => SELLING_STATUSES.includes(d.status));
-  const packingDeals = myListings.filter(d => d.source === 'listing' && PACKING_STATUSES.includes(d.status));
-  const shippingDeals = myListings.filter(d => d.source === 'listing' && SHIPPING_STATUSES.includes(d.status));
-  const doneDeals = myListings.filter(d => d.source === 'listing' && DONE_STATUSES.includes(d.status));
-  const historyDeals = myListings.filter(d => HISTORY_STATUSES.includes(d.status) || (d.source !== 'listing' && DONE_STATUSES.includes(d.status)));
-  const totalRev = myListings.filter(d => d.status === 'completed').reduce((s, d) => s + (d.price || 0), 0);
+  const storeListings = myListings.filter(d => isListingStoreOrder(d));
+  const sellingDeals = storeListings.filter(d => SELLING_STATUSES.includes(d.status));
+  const packingDeals = storeListings.filter(d => PACKING_STATUSES.includes(d.status));
+  const shippingDeals = storeListings.filter(d => SHIPPING_STATUSES.includes(d.status));
+  const doneDeals = storeListings.filter(d => DONE_STATUSES.includes(d.status));
+  const historyDeals = myListings.filter(d => HISTORY_STATUSES.includes(d.status) || (!isListingStoreOrder(d) && DONE_STATUSES.includes(d.status)));
+  const totalRev = storeListings.filter(d => d.status === 'completed').reduce((s, d) => s + (d.price || 0), 0);
+  const packingOpenDeal = packingDeals.find(d => d.id === packingDealId) || null;
   const listingGpPreview = price && Number(price) > 0 && postModal === 'listing' ? computeMarketplaceGp(feeConfig, Number(price)) : null;
   const auctionGpPreview = price && Number(price) > 0 && postModal === 'auction' ? computeAuctionGp(feeConfig, Number(price)) : null;
 
@@ -350,6 +361,11 @@ export default function SellerDashboard() {
 
   function DealCard({ deal }: { deal: Deal }) {
     const firstImg = deal.images?.length ? imgUrl(deal.images[0]) : '';
+    const isStore = isListingStoreOrder(deal);
+    const statusLabel = isStore ? sellerListingStatusLabel(deal) : (STATUS_LABEL[deal.status] || deal.status);
+    const statusCls = isStore ? sellerListingStatusClass(deal) : (STATUS_CLS[deal.status] || 'sb-gray');
+    const canEdit = deal.status === 'posted' && isStore && !deal.buyer_id;
+    const needsPack = isStore && deal.status === 'packing';
     return (
       <div className="deal-card">
         <div className="deal-card-header">
@@ -366,15 +382,26 @@ export default function SellerDashboard() {
               </div>
             </div>
           </div>
-          <span className={`sb ${STATUS_CLS[deal.status] || 'sb-gray'}`}>{STATUS_LABEL[deal.status] || deal.status}</span>
+          <span className={`sb ${statusCls}`}>{statusLabel}</span>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignSelf: 'flex-start' }}>
-          {deal.status === 'posted' && deal.source === 'listing' && (
+          {canEdit && (
             <button type="button" className="btn btn-soft btn-sm" onClick={() => openEditListing(deal)}>✏️ แก้ไข</button>
           )}
-          <Link href={deal.status === 'posted' ? `/marketplace/${deal.id}` : `/deal/${deal.id}`} className="btn btn-ghost btn-sm">
-            {deal.status === 'posted' ? '📋 ดูประกาศ →' : '💬 เข้าห้องดีล →'}
-          </Link>
+          {needsPack && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => { setTab('packing'); setPackingDealId(deal.id); }}>
+              📦 แพ็คสินค้า
+            </button>
+          )}
+          {isStore && deal.status === 'posted' && !deal.buyer_id && (
+            <Link href={`/marketplace/${deal.id}`} className="btn btn-ghost btn-sm">📋 ดูประกาศ →</Link>
+          )}
+          {isStore && deal.status === 'completed' && (
+            <span className="sb sb-green">ขายแล้ว</span>
+          )}
+          {!isStore && (
+            <Link href={`/deal/${deal.id}`} className="btn btn-ghost btn-sm">💬 เข้าห้องดีล →</Link>
+          )}
         </div>
       </div>
     );
@@ -520,7 +547,42 @@ export default function SellerDashboard() {
           </div>
         ) : sellingDeals.map(d => <DealCard key={d.id} deal={d} />))}
 
-        {tab === 'packing' && (packingDeals.length === 0 ? <div className="dash-empty"><p>ไม่มีสินค้ารอแพค</p></div> : packingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+        {tab === 'packing' && (
+          packingDeals.length === 0 ? (
+            <div className="dash-empty"><p>ไม่มีสินค้ารอแพค</p></div>
+          ) : (
+            <div className="seller-pack-list">
+              {packingOpenDeal ? (
+                <SellerPackingPanel
+                  dealId={packingOpenDeal.id}
+                  dealTitle={packingOpenDeal.title}
+                  onClose={() => setPackingDealId('')}
+                  onDone={async () => {
+                    setPackingDealId('');
+                    const headers = await authHeaders();
+                    await fetchDeals(headers);
+                    setTab('shipping');
+                  }}
+                />
+              ) : null}
+              {packingDeals.map(d => (
+                <div key={d.id}>
+                  <DealCard deal={d} />
+                  {packingDealId !== d.id && (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-block"
+                      style={{ marginTop: -8, marginBottom: 12 }}
+                      onClick={() => setPackingDealId(d.id)}
+                    >
+                      📦 เปิดหน้าแพ็คสินค้า
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        )}
 
         {tab === 'shipping' && (shippingDeals.length === 0 ? <div className="dash-empty"><p>ไม่มีสินค้ารอจัดส่ง</p></div> : shippingDeals.map(d => <DealCard key={d.id} deal={d} />))}
 

@@ -9,7 +9,13 @@ import { runAutoSlipVerification } from '../../_lib/slipAutoVerify';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide, computeMarketplaceGp } from '@/lib/fees';
 import { getLogisticsProviderLabel, sanitizeShippingProviders } from '@/lib/logistics';
-import { isDirectShipOrder, isMarketplaceOrder, canJoinMarketplaceAsBuyer, isMarketplaceSold } from '@/lib/marketplaceOrder';
+import {
+  isDirectShipOrder,
+  isMarketplaceOrder,
+  isListingCheckoutOrder,
+  canJoinMarketplaceAsBuyer,
+  isMarketplaceSold,
+} from '@/lib/marketplaceOrder';
 import { finalizeAuction } from '../../_lib/auctionSync';
 import { rowToAuctionPublic, type AuctionRow } from '@/lib/auction';
 
@@ -89,16 +95,35 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const { data: refreshed } = await db.from('deals').select('*').eq('id', id).single();
       if (refreshed) current = refreshed;
     }
-    // ตลาด: payment_pending โดยไม่มีสลิป = checkout ค้าง → คืน posted (ยังขายได้)
-    if (isMarketplaceOrder(current) && current.status === 'payment_pending' && !current.payment_slip_file_id) {
+    // ตลาด/ประมูลชนะ: payment_pending โดยไม่มีสลิป = checkout ค้าง → คืน posted
+    if (isListingCheckoutOrder(current) && current.status === 'payment_pending' && !current.payment_slip_file_id) {
       const { data: fixed } = await db.from('deals').update({ status: 'posted' }).eq('id', id).select().single();
+      if (fixed) current = fixed;
+    }
+    // ประมูลเก่าที่ค้าง buyer_joined → ย้ายเข้า checkout แบบตลาด
+    if (
+      current.source === 'listing'
+      && current.deal_type === 'auction'
+      && current.buyer_id
+      && ['buyer_joined', 'terms_pending'].includes(String(current.status))
+    ) {
+      const { data: fixed } = await db.from('deals').update({
+        status: 'posted',
+        seller_accepted_terms: true,
+        buyer_accepted_terms: true,
+        fee_payer: current.fee_payer || 'buyer',
+      }).eq('id', id).select().single();
       if (fixed) current = fixed;
     }
     // Self-heal: ทั้งสองฝ่าย (และคนกลางถ้ามี) ยอมรับครบแล้วแต่สถานะค้างที่ขั้นยอมรับ
     // (เกิดได้จาก race ตอนสองฝ่ายกดยอมรับพร้อมกัน) → ดันไปขั้นคุย/เก็บหลักฐานก่อนโอนเงิน
-    if (['buyer_joined', 'terms_pending'].includes(String(deal.status))
-      && deal.seller_accepted_terms && deal.buyer_accepted_terms
-      && (!deal.middleman_id || deal.middleman_accepted_terms)) {
+    // ข้าม listing checkout (ตลาด/ประมูล) — ไม่ดันเข้า payment_pending แบบคนกลาง
+    if (
+      !isListingCheckoutOrder(current)
+      && ['buyer_joined', 'terms_pending'].includes(String(current.status))
+      && current.seller_accepted_terms && current.buyer_accepted_terms
+      && (!current.middleman_id || current.middleman_accepted_terms)
+    ) {
       const { data: fixed } = await db.from('deals').update({ status: 'payment_pending' }).eq('id', id).select().single();
       if (fixed) current = fixed;
     }
@@ -317,7 +342,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
               await notifyUsers(db, [deal.seller_id], {
                 title: takingOver ? '🛒 มีผู้ซื้อใหม่ (แทนที่คำสั่งเดิม)' : '🛒 มีคนสั่งซื้อสินค้าในตลาด',
                 body: `${myName} สั่งซื้อ "${deal.title || 'สินค้า'}" — รอผู้ซื้อโอนเงิน`,
-                link: `/deal/${id}`,
+                link: '/dashboard/seller',
               }).catch(() => {});
             }
           }
@@ -430,7 +455,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // (admin จะเช็คเองว่าผู้ขายอัปสลิปค่าบริการครบไหนก่อนกดยืนยัน → packing)
         if (!isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
-        if (isMarketplaceOrder(deal)) {
+        if (isListingCheckoutOrder(deal)) {
           if (!['posted', 'payment_pending'].includes(deal.status)) {
             return NextResponse.json({ error: 'ไม่สามารถอัปสลิปในขั้นตอนนี้ได้' }, { status: 400 });
           }
@@ -574,11 +599,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'cancel': {
         if (!isSeller && !isMiddleman && !isBuyer)
           return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        if (isMarketplaceOrder(deal) && !isMarketplaceSold(deal)) {
+        if (isListingCheckoutOrder(deal) && !isMarketplaceSold(deal)) {
           if (deal.status === 'payment_uploaded') {
             return NextResponse.json({ error: 'อัปสลิปแล้ว รอตรวจ — ติดต่อทีมงานหากต้องการยกเลิก' }, { status: 400 });
           }
           if (['posted', 'payment_pending'].includes(deal.status)) {
+            // ประมูลที่ปิดแล้ว — ยกเลิกคำสั่งซื้อ (ไม่เปิดประมูลใหม่)
+            if (deal.deal_type === 'auction') {
+              updates = { status: 'cancelled', reject_reason: body.reason || 'ผู้ซื้อยกเลิกหลังชนะประมูล' };
+              systemMsg = `ยกเลิกคำสั่งซื้อประมูล${body.reason ? ': ' + body.reason : ''}`;
+              break;
+            }
             updates = {
               status: 'posted',
               buyer_id: null,
@@ -1059,12 +1090,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           } else if (action === 'price_agree') {
             dataPayload.type = 'price_agreement';
           }
-          await notifyUsers(db, recipients, {
-            title,
-            body: systemMsg,
-            link: `/deal/${id}`,
-            data: dataPayload,
-          });
+          // ผู้ซื้อตลาด/ประมูล → checkout · ผู้ขาย → บอร์ดผู้ขาย
+          if (isListingCheckoutOrder(updated)) {
+            await Promise.all(recipients.map(uid => notifyUsers(db, [uid], {
+              title,
+              body: systemMsg,
+              link: uid === updated.buyer_id ? `/cart/checkout/${id}` : '/dashboard/seller',
+              data: dataPayload,
+            })));
+          } else {
+            await notifyUsers(db, recipients, {
+              title,
+              body: systemMsg,
+              link: `/deal/${id}`,
+              data: dataPayload,
+            });
+          }
         }
       }
 

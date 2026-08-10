@@ -20,7 +20,7 @@ import { FeeConfig, FEE_DEFAULTS, computeDealFees, type SimpleDealShareBreakdown
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { MarketplacePaymentSection } from '@/components/marketplace/MarketplacePaymentSection';
-import { isDirectShipOrder, isMarketplaceOrder, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
+import { isDirectShipOrder, isMarketplaceOrder, isListingCheckoutOrder, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
 
@@ -688,10 +688,10 @@ export default function DealRoom() {
     })();
   }, [dealId, fetchDeal]);
 
-  // ผู้ซื้อตลาด — ไปหน้า checkout แบบ Shopee ไม่ใช่ห้องดีลคนกลาง
+  // ผู้ซื้อตลาด/ประมูลชนะ — ไปหน้า checkout แบบ Shopee ไม่ใช่ห้องดีลคนกลาง
   useEffect(() => {
     if (!deal || !myId || loading || authLoading) return;
-    if (!isMarketplaceOrder(deal)) return;
+    if (!isListingCheckoutOrder(deal)) return;
     if (deal.buyer_id !== myId) return;
     router.replace(`/cart/checkout/${deal.id}`);
   }, [deal, myId, loading, authLoading, router]);
@@ -1376,8 +1376,8 @@ export default function DealRoom() {
 
   const isMeetup = deal.deal_type === 'meetup';
   const isSimple = deal.deal_type === 'simple';
-  const isMarketplaceCheckout = isMarketplaceOrder(deal);
-  const isDirectShipFlow = isSimple || isMarketplaceCheckout;
+  const isMarketplaceCheckout = isListingCheckoutOrder(deal);
+  const isDirectShipFlow = isSimple || isMarketplaceCheckout || isDirectShipOrder(deal);
   const isAdminUser = user?.prefs?.role === 'admin';
   const myRole: DealRole = !deal || !myId
     ? (myId ? 'guest' : '')

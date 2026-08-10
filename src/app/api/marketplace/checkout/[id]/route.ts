@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import {
-  isMarketplaceOrder,
+  isListingCheckoutOrder,
   marketplaceCheckoutPhase,
   marketplaceBuyerPayAmount,
   marketplaceOrderStatusLabel,
@@ -20,13 +20,19 @@ async function loadCheckout(db: ReturnType<typeof getAdminClient>, id: string, b
 
   const { data: deal, error } = await db.from('deals').select('*').eq('id', id).single();
   if (error || !deal) return null;
-  if (!isMarketplaceOrder(deal)) return { error: 'ไม่ใช่ออเดอร์ตลาด', status: 400 as const };
+  if (!isListingCheckoutOrder(deal)) return { error: 'ไม่ใช่ออเดอร์ตลาด', status: 400 as const };
   if (deal.buyer_id !== buyerId) return { error: 'Forbidden', status: 403 as const };
 
-  const [{ data: priceState }, { data: profileRow }, { data: images }] = await Promise.all([
+  const [{ data: priceState }, { data: profileRow }, { data: images }, { data: packingEvidence }] = await Promise.all([
     db.from('deal_price_state').select('buyer_shipping_confirmed_at').eq('deal_id', id).maybeSingle(),
     db.from('profiles').select('first_name, last_name, display_name, phone, address').eq('id', buyerId).maybeSingle(),
     db.from('deal_images').select('file_id').eq('deal_id', id).order('position', { ascending: true }).limit(1),
+    db.from('deal_evidence')
+      .select('id, type, file_id, file_name, created_at')
+      .eq('deal_id', id)
+      .eq('type', 'packing')
+      .order('created_at', { ascending: true })
+      .limit(3),
   ]);
 
   const profile = (profileRow || {}) as ProfileRow;
@@ -43,6 +49,7 @@ async function loadCheckout(db: ReturnType<typeof getAdminClient>, id: string, b
     shippingProviderLabel: deal.buyer_shipping_provider
       ? getLogisticsProviderLabel(String(deal.buyer_shipping_provider))
       : '',
+    packingEvidence: packingEvidence || [],
   };
 }
 
@@ -55,7 +62,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!loaded) return NextResponse.json({ error: 'ไม่พบคำสั่งซื้อ' }, { status: 404 });
     if ('error' in loaded) return NextResponse.json({ error: loaded.error }, { status: loaded.status });
 
-    const { deal, profile, imageFileId, shippingConfirmed, phase, shippingProviderLabel } = loaded;
+    const { deal, profile, imageFileId, shippingConfirmed, phase, shippingProviderLabel, packingEvidence } = loaded;
+    const packingSteps = [
+      { step: 1, label: 'แพ็คสินค้า' },
+      { step: 2, label: 'ไปส่งของ' },
+      { step: 3, label: 'สลิป/QR พัสดุ' },
+    ].map((meta, idx) => {
+      const ev = packingEvidence[idx];
+      return {
+        step: meta.step,
+        label: meta.label,
+        fileId: ev?.file_id || '',
+        fileName: ev?.file_name || '',
+        uploaded: !!ev?.file_id,
+      };
+    });
+
     return NextResponse.json({
       order: {
         id: deal.id,
@@ -71,6 +93,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         trackingNumber: deal.tracking_to_buyer || '',
         trackingProvider: deal.tracking_to_buyer_provider || '',
         listGrossPrice: deal.list_gross_price,
+        dealType: deal.deal_type || 'normal',
+        packingSteps,
       },
       profile: {
         firstName: profile.first_name || '',

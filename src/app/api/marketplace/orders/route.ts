@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
-import { isMarketplaceOrder, isActiveMarketplaceBuyerOrder, marketplaceOrderStatusLabel, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
+import { isListingCheckoutOrder, isActiveMarketplaceBuyerOrder, marketplaceOrderStatusLabel, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
 
-/** คำสั่งซื้อตลาดของผู้ซื้อ — ?count=1 คืนเฉพาะจำนวนที่ยังดำเนินการ */
+/** คำสั่งซื้อตลาด/ประมูลของผู้ซื้อ — ?count=1 คืนเฉพาะจำนวนที่ยังดำเนินการ */
 export async function GET(req: NextRequest) {
   try {
     const me = await verifyUser(req);
@@ -14,14 +14,13 @@ export async function GET(req: NextRequest) {
       .select('id, title, price, status, shipping_cost, seller_name, payment_slip_file_id, created_at, deal_type, source, buyer_id')
       .eq('buyer_id', me.id)
       .eq('source', 'listing')
-      .neq('deal_type', 'auction')
       .neq('deal_type', 'meetup')
       .order('created_at', { ascending: false })
       .limit(100);
 
     if (error) throw error;
 
-    const orders = (data || []).filter(d => isMarketplaceOrder(d) && d.buyer_id);
+    const orders = (data || []).filter(d => isListingCheckoutOrder(d) && d.buyer_id);
     const ids = orders.map(d => d.id);
     const imgMap = new Map<string, string>();
     if (ids.length) {
@@ -49,6 +48,7 @@ export async function GET(req: NextRequest) {
       createdAt: d.created_at,
       imageFileId: imgMap.get(d.id) || '',
       isActive: isActiveMarketplaceBuyerOrder(d),
+      dealType: d.deal_type || 'normal',
     }));
 
     return NextResponse.json({ orders: mapped, activeCount: active.length });

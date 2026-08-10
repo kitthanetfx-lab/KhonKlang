@@ -1,8 +1,19 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import Link from 'next/link';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { marketplaceOrderStatusLabel } from '@/lib/marketplaceOrder';
+import { fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
+
+type PackingStep = {
+  step: number;
+  label: string;
+  fileId?: string;
+  fileName?: string;
+  uploaded?: boolean;
+};
 
 type OrderStatus = {
   status: string;
@@ -10,6 +21,7 @@ type OrderStatus = {
   trackingNumber?: string;
   trackingProvider?: string;
   paymentSlipFileId?: string;
+  packingSteps?: PackingStep[];
 };
 
 type Props = {
@@ -19,11 +31,23 @@ type Props = {
   onCancel?: () => Promise<void>;
 };
 
+function mediaUrl(fileId: string) {
+  return fileViewUrl(DEAL_BUCKET, fileId);
+}
+
+function isVideo(name?: string) {
+  return !!name?.match(/\.(mp4|mov|avi|webm)$/i);
+}
+
 export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived, onCancel }: Props) {
   const label = order.statusLabel || marketplaceOrderStatusLabel(order.status);
   const trackingUrl = order.trackingNumber && order.trackingProvider
     ? buildTrackingUrl(order.trackingProvider, order.trackingNumber)
     : '';
+  const packingSteps = order.packingSteps || [];
+  const packingUploadedCount = packingSteps.filter(s => s.uploaded).length;
+  const showPacking = ['packing', 'shipped_to_buyer', 'delivered', 'completed'].includes(order.status)
+    || packingUploadedCount > 0;
 
   const steps = [
     { key: 'pay', label: 'ชำระเงิน', done: !!order.paymentSlipFileId || !['posted', 'payment_pending'].includes(order.status) },
@@ -50,8 +74,37 @@ export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived
         <p className="mkt-co-hint">ส่งสลิปแล้ว — รอทีมงานตรวจสอบการชำระเงิน (โดยปกติไม่เกิน 1 วันทำการ)</p>
       )}
       {order.status === 'packing' && (
-        <p className="mkt-co-hint">ผู้ขายกำลังแพ็คสินค้า — จะแจ้งเลขพัสดุเมื่อจัดส่งแล้ว</p>
+        <p className="mkt-co-hint">
+          ผู้ขายกำลังแพ็คสินค้า
+          {packingUploadedCount > 0 ? ` — อัปโหลดแล้ว ${packingUploadedCount}/3 ขั้น` : ' — จะแจ้งเลขพัสดุเมื่อจัดส่งแล้ว'}
+        </p>
       )}
+
+      {showPacking && packingSteps.length > 0 && (
+        <div className="mkt-co-packing">
+          <div className="mkt-co-packing-title">หลักฐานจากผู้ขาย</div>
+          <div className="mkt-co-packing-grid">
+            {packingSteps.map(step => (
+              <div key={step.step} className={`mkt-co-packing-slot${step.uploaded ? ' done' : ''}`}>
+                <div className="mkt-co-packing-label">ขั้น {step.step}</div>
+                <div className="mkt-co-packing-media">
+                  {step.uploaded && step.fileId ? (
+                    isVideo(step.fileName)
+                      ? <video src={mediaUrl(step.fileId)} controls />
+                      : <img src={mediaUrl(step.fileId)} alt={step.label} />
+                  ) : (
+                    <span>{step.step}</span>
+                  )}
+                </div>
+                <div className="mkt-co-packing-caption">
+                  {step.uploaded ? `✅ ${step.label}` : `⏳ รอ${step.label}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {(order.status === 'shipped_to_buyer' || order.status === 'delivered') && order.trackingNumber && (
         <div className="mkt-co-tracking">
           <div className="mkt-co-tracking-title">🚚 เลขพัสดุ</div>

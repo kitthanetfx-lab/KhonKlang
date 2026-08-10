@@ -16,7 +16,7 @@ import {
   type AdminStatusTab,
 } from '@/lib/adminDealCategory';
 import { readFeesConfig } from '../../_lib/financeLedger';
-import { isMarketplaceOrder } from '@/lib/marketplaceOrder';
+import { isListingCheckoutOrder } from '@/lib/marketplaceOrder';
 
 async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string | null) {
   if (!uid) return null;
@@ -170,7 +170,9 @@ export async function PATCH(req: NextRequest) {
     const beforeSnapshot = await loadAdminDealSnapshot(db, deal);
     const { data: priceState } = await db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle();
     const feePayer = String(priceState?.proposed_fee_payer || deal.fee_payer || 'split');
-    const sellerSlipRequired = deal.deal_type !== 'meetup' && (feePayer === 'seller' || feePayer === 'split');
+    const sellerSlipRequired = !isListingCheckoutOrder(deal)
+      && deal.deal_type !== 'meetup'
+      && (feePayer === 'seller' || feePayer === 'split');
 
     switch (action) {
       case 'resolve_dispute': {
@@ -242,7 +244,7 @@ export async function PATCH(req: NextRequest) {
               ? '✅ ศูนย์กลางตรวจสลิปผู้ซื้อแล้ว (ถูกต้อง) — รอตรวจสลิปค่าบริการของผู้ขาย'
               : '✅ ศูนย์กลางตรวจสลิปผู้ซื้อแล้ว (ถูกต้อง)';
           } else {
-            const mkt = isMarketplaceOrder(deal);
+            const mkt = isListingCheckoutOrder(deal);
             await db.from('deals').update({
               status: mkt ? 'posted' : 'payment_pending',
               payment_slip_file_id: null,

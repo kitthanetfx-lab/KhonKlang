@@ -30,6 +30,13 @@ interface CheckoutData {
     trackingNumber: string;
     trackingProvider: string;
     listGrossPrice?: number | null;
+    packingSteps?: Array<{
+      step: number;
+      label: string;
+      fileId?: string;
+      fileName?: string;
+      uploaded?: boolean;
+    }>;
   };
   profile: {
     displayName: string;

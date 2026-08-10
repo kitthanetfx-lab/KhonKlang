@@ -16,7 +16,7 @@ import { shouldAutoVerifySlip } from '@/lib/serviceControls';
 import { notifyUsers } from '@/app/api/_lib/notify';
 import { maybeNotifyAdminLineQueues } from '@/app/api/_lib/adminLineNotifyHook';
 import { loadAdminDealSnapshot, type AdminDealRow } from '@/app/api/_lib/adminDealQueue';
-import { isMarketplaceOrder, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
+import { isListingCheckoutOrder, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
 
 export type SlipSide = 'buyer' | 'seller';
 
@@ -124,6 +124,7 @@ export function evaluateSlipCheck(
 }
 
 function sellerSlipRequired(deal: Record<string, unknown>, priceState: Record<string, unknown> | null): boolean {
+  if (isListingCheckoutOrder(deal as { source?: string; deal_type?: string; buyer_id?: string })) return false;
   const feePayer = String(priceState?.proposed_fee_payer || deal.fee_payer || 'split');
   return deal.deal_type !== 'meetup' && (feePayer === 'seller' || feePayer === 'split');
 }
@@ -133,7 +134,7 @@ function computeExpectedAmounts(
   priceState: Record<string, unknown> | null,
   fees: FeeConfig,
 ) {
-  if (isMarketplaceOrder(deal)) {
+  if (isListingCheckoutOrder(deal as { source?: string; deal_type?: string; buyer_id?: string })) {
     return {
       buyer: marketplaceBuyerPayAmount(deal),
       seller: 0,
@@ -204,12 +205,20 @@ async function tryAutoApprove(db: SupabaseClient, dealId: string, deal: Record<s
   const msg = '🤖 ระบบตรวจสลิปครบและอนุมัติรับเงินอัตโนมัติ — ผู้ขายเริ่มแพ็คสินค้าได้';
   await insertSystemMsg(db, dealId, msg);
 
-  const recipients = [updated.seller_id, updated.buyer_id, updated.middleman_id].filter((x): x is string => typeof x === 'string' && !!x);
-  if (recipients.length) {
-    await notifyUsers(db, recipients, {
+  const isListing = isListingCheckoutOrder(updated as { source?: string; deal_type?: string; buyer_id?: string });
+  if (updated.seller_id) {
+    await notifyUsers(db, [String(updated.seller_id)], {
+      title: `ยืนยันรับเงิน: ${updated.title || 'ดีล'}`,
+      body: isListing ? `${msg} — เข้าบอร์ดผู้ขายเพื่อแพ็คสินค้า` : msg,
+      link: isListing ? '/dashboard/seller' : `/deal/${dealId}`,
+    });
+  }
+  const otherRecipients = [updated.buyer_id, updated.middleman_id].filter((x): x is string => typeof x === 'string' && !!x);
+  if (otherRecipients.length) {
+    await notifyUsers(db, otherRecipients, {
       title: `ยืนยันรับเงิน: ${updated.title || 'ดีล'}`,
       body: msg,
-      link: `/deal/${dealId}`,
+      link: isListing ? `/cart/checkout/${dealId}` : `/deal/${dealId}`,
     });
   }
 
