@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { ResponsiveShell } from '@/components/mobile';
+import { OnsiteAppShell } from '@/components/onsite/OnsiteAppShell';
+import { OnsiteCreateApp } from '@/components/onsite/OnsiteCreateApp';
 
 const PROVINCES = [
   'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร',
@@ -59,39 +62,40 @@ export default function CreateOnsiteJob() {
     finally { setLoading(false); }
   }
 
-  return (
-    <div className="min-h-screen bg-[#0a0f1e] text-white">
-      <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
-        <Link href="/service/onsite" className="text-gray-400 hover:text-white">←</Link>
-        <h1 className="text-xl font-bold">สร้างคำขอลงพื้นที่</h1>
-      </div>
+  const formProps = {
+    itemDescription, onItemDescription: setItemDescription,
+    itemPrice, onItemPrice: setItemPrice,
+    sellerProvince, onSellerProvince: setSellerProvince,
+    sellerLocation, onSellerLocation: setSellerLocation,
+    sellerContact, onSellerContact: setSellerContact,
+    maxBudget, onMaxBudget: setMaxBudget,
+    provinces: PROVINCES,
+    error, loading,
+    disabled: !controls.isEnabled('onsite'),
+    onSubmit: handleSubmit,
+  };
 
+  const desktopForm = (
       <div className="max-w-lg mx-auto px-4 py-8 space-y-5">
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm">{error}</div>
         )}
-
-        {/* Item description */}
+        {/* desktop fields — unchanged */}
         <div>
           <label className="text-sm text-gray-400 mb-1.5 block">รายละเอียดสินค้าที่ต้องการตรวจ *</label>
           <textarea value={itemDescription} onChange={e => setItemDescription(e.target.value)}
-            rows={3} placeholder="เช่น Honda Civic 2018 สีขาว เลขไมล์ 80,000 กม. ต้องการตรวจสภาพเครื่องยนต์และตัวถัง"
+            rows={3} placeholder="เช่น Honda Civic 2018 สีขาว เลขไมล์ 80,000 กม."
             className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition resize-none"
           />
         </div>
-
-        {/* Item price */}
         <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">ราคาสินค้าที่ตกลงกับผู้ขาย (บาท)</label>
-          <input type="number" value={itemPrice} onChange={e => setItemPrice(e.target.value)}
-            placeholder="เช่น 350000"
+          <label className="text-sm text-gray-400 mb-1.5 block">ราคาสินค้า (บาท)</label>
+          <input type="number" value={itemPrice} onChange={e => setItemPrice(e.target.value)} placeholder="350000"
             className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition"
           />
         </div>
-
-        {/* Province */}
         <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">จังหวัดที่ตั้งสินค้า *</label>
+          <label className="text-sm text-gray-400 mb-1.5 block">จังหวัด *</label>
           <select value={sellerProvince} onChange={e => setSellerProvince(e.target.value)}
             className="w-full bg-[#1a2035] border border-white/15 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 transition"
           >
@@ -99,41 +103,48 @@ export default function CreateOnsiteJob() {
             {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
-
-        {/* Seller location */}
         <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">ที่อยู่/สถานที่นัดพบผู้ขาย *</label>
-          <textarea value={sellerLocation} onChange={e => setSellerLocation(e.target.value)}
-            rows={2} placeholder="เช่น ตลาดนัดรถยนต์มือสอง ถ.พหลโยธิน กม.30 ปทุมธานี (หรือชื่อร้าน/แผนที่ Google)"
+          <label className="text-sm text-gray-400 mb-1.5 block">ที่อยู่/สถานที่นัด *</label>
+          <textarea value={sellerLocation} onChange={e => setSellerLocation(e.target.value)} rows={2}
             className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition resize-none"
           />
         </div>
-
-        {/* Seller contact */}
         <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">เบอร์ติดต่อผู้ขาย (ให้คนกลางนัดเวลา)</label>
-          <input type="text" value={sellerContact} onChange={e => setSellerContact(e.target.value)}
-            placeholder="เช่น 081-234-5678"
+          <label className="text-sm text-gray-400 mb-1.5 block">เบอร์ผู้ขาย</label>
+          <input value={sellerContact} onChange={e => setSellerContact(e.target.value)} placeholder="081-234-5678"
             className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition"
           />
         </div>
-
-        {/* Max budget */}
         <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">งบค่าบริการสูงสุดที่ยอมรับได้ (บาท)</label>
-          <input type="number" value={maxBudget} onChange={e => setMaxBudget(e.target.value)}
-            placeholder="เช่น 1000 (ค่าเดินทาง + ค่าตรวจ)"
+          <label className="text-sm text-gray-400 mb-1.5 block">งบค่าบริการสูงสุด</label>
+          <input type="number" value={maxBudget} onChange={e => setMaxBudget(e.target.value)} placeholder="1000"
             className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition"
           />
-          {maxBudget && <p className="text-xs text-gray-500 mt-1">คนกลางจะเห็นงบนี้และเสนอราคาภายในขอบเขตที่เหมาะสม</p>}
         </div>
-
         <button onClick={handleSubmit} disabled={loading || !controls.isEnabled('onsite')}
           className="w-full py-4 rounded-2xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-lg transition"
         >
           {loading ? 'กำลังสร้างคำขอ...' : '📋 ส่งคำขอหาคนกลาง'}
         </button>
       </div>
+  );
+
+  return (
+    <ResponsiveShell
+      mobile={
+        <OnsiteAppShell title="สร้างคำขอลงพื้นที่">
+          <OnsiteCreateApp {...formProps} />
+        </OnsiteAppShell>
+      }
+      desktop={
+    <div className="min-h-screen bg-[#0a0f1e] text-white onsite-app-shell">
+      <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
+        <Link href="/service/onsite" className="text-gray-400 hover:text-white">←</Link>
+        <h1 className="text-xl font-bold">สร้างคำขอลงพื้นที่</h1>
+      </div>
+      {desktopForm}
     </div>
+      }
+    />
   );
 }

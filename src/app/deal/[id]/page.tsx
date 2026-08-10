@@ -23,6 +23,7 @@ import { MarketplacePaymentSection } from '@/components/marketplace/MarketplaceP
 import { isDirectShipOrder, isMarketplaceOrder, isListingCheckoutOrder, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
+import { DealRoomMobileBar } from '@/components/deal/DealRoomMobileBar';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -1361,12 +1362,12 @@ export default function DealRoom() {
   }
 
   if (loading || authLoading) return (
-    <div className="dr-root" style={{ alignItems: 'center', justifyContent: 'center' }}>
+    <div className="dr-root dr-app-mobile" style={{ alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'dashSpin .8s linear infinite' }} />
     </div>
   );
   if (!deal) return (
-    <div className="dr-root" style={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 14, padding: 24 }}>
+    <div className="dr-root dr-app-mobile" style={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 14, padding: 24 }}>
       <p style={{ fontSize: 22 }}>❌ ไม่พบ Deal</p>
       {dealError && <p style={{ fontSize: 13, color: '#b22441', background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '8px 14px' }}>{dealError}</p>}
       <p style={{ color: 'var(--muted)', fontSize: 14 }}>Deal อาจถูกลบหรือลิงก์ไม่ถูกต้อง</p>
@@ -1407,7 +1408,7 @@ export default function DealRoom() {
       completed: 'เสร็จสมบูรณ์', cancelled: 'ยกเลิก', disputed: 'ข้อพิพาท',
     };
     return (
-      <div className="dr-root">
+      <div className="dr-root dr-app-mobile">
         <InAppBanner />
         <header className="dr-header">
           <Link href="/admin/deals" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
@@ -1490,7 +1491,7 @@ export default function DealRoom() {
       else doAction(role === 'buyer' ? 'join_as_buyer' : 'join_as_seller');
     }
     return (
-      <div className="dr-root">
+      <div className="dr-root dr-app-mobile">
         <InAppBanner />
         <header className="dr-header">
           <Link href="/" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
@@ -5333,7 +5334,7 @@ export default function DealRoom() {
 
   // ─── Main render ─────────────────────────────────────────────────────────
   return (
-    <div className="dr-root">
+    <div className="dr-root dr-app-mobile">
       <InAppBanner />
       <header className="dr-header">
         <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
@@ -5402,7 +5403,7 @@ export default function DealRoom() {
           )}
           {/* Regular deal: แถบแชท + หลักฐาน ซ่อนในโหมด wizard แต่ยังเข้าถึงได้ผ่านปุ่มลิงก์ */}
           {!isSimple && !isMeetup && !isMarketplaceCheckout && (
-          <nav className="dr-tabs" style={{ display: 'none' }}>
+          <nav className="dr-tabs dr-tabs--legacy-hidden">
             {(['steps', 'evidence'] as const).map(k => (
               <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
                 {k === 'steps' ? 'ขั้นตอน' : 'หลักฐาน'}
@@ -5444,7 +5445,7 @@ export default function DealRoom() {
       {/* แถบปุ่มลอย (💬 แชท / 📞 โทร / 📹 วิดีโอ) — แสดงตลอดทุกขั้นตอนของดีล ตั้งแต่มีคู่ดีลเข้ามาจนจบ
           สถานะปุ่ม 📞: ปกติ=กดโทร, กำลังคุย voice bg=ตัวนับเวลาแดงกดเพื่อวางสาย, มีสายเข้า=กระพริบ */}
       {canCall && (
-        <div className="dr-floatbar" role="toolbar" aria-label="การสื่อสารในดีล">
+        <div className="dr-floatbar dr-floatbar--desktop" role="toolbar" aria-label="การสื่อสารในดีล">
           <button type="button" className={`dr-floatbar-btn ${floatChatOpen ? 'active' : ''}`} onClick={() => setFloatChatOpen(v => !v)} title="แชท">
             <span className="ic">💬</span><span>แชท</span>
             {(() => { const n = msgs.filter(m => m.role !== 'system').length; return n > 0 && !floatChatOpen ? <span className="dr-floatbar-badge">{n > 99 ? '99+' : n}</span> : null; })()}
@@ -5532,6 +5533,21 @@ export default function DealRoom() {
           <button className="btn btn-primary btn-sm btn-block" onClick={() => setCallTimedOut(false)}>รับทราบ</button>
         </div>
       )}
+      <DealRoomMobileBar
+        tab={tab === 'evidence' ? 'evidence' : 'steps'}
+        onTab={k => setTab(k)}
+        msgCount={msgs.filter(m => m.role !== 'system').length}
+        canCall={canCall}
+        onChat={() => setFloatChatOpen(v => !v)}
+        chatOpen={floatChatOpen}
+        onVoice={() => {
+          if (voiceBgActive) endCall();
+          else if (incomingCall) acceptIncomingCall();
+          else if (callStatus === 'idle') startCall('voice');
+        }}
+        voiceActive={voiceBgActive || !!incomingCall}
+        voiceLabel={voiceBgActive ? fmtVoiceDur(callSeconds) : incomingCall ? 'รับสาย' : 'โทร'}
+      />
       {showTerms && (() => { const t = termsFor(deal.deal_type); return (
         <div onClick={() => setShowTerms(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 100 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 'var(--r-lg)', maxWidth: 460, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: '22px 20px' }}>

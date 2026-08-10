@@ -10,6 +10,7 @@ import { MarketplaceOrdersIcon } from './MarketplaceOrdersIcon';
 import { InAppBanner } from './InAppBanner';
 import { useAppPreferences } from './AppPreferences';
 import { useUser } from '@/lib/useUser';
+import { AppBottomNav } from '@/components/mobile/AppBottomNav';
 
 /* ---------- hooks ---------- */
 export function useScrolled(threshold = 8) {
@@ -213,9 +214,12 @@ export function Nav({ active }: { active?: string }) {
           <Link className={`nav-link ${active === 'market' || isMarketBrowse ? 'is-active' : ''}`} href="/marketplace"><Icon name="store" size={17} /> {locale === 'th' ? 'ตลาด' : 'Marketplace'}</Link>
           <Link className={`nav-link ${isAct('/check-scam') ? 'is-active' : ''}`} href="/check-scam"><Icon name="search" size={17} /> {locale === 'th' ? 'เช็คคนโกง' : 'Scam Check'}</Link>
         </div>
+        <div className="nav-desktop-actions">
         {user && <MarketplaceOrdersIcon />}
         {user && <MessengerIcon />}
         {user && <NotifyBell />}
+        </div>
+        <div className="nav-compact-actions">
         <div className="nav-cta-group">
           {loading ? (
             <span className="btn btn-ghost btn-sm" aria-busy="true">{locale === 'th' ? 'กำลังโหลด...' : 'Loading...'}</span>
@@ -246,6 +250,7 @@ export function Nav({ active }: { active?: string }) {
           )}
         </div>
         <button className="nav-burger" onClick={() => setDrawer(true)} aria-label={locale === 'th' ? 'เปิดเมนู' : 'Open menu'} aria-expanded={drawer}><Icon name="menu" size={22} /></button>
+        </div>
       </div>
 
         <div className={`drawer-backdrop ${drawer ? 'open' : ''}`} onClick={() => setDrawer(false)} />
@@ -304,6 +309,7 @@ export function Nav({ active }: { active?: string }) {
         </Link>
       ))}
     </div>
+    <AppBottomNav />
     </>
   );
 }

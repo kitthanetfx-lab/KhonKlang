@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase, authHeaders } from '@/lib/supabase';
 import { Nav, Footer, useReveal } from '@/components/Site';
 import { Icon } from '@/components/Icon';
+import { ResponsiveShell } from '@/components/mobile';
+import { WantedApp } from '@/components/wanted/WantedApp';
 
 const CATS = ['มือถือ & ไอที', 'แบรนด์เนม', 'รถ & ยานพาหนะ', 'ไอดีเกม & ดิจิทัล', 'พระเครื่อง', 'อาร์ตทอย & ของสะสม', 'เหมาสวน & เกษตร', 'ค้าส่ง & OEM โรงงาน', 'เครื่องจักร & อสังหาฯ', 'อื่นๆ'];
 const PROVINCES = ['กระบี่','กรุงเทพมหานคร','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
@@ -133,9 +135,57 @@ export default function WantedPage() {
     .filter(p => !mode || p.buy_mode === mode || p.buy_mode === 'both')
     .filter(p => !search || p.title.toLowerCase().includes(search.toLowerCase()) || (p.detail || '').toLowerCase().includes(search.toLowerCase()));
 
+  const mobileApp = (
+    <WantedApp
+      loading={loading}
+      myId={myId}
+      filtered={filtered}
+      search={search}
+      onSearch={setSearch}
+      cat={cat}
+      onCat={setCat}
+      province={province}
+      onProvince={setProvince}
+      mode={mode}
+      onMode={setMode}
+      showForm={showForm}
+      onToggleForm={() => setShowForm(v => !v)}
+      onLoginToPost={() => router.push(`/login?returnTo=${encodeURIComponent('/wanted')}`)}
+      fTitle={fTitle}
+      onFTitle={setFTitle}
+      fDetail={fDetail}
+      onFDetail={setFDetail}
+      fBudgetMin={fBudgetMin}
+      onFBudgetMin={setFBudgetMin}
+      fBudgetMax={fBudgetMax}
+      onFBudgetMax={setFBudgetMax}
+      fCat={fCat}
+      onFCat={setFCat}
+      fProvince={fProvince}
+      onFProvince={setFProvince}
+      fMode={fMode}
+      onFMode={setFMode}
+      fContact={fContact}
+      onFContact={setFContact}
+      posting={posting}
+      formError={formError}
+      onSubmitPost={submitPost}
+      contactOpen={contactOpen}
+      onContactOpen={setContactOpen}
+      onOfferToSell={offerToSell}
+      onClosePost={closePost}
+      budgetText={budgetText}
+      timeAgo={timeAgo}
+    />
+  );
+
   return (
     <>
       <Nav active="wanted" />
+      <ResponsiveShell
+        mobile={mobileApp}
+        desktop={
+      <>
       <header className="page-hero">
         <div className="container" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18 }}>
           <div>
@@ -292,6 +342,9 @@ export default function WantedPage() {
         </div>
       </main>
       <Footer />
+      </>
+        }
+      />
     </>
   );
 }

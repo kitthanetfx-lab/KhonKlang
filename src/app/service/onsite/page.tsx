@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { SubPageShell } from '@/components/mobile';
+import { OnsiteApp } from '@/components/service/OnsiteApp';
 
 const EXPERTS = [
   { icon: '🔧', t: 'ช่างยนต์', sub: 'ตรวจรถมือสอง' },
@@ -26,7 +28,9 @@ export default function ServiceOnsitePage() {
     return <ServiceDisabledNotice title="บริการนัดออนไซต์" message={controls.message('onsite')} />;
   }
 
-  return (
+  const enabled = controls.isEnabled('onsite');
+
+  const desktop = (
     <div className="sub-page service-sub-page">
       <header className="sub-header">
         <Link href="/" className="sub-back" aria-label="ย้อนกลับ">
@@ -57,10 +61,16 @@ export default function ServiceOnsitePage() {
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 20 }}>
           💰 ค่าบริการ: ฿200–800 ขึ้นอยู่กับประเภทสินค้าและระยะทาง · จ่ายเฉพาะเมื่อรับงานสำเร็จ
         </div>
-        {controls.isEnabled('onsite')
+        {enabled
           ? <Link href="/onsite/create" className="btn btn-primary btn-block" style={{ display: 'flex', justifyContent: 'center', textDecoration: 'none' }}>สร้างงานออนไซต์ →</Link>
           : <button type="button" className="btn btn-primary btn-block" disabled>ปิดให้บริการชั่วคราว</button>}
       </div>
     </div>
+  );
+
+  return (
+    <SubPageShell title="บริการออนไซต์" backHref="/" right={<HeaderAccountActions />} withBottomNav desktop={desktop}>
+      <OnsiteApp experts={EXPERTS} steps={STEPS} enabled={enabled} />
+    </SubPageShell>
   );
 }

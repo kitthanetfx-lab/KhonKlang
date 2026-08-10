@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getSiteMaintenanceInfo, type ServiceControlMap } from '@/lib/serviceControls';
+import { ResponsiveShell } from '@/components/mobile';
+import { MaintenanceApp } from '@/components/system/SystemNoticeApp';
 
 export default function MaintenancePage() {
   const [info, setInfo] = useState(() => getSiteMaintenanceInfo(null));
@@ -24,7 +26,7 @@ export default function MaintenancePage() {
     ? new Date(info.reopenAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
     : '';
 
-  return (
+  const desktop = (
     <div style={{ maxWidth: 720, margin: '56px auto', padding: '0 20px' }}>
       <div style={{
         background: 'linear-gradient(180deg, #fff, #f7f9fd)',
@@ -43,11 +45,15 @@ export default function MaintenancePage() {
             คาดว่าจะเปิดให้บริการอีกครั้ง: {reopenLabel}
           </p>
         )}
-        <p style={{ color: 'var(--muted)', fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
-          กรุณาทำรายการต่อหลังจากเปิดให้บริการ — ดีลหรืองานที่ค้างอยู่สามารถกลับมาดำเนินการต่อได้เมื่อเว็บเปิดอีกครั้ง
-        </p>
         <Link href="/" className="btn btn-primary">ลองใหม่อีกครั้ง</Link>
       </div>
     </div>
+  );
+
+  return (
+    <ResponsiveShell
+      mobile={<MaintenanceApp message={info.message} reopenLabel={reopenLabel || undefined} />}
+      desktop={desktop}
+    />
   );
 }

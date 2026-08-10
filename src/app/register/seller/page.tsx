@@ -15,6 +15,9 @@ import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { ConsentModal } from '@/components/ConsentModal';
 import { FEE_DEFAULTS, effectiveRegFee, isPromoActive, type FeeConfig } from '@/lib/fees';
+import { ResponsiveShell } from '@/components/mobile';
+import { RegisterWizardApp } from '@/components/register/RegisterWizardApp';
+import { RegisterSellerApp } from '@/components/register/RegisterSellerApp';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -369,6 +372,12 @@ function SellerForm() {
   const addBranch = () =>
     setBranches(prev => [...prev, newBranch(`สาขา ${prev.length + 1}`)]);
 
+  const fillBranchFromProfile = (id: string) => {
+    if (!profileAddress) return;
+    const parsed = parseProfileAddress(profileAddress);
+    setBranches(prev => prev.map(b => b.id === id ? { ...b, ...parsed } : b));
+  };
+
   // Validation
   const validate = () => {
     setError('');
@@ -517,25 +526,25 @@ function SellerForm() {
     </div>
   );
 
-  return (
+  const wizardNav = (
     <>
-    {!consentShown && (
-      <ConsentModal
-        onAccept={() => setConsentShown(true)}
-        onDecline={() => router.replace('/register')}
-      />
-    )}
-    <div className="min-h-screen py-10 px-4 sm:px-6">
-      <div className="max-w-xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-1.5 rounded-full text-sm font-medium mb-3">
-            <Store className="w-4 h-4" /> สมัครเป็นผู้ขายในเครือคนกลาง
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold">ลงทะเบียนผู้ขาย</h1>
+      {step < 4 && (
+        <div className={`reg-app-nav${step > 1 ? ' reg-app-nav--split' : ''}`}>
+          {step > 1 && (
+            <button type="button" onClick={back} className="btn btn-ghost">ย้อนกลับ</button>
+          )}
+          <button type="button" onClick={next} className="btn btn-primary">ถัดไป</button>
         </div>
+      )}
+      {step === 4 && (
+        <button type="button" onClick={back} className="btn btn-ghost btn-block">ย้อนกลับแก้ไขข้อมูล</button>
+      )}
+    </>
+  );
 
-        <div className="glass-panel rounded-2xl p-6 sm:p-8 shadow-xl animate-fade-in">
-          <StepIndicator current={step} />
+  const wizardPanel = (
+        <div className="glass-panel rounded-2xl p-6 sm:p-8 shadow-xl animate-fade-in reg-wiz-panel">
+          <div className="reg-wiz-desktop-steps"><StepIndicator current={step} /></div>
 
           {/* ───── STEP 1: Basic Identity ───── */}
           {step === 1 && (
@@ -804,7 +813,8 @@ function SellerForm() {
             </div>
           )}
 
-          {/* Navigation */}
+          {/* Navigation — desktop only (mobile ใช้ sticky footer) */}
+          <div className="reg-wiz-desktop-nav-wrap">
           {error && step < 4 && <p className="mt-4 text-red-500 text-sm text-center">{error}</p>}
           {step < 4 && (
             <div className={`flex mt-8 gap-3 ${step > 1 ? 'justify-between' : 'justify-end'}`}>
@@ -822,13 +832,110 @@ function SellerForm() {
           )}
           {step === 4 && (
             <button type="button" onClick={back}
-              className="flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-sm font-medium mx-auto">
+              className="flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-sm font-medium mx-auto reg-wiz-desktop-nav">
               <ArrowLeft className="w-4 h-4" /> ย้อนกลับแก้ไขข้อมูล
             </button>
           )}
+          </div>
         </div>
+  );
+
+  return (
+    <>
+    {!consentShown && (
+      <ConsentModal
+        onAccept={() => setConsentShown(true)}
+        onDecline={() => router.replace('/register')}
+      />
+    )}
+    <ResponsiveShell
+      mobile={
+        <RegisterWizardApp
+          title="ลงทะเบียนผู้ขาย"
+          badge="🛒 สมัครเป็นผู้ขายในเครือคนกลาง"
+          steps={STEPS}
+          currentStep={step}
+          error={error && step < 4 ? error : undefined}
+          footer={wizardNav}
+        >
+          <RegisterSellerApp
+            step={step}
+            provinces={PROVINCES}
+            banks={BANKS}
+            displayName={displayName}
+            oauthEmail={oauthEmail}
+            sellerType={sellerType}
+            onSellerType={setSellerType}
+            fullNameId={fullNameId}
+            onFullNameId={setFullNameId}
+            idNumber={idNumber}
+            onIdNumber={setIdNumber}
+            shopName={shopName}
+            onShopName={setShopName}
+            shopTagline={shopTagline}
+            onShopTagline={setShopTagline}
+            shopLogoFile={shopLogoFile}
+            onShopLogoFile={setShopLogoFile}
+            isCorporate={isCorporate}
+            companyName={companyName}
+            onCompanyName={setCompanyName}
+            companyRegNum={companyRegNum}
+            onCompanyRegNum={setCompanyRegNum}
+            branches={branches}
+            profileAddress={profileAddress}
+            onUpdateBranch={updateBranch}
+            onRemoveBranch={removeBranch}
+            onAddBranch={addBranch}
+            onFillBranchFromProfile={fillBranchFromProfile}
+            onlineLink={onlineLink}
+            onOnlineLink={setOnlineLink}
+            idCardFile={idCardFile}
+            onIdCardFile={setIdCardFile}
+            bookbankFile={bookbankFile}
+            onBookbankFile={setBookbankFile}
+            companyCertFile={companyCertFile}
+            onCompanyCertFile={setCompanyCertFile}
+            bankAcct={bankAcct}
+            onBankAcct={setBankAcct}
+            bankName={bankName}
+            onBankName={setBankName}
+            bankOwner={bankOwner}
+            onBankOwner={setBankOwner}
+            companyBankAcct={companyBankAcct}
+            onCompanyBankAcct={setCompanyBankAcct}
+            companyBankName={companyBankName}
+            onCompanyBankName={setCompanyBankName}
+            fees={fees}
+            membershipFee={membershipFee}
+            promoActive={promoActive}
+            qrSrc={qrSrc}
+            ppDigits={ppDigits}
+            copied={copied}
+            onCopyText={copyText}
+            slipFile={slipFile}
+            onSlipFile={setSlipFile}
+            pdpaConsent={pdpaConsent}
+            onPdpaConsent={setPdpaConsent}
+            error={error}
+            submitting={submitting}
+            onSubmit={handleSubmit}
+          />
+        </RegisterWizardApp>
+      }
+      desktop={
+    <div className="min-h-screen py-10 px-4 sm:px-6">
+      <div className="max-w-xl mx-auto">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-1.5 rounded-full text-sm font-medium mb-3">
+            <Store className="w-4 h-4" /> สมัครเป็นผู้ขายในเครือคนกลาง
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold">ลงทะเบียนผู้ขาย</h1>
+        </div>
+        {wizardPanel}
       </div>
     </div>
+      }
+    />
     </>
   );
 }

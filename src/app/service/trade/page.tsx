@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { SubPageShell } from '@/components/mobile';
+import { TradeApp } from '@/components/service/TradeApp';
 
 const MODES = [
   { title: 'ซื้อขายผ่านกลางปลอดภัย', href: '/service/trade/online', image: '/Full.webp' },
@@ -18,7 +20,12 @@ export default function ServiceTradePage() {
     return <ServiceDisabledNotice title="บริการผ่านคนกลาง" message={controls.message('tradeOnline')} />;
   }
 
-  return (
+  const isEnabled = (href: string) =>
+    href === '/service/simple' ? controls.isEnabled('tradeSimple') : controls.isEnabled('tradeOnline');
+  const disabledMessage = (href: string) =>
+    href === '/service/simple' ? controls.message('tradeSimple') : controls.message('tradeOnline');
+
+  const desktop = (
     <div className="sub-page service-sub-page service-trade-page">
       <header className="sub-header">
         <Link href="/" className="sub-back" aria-label="ย้อนกลับ">
@@ -35,8 +42,8 @@ export default function ServiceTradePage() {
         </div>
         <div className="svc-modes">
           {MODES.map(m => {
-            const enabled = m.href === '/service/simple' ? controls.isEnabled('tradeSimple') : controls.isEnabled('tradeOnline');
-            const note = m.href === '/service/simple' ? controls.message('tradeSimple') : controls.message('tradeOnline');
+            const enabled = isEnabled(m.href);
+            const note = disabledMessage(m.href);
             return enabled ? (
             <Link key={m.title} href={m.href} className="svc-mode">
               <div className="svc-mode-media">
@@ -59,5 +66,11 @@ export default function ServiceTradePage() {
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <SubPageShell title="บริการผ่านคนกลาง" backHref="/" right={<HeaderAccountActions />} withBottomNav desktop={desktop}>
+      <TradeApp modes={MODES} isEnabled={isEnabled} disabledMessage={disabledMessage} />
+    </SubPageShell>
   );
 }

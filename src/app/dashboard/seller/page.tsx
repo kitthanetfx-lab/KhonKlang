@@ -18,6 +18,8 @@ import {
   sellerListingStatusLabel,
   sellerListingStatusClass,
 } from '@/lib/marketplaceOrder';
+import { ResponsiveShell } from '@/components/mobile';
+import { SellerDashboardApp } from '@/components/dashboard/SellerDashboardApp';
 
 interface Deal {
   id: string; seller_id: string; seller_name: string; middleman_id: string; middleman_name: string;
@@ -452,7 +454,79 @@ export default function SellerDashboard() {
     );
   }
 
-  return (
+  const sellerTabs = ([
+    { k: 'selling' as const, l: `กำลังขาย (${sellingDeals.length})` },
+    { k: 'packing' as const, l: `ขอแพคกิ้ง (${packingDeals.length})` },
+    { k: 'shipping' as const, l: `เตรียมจัดส่ง (${shippingDeals.length})` },
+    { k: 'done' as const, l: `สำเร็จ (${doneDeals.length})` },
+    { k: 'history' as const, l: `ประวัติ (${historyDeals.length})` },
+  ]);
+
+  const tabPanel = (
+    <div className="dash-deal-grid">
+      {tab === 'selling' && (sellingDeals.length === 0 ? (
+        <div className="dash-empty">
+          <div className="dash-empty-icon">📦</div>
+          <p>ยังไม่มีประกาศที่กำลังดำเนินการ</p>
+          <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setPostModal('pick')}>+ ลงประกาศใหม่</button>
+        </div>
+      ) : sellingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+
+      {tab === 'packing' && (
+        packingDeals.length === 0 ? (
+          <div className="dash-empty"><p>ไม่มีสินค้ารอแพค</p></div>
+        ) : packingOpenDeal ? (
+          <div className="seller-pack-list">
+            {packingDeals.length > 1 && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ alignSelf: 'flex-start', marginBottom: 4 }}
+                onClick={() => setPackingDealId('')}
+              >
+                ← เลือกออเดอร์อื่น
+              </button>
+            )}
+            <SellerPackingPanel
+              dealId={packingOpenDeal.id}
+              dealTitle={packingOpenDeal.title}
+              onClose={() => setPackingDealId('')}
+              onDone={async () => {
+                setPackingDealId('');
+                const headers = await authHeaders();
+                await fetchDeals(headers);
+                setTab('shipping');
+              }}
+            />
+          </div>
+        ) : (
+          <div className="seller-pack-list">
+            {packingDeals.map(d => (
+              <div key={d.id}>
+                <DealCard deal={d} hidePackButton />
+                <button
+                  type="button"
+                  className="btn btn-primary btn-block"
+                  style={{ marginTop: 8, marginBottom: 12 }}
+                  onClick={() => setPackingDealId(d.id)}
+                >
+                  📦 เริ่มแพ็คสินค้า
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === 'shipping' && (shippingDeals.length === 0 ? <div className="dash-empty"><p>ไม่มีสินค้ารอจัดส่ง</p></div> : shippingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+
+      {tab === 'done' && (doneDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีออเดอร์สำเร็จ</p></div> : doneDeals.map(d => <DealCard key={d.id} deal={d} />))}
+
+      {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.id} deal={d} />))}
+    </div>
+  );
+
+  const desktopView = (
     <div className="dash-root">
       <header className="dash-header">
         <button onClick={() => router.back()} className="dash-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
@@ -588,70 +662,42 @@ export default function SellerDashboard() {
               <div className="dash-stat"><div className="dash-stat-val" style={{ fontSize: 17 }}>฿{totalRev.toLocaleString()}</div><div className="dash-stat-lbl">รายได้รวม</div></div>
             </div>
 
-            <div className="dash-deal-grid">
-              {tab === 'selling' && (sellingDeals.length === 0 ? (
-                <div className="dash-empty">
-                  <div className="dash-empty-icon">📦</div>
-                  <p>ยังไม่มีประกาศที่กำลังดำเนินการ</p>
-                  <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setPostModal('pick')}>+ ลงประกาศใหม่</button>
-                </div>
-              ) : sellingDeals.map(d => <DealCard key={d.id} deal={d} />))}
-
-              {tab === 'packing' && (
-                packingDeals.length === 0 ? (
-                  <div className="dash-empty"><p>ไม่มีสินค้ารอแพค</p></div>
-                ) : packingOpenDeal ? (
-                  <div className="seller-pack-list">
-                    {packingDeals.length > 1 && (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        style={{ alignSelf: 'flex-start', marginBottom: 4 }}
-                        onClick={() => setPackingDealId('')}
-                      >
-                        ← เลือกออเดอร์อื่น
-                      </button>
-                    )}
-                    <SellerPackingPanel
-                      dealId={packingOpenDeal.id}
-                      dealTitle={packingOpenDeal.title}
-                      onClose={() => setPackingDealId('')}
-                      onDone={async () => {
-                        setPackingDealId('');
-                        const headers = await authHeaders();
-                        await fetchDeals(headers);
-                        setTab('shipping');
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="seller-pack-list">
-                    {packingDeals.map(d => (
-                      <div key={d.id}>
-                        <DealCard deal={d} hidePackButton />
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-block"
-                          style={{ marginTop: 8, marginBottom: 12 }}
-                          onClick={() => setPackingDealId(d.id)}
-                        >
-                          📦 เริ่มแพ็คสินค้า
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )
-              )}
-
-              {tab === 'shipping' && (shippingDeals.length === 0 ? <div className="dash-empty"><p>ไม่มีสินค้ารอจัดส่ง</p></div> : shippingDeals.map(d => <DealCard key={d.id} deal={d} />))}
-
-              {tab === 'done' && (doneDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีออเดอร์สำเร็จ</p></div> : doneDeals.map(d => <DealCard key={d.id} deal={d} />))}
-
-              {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.id} deal={d} />))}
-            </div>
+            {tabPanel}
           </main>
         </section>
       </div>
+    </div>
+  );
+
+  return (
+    <>
+      <ResponsiveShell
+        mobile={
+          <SellerDashboardApp
+            tab={tab}
+            tabs={sellerTabs.map(({ k, l }) => ({ id: k, label: l }))}
+            onTabChange={setTab}
+            onPost={() => { setPostError(''); setPostDone(false); setPostModal('pick'); }}
+            shopName={shopName}
+            shopTagline={shopTagline}
+            shopLocation={shopLocation}
+            shopAvatarUrl={shopAvatarUrl}
+            shopBannerUrl={shopBannerUrl}
+            shopPublic={shopPublic}
+            myId={myId}
+            shopStats={shopStats}
+            stats={{
+              packing: packingDeals.length,
+              shipping: shippingDeals.length,
+              done: doneDeals.length,
+              revenue: totalRev,
+            }}
+          >
+            {tabPanel}
+          </SellerDashboardApp>
+        }
+        desktop={desktopView}
+      />
 
       {postModal && (
         <div className="seller-modal-backdrop" onClick={closePostModal}>
@@ -912,6 +958,6 @@ export default function SellerDashboard() {
         onClose={() => setCarrierPickerOpen(false)}
         onConfirm={next => { setShippingProviders(next); setCarrierPickerOpen(false); }}
       />
-    </div>
+    </>
   );
 }

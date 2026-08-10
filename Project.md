@@ -1,5 +1,71 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-11 (02:15 UTC)
+
+### Mobile Shell — งานค้างครบ (register/onsite/admin/deal/nav)
+
+**Register wizard:** `RegisterWizardApp` wire ใน `/register/seller` + `/register/middleman` — progress bar + sticky ปุ่มบนมือถือ  
+**Onsite:** `OnsiteAppShell` + `ResponsiveShell` ใน `/onsite/create` · `/onsite/[id]`  
+**Deal room:** `DealRoomMobileBar` + CSS `.dr-mobile-bar` ซ่อน floatbar desktop บนมือถือ  
+**Admin:** `AdminMobilePage` wrapper + CSS แปลง table/grid เป็น card stack ทุกหน้า admin  
+**Nav:** แยก `.nav-desktop-actions` / `.nav-compact-actions` + แก้ JSX ปิด tag  
+**CSS:** `.reg-wiz-*` · `.dr-mobile-bar` · `.admin-mobile-page` · `.onsite-app-inner`
+
+---
+
+## 2026-08-11 (01:40 UTC)
+
+### Mobile Shell ทั้งเว็บ — รวม Foundation + ทุกส่วน (รวม Admin)
+
+**Foundation:** `src/components/mobile/` — ResponsiveShell, AppPage, AppHeader, AppSegment, AppSheet, AppListRow, AppBottomNav, ContentPageApp, SubPageShell · CSS `.app-*` breakpoint 767px  
+**Nav:** bottom nav 5 ช่อง แทน mobile-service-tabs  
+**ครอบคลุม:** ตลาด cluster · cart/checkout · deal/orders · service · home/auth · profile/messages/dashboards · admin shell · payment/status/maintenance · register/onsite CSS · ห้องดีล `.dr-app-mobile`  
+**เทคนิค:** logic ใน page.tsx · UI มือถือใน `*App.tsx` · desktop ใน `app-desktop-shell`
+
+---
+
+## 2026-08-10 (18:52 UTC)
+
+### Mobile app shells — Admin / Profile / Messages / Dashboard
+
+**เป้าหมาย:** แยก markup มือถือออกจาก desktop ด้วย `ResponsiveShell` (≤767px) · logic คงใน page  
+**ใหม่:** `AdminAppShell` (top bar + drawer) · `ProfileApp` · `MessagesApp` (master-detail) · `SellerDashboardApp` · `MiddlemanDashboardApp` (mobile tabs)  
+**wire:** `admin/layout.tsx` → mobile=`AdminAppShell` + `admin-layout-desktop` · `/profile` · `/messages` · `/dashboard/seller` · `/dashboard/middleman`  
+**CSS:** `.admin-app*`, `.pf-app*`, `.dm-app*`, `.dash-app*`
+
+---
+
+## 2026-08-10 (18:50 UTC)
+
+### Mobile app shells — home / login / register / check-scam / privacy / service
+
+**เป้าหมาย:** แยก UI มือถือ · logic คงใน page.tsx · ใช้ `src/components/mobile/`  
+**ใหม่:** `HomeApp` · `LoginApp` · `RegisterPickApp` · `CheckScamApp` · `TradeApp` · `MeetupApp` · `ConsignApp` · `OnsiteApp` · `ServiceFlowApp`  
+**wire:** `ResponsiveShell` ใน `/`, `/login`, `/register` · `SubPageShell` ใน `/check-scam`, `/service/*` · `PageShell` ใน `/privacy` (แก้ Nav หาย)  
+**CSS:** `.home-app*`, `.login-app*`, `.reg-pick-app*`, `.cs-app*`, `.svc-app*`
+
+---
+
+## 2026-08-10 (18:45 UTC)
+
+### Mobile app shells — ตะกร้า / checkout / ดีล / orders
+
+**เป้าหมาย:** แยก UI มือถือ (≤767px) ออกจาก desktop · logic อยู่ใน page.tsx · touch target ≥44px  
+**ใหม่:** `CartApp` · `CheckoutApp` · `DealAllApp` · `OrdersApp` · `DealCreateApp` + CSS ชุด `*-app-*`  
+**wire:** `ResponsiveShell` ใน `/cart` · `/cart/checkout/[id]` · `/deal-all` · `/orders` · `/deal/create`  
+**foundation:** ใช้ `AppPage` / `AppHeader` / `AppSegment` / `AppFeed` / `AppStickyBar` / `SubPageApp` จาก `src/components/mobile/`
+
+---
+
+### Mobile app shells — marketplace detail / shop / wanted
+
+**เป้าหมาย:** ขยาย mobile foundation ไป cluster ตลาด · logic คงใน page.tsx · primary action ไม่ต้องเลื่อนมาก  
+**ใหม่:** `MarketplaceDetailApp` (gallery snap · sticky bid/ซื้อ · Auto-bid ใน AppSheet) · `ShopApp` · `WantedApp`  
+**wire:** `ResponsiveShell` ใน `/marketplace/[id]` · `/shop/[sellerId]` · `/wanted`  
+**foundation:** checkout `src/components/mobile/` จาก branch mobile-app-shells + CSS `.app-detail-*` `.shop-app-*` `.wanted-app-*`
+
+---
+
 ## 2026-08-11 (00:55)
 
 ### ตลาด/ประมูลมือถือ — โครง UI/UX ใหม่แบบแอป (แยกจากเดสก์ท็อป)

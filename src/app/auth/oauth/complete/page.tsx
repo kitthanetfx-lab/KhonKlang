@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveShell } from '@/components/mobile';
+import { AuthCompleteApp } from '@/components/auth/AuthCompleteApp';
 
 /**
  * หน้ารับ callback จาก Google/Facebook OAuth.
@@ -40,11 +42,16 @@ function OAuthCompleteInner() {
   }, [returnTo, router]);
 
   return (
+    <ResponsiveShell
+      mobile={<AuthCompleteApp status={status} />}
+      desktop={
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: '#0a0f1e', color: '#fff' }}>
       <div style={{ width: 40, height: 40, border: '4px solid #2f6bf0', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       <p style={{ color: '#9aa4bd', fontSize: 14 }}>{status}</p>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
+      }
+    />
   );
 }
 

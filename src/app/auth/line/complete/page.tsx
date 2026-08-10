@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { ResponsiveShell } from '@/components/mobile';
+import { AuthCompleteApp } from '@/components/auth/AuthCompleteApp';
 
 function LineCompleteInner() {
   const router = useRouter();
@@ -59,10 +61,15 @@ function LineCompleteInner() {
   }, [returnTo, router]);
 
   return (
+    <ResponsiveShell
+      mobile={<AuthCompleteApp status={status} />}
+      desktop={
     <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center gap-4 text-white">
       <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
       <p className="text-gray-300 text-sm">{status}</p>
     </div>
+      }
+    />
   );
 }
 

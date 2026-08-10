@@ -6,9 +6,12 @@ import Link from 'next/link';
 import { supabase, authHeaders } from '@/lib/supabase';
 import { useAppPreferences } from '@/components/AppPreferences';
 import {
-  LayoutDashboard, Store, Shield, Users, Settings, SlidersHorizontal,
-  LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, Wallet, MessageCircle, Banknote,
+  LogOut, Menu, ChevronRight, Bell,
 } from 'lucide-react';
+import { ResponsiveShell } from '@/components/mobile';
+import { AdminAppShell } from '@/components/admin/mobile/AdminAppShell';
+import { AdminMobilePage } from '@/components/admin/mobile/AdminMobilePage';
+import { getAdminActiveLabel, getAdminNav } from '@/components/admin/mobile/adminNav';
 
 const ADMIN_DEVICE_STORAGE_KEY = 'kk_admin_device_id';
 const ADMIN_UNLOCK_STORAGE_KEY = 'kk_admin_panel_unlock';
@@ -60,38 +63,6 @@ function writeLocalUnlock(userId: string) {
 
 function clearLocalUnlock() {
   try { localStorage.removeItem(ADMIN_UNLOCK_STORAGE_KEY); } catch { /* ignore */ }
-}
-
-function getAdminNav(locale: 'th' | 'en') {
-  return locale === 'th'
-    ? [
-        { href: '/admin', icon: LayoutDashboard, label: 'ภาพรวม' },
-        { href: '/admin/support', icon: MessageCircle, label: 'แชทลูกค้า' },
-        { href: '/admin/sellers', icon: Store, label: 'ผู้ขาย' },
-        { href: '/admin/middlemen', icon: Shield, label: 'คนกลาง' },
-        { href: '/admin/middleman-deposits', icon: Banknote, label: 'เงินค้ำประกันคนกลาง' },
-        { href: '/admin/scam-reports', icon: ShieldAlert, label: 'รายงานคนโกง' },
-        { href: '/admin/finance', icon: Wallet, label: 'การเงิน' },
-        { href: '/admin/deals', icon: Handshake, label: 'ดีล & ข้อพิพาท' },
-        { href: '/admin/moderate', icon: EyeOff, label: 'ตรวจสอบเนื้อหา' },
-        { href: '/admin/users', icon: Users, label: 'ผู้ใช้ทั้งหมด' },
-        { href: '/admin/service-controls', icon: SlidersHorizontal, label: 'ควบคุมบริการ' },
-        { href: '/admin/settings', icon: Settings, label: 'ค่าธรรมเนียม' },
-      ]
-    : [
-        { href: '/admin', icon: LayoutDashboard, label: 'Overview' },
-        { href: '/admin/support', icon: MessageCircle, label: 'Customer Chat' },
-        { href: '/admin/sellers', icon: Store, label: 'Sellers' },
-        { href: '/admin/middlemen', icon: Shield, label: 'Middlemen' },
-        { href: '/admin/middleman-deposits', icon: Banknote, label: 'Middleman Deposits' },
-        { href: '/admin/scam-reports', icon: ShieldAlert, label: 'Scam Reports' },
-        { href: '/admin/finance', icon: Wallet, label: 'Finance' },
-        { href: '/admin/deals', icon: Handshake, label: 'Deals & Disputes' },
-        { href: '/admin/moderate', icon: EyeOff, label: 'Moderation' },
-        { href: '/admin/users', icon: Users, label: 'Users' },
-        { href: '/admin/service-controls', icon: SlidersHorizontal, label: 'Service Controls' },
-        { href: '/admin/settings', icon: Settings, label: 'Fees' },
-      ];
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -239,10 +210,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  const activeHref = NAV.slice(1).find(n => pathname.startsWith(n.href))?.href ?? '/admin';
-  const activeLabel = NAV.find(n => n.href === activeHref)?.label ?? (locale === 'th' ? 'ภาพรวม' : 'Overview');
+  const activeLabel = getAdminActiveLabel(pathname, locale, NAV);
 
-  return (
+  async function handleLogout() {
+    await clearAdminTrust();
+    await supabase.auth.signOut().catch(() => {
+      // Continue even if the remote session is already gone.
+    });
+    router.push('/login');
+  }
+
+  const desktopShell = (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
 
       <aside className={`
@@ -284,13 +262,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <p className="text-sm text-gray-500 dark:text-gray-400">Admin</p>
             </div>
             <button
-              onClick={async () => {
-                await clearAdminTrust();
-                await supabase.auth.signOut().catch(() => {
-                  // Continue even if the remote session is already gone.
-                });
-                router.push('/login');
-              }}
+              onClick={() => void handleLogout()}
               className="p-1.5 text-gray-500 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
               <LogOut size={15} />
             </button>
@@ -338,5 +310,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </main>
       </div>
     </div>
+  );
+
+  return (
+    <ResponsiveShell
+      mobileClassName="admin-layout-mobile"
+      desktopClassName="admin-layout-desktop"
+      mobile={
+        <AdminAppShell locale={locale} adminName={adminName} onLogout={handleLogout}>
+          <AdminMobilePage><div className="admin-app-content">{children}</div></AdminMobilePage>
+        </AdminAppShell>
+      }
+      desktop={desktopShell}
+    />
   );
 }
