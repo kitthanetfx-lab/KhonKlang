@@ -1,5 +1,16 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (18:45 UTC)
+
+### Mobile app shells — ตะกร้า / checkout / ดีล / orders
+
+**เป้าหมาย:** แยก UI มือถือ (≤767px) ออกจาก desktop · logic อยู่ใน page.tsx · touch target ≥44px  
+**ใหม่:** `CartApp` · `CheckoutApp` · `DealAllApp` · `OrdersApp` · `DealCreateApp` + CSS ชุด `*-app-*`  
+**wire:** `ResponsiveShell` ใน `/cart` · `/cart/checkout/[id]` · `/deal-all` · `/orders` · `/deal/create`  
+**foundation:** ใช้ `AppPage` / `AppHeader` / `AppSegment` / `AppFeed` / `AppStickyBar` / `SubPageApp` จาก `src/components/mobile/`
+
+---
+
 ## 2026-08-11 (00:55)
 
 ### ตลาด/ประมูลมือถือ — โครง UI/UX ใหม่แบบแอป (แยกจากเดสก์ท็อป)
