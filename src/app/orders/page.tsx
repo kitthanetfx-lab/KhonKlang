@@ -1,10 +1,13 @@
 'use client';
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authHeaders } from '@/lib/supabase';
-import { PageShell } from '@/components/PageShell';
+import { Nav, Footer } from '@/components/Site';
 import { Icon } from '@/components/Icon';
+import { OrdersApp, type OrdersFilter } from '@/components/orders/OrdersApp';
+import { ResponsiveShell } from '@/components/mobile';
 
 const STEP_LABEL: Record<string, string> = {
   posted: 'รอผู้ซื้อ', waiting_seller: 'รอผู้ขาย', waiting_buyer: 'รอผู้ซื้อ', buyer_joined: 'รอเลือกคนกลาง',
@@ -16,7 +19,7 @@ const STEP_LABEL: Record<string, string> = {
 const ROLE_LABEL: Record<string, string> = { buyer: 'ผู้ซื้อ', seller: 'ผู้ขาย', middleman: 'คนกลาง' };
 const ROLE_CLS: Record<string, string> = { buyer: 'badge-blue', seller: 'badge-amber', middleman: 'badge-green' };
 
-type Filter = 'all' | 'active' | 'completed' | 'cancelled';
+type Filter = OrdersFilter;
 const DONE = ['completed'];
 const DEAD = ['cancelled', 'disputed'];
 
@@ -51,6 +54,13 @@ export default function OrdersPage() {
   const [wanted, setWanted] = useState<MyWanted[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const r = document.documentElement;
+    r.style.setProperty('--accent', '#2f6bf0');
+    r.style.setProperty('--accent-strong', '#1f54d6');
+    r.style.setProperty('--accent-soft', '#eef4ff');
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -98,87 +108,113 @@ export default function OrdersPage() {
   ];
 
   return (
-    <PageShell
-      kicker="ประวัติการซื้อขาย"
-      title="ดีลของฉันทั้งหมด"
-      lead="รวมทุกดีลที่คุณเกี่ยวข้อง — ซื้อ ขาย หรือเป็นคนกลาง พร้อมข้อความล่าสุดของแต่ละห้อง"
-    >
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-        {FILTERS.map(f => (
-          <button key={f.k} className={`chip ${filter === f.k ? 'is-active' : ''}`} onClick={() => setFilter(f.k)}>
-            {f.t}{f.k === 'all' && deals ? ` (${deals.length})` : ''}
-          </button>
-        ))}
-      </div>
-
-      {error && <p className="rv-error">{error}</p>}
-      {deals === null && !error && <div className="mkt-detail-loading" />}
-
-      {deals !== null && filtered.length === 0 && (
-        <div className="prose-card center" style={{ padding: '44px 24px' }}>
-          <p style={{ fontSize: 30, marginBottom: 8 }}>📦</p>
-          <p style={{ fontWeight: 600, color: 'var(--ink)' }}>ยังไม่มีดีลในหมวดนี้</p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
-            <Link className="btn btn-primary" href="/marketplace">ดูตลาด</Link>
-            <Link className="btn btn-ghost" href="/deal/create">สร้างดีลใหม่</Link>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gap: 12 }}>
-        {filtered.map(d => {
-          const done = DONE.includes(d.status);
-          const dead = DEAD.includes(d.status);
-          return (
-            <div key={d.id} className="od-card">
-              <div className="od-head">
-                <span className={`badge ${ROLE_CLS[d.myRole] || 'badge-gray'}`}>ฉันเป็น{ROLE_LABEL[d.myRole] || d.myRole}</span>
-                <span className={`badge ${done ? 'badge-green' : dead ? 'badge-rose' : 'badge-blue'}`}>{STEP_LABEL[d.status] || d.status}</span>
-                <span className="od-price mono">฿{Number(d.price || 0).toLocaleString()}</span>
+    <>
+      <Nav />
+      <ResponsiveShell
+        mobile={
+          <OrdersApp
+            deals={deals}
+            wanted={wanted}
+            filter={filter}
+            error={error}
+            onFilterChange={setFilter}
+            onToggleWanted={toggleWanted}
+          />
+        }
+        desktop={
+          <>
+            <header className="page-hero">
+              <div className="container">
+                <div className="kicker" style={{ marginBottom: 12 }}>ประวัติการซื้อขาย</div>
+                <h1 className="section-title">ดีลของฉันทั้งหมด</h1>
+                <p className="section-lead" style={{ marginTop: 12 }}>
+                  รวมทุกดีลที่คุณเกี่ยวข้อง — ซื้อ ขาย หรือเป็นคนกลาง พร้อมข้อความล่าสุดของแต่ละห้อง
+                </p>
               </div>
-              <h3 className="od-title">{d.title}</h3>
-              <p className="od-parties">
-                {d.sellerName && <>ผู้ขาย: {d.sellerName} · </>}
-                {d.buyerName && <>ผู้ซื้อ: {d.buyerName} · </>}
-                {d.middlemanName ? <>คนกลาง: {d.middlemanName}</> : <>ยังไม่มีคนกลาง</>}
-              </p>
-              <div className="od-msg">
-                <Icon name="message" size={14} />
-                <span className="od-msg-tx">{msgPreview(d.lastMsg)}</span>
-                <small>{timeAgo(d.lastMsg?.createdAt || d.createdAt)}</small>
-              </div>
-              <div className="od-actions">
-                <Link className="btn btn-primary btn-sm" href={`/deal/${d.id}`}>เปิดดีล <Icon name="arrowRight" size={14} /></Link>
-                <Link className="btn btn-ghost btn-sm" href={`/deal/${d.id}?tab=chat`}><Icon name="chat" size={14} /> เปิดแชท</Link>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── ประกาศหาของฉัน (รวมที่ปิดแล้ว) ── */}
-      {wanted.length > 0 && (
-        <>
-          <h2 style={{ fontSize: 19, margin: '36px 0 14px' }}>📢 ประกาศหาสินค้าของฉัน</h2>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {wanted.map(p => (
-              <div key={p.id} className="od-card" style={{ padding: '14px 18px' }}>
-                <div className="od-head">
-                  <span className={`badge ${p.status === 'open' ? 'badge-green' : 'badge-gray'}`}>{p.status === 'open' ? 'เปิดอยู่' : 'ปิดแล้ว'}</span>
-                  <span style={{ fontSize: 12, color: 'var(--faint)' }}>{timeAgo(p.created_at)}</span>
+            </header>
+            <main className="page-body">
+              <div className="container">
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                  {FILTERS.map(f => (
+                    <button key={f.k} className={`chip ${filter === f.k ? 'is-active' : ''}`} onClick={() => setFilter(f.k)}>
+                      {f.t}{f.k === 'all' && deals ? ` (${deals.length})` : ''}
+                    </button>
+                  ))}
                 </div>
-                <h3 className="od-title" style={{ fontSize: 15 }}>{p.title}</h3>
-                <div className="od-actions" style={{ marginTop: 10, paddingTop: 10 }}>
-                  <Link className="btn btn-ghost btn-sm" href="/wanted">ดูหน้าประกาศหา</Link>
-                  {p.status === 'open'
-                    ? <button className="btn btn-ghost btn-sm" onClick={() => toggleWanted(p.id, 'close')}><Icon name="check" size={14} /> ปิดประกาศ</button>
-                    : <button className="btn btn-soft btn-sm" onClick={() => toggleWanted(p.id, 'reopen')}><Icon name="refresh" size={14} /> เปิดประกาศอีกครั้ง</button>}
+
+                {error && <p className="rv-error">{error}</p>}
+                {deals === null && !error && <div className="mkt-detail-loading" />}
+
+                {deals !== null && filtered.length === 0 && (
+                  <div className="prose-card center" style={{ padding: '44px 24px' }}>
+                    <p style={{ fontSize: 30, marginBottom: 8 }}>📦</p>
+                    <p style={{ fontWeight: 600, color: 'var(--ink)' }}>ยังไม่มีดีลในหมวดนี้</p>
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+                      <Link className="btn btn-primary" href="/marketplace">ดูตลาด</Link>
+                      <Link className="btn btn-ghost" href="/deal/create">สร้างดีลใหม่</Link>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {filtered.map(d => {
+                    const done = DONE.includes(d.status);
+                    const dead = DEAD.includes(d.status);
+                    return (
+                      <div key={d.id} className="od-card">
+                        <div className="od-head">
+                          <span className={`badge ${ROLE_CLS[d.myRole] || 'badge-gray'}`}>ฉันเป็น{ROLE_LABEL[d.myRole] || d.myRole}</span>
+                          <span className={`badge ${done ? 'badge-green' : dead ? 'badge-rose' : 'badge-blue'}`}>{STEP_LABEL[d.status] || d.status}</span>
+                          <span className="od-price mono">฿{Number(d.price || 0).toLocaleString()}</span>
+                        </div>
+                        <h3 className="od-title">{d.title}</h3>
+                        <p className="od-parties">
+                          {d.sellerName && <>ผู้ขาย: {d.sellerName} · </>}
+                          {d.buyerName && <>ผู้ซื้อ: {d.buyerName} · </>}
+                          {d.middlemanName ? <>คนกลาง: {d.middlemanName}</> : <>ยังไม่มีคนกลาง</>}
+                        </p>
+                        <div className="od-msg">
+                          <Icon name="message" size={14} />
+                          <span className="od-msg-tx">{msgPreview(d.lastMsg)}</span>
+                          <small>{timeAgo(d.lastMsg?.createdAt || d.createdAt)}</small>
+                        </div>
+                        <div className="od-actions">
+                          <Link className="btn btn-primary btn-sm" href={`/deal/${d.id}`}>เปิดดีล <Icon name="arrowRight" size={14} /></Link>
+                          <Link className="btn btn-ghost btn-sm" href={`/deal/${d.id}?tab=chat`}><Icon name="chat" size={14} /> เปิดแชท</Link>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+
+                {wanted.length > 0 && (
+                  <>
+                    <h2 style={{ fontSize: 19, margin: '36px 0 14px' }}>📢 ประกาศหาสินค้าของฉัน</h2>
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      {wanted.map(p => (
+                        <div key={p.id} className="od-card" style={{ padding: '14px 18px' }}>
+                          <div className="od-head">
+                            <span className={`badge ${p.status === 'open' ? 'badge-green' : 'badge-gray'}`}>{p.status === 'open' ? 'เปิดอยู่' : 'ปิดแล้ว'}</span>
+                            <span style={{ fontSize: 12, color: 'var(--faint)' }}>{timeAgo(p.created_at)}</span>
+                          </div>
+                          <h3 className="od-title" style={{ fontSize: 15 }}>{p.title}</h3>
+                          <div className="od-actions" style={{ marginTop: 10, paddingTop: 10 }}>
+                            <Link className="btn btn-ghost btn-sm" href="/wanted">ดูหน้าประกาศหา</Link>
+                            {p.status === 'open'
+                              ? <button className="btn btn-ghost btn-sm" onClick={() => toggleWanted(p.id, 'close')}><Icon name="check" size={14} /> ปิดประกาศ</button>
+                              : <button className="btn btn-soft btn-sm" onClick={() => toggleWanted(p.id, 'reopen')}><Icon name="refresh" size={14} /> เปิดประกาศอีกครั้ง</button>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
-            ))}
-          </div>
-        </>
-      )}
-    </PageShell>
+            </main>
+            <Footer />
+          </>
+        }
+      />
+    </>
   );
 }

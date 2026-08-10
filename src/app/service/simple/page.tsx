@@ -10,12 +10,20 @@ import { Icon } from '@/components/Icon';
 import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { SubPageShell } from '@/components/mobile';
+import { ServiceFlowApp } from '@/components/service/ServiceFlowApp';
 
 const SLIDES = [
   { src: slide1, alt: 'ขั้นตอนที่ 1 ซื้อขายผ่านกลางแบบง่าย' },
   { src: slide2, alt: 'ขั้นตอนที่ 2 ซื้อขายผ่านกลางแบบง่าย' },
   { src: slide3, alt: 'ขั้นตอนที่ 3 ซื้อขายผ่านกลางแบบง่าย' },
   { src: slide4, alt: 'ขั้นตอนที่ 4 ซื้อขายผ่านกลางแบบง่าย' },
+];
+
+const SUBS = [
+  'ซื้อขายง่าย ปลอดภัยขึ้น70%',
+  'คลอบคลุมกรณีไม่ได้รับสินค้า ไม่ตรงปก',
+  'ความเสียหายที่เห็นได้ชัด',
 ];
 
 export default function ServiceSimplePage() {
@@ -33,7 +41,9 @@ export default function ServiceSimplePage() {
     return <ServiceDisabledNotice title="ซื้อขายผ่านกลางแบบง่าย" message={controls.message('tradeSimple')} backHref="/service/trade" backLabel="กลับไปหน้าบริการ" />;
   }
 
-  return (
+  const enabled = controls.isEnabled('tradeSimple');
+
+  const desktop = (
     <div className="sub-page service-sub-page svc-simple-page">
       <header className="sub-header">
         <Link href="/service/trade" className="sub-back" aria-label="ย้อนกลับ">
@@ -53,9 +63,7 @@ export default function ServiceSimplePage() {
 
           <div className="svc-simple-hero">
             <h1 className="svc-simple-title">ซื้อขายผ่านกลางแบบง่าย</h1>
-            <p className="svc-simple-sub">ซื้อขายง่าย ปลอดภัยขึ้น70% </p>
-            <p className="svc-simple-sub">คลอบคลุมกรณีไม่ได้รับสินค้า ไม่ตรงปก</p>
-            <p className="svc-simple-sub"> ความเสียหายที่เห็นได้ชัด </p>
+            {SUBS.map(line => <p key={line} className="svc-simple-sub">{line}</p>)}
           </div>
 
           <div className="svc-simple-kicker svc-simple-fade">ขั้นตอนการดำเนินงาน</div>
@@ -92,12 +100,28 @@ export default function ServiceSimplePage() {
           </div>
 
           <div className="svc-simple-cta-wrap svc-simple-fade">
-            {controls.isEnabled('tradeSimple')
+            {enabled
               ? <Link href="/deal/create?type=simple" className="btn btn-primary btn-block svc-simple-cta">เริ่มสร้างดีล →</Link>
               : <button type="button" className="btn btn-primary btn-block svc-simple-cta" disabled>ปิดให้บริการชั่วคราว</button>}
           </div>
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <SubPageShell title="ซื้อขายแบบง่าย" backHref="/service/trade" right={<HeaderAccountActions />} withBottomNav desktop={desktop}>
+      <ServiceFlowApp
+        title="ซื้อขายผ่านกลางแบบง่าย"
+        subs={SUBS}
+        slides={SLIDES}
+        activeSlide={activeSlide}
+        onSlide={setActiveSlide}
+        alertText="สำคัญ: ผู้ซื้อต้องถ่ายวิดีโอหลักฐานทุกครั้ง มิฉะนั้นจะไม่สามารถใช้เรียกร้องกับผู้ขายได้"
+        ctaHref="/deal/create?type=simple"
+        ctaLabel="เริ่มสร้างดีล →"
+        enabled={enabled}
+      />
+    </SubPageShell>
   );
 }

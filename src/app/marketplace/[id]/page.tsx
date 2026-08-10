@@ -7,6 +7,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Nav, Footer } from '@/components/Site';
 import { Icon } from '@/components/Icon';
+import { ResponsiveShell } from '@/components/mobile';
+import { MarketplaceDetailApp } from '@/components/marketplace/MarketplaceDetailApp';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { isCertifiedMode, supportsSellerChat } from '@/lib/listingMode';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
@@ -235,11 +237,62 @@ export default function MarketplaceDetailPage() {
     }
   }
 
+  const isOwner = listing ? listing.seller_id === myId : false;
+  const isAuction = Boolean(listing && listing.deal_type === 'auction' && auction);
+  const canSellerChat = listing ? supportsSellerChat(listing.selling_mode) : false;
+  const displayPrice = isAuction && auction ? auction.leadingPrice : (listing?.price || 0);
+  const shippingProviders = listing?.shipping_providers || [];
+  const shippingCost = listing?.shipping_cost ?? 0;
+  const buyState = listing ? marketplaceListingBuyState(listing, myId || undefined) : 'unavailable';
+
+  const mobileApp = (
+    <MarketplaceDetailApp
+      loading={loading}
+      error={error}
+      listing={listing}
+      sellerShop={sellerShop}
+      images={images}
+      displayImage={displayImage}
+      onMainImageChange={setMainImage}
+      myId={myId}
+      isOwner={isOwner}
+      isAuction={isAuction}
+      auction={auction}
+      auctionBids={auctionBids}
+      displayPrice={displayPrice}
+      shippingProviders={shippingProviders}
+      shippingCost={shippingCost}
+      buyState={buyState}
+      selectedShipping={selectedShipping}
+      onSelectedShippingChange={setSelectedShipping}
+      joining={joining}
+      bidding={bidding}
+      bidAmount={bidAmount}
+      onBidAmountChange={setBidAmount}
+      maxBidAmount={maxBidAmount}
+      onMaxBidAmountChange={setMaxBidAmount}
+      bidStepAmount={bidStepAmount}
+      onBidStepAmountChange={setBidStepAmount}
+      autoBidOn={autoBidOn}
+      onAutoBidToggle={() => setAutoBidOn(v => !v)}
+      myAutoBidMax={myAutoBidMax}
+      myAutoBidStep={myAutoBidStep}
+      hasLineNotify={hasLineNotify}
+      lineOaUrl={lineOaUrl}
+      bidError={bidError}
+      onBuy={buyViaEscrow}
+      onBid={placeBid}
+      onSellerChat={sellerChatHref}
+    />
+  );
+
   if (loading) {
     return (
       <>
         <Nav active="market" />
-        <div className="pd-shell"><div className="pd-loading" /></div>
+        <ResponsiveShell mobile={mobileApp} desktop={
+          <div className="pd-shell"><div className="pd-loading" /></div>
+        } />
       </>
     );
   }
@@ -248,28 +301,26 @@ export default function MarketplaceDetailPage() {
     return (
       <>
         <Nav active="market" />
-        <div className="pd-shell">
-          <div className="pd-empty">
-            <div className="mkt-empty-ic"><Icon name="search" size={32} /></div>
-            <p>{error || 'ไม่พบสินค้าที่ต้องการ'}</p>
-            <Link href="/marketplace" className="btn btn-primary">กลับสู่ตลาด</Link>
+        <ResponsiveShell mobile={mobileApp} desktop={
+          <div className="pd-shell">
+            <div className="pd-empty">
+              <div className="mkt-empty-ic"><Icon name="search" size={32} /></div>
+              <p>{error || 'ไม่พบสินค้าที่ต้องการ'}</p>
+              <Link href="/marketplace" className="btn btn-primary">กลับสู่ตลาด</Link>
+            </div>
           </div>
-        </div>
+        } />
       </>
     );
   }
 
-  const isOwner = listing.seller_id === myId;
-  const isAuction = listing.deal_type === 'auction' && auction;
-  const canSellerChat = supportsSellerChat(listing.selling_mode);
-  const displayPrice = isAuction ? auction.leadingPrice : (listing.price || 0);
-  const shippingProviders = listing.shipping_providers || [];
-  const shippingCost = listing.shipping_cost ?? 0;
-  const buyState = marketplaceListingBuyState(listing, myId || undefined);
-
   return (
     <>
       <Nav active="market" />
+      <ResponsiveShell
+        mobile={mobileApp}
+        desktop={
+          <>
       <div className="pd-shell">
         <div className="container">
           <Link
@@ -586,6 +637,9 @@ export default function MarketplaceDetailPage() {
         </div>
       </div>
       <Footer />
+          </>
+        }
+      />
     </>
   );
 }

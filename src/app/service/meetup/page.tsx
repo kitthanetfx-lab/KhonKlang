@@ -10,8 +10,10 @@ import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { RATE_PER_KM } from '@/lib/provinceGeo';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { DealFlowBrand } from '@/components/DealFlowBrand';
+import { SubPageShell } from '@/components/mobile';
+import { MeetupApp } from '@/components/service/MeetupApp';
 
-const PLATFORM = 50, MM_FEE = 300;
+const PLATFORM = 50;
 const MODES = [
   { title: 'รับประกันเดินทาง EzDrive', href: '/service/meetup?step=2', image: '/Drive/Ezdrive.webp', kind: 'guarantee' as const },
   { title: 'Safedrive นัดรับเซฟโซน', href: '/deal/create?safezone=1', image: '/Drive/Safedrive.webp', kind: 'safezone' as const },
@@ -21,7 +23,6 @@ function MeetupInner() {
   const router = useRouter();
   const sp = useSearchParams();
   const controls = useServiceControls();
-  // เปิดจากปุ่ม "นัดรับ" ในหน้าสินค้า/ประกาศหา → ข้ามมาขั้นกรอกที่อยู่เลย พร้อม prefill
   const [feeWho] = useState('split');
   const [step, setStep] = useState<1 | 2>(sp.get('step') === '2' ? 2 : 1);
 
@@ -52,8 +53,6 @@ function MeetupInner() {
     setCreating(true); setError('');
     try {
       const headers = await authHeaders();
-      // v2: เก็บเฉพาะที่อยู่ของฝ่ายผู้สร้าง — อีกฝ่ายมากรอกที่อยู่ตัวเองในห้องดีล
-      // จุดนัดพบ + ยอดประกัน ไปตกลงกัน (เสนอ-ยอมรับ) ในห้องดีล
       const meetupData = JSON.stringify({
         v: 2,
         [myRole === 'buyer' ? 'buyerLoc' : 'sellerLoc']: myAddr,
@@ -84,7 +83,98 @@ function MeetupInner() {
     } finally { setCreating(false); }
   }
 
-  return (
+  const desktopBody = (
+    <div className="svc-inner">
+      {step === 1 && (
+        <>
+          <div className="svc-hero">
+            <div className="svc-hero-icon">🚗</div>
+            <h1 className="svc-hero-title">เลือกรูปแบบบริการ</h1>
+          </div>
+          <div className="svc-modes">
+            {MODES.map(m => {
+              const enabled = m.kind === 'guarantee' ? guaranteeEnabled : safeZoneEnabled;
+              const note = m.kind === 'guarantee' ? controls.message('meetupGuarantee') : controls.message('meetupSafeZone');
+              return enabled ? (
+                <div
+                  key={m.title}
+                  className="svc-mode"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => m.kind === 'guarantee' ? setStep(2) : router.push(m.href)}
+                >
+                  <div className="svc-mode-media">
+                    <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 100vw, 50vw" />
+                  </div>
+                  <div className="svc-mode-title">{m.title}</div>
+                  <div className="svc-mode-cta">เริ่มต้น <span>→</span></div>
+                </div>
+              ) : (
+                <div key={m.title} className="svc-mode" style={{ opacity: 0.7, cursor: 'not-allowed' }}>
+                  <div className="svc-mode-media">
+                    <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 100vw, 50vw" />
+                  </div>
+                  <div className="svc-mode-title">{m.title}</div>
+                  <div className="svc-mode-cta" style={{ color: '#b7791f' }}>ปิดชั่วคราว</div>
+                  <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700', lineHeight: 1.6 }}>{note}</div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {step === 2 && (
+        <>
+          <DealFlowBrand docked />
+          <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => setStep(1)}>← ย้อนกลับ</button>
+          <h2 style={{ marginBottom: 6 }}>🚗 นัดรับ + รับประกันเดินทาง</h2>
+          <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 20, lineHeight: 1.65 }}>
+            <b>ระบุที่อยู่ของคุณคนเดียวพอ</b> — อีกฝ่ายจะระบุที่อยู่ของเขาเองเมื่อเข้าร่วมดีล
+            จากนั้นไปตกลงกันในห้องดีลว่าใครเดินทางไปหาใคร หรือนัดเจอจุดไหน พร้อมยอดประกันที่ทั้งคู่ต้องกดยอมรับ — บริการนี้<b>ไม่ต้องใช้คนกลาง</b>
+          </p>
+
+          <div className="mu-form">
+            <div className="mu-field">
+              <label>ฉันเป็น...</label>
+              <div className="svc-who-chips">
+                {([['buyer', '🛍️ ผู้ซื้อ'], ['seller', '🛒 ผู้ขาย']] as const).map(([k, l]) => (
+                  <button key={k} className={`svc-chip${myRole === k ? ' sel' : ''}`} onClick={() => setMyRole(k)}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <div className="mu-grid">
+              <div className="mu-field">
+                <label>สินค้า/สิ่งที่นัดรับ *</label>
+                <input value={title} onChange={e => setTitle(e.target.value)} maxLength={150} placeholder="เช่น iPhone 15 Pro มือสอง" />
+              </div>
+              <div className="mu-field">
+                <label>ราคาสินค้า (บาท)</label>
+                <input type="number" min="0" value={price} onChange={e => setPrice(e.target.value)} placeholder="ไม่บังคับ" />
+              </div>
+            </div>
+
+            <div className="mu-field">
+              <label>📍 ที่อยู่ของฉัน ({myRole === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}) — เลือกถึงระดับตำบลเพื่อระยะทางที่แม่นยำ *</label>
+              <AddressPicker value={myAddr} onChange={setMyAddr} />
+              {myAddr.tambon && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 8 }}>✅ {addressLabel(myAddr)}</p>}
+            </div>
+
+            <div className="mu-note" style={{ marginTop: 0 }}>
+              ขั้นตอนถัดไปในห้องดีล: อีกฝ่ายระบุที่อยู่ → ตกลงจุดนัดพบ (ใครไปหาใคร/เจอครึ่งทาง/จุดอื่น)
+              → เสนอยอดประกัน-อีกฝ่ายกดยอมรับ → ทั้งคู่วางเงิน → เจอกันสำเร็จรับเงินคืนเต็มจำนวน
+            </div>
+
+            {error && <p className="rv-error">{error}</p>}
+            <button className="btn btn-primary btn-block btn-lg" disabled={creating || !title.trim() || !myAddr.tambon || !guaranteeEnabled} onClick={createGuaranteeDeal}>
+              {creating ? 'กำลังสร้างดีล...' : 'สร้างดีลนัดรับ + รับลิงก์ชวนอีกฝ่าย →'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  const desktop = (
     <div className="sub-page service-sub-page service-trade-page service-meetup-page">
       <header className="sub-header">
         <Link href="/" className="sub-back" aria-label="ย้อนกลับ">
@@ -94,96 +184,32 @@ function MeetupInner() {
         <span className="sub-htitle">นัดรับผ่านกลาง</span>
         <HeaderAccountActions />
       </header>
-      <div className="svc-inner">
-
-        {step === 1 && (
-          <>
-            <div className="svc-hero">
-              <div className="svc-hero-icon">🚗</div>
-              <h1 className="svc-hero-title">เลือกรูปแบบบริการ</h1>
-            </div>
-            <div className="svc-modes">
-              {MODES.map(m => {
-                const enabled = m.kind === 'guarantee' ? guaranteeEnabled : safeZoneEnabled;
-                const note = m.kind === 'guarantee' ? controls.message('meetupGuarantee') : controls.message('meetupSafeZone');
-                return enabled ? (
-                  <div
-                    key={m.title}
-                    className="svc-mode"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => m.kind === 'guarantee' ? setStep(2) : router.push(m.href)}
-                  >
-                    <div className="svc-mode-media">
-                      <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 100vw, 50vw" />
-                    </div>
-                    <div className="svc-mode-title">{m.title}</div>
-                    <div className="svc-mode-cta">เริ่มต้น <span>→</span></div>
-                  </div>
-                ) : (
-                  <div key={m.title} className="svc-mode" style={{ opacity: 0.7, cursor: 'not-allowed' }}>
-                    <div className="svc-mode-media">
-                      <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 100vw, 50vw" />
-                    </div>
-                    <div className="svc-mode-title">{m.title}</div>
-                    <div className="svc-mode-cta" style={{ color: '#b7791f' }}>ปิดชั่วคราว</div>
-                    <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700', lineHeight: 1.6 }}>{note}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {step === 2 && (
-          <>
-            <DealFlowBrand docked />
-            <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => setStep(1)}>← ย้อนกลับ</button>
-            <h2 style={{ marginBottom: 6 }}>🚗 นัดรับ + รับประกันเดินทาง</h2>
-            <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 20, lineHeight: 1.65 }}>
-              <b>ระบุที่อยู่ของคุณคนเดียวพอ</b> — อีกฝ่ายจะระบุที่อยู่ของเขาเองเมื่อเข้าร่วมดีล
-              จากนั้นไปตกลงกันในห้องดีลว่าใครเดินทางไปหาใคร หรือนัดเจอจุดไหน พร้อมยอดประกันที่ทั้งคู่ต้องกดยอมรับ — บริการนี้<b>ไม่ต้องใช้คนกลาง</b>
-            </p>
-
-            <div className="mu-form">
-              <div className="mu-field">
-                <label>ฉันเป็น...</label>
-                <div className="svc-who-chips">
-                  {([['buyer', '🛍️ ผู้ซื้อ'], ['seller', '🛒 ผู้ขาย']] as const).map(([k, l]) => (
-                    <button key={k} className={`svc-chip${myRole === k ? ' sel' : ''}`} onClick={() => setMyRole(k)}>{l}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="mu-grid">
-                <div className="mu-field">
-                  <label>สินค้า/สิ่งที่นัดรับ *</label>
-                  <input value={title} onChange={e => setTitle(e.target.value)} maxLength={150} placeholder="เช่น iPhone 15 Pro มือสอง" />
-                </div>
-                <div className="mu-field">
-                  <label>ราคาสินค้า (บาท)</label>
-                  <input type="number" min="0" value={price} onChange={e => setPrice(e.target.value)} placeholder="ไม่บังคับ" />
-                </div>
-              </div>
-
-              <div className="mu-field">
-                <label>📍 ที่อยู่ของฉัน ({myRole === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}) — เลือกถึงระดับตำบลเพื่อระยะทางที่แม่นยำ *</label>
-                <AddressPicker value={myAddr} onChange={setMyAddr} />
-                {myAddr.tambon && <p style={{ fontSize: 12.5, color: 'var(--green-600)', marginTop: 8 }}>✅ {addressLabel(myAddr)}</p>}
-              </div>
-
-              <div className="mu-note" style={{ marginTop: 0 }}>
-                ขั้นตอนถัดไปในห้องดีล: อีกฝ่ายระบุที่อยู่ → ตกลงจุดนัดพบ (ใครไปหาใคร/เจอครึ่งทาง/จุดอื่น)
-                → เสนอยอดประกัน-อีกฝ่ายกดยอมรับ → ทั้งคู่วางเงิน → เจอกันสำเร็จรับเงินคืนเต็มจำนวน
-              </div>
-
-              {error && <p className="rv-error">{error}</p>}
-              <button className="btn btn-primary btn-block btn-lg" disabled={creating || !title.trim() || !myAddr.tambon || !guaranteeEnabled} onClick={createGuaranteeDeal}>
-                {creating ? 'กำลังสร้างดีล...' : 'สร้างดีลนัดรับ + รับลิงก์ชวนอีกฝ่าย →'}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+      {desktopBody}
     </div>
+  );
+
+  return (
+    <SubPageShell title="นัดรับผ่านกลาง" backHref="/" right={<HeaderAccountActions />} withBottomNav desktop={desktop}>
+      <MeetupApp
+        step={step}
+        onStep={setStep}
+        modes={MODES}
+        guaranteeEnabled={guaranteeEnabled}
+        safeZoneEnabled={safeZoneEnabled}
+        disabledMessage={kind => kind === 'guarantee' ? controls.message('meetupGuarantee') : controls.message('meetupSafeZone')}
+        myRole={myRole}
+        onRole={setMyRole}
+        title={title}
+        onTitle={setTitle}
+        price={price}
+        onPrice={setPrice}
+        myAddr={myAddr}
+        onAddr={setMyAddr}
+        error={error}
+        creating={creating}
+        onCreate={createGuaranteeDeal}
+      />
+    </SubPageShell>
   );
 }
 

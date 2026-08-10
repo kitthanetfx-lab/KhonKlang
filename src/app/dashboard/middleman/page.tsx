@@ -6,6 +6,8 @@ import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase'
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
+import { ResponsiveShell } from '@/components/mobile';
+import { MiddlemanDashboardApp } from '@/components/dashboard/MiddlemanDashboardApp';
 
 const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -213,6 +215,142 @@ export default function MiddlemanDashboard() {
   const history = deals.filter(d => FINAL.includes(d.status));
   const ti = TIER_INFO[tier] || TIER_INFO.Bronze;
 
+  const depositSummary = (
+    <div className="deal-card" style={{ gap: 14 }}>
+      <div className="deal-card-header">
+        <div style={{ flex: 1 }}>
+          <div className="deal-card-title">💰 เงินค้ำประกัน</div>
+          <div className="deal-card-meta">
+            <span>ยืนยันแล้ว {baht(confirmedTotal)} — ใช้เป็นเครดิตรับงานได้เต็มจำนวนนี้</span>
+          </div>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowDepositForm(v => !v)}>
+          {showDepositForm ? 'ปิด' : '+ เพิ่มเงินค้ำประกัน'}
+        </button>
+      </div>
+
+      <div className="info-banner">
+        <Icon name="info" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>ไม่มีขั้นต่ำและไม่มีเพดานต่อดีล — โอนเงินค้ำประกันเข้ามาเท่าไหร่ (และ admin ตรวจสอบยืนยันแล้ว) ใช้เป็นเครดิตรับงานได้เต็มจำนวนนั้นทันที</span>
+      </div>
+
+      {showDepositForm && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+          {companyFees?.companyBankAcct || companyFees?.companyQrFileId ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+              {companyFees.companyQrFileId && (
+                <div style={{ textAlign: 'center' }}>
+                  <img src={qrUrl(companyFees.companyQrFileId)} alt="QR พร้อมเพย์" style={{ width: 200, height: 200, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />
+                </div>
+              )}
+              {companyFees.companyBankAcct && (
+                <>
+                  <div className="party-box"><span className="party-box-role">ธนาคาร</span><span className="party-box-name">{companyFees.companyBankName}</span></div>
+                  <div className="party-box"><span className="party-box-role">เลขที่บัญชี</span><span className="party-box-name mono">{companyFees.companyBankAcct}</span></div>
+                  <div className="party-box"><span className="party-box-role">ชื่อบัญชี</span><span className="party-box-name">{companyFees.companyBankHolder}</span></div>
+                </>
+              )}
+            </div>
+          ) : (
+            <p style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center' }}>⚠️ ทีมงานยังไม่ได้ตั้งบัญชีรับเงิน กรุณาติดต่อแอดมินก่อนโอนเงิน</p>
+          )}
+
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>จำนวนเงินที่โอน (บาท) *</div>
+            <input className="pf-edit-input" type="number" min={1} value={depAmount} onChange={e => setDepAmount(e.target.value)} placeholder="เช่น 1000" />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {depSlip && <img src={qrUrl(depSlip)} alt="สลิป" style={{ width: 70, height: 70, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />}
+            <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer' }}>
+              {depUploading ? 'กำลังอัปโหลด...' : depSlip ? '🖼️ เปลี่ยนสลิป' : '🖼️ แนบสลิปการโอนเงิน *'}
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadDepSlip(f); e.target.value = ''; }} />
+            </label>
+          </div>
+
+          {depError && <div style={{ color: '#b22441', fontSize: 13, background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>⚠️ {depError}</div>}
+          {depOk && <div style={{ color: 'var(--green-700)', fontSize: 13, background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>✅ ส่งคำขอแล้ว รอ admin ตรวจสอบ</div>}
+
+          <button className="btn btn-primary" onClick={submitDeposit} disabled={depSubmitting}>{depSubmitting ? 'กำลังส่ง...' : 'ยืนยันการโอนเงินค้ำประกัน'}</button>
+        </div>
+      )}
+
+      {deposits.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>ประวัติการโอนเงินค้ำประกัน</div>
+          {deposits.slice(0, 5).map(d => (
+            <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
+              <span>{new Date(d.created_at).toLocaleDateString('th-TH')}</span>
+              <span style={{ fontWeight: 700 }}>{baht(d.amount)}</span>
+              <span>{DEPOSIT_STATUS_LABEL[d.status] || d.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const walletSummary = wallet ? (
+    <div className="deal-card" style={{ gap: 14 }}>
+      <div className="deal-card-header">
+        <div style={{ flex: 1 }}>
+          <div className="deal-card-title">เครดิตคนกลาง</div>
+          <div className="deal-card-meta"><span>วงเงิน {baht(wallet.credit_limit)}</span><span>อัปเดต {new Date(wallet.updated_at).toLocaleString('th-TH')}</span></div>
+        </div>
+        <span className="sb sb-green">พร้อมรับงาน {wallet.active_deal_count} รายการ</span>
+      </div>
+      <div className="parties-row">
+        <div className="party-box">
+          <span className="party-box-role">เครดิตคงเหลือ</span>
+          <span className="party-box-name" style={{ color: 'var(--accent-strong)' }}>{baht(wallet.available_credit)}</span>
+        </div>
+        <div className="party-box">
+          <span className="party-box-role">เครดิตที่ hold</span>
+          <span className="party-box-name">{baht(wallet.held_credit)}</span>
+        </div>
+        <div className="party-box">
+          <span className="party-box-role">เครดิตปลดแล้ว</span>
+          <span className="party-box-name">{baht(wallet.released_credit)}</span>
+        </div>
+      </div>
+      {wallet.penalty_credit > 0 && (
+        <div className="deal-action-needed">เครดิตถูกหักสะสม {baht(wallet.penalty_credit)}</div>
+      )}
+    </div>
+  ) : null;
+
+  const infoBanner = (
+    <div className="info-banner">
+      <Icon name="info" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+      <span>ผู้ซื้อเป็นคนเลือกคุณเป็นคนกลาง กดรีเฟรชเพื่อตรวจสอบดีลใหม่ที่เข้ามา</span>
+    </div>
+  );
+
+  const ledgerSummary = ledger.length > 0 ? (
+    <div className="deal-card">
+      <div className="deal-card-header">
+        <div>
+          <div className="deal-card-title">รายการเครดิตล่าสุด</div>
+          <div className="deal-card-meta"><span>ดูจาก wallet ledger จริง</span></div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {ledger.slice(0, 4).map(item => (
+          <div key={item.entry_key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700 }}>{item.purpose}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{item.deal_number || item.entry_key}</div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontWeight: 700 }}>{baht(item.amount)}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{LEDGER_STATUS[item.status] || item.status}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   if (loading) return (
     <div className="dash-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'dashSpin .8s linear infinite' }} />
@@ -248,7 +386,21 @@ export default function MiddlemanDashboard() {
     );
   }
 
-  return (
+  const dealTabPanel = (
+    <div className="dash-mm-grid">
+      {tab === 'active' && (active.length === 0 ? (
+        <div className="dash-empty">
+          <div className="dash-empty-icon">🤝</div>
+          <p>ยังไม่มีดีลที่กำลังดำเนินการ</p>
+          <p style={{ fontSize: 13, marginTop: 8 }}>รอผู้ซื้อเลือกคุณเป็นคนกลาง</p>
+          <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={refresh} disabled={refreshing}>🔄 ตรวจสอบอีกครั้ง</button>
+        </div>
+      ) : active.map(d => <DealCard key={d.id} deal={d} />))}
+      {tab === 'history' && (history.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติ</p></div> : history.map(d => <DealCard key={d.id} deal={d} />))}
+    </div>
+  );
+
+  const desktopView = (
     <div className="dash-root">
       <header className="dash-header">
         <button onClick={() => router.back()} className="dash-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
@@ -266,137 +418,10 @@ export default function MiddlemanDashboard() {
           <div className="tier-card-right"><div className="tier-card-dep-lbl">เงินค้ำประกันที่ยืนยันแล้ว</div><div className="tier-card-dep-val" style={{ color: ti.color }}>{baht(confirmedTotal)}</div></div>
         </div>
 
-        <div className="deal-card" style={{ gap: 14 }}>
-          <div className="deal-card-header">
-            <div style={{ flex: 1 }}>
-              <div className="deal-card-title">💰 เงินค้ำประกัน</div>
-              <div className="deal-card-meta">
-                <span>ยืนยันแล้ว {baht(confirmedTotal)} — ใช้เป็นเครดิตรับงานได้เต็มจำนวนนี้</span>
-              </div>
-            </div>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowDepositForm(v => !v)}>
-              {showDepositForm ? 'ปิด' : '+ เพิ่มเงินค้ำประกัน'}
-            </button>
-          </div>
-
-          <div className="info-banner">
-            <Icon name="info" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-            <span>ไม่มีขั้นต่ำและไม่มีเพดานต่อดีล — โอนเงินค้ำประกันเข้ามาเท่าไหร่ (และ admin ตรวจสอบยืนยันแล้ว) ใช้เป็นเครดิตรับงานได้เต็มจำนวนนั้นทันที</span>
-          </div>
-
-          {showDepositForm && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
-              {companyFees?.companyBankAcct || companyFees?.companyQrFileId ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-                  {companyFees.companyQrFileId && (
-                    <div style={{ textAlign: 'center' }}>
-                      <img src={qrUrl(companyFees.companyQrFileId)} alt="QR พร้อมเพย์" style={{ width: 200, height: 200, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />
-                    </div>
-                  )}
-                  {companyFees.companyBankAcct && (
-                    <>
-                      <div className="party-box"><span className="party-box-role">ธนาคาร</span><span className="party-box-name">{companyFees.companyBankName}</span></div>
-                      <div className="party-box"><span className="party-box-role">เลขที่บัญชี</span><span className="party-box-name mono">{companyFees.companyBankAcct}</span></div>
-                      <div className="party-box"><span className="party-box-role">ชื่อบัญชี</span><span className="party-box-name">{companyFees.companyBankHolder}</span></div>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <p style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center' }}>⚠️ ทีมงานยังไม่ได้ตั้งบัญชีรับเงิน กรุณาติดต่อแอดมินก่อนโอนเงิน</p>
-              )}
-
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>จำนวนเงินที่โอน (บาท) *</div>
-                <input className="pf-edit-input" type="number" min={1} value={depAmount} onChange={e => setDepAmount(e.target.value)} placeholder="เช่น 1000" />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                {depSlip && <img src={qrUrl(depSlip)} alt="สลิป" style={{ width: 70, height: 70, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />}
-                <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer' }}>
-                  {depUploading ? 'กำลังอัปโหลด...' : depSlip ? '🖼️ เปลี่ยนสลิป' : '🖼️ แนบสลิปการโอนเงิน *'}
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadDepSlip(f); e.target.value = ''; }} />
-                </label>
-              </div>
-
-              {depError && <div style={{ color: '#b22441', fontSize: 13, background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>⚠️ {depError}</div>}
-              {depOk && <div style={{ color: 'var(--green-700)', fontSize: 13, background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>✅ ส่งคำขอแล้ว รอ admin ตรวจสอบ</div>}
-
-              <button className="btn btn-primary" onClick={submitDeposit} disabled={depSubmitting}>{depSubmitting ? 'กำลังส่ง...' : 'ยืนยันการโอนเงินค้ำประกัน'}</button>
-            </div>
-          )}
-
-          {deposits.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>ประวัติการโอนเงินค้ำประกัน</div>
-              {deposits.slice(0, 5).map(d => (
-                <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
-                  <span>{new Date(d.created_at).toLocaleDateString('th-TH')}</span>
-                  <span style={{ fontWeight: 700 }}>{baht(d.amount)}</span>
-                  <span>{DEPOSIT_STATUS_LABEL[d.status] || d.status}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {wallet && (
-          <div className="deal-card" style={{ gap: 14 }}>
-            <div className="deal-card-header">
-              <div style={{ flex: 1 }}>
-                <div className="deal-card-title">เครดิตคนกลาง</div>
-                <div className="deal-card-meta"><span>วงเงิน {baht(wallet.credit_limit)}</span><span>อัปเดต {new Date(wallet.updated_at).toLocaleString('th-TH')}</span></div>
-              </div>
-              <span className="sb sb-green">พร้อมรับงาน {wallet.active_deal_count} รายการ</span>
-            </div>
-            <div className="parties-row">
-              <div className="party-box">
-                <span className="party-box-role">เครดิตคงเหลือ</span>
-                <span className="party-box-name" style={{ color: 'var(--accent-strong)' }}>{baht(wallet.available_credit)}</span>
-              </div>
-              <div className="party-box">
-                <span className="party-box-role">เครดิตที่ hold</span>
-                <span className="party-box-name">{baht(wallet.held_credit)}</span>
-              </div>
-              <div className="party-box">
-                <span className="party-box-role">เครดิตปลดแล้ว</span>
-                <span className="party-box-name">{baht(wallet.released_credit)}</span>
-              </div>
-            </div>
-            {wallet.penalty_credit > 0 && (
-              <div className="deal-action-needed">เครดิตถูกหักสะสม {baht(wallet.penalty_credit)}</div>
-            )}
-          </div>
-        )}
-
-        <div className="info-banner">
-          <Icon name="info" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-          <span>ผู้ซื้อเป็นคนเลือกคุณเป็นคนกลาง กดรีเฟรชเพื่อตรวจสอบดีลใหม่ที่เข้ามา</span>
-        </div>
-
-        {ledger.length > 0 && (
-          <div className="deal-card">
-            <div className="deal-card-header">
-              <div>
-                <div className="deal-card-title">รายการเครดิตล่าสุด</div>
-                <div className="deal-card-meta"><span>ดูจาก wallet ledger จริง</span></div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {ledger.slice(0, 4).map(item => (
-                <div key={item.entry_key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700 }}>{item.purpose}</div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{item.deal_number || item.entry_key}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontWeight: 700 }}>{baht(item.amount)}</div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{LEDGER_STATUS[item.status] || item.status}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {depositSummary}
+        {walletSummary}
+        {infoBanner}
+        {ledgerSummary}
 
         <div className="dash-tabs-inline">
           {([{ k: 'active', l: `กำลังดีล (${active.length})` }, { k: 'history', l: `ประวัติ (${history.length})` }] as const).map(({ k, l }) => (
@@ -404,18 +429,35 @@ export default function MiddlemanDashboard() {
           ))}
         </div>
 
-        <div className="dash-mm-grid">
-          {tab === 'active' && (active.length === 0 ? (
-            <div className="dash-empty">
-              <div className="dash-empty-icon">🤝</div>
-              <p>ยังไม่มีดีลที่กำลังดำเนินการ</p>
-              <p style={{ fontSize: 13, marginTop: 8 }}>รอผู้ซื้อเลือกคุณเป็นคนกลาง</p>
-              <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={refresh} disabled={refreshing}>🔄 ตรวจสอบอีกครั้ง</button>
-            </div>
-          ) : active.map(d => <DealCard key={d.id} deal={d} />))}
-          {tab === 'history' && (history.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติ</p></div> : history.map(d => <DealCard key={d.id} deal={d} />))}
-        </div>
+        {dealTabPanel}
       </main>
     </div>
+  );
+
+  return (
+    <ResponsiveShell
+      mobile={
+        <MiddlemanDashboardApp
+          tab={tab}
+          onTabChange={setTab}
+          onRefresh={refresh}
+          refreshing={refreshing}
+          tier={tier}
+          tierColor={ti.color}
+          tierBg={ti.bg}
+          confirmedTotal={confirmedTotal}
+          baht={baht}
+          activeCount={active.length}
+          historyCount={history.length}
+          depositSummary={depositSummary}
+          walletSummary={walletSummary}
+          infoBanner={infoBanner}
+          ledgerSummary={ledgerSummary}
+        >
+          {dealTabPanel}
+        </MiddlemanDashboardApp>
+      }
+      desktop={desktopView}
+    />
   );
 }
