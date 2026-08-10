@@ -1,5 +1,11 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (14:50)
+
+### แก้ build error slipok.ts — Buffer → Uint8Array ก่อน fetch
+
+---
+
 ## 2026-08-10 (14:45)
 
 ### SlipOK 404 — multipart manual + วินิจฉัยชัดขึ้น

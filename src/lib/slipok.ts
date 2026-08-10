@@ -125,10 +125,11 @@ async function postSlipok(
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
   try {
+    const fetchBody: BodyInit = Buffer.isBuffer(body) ? Uint8Array.from(body) : body;
     const res = await fetch(`https://api.slipok.com/api/line/apikey/${encodeURIComponent(branchId)}`, {
       method: 'POST',
       headers: { ...headers, 'x-authorization': apiKey },
-      body,
+      body: fetchBody,
     });
     const text = await res.text();
     let j: Record<string, unknown> = {};
