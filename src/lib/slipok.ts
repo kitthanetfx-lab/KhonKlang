@@ -1,8 +1,6 @@
 // ตรวจสลิปโอนเงินผ่าน SlipOK (https://slipok.com) — ใช้ฝั่ง server เท่านั้น (มี API key)
 // ตั้งค่าใน .env.local: SLIPOK_BRANCH_ID, SLIPOK_API_KEY (และเพิ่มใน Vercel ด้วย)
 
-import { File as NodeFile } from 'node:buffer';
-
 export interface SlipInfo {
   amount: number;
   transRef: string;
@@ -231,7 +229,8 @@ export async function verifySlipByImageBytes(
   }
   const form = new FormData();
   const mime = slipImageMime(filename);
-  form.append('files', new NodeFile([imageBytes], filename, { type: mime }));
+  const bytes = Uint8Array.from(imageBytes);
+  form.append('files', new Blob([bytes], { type: mime }), filename);
   form.append('log', 'true');
   if (expectedAmount != null && expectedAmount > 0) form.append('amount', String(Math.round(expectedAmount)));
   return postSlipok(form, {}, 'upload');
