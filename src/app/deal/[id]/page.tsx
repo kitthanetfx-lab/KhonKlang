@@ -1361,12 +1361,12 @@ export default function DealRoom() {
   }
 
   if (loading || authLoading) return (
-    <div className="dr-root" style={{ alignItems: 'center', justifyContent: 'center' }}>
+    <div className="dr-root dr-app-mobile" style={{ alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'dashSpin .8s linear infinite' }} />
     </div>
   );
   if (!deal) return (
-    <div className="dr-root" style={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 14, padding: 24 }}>
+    <div className="dr-root dr-app-mobile" style={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 14, padding: 24 }}>
       <p style={{ fontSize: 22 }}>❌ ไม่พบ Deal</p>
       {dealError && <p style={{ fontSize: 13, color: '#b22441', background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', padding: '8px 14px' }}>{dealError}</p>}
       <p style={{ color: 'var(--muted)', fontSize: 14 }}>Deal อาจถูกลบหรือลิงก์ไม่ถูกต้อง</p>
@@ -1407,7 +1407,7 @@ export default function DealRoom() {
       completed: 'เสร็จสมบูรณ์', cancelled: 'ยกเลิก', disputed: 'ข้อพิพาท',
     };
     return (
-      <div className="dr-root">
+      <div className="dr-root dr-app-mobile">
         <InAppBanner />
         <header className="dr-header">
           <Link href="/admin/deals" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
@@ -1490,7 +1490,7 @@ export default function DealRoom() {
       else doAction(role === 'buyer' ? 'join_as_buyer' : 'join_as_seller');
     }
     return (
-      <div className="dr-root">
+      <div className="dr-root dr-app-mobile">
         <InAppBanner />
         <header className="dr-header">
           <Link href="/" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
@@ -5333,7 +5333,7 @@ export default function DealRoom() {
 
   // ─── Main render ─────────────────────────────────────────────────────────
   return (
-    <div className="dr-root">
+    <div className="dr-root dr-app-mobile">
       <InAppBanner />
       <header className="dr-header">
         <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>

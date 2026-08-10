@@ -525,7 +525,7 @@ function SellerForm() {
         onDecline={() => router.replace('/register')}
       />
     )}
-    <div className="min-h-screen py-10 px-4 sm:px-6">
+    <div className="min-h-screen py-10 px-4 sm:px-6 reg-wizard-app-shell">
       <div className="max-w-xl mx-auto">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-1.5 rounded-full text-sm font-medium mb-3">

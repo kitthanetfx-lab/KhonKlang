@@ -110,7 +110,7 @@ export default function OnsiteJobDetail({ params }: { params: Promise<{ id: stri
   const stepIdx      = STATUS_STEPS.findIndex(s => s.key === job.status);
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-white">
+    <div className="min-h-screen bg-[#0a0f1e] text-white onsite-app-shell">
       {/* Header */}
       <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
         <button onClick={() => router.back()} className="text-gray-400 hover:text-white">←</button>

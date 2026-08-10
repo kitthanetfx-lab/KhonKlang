@@ -318,7 +318,7 @@ function MiddlemanForm() {
         onDecline={() => router.replace('/register')}
       />
     )}
-    <div className="min-h-screen py-10 px-4 sm:px-6">
+    <div className="min-h-screen py-10 px-4 sm:px-6 reg-wizard-app-shell">
       <div className="max-w-xl mx-auto">
 
         {/* Header */}

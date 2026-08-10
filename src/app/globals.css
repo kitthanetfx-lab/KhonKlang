@@ -8119,3 +8119,95 @@ html:not([data-theme='dark']) .home-app-logo--dark { display: none; }
   color: #7a5c00;
 }
 .svc-app-flow .btn { min-height: 48px; }
+
+/* Payment / System notice mobile apps */
+.pay-app-summary { margin-bottom: 12px; }
+.pay-app-lbl { font-size: 13px; color: #64748b; }
+.pay-app-amount { font-size: 28px; font-weight: 800; margin: 4px 0; }
+.pay-app-period { font-size: 13px; color: #64748b; margin-bottom: 10px; }
+.pay-app-features { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
+.pay-app-bank h2 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
+.pay-app-bank dl { margin: 0; display: grid; gap: 8px; }
+.pay-app-bank dt { font-size: 11px; color: #94a3b8; font-weight: 700; }
+.pay-app-bank dd { margin: 0; font-size: 14px; font-weight: 600; }
+.pay-app-upload { width: 100%; min-height: 88px; border-radius: 14px; border: 2px dashed rgba(15,23,42,.15); background: #fff; margin: 12px 0; font-size: 14px; font-weight: 600; cursor: pointer; }
+.pay-app-upload.is-on { border-color: #16a34a; background: #f0fdf4; color: #15803d; }
+.pay-app-submit { min-height: 48px; margin-top: 8px; }
+.pay-app-success { text-align: center; padding: 48px 16px; }
+.pay-app-success-ic { font-size: 56px; margin-bottom: 12px; }
+.sys-app-card { text-align: center; padding: 32px 16px; background: #fff; border-radius: 16px; border: 1px solid rgba(15,23,42,.06); display: grid; gap: 12px; justify-items: center; }
+.sys-app-ic { font-size: 48px; }
+.sys-app-reopen { color: var(--app-accent, #2f6bf0); font-weight: 700; margin: 0; }
+.sys-app-dev { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
+.sys-app-dev button { min-height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(15,23,42,.1); background: #fff; font-size: 12px; }
+.sys-app-dev button.is-on { background: #eef4ff; color: #2f6bf0; font-weight: 700; }
+.auth-complete-app { min-height: 60vh; display: grid; place-items: center; gap: 12px; text-align: center; color: #94a3b8; }
+
+/* Deal room — mobile app layout (single DOM, CSS transform) */
+@media (max-width: 767px) {
+  .dr-root.dr-app-mobile {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: #f4f6fb;
+  }
+  .dr-root.dr-app-mobile .dr-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: rgba(255,255,255,.96);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(15,23,42,.06);
+    padding: 8px 12px;
+  }
+  .dr-root.dr-app-mobile .dr-htitle { font-size: 15px; font-weight: 800; }
+  .dr-root.dr-app-mobile .dr-hsub { font-size: 11px; line-height: 1.4; }
+  .dr-root.dr-app-mobile .dr-tabs {
+    position: sticky;
+    top: 56px;
+    z-index: 35;
+    background: #fff;
+    border-bottom: 1px solid rgba(15,23,42,.06);
+    padding: 0 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dr-root.dr-app-mobile .dr-tab-btn { min-height: 44px; font-size: 13px; white-space: nowrap; }
+  .dr-root.dr-app-mobile .dr-main,
+  .dr-root.dr-app-mobile main { padding: 12px !important; }
+  .dr-root.dr-app-mobile .dr-floatbar {
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    right: 12px;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(15,23,42,.12);
+  }
+  .dr-root.dr-app-mobile .dr-card { border-radius: 16px; }
+  .dr-root.dr-app-mobile .btn { min-height: 44px; }
+}
+
+@media (max-width: 767px) {
+  .reg-wizard-app-shell {
+    background: var(--app-surface, #f4f6fb);
+    padding: 0 0 24px !important;
+    min-height: calc(100dvh - 56px);
+  }
+  .reg-wizard-app-shell .glass-panel {
+    border-radius: 16px;
+    box-shadow: none;
+    border: 1px solid rgba(15,23,42,.06);
+    margin: 0 14px;
+    padding: 16px !important;
+  }
+  .reg-wizard-app-shell .text-center.mb-8 { padding: 12px 14px 0; margin-bottom: 12px !important; }
+  .reg-wizard-app-shell h1 { font-size: 20px !important; }
+  .reg-wizard-app-shell button { min-height: 44px; }
+  .reg-wizard-app-shell input,
+  .reg-wizard-app-shell select,
+  .reg-wizard-app-shell textarea { font-size: 16px !important; min-height: 48px; }
+  .onsite-app-shell { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .onsite-app-shell input,
+  .onsite-app-shell select,
+  .onsite-app-shell textarea { font-size: 16px !important; min-height: 48px; }
+  .onsite-app-shell button { min-height: 48px; }
+}

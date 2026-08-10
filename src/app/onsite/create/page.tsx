@@ -60,7 +60,7 @@ export default function CreateOnsiteJob() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-white">
+    <div className="min-h-screen bg-[#0a0f1e] text-white onsite-app-shell">
       <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
         <Link href="/service/onsite" className="text-gray-400 hover:text-white">←</Link>
         <h1 className="text-xl font-bold">สร้างคำขอลงพื้นที่</h1>
