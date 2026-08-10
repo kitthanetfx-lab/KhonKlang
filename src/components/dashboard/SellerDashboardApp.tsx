@@ -6,7 +6,6 @@ import { AppPage } from '@/components/mobile/AppPage';
 import { AppHeader } from '@/components/mobile/AppHeader';
 import { AppFeed } from '@/components/mobile/AppStates';
 import { AppSegment } from '@/components/mobile/AppSegment';
-import { Icon } from '@/components/Icon';
 
 type TabId = 'selling' | 'packing' | 'shipping' | 'done' | 'history';
 
@@ -45,7 +44,6 @@ export function SellerDashboardApp({
   tab,
   tabs,
   onTabChange,
-  onBack,
   onPost,
   shopName,
   shopTagline,

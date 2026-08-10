@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { AppPage } from '@/components/mobile/AppPage';
 import { AppHeader } from '@/components/mobile/AppHeader';
 import { AppEmpty } from '@/components/mobile/AppStates';

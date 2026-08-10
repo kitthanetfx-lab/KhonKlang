@@ -677,7 +677,6 @@ export default function SellerDashboard() {
             tab={tab}
             tabs={sellerTabs.map(({ k, l }) => ({ id: k, label: l }))}
             onTabChange={setTab}
-            onBack={() => router.back()}
             onPost={() => { setPostError(''); setPostDone(false); setPostModal('pick'); }}
             shopName={shopName}
             shopTagline={shopTagline}
