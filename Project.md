@@ -1,5 +1,14 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (14:55)
+
+### แก้ SlipOK 1000 — ส่ง FormData แทน JSON (สลิปไม่ได้ขาด)
+
+**สาเหตุ**: รหัส 1000 แปลว่า SlipOK API ไม่ได้รับ field `files`/`url` — เราส่ง URL เป็น JSON ทั้งที่ SDK ใช้ FormData
+**แก้**: `verifySlipByUrl` + `verifySlipByImageBytes` ใช้ FormData ตาม SlipOK SDK, ข้อความ 1000 ชัดขึ้น + แสดง trail วินิจฉัย
+
+---
+
 ## 2026-08-10 (14:50)
 
 ### แก้ build error slipok.ts — Buffer → Uint8Array ก่อน fetch
