@@ -316,17 +316,21 @@ export default function Marketplace() {
             <span className="lc-auction-foot-bidders">👥 {a.uniqueBidderCount} คน bid</span>
             <span className="lc-auction-foot-sep">·</span>
             <span className="lc-auction-bid-step">+฿{a.bidIncrement.toLocaleString()}/bid</span>
-            {listing.location && (
-              <>
-                <span className="lc-auction-foot-sep">·</span>
-                <span>📍 {listing.location}</span>
-              </>
-            )}
-            {listing.condition && (
-              <>
-                <span className="lc-auction-foot-sep">·</span>
-                <span>{listing.condition}</span>
-              </>
+            {(listing.location || listing.condition) && (
+              <span className="lc-auction-foot-extra">
+                {listing.location && (
+                  <>
+                    <span className="lc-auction-foot-sep">·</span>
+                    <span>📍 {listing.location}</span>
+                  </>
+                )}
+                {listing.condition && (
+                  <>
+                    <span className="lc-auction-foot-sep">·</span>
+                    <span>{listing.condition}</span>
+                  </>
+                )}
+              </span>
             )}
           </div>
           {(listing.seller_id === myId || listing.buyer_id === myId) && (
