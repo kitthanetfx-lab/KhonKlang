@@ -939,10 +939,16 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   font-size: 13px !important;
 }
 
-/* marketplace container — เว้นขอบ ~1 ซม. */
+/* marketplace container — มือถือแคบพอดี · เดสก์ท็อปเว้นขอบมากขึ้น */
 .mkt-container {
-  padding-left: max(16px, 1cm) !important;
-  padding-right: max(16px, 1cm) !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+@media (min-width: 640px) {
+  .mkt-container {
+    padding-left: max(16px, 0.6cm) !important;
+    padding-right: max(16px, 0.6cm) !important;
+  }
 }
 @media (min-width: 768px) {
   .mkt-container {
@@ -5615,6 +5621,16 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 
 /* ========== ตลาด/ประมูล — มือถือจัดใหม่ตาม UI/UX (ไม่แตะ desktop) ========== */
 @media (max-width: 639px) {
+  /* ใช้ความกว้างจอเกือบเต็ม — ไม่เว้น 1cm */
+  .mkt-container {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .mkt-hero .container.mkt-container {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
   /* เป้าหมายชัด: แท็บโซน + ค้นหา + สินค้าขึ้นเร็ว */
   .mkt-hero {
     padding: 10px 0 8px;
@@ -5633,11 +5649,12 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   }
   .mkt-mode-tab {
     width: 100%;
+    min-height: 44px;
     padding: 10px 8px;
-    font-size: 13px;
-    gap: 5px;
+    font-size: 14px;
+    gap: 6px;
   }
-  .mkt-mode-tab-ic { font-size: 14px; }
+  .mkt-mode-tab-ic { font-size: 15px; }
   .mkt-headline {
     font-size: 18px;
     line-height: 1.25;
@@ -5649,38 +5666,48 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
     display: none !important;
   }
 
-  /* ค้นหาเดียวชัด — หมวดใน dropdown พอ (progressive disclosure) */
+  /* ค้นหาเต็มความกว้าง · เป้าหมายสัมผัส ~44px */
   .mkt-yahoo-panel {
     border-radius: 12px;
     box-shadow: 0 2px 12px rgba(15, 23, 42, .05);
   }
   .mkt-yahoo-search-row {
-    padding: 10px;
+    padding: 8px;
     gap: 0;
     border-bottom: none;
   }
   .mkt-yahoo-cats { display: none !important; }
   .mkt-yahoo-search {
+    width: 100%;
+    min-height: 48px;
     border-width: 1.5px;
-    border-radius: 10px;
+    border-radius: 12px;
+  }
+  .mkt-yahoo-cat-select {
+    display: flex;
+    align-items: stretch;
   }
   .mkt-yahoo-cat-select select {
-    min-width: 88px;
-    max-width: 100px;
-    padding: 11px 26px 11px 10px;
-    font-size: 12px;
-    background-position: right 8px center;
+    min-width: 96px;
+    max-width: 108px;
+    min-height: 48px;
+    padding: 0 28px 0 12px;
+    font-size: 13px;
+    background-position: right 10px center;
   }
   .mkt-hero--auction .mkt-yahoo-cat-select select {
-    background-position: right 8px center, 0 0;
+    background-position: right 10px center, 0 0;
   }
   .mkt-yahoo-input {
-    padding: 11px 10px;
-    font-size: 15px;
+    min-height: 48px;
+    padding: 0 12px;
+    font-size: 16px; /* ลด zoom อัตโนมัติบน iOS */
   }
   .mkt-yahoo-submit {
-    padding: 0 14px;
-    font-size: 13px;
+    min-height: 48px;
+    min-width: 72px;
+    padding: 0 16px;
+    font-size: 15px;
   }
 
   /* มุมมองประมูล + toolbar กะทัดรัด */
@@ -5692,23 +5719,25 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   .mkt-auction-view-tab {
     flex: 1 1 auto;
     text-align: center;
-    padding: 8px 12px;
-    font-size: 13px;
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 14px;
   }
   .mkt-toolbar {
     gap: 8px;
     margin-bottom: 10px;
-    padding: 8px 10px;
+    padding: 10px;
     border-radius: 12px;
   }
-  .mkt-count { font-size: 12px; }
+  .mkt-count { font-size: 13px; }
   .mkt-filter-pill,
   .mkt-filter-chip {
-    padding: 6px 10px;
-    font-size: 12px;
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 13px;
   }
-  .mkt-filter-pill select { font-size: 12px; max-width: 110px; }
-  .mkt-filter-label { font-size: 11px; }
+  .mkt-filter-pill select { font-size: 13px; max-width: 120px; }
+  .mkt-filter-label { font-size: 12px; }
 
   /* กริด + การ์ดตลาด — hierarchy ชัด อ่านง่าย */
   .mkt-grid { gap: 10px; }
