@@ -240,141 +240,6 @@ export default function MarketplaceDetailPage() {
             <Link href={isAuction ? '/marketplace?zone=auction' : '/marketplace'} className="btn btn-ghost btn-sm"><Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} /> {isAuction ? 'กลับตลาดประมูล' : 'กลับตลาดซื้อขาย'}</Link>
           </div>
 
-          {isAuction ? (
-            <article className="mkt-detail-card mkt-detail-card--auction">
-              <header className="mkt-detail-header">
-                <div className="mkt-detail-badges">
-                  {listing.category && <span className="badge badge-gray">{listing.category}</span>}
-                  {listing.condition && <span className="badge badge-gray">{listing.condition}</span>}
-                  <span className="badge badge-purple">🔨 ประมูล</span>
-                </div>
-                <h1 className="mkt-detail-title">{listing.title}</h1>
-                <div className="mkt-detail-summary">
-                  <span className="mkt-detail-summary-price">
-                    {auction.bidCount > 0 ? '฿' : 'เริ่ม ฿'}{displayPrice.toLocaleString()}
-                  </span>
-                  <span className="mkt-detail-summary-sep">·</span>
-                  <span className="mkt-detail-summary-time">
-                    <AuctionCountdown endsAt={auction.endsAt} endedAt={auction.endedAt} variant="card" liveClassName="is-live" />
-                  </span>
-                  <span className="mkt-detail-summary-sep">·</span>
-                  <span className="mkt-detail-summary-leader">
-                    🏆 {auction.currentBidderName || 'ยังไม่มี bid'}
-                  </span>
-                  <span className="mkt-detail-summary-sep">·</span>
-                  <span>👥 {auction.uniqueBidderCount} คน · +฿{auction.bidIncrement.toLocaleString()}/bid</span>
-                </div>
-              </header>
-
-              <div className="mkt-detail-body">
-                <section className="mkt-detail-gallery">
-                  <div className="mkt-detail-main">
-                    {displayImage ? (
-                      <img src={displayImage} alt={listing.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div className="mkt-detail-fallback"><Icon name="package" size={40} /></div>
-                    )}
-                  </div>
-                  {images.length > 1 && (
-                    <div className="mkt-detail-thumbs">
-                      {images.map(src => (
-                        <button key={src} type="button" className={`mkt-detail-thumb${displayImage === src ? ' active' : ''}`} onClick={() => setMainImage(src)}>
-                          <img src={src} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <section className="mkt-detail-main-col">
-                  {isOwner ? (
-                    <Link href={listing.status === 'posted' ? `/marketplace/${listing.id}` : `/deal/${listing.id}`} className="btn btn-primary btn-lg">รายการของคุณ</Link>
-                  ) : auction.phase === 'live' ? (
-                    <>
-                      <div className="mkt-detail-bid-panel">
-                        <h2 className="mkt-detail-bid-title">🔨 วาง Bid</h2>
-                        <div className="mkt-bid-form">
-                          <label>ราคา bid ครั้งนี้ (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
-                          <div className="mkt-bid-row mkt-bid-row--primary">
-                            <input type="number" min={auction.minNextBid} step={auction.bidIncrement} value={bidAmount} onChange={e => setBidAmount(e.target.value)} />
-                            <button type="button" className="btn btn-primary btn-lg" onClick={placeBid} disabled={bidding}>
-                              {bidding ? 'กำลัง bid...' : 'Bid'}
-                            </button>
-                          </div>
-                          <label className="mkt-bid-max-label">
-                            ราคาสูงสุดที่สู้ (auto-bid)
-                            <span className="mkt-bid-max-hint">สู้ให้อัตโนมัติเมื่อถูก overbid จนถึงเพดาน</span>
-                          </label>
-                          <div className="mkt-bid-row">
-                            <input
-                              type="number"
-                              min={auction.minNextBid}
-                              step={auction.bidIncrement}
-                              value={maxBidAmount}
-                              onChange={e => setMaxBidAmount(e.target.value)}
-                              placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
-                            />
-                          </div>
-                          {myAutoBidMax != null && (
-                            <p className="mkt-bid-auto-active">🤖 ตั้ง auto-bid ไว้สูงสุด ฿{myAutoBidMax.toLocaleString()}</p>
-                          )}
-                          {bidError && <p className="mkt-bid-error">{bidError}</p>}
-                        </div>
-                      </div>
-                      {canSellerChat && (
-                        <button type="button" className="btn btn-soft btn-sm mkt-detail-chat-btn" onClick={sellerChatHref}>
-                          <Icon name="chat" size={16} /> แชทผู้ขาย
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <div className="mkt-detail-note-card">
-                      <div className="mkt-detail-note-title">
-                        {listing.buyer_id || auction.endedAt ? 'ขายแล้ว · ประมูลปิด' : 'ประมูลปิดแล้ว'}
-                      </div>
-                      <p>{auction.currentBidderName ? `ผู้ชนะ: ${auction.currentBidderName} · ฿${(auction.currentBid || displayPrice).toLocaleString()}` : 'ไม่มีผู้ bid'}</p>
-                      {myId && listing.buyer_id === myId && (
-                        <Link href={`/cart/checkout/${listing.id}`} className="btn btn-primary btn-lg" style={{ marginTop: 12 }}>
-                          ไปชำระเงิน →
-                        </Link>
-                      )}
-                    </div>
-                  )}
-
-                  {auctionBids.length > 0 && (
-                    <div className="mkt-bid-history">
-                      <h3>ประวัติ bid ล่าสุด</h3>
-                      <ul>
-                        {auctionBids.map(b => (
-                          <li key={b.id}>
-                            <span>{b.bidder_name}</span>
-                            <strong>฿{b.amount.toLocaleString()}</strong>
-                            <time>{new Date(b.created_at).toLocaleString('th-TH')}</time>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <details className="mkt-detail-more">
-                    <summary>รายละเอียดและร้านค้า</summary>
-                    <div className="mkt-detail-more-body">
-                      <div className="mkt-detail-meta">
-                        <span><Icon name="user" size={15} /> {listing.seller_name || 'ผู้ขาย'}</span>
-                        {listing.location && <span><Icon name="mapPin" size={15} /> {listing.location}</span>}
-                      </div>
-                      {listing.description && <p className="mkt-detail-desc">{listing.description}</p>}
-                      {sellerShop && (
-                        <Link href={`/shop/${sellerShop.sellerId || listing.seller_id}`} className="mkt-detail-shop-link">
-                          🏪 {sellerShop.name} →
-                        </Link>
-                      )}
-                    </div>
-                  </details>
-                </section>
-              </div>
-            </article>
-          ) : (
           <div className="mkt-detail-grid">
             <section className="mkt-detail-gallery">
               <div className="mkt-detail-main">
@@ -399,15 +264,44 @@ export default function MarketplaceDetailPage() {
               <div className="mkt-detail-badges">
                 {listing.category && <span className="badge badge-gray">{listing.category}</span>}
                 {listing.condition && <span className="badge badge-gray">{listing.condition}</span>}
+                {isAuction && <span className="badge badge-purple">🔨 ประมูล</span>}
                 {isCertifiedMode(listing.selling_mode) && <span className="badge badge-amber">⭐ Certified</span>}
               </div>
 
               <h1 className="mkt-detail-title">{listing.title}</h1>
-              <div className="mkt-detail-price">฿{displayPrice.toLocaleString()}</div>
-              <div className="mkt-detail-shipping">
-                <span>ค่าขนส่ง</span>
-                <strong>{shippingCost > 0 ? `฿${shippingCost.toLocaleString()}` : 'ฟรี'}</strong>
+              <div className="mkt-detail-price">
+                {isAuction && auction.bidCount > 0 ? 'ราคาปัจจุบัน ' : isAuction ? 'ราคาเริ่ม ' : ''}
+                ฿{displayPrice.toLocaleString()}
               </div>
+              {!isAuction && (
+                <div className="mkt-detail-shipping">
+                  <span>ค่าขนส่ง</span>
+                  <strong>{shippingCost > 0 ? `฿${shippingCost.toLocaleString()}` : 'ฟรี'}</strong>
+                </div>
+              )}
+
+              {isAuction && (
+                <div className="mkt-auction-panel">
+                  <div className="mkt-auction-stat">
+                    <span className="mkt-auction-stat-lbl">เหลือเวลา</span>
+                    <strong className="mkt-auction-countdown">
+                      <AuctionCountdown endsAt={auction.endsAt} endedAt={auction.endedAt} liveClassName="is-live" />
+                    </strong>
+                  </div>
+                  <div className="mkt-auction-stat">
+                    <span className="mkt-auction-stat-lbl">ผู้ประมูล</span>
+                    <strong>{auction.uniqueBidderCount} คน · {auction.bidCount} bid</strong>
+                  </div>
+                  <div className="mkt-auction-stat">
+                    <span className="mkt-auction-stat-lbl">นำอยู่</span>
+                    <strong>{auction.currentBidderName || '— ยังไม่มี'}</strong>
+                  </div>
+                  <div className="mkt-auction-stat">
+                    <span className="mkt-auction-stat-lbl">บิทครั้งละ</span>
+                    <strong>฿{auction.bidIncrement.toLocaleString()}</strong>
+                  </div>
+                </div>
+              )}
               <div className="mkt-detail-meta">
                 <span><Icon name="user" size={15} /> {listing.seller_name || 'ผู้ขาย'}</span>
                 {listing.location && <span><Icon name="mapPin" size={15} /> {listing.location}</span>}
@@ -416,14 +310,77 @@ export default function MarketplaceDetailPage() {
               {listing.description && <p className="mkt-detail-desc">{listing.description}</p>}
 
               {sellerShop && (
-                <Link href={`/shop/${sellerShop.sellerId || listing.seller_id}`} className="mkt-detail-shop-link">
-                  🏪 {sellerShop.name} →
+                <Link href={`/shop/${sellerShop.sellerId || listing.seller_id}`} className="mkt-detail-note-card shop-detail-link" style={{ background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb, var(--accent) 24%, var(--line))', textDecoration: 'none', display: 'block' }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    {sellerShop.avatarFileId ? (
+                      <img src={fileViewUrl(DEAL_BUCKET, sellerShop.avatarFileId)} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--surface)', display: 'grid', placeItems: 'center', fontSize: 22 }}>🏪</div>
+                    )}
+                    <div>
+                      <div className="mkt-detail-note-title">🏪 {sellerShop.name}</div>
+                      {sellerShop.tagline && <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--ink-2)' }}>{sellerShop.tagline}</p>}
+                      {sellerShop.location && <p style={{ margin: '4px 0 0', fontSize: 14 }}>📍 {sellerShop.location}</p>}
+                    </div>
+                  </div>
+                  <p style={{ margin: '10px 0 0', fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>เข้าชมหน้าร้าน →</p>
                 </Link>
               )}
 
               <div className="mkt-detail-actions">
                 {isOwner ? (
                   <Link href={listing.status === 'posted' ? `/marketplace/${listing.id}` : `/deal/${listing.id}`} className="btn btn-primary btn-lg">รายการของคุณ</Link>
+                ) : isAuction ? (
+                  auction.phase === 'live' ? (
+                    <>
+                      <div className="mkt-detail-bid-panel">
+                        <div className="mkt-bid-form">
+                          <label>ราคา bid ครั้งนี้ (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
+                          <div className="mkt-bid-row">
+                            <input type="number" min={auction.minNextBid} step={auction.bidIncrement} value={bidAmount} onChange={e => setBidAmount(e.target.value)} />
+                          </div>
+                          <label className="mkt-bid-max-label">
+                            ราคาสูงสุดที่สู้ (auto-bid)
+                            <span className="mkt-bid-max-hint">ระบบ bid ให้อัตโนมัติเมื่อมีคน overbid จนถึงเพดานนี้</span>
+                          </label>
+                          <div className="mkt-bid-row">
+                            <input
+                              type="number"
+                              min={auction.minNextBid}
+                              step={auction.bidIncrement}
+                              value={maxBidAmount}
+                              onChange={e => setMaxBidAmount(e.target.value)}
+                              placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
+                            />
+                            <button type="button" className="btn btn-primary btn-lg" onClick={placeBid} disabled={bidding}>
+                              {bidding ? 'กำลัง bid...' : '🔨 Bid'}
+                            </button>
+                          </div>
+                          {myAutoBidMax != null && (
+                            <p className="mkt-bid-auto-active">🤖 ตั้ง auto-bid ไว้สูงสุด ฿{myAutoBidMax.toLocaleString()}</p>
+                          )}
+                          {bidError && <p className="mkt-bid-error">{bidError}</p>}
+                        </div>
+                      </div>
+                      {canSellerChat && (
+                        <button type="button" className="btn btn-soft btn-lg" onClick={sellerChatHref}>
+                          <Icon name="chat" size={18} /> แชทกับผู้ขาย
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <div className="mkt-detail-note-card">
+                      <div className="mkt-detail-note-title">
+                        {listing.buyer_id || auction.endedAt ? 'ขายแล้ว · ประมูลปิด' : 'ประมูลปิดแล้ว'}
+                      </div>
+                      <p>{auction.currentBidderName ? `ผู้ชนะ: ${auction.currentBidderName} · ฿${(auction.currentBid || displayPrice).toLocaleString()}` : 'ไม่มีผู้ bid'}</p>
+                      {myId && listing.buyer_id === myId && (
+                        <Link href={`/cart/checkout/${listing.id}`} className="btn btn-primary btn-lg" style={{ marginTop: 12 }}>
+                          ไปชำระเงิน / ติดตามสถานะ →
+                        </Link>
+                      )}
+                    </div>
+                  )
                 ) : buyState === 'sold' || buyState === 'reserved' ? (
                   <div className="mkt-detail-note-card">
                     <div className="mkt-detail-note-title">
@@ -486,9 +443,24 @@ export default function MarketplaceDetailPage() {
                   </div>
                 )}
               </div>
+
+              {isAuction && auctionBids.length > 0 && (
+                <div className="mkt-bid-history">
+                  <h3>ประวัติ bid ล่าสุด</h3>
+                  <ul>
+                    {auctionBids.map(b => (
+                      <li key={b.id}>
+                        <span>{b.bidder_name}</span>
+                        <strong>฿{b.amount.toLocaleString()}</strong>
+                        <time>{new Date(b.created_at).toLocaleString('th-TH')}</time>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
             </section>
           </div>
-          )}
         </div>
       </div>
       <Footer />

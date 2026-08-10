@@ -1435,164 +1435,49 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 
 .mkt-detail-shell { min-height: calc(100vh - 70px); background: linear-gradient(180deg, #f6f8fc 0%, #eef3fb 100%); padding: 28px 0 72px; }
 .mkt-detail-shell > .container {
-  max-width: 920px;
   padding-left: max(16px, 1cm);
   padding-right: max(16px, 1cm);
 }
-
-/* การ์ดประมูล — layout ใหม่ */
-.mkt-detail-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-xl);
-  box-shadow: var(--sh-sm);
-  overflow: hidden;
-}
-.mkt-detail-card--auction .mkt-detail-header {
-  padding: 18px 20px 14px;
-  border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, #faf5ff 0%, var(--surface) 100%);
-}
-@media (min-width: 768px) {
-  .mkt-detail-card--auction .mkt-detail-header { padding: 20px 24px 16px; }
-}
-.mkt-detail-card--auction .mkt-detail-title {
-  font-size: clamp(20px, 3.5vw, 26px);
-  margin: 8px 0 10px;
-  line-height: 1.25;
-}
-.mkt-detail-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  font-size: 13px;
-  color: var(--ink-2);
-  line-height: 1.4;
-}
-.mkt-detail-summary-price {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 20px;
-  color: #dc2626;
-  letter-spacing: -.02em;
-}
-.mkt-detail-summary-sep { color: var(--faint); user-select: none; }
-.mkt-detail-summary-time .auction-countdown--card .acd-clock { font-size: 14px; color: #c2410c; }
-.mkt-detail-summary-leader { font-weight: 600; color: #059669; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.mkt-detail-body {
-  display: grid;
-  gap: 16px;
-  padding: 16px 20px 20px;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 768px) {
-  .mkt-detail-body {
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 20px;
-    padding: 18px 24px 22px;
-    align-items: start;
-  }
-}
-.mkt-detail-card--auction .mkt-detail-gallery {
-  padding: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  border-radius: 0;
-}
-.mkt-detail-card--auction .mkt-detail-main {
-  aspect-ratio: 1 / 1;
-  max-width: 280px;
-  width: 100%;
-  margin-inline: auto;
-  border-radius: var(--r-md);
-}
-.mkt-detail-card--auction .mkt-detail-thumbs { justify-content: flex-start; margin-top: 8px; }
-.mkt-detail-main-col {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-width: 0;
-}
-.mkt-detail-bid-title {
-  margin: 0 0 10px;
-  font-size: 16px;
-  font-weight: 800;
-  color: #6d28d9;
-}
-.mkt-detail-bid-panel {
-  margin: 0;
-  padding: 14px 16px;
-  border-radius: var(--r-lg);
-  background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%);
-  border: 1px solid #ddd6fe;
-}
-.mkt-bid-row--primary { align-items: stretch; }
-.mkt-bid-row--primary .btn { flex-shrink: 0; min-width: 88px; }
-.mkt-detail-chat-btn { align-self: flex-start; }
-.mkt-detail-more {
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-}
-.mkt-detail-more summary {
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-  list-style: none;
-}
-.mkt-detail-more summary::-webkit-details-marker { display: none; }
-.mkt-detail-more-body { padding: 0 14px 14px; display: grid; gap: 10px; }
-.mkt-detail-shop-link {
-  display: inline-flex;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent-strong);
-  text-decoration: none;
-}
-.mkt-detail-shop-link:hover { text-decoration: underline; }
-
 .mkt-detail-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-.mkt-detail-grid {
-  display: grid;
-  gap: 20px;
-  grid-template-columns: 1fr;
+.mkt-detail-grid { display: grid; gap: 26px; }
+@media (min-width: 640px) {
+  .mkt-detail-gallery { max-width: min(100%, 280px); margin-inline: auto; }
 }
-@media (min-width: 768px) {
+@media (min-width: 1040px) {
   .mkt-detail-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    grid-template-columns: minmax(0, 280px) minmax(360px, 1fr);
     align-items: start;
     gap: 22px;
   }
+  .mkt-detail-gallery { max-width: 280px; margin-inline: 0; justify-self: start; }
 }
 .mkt-detail-gallery, .mkt-detail-info { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--sh-sm); }
-.mkt-detail-gallery { padding: 14px; max-width: 100%; }
+.mkt-detail-gallery { padding: 12px; }
+@media (min-width: 640px) { .mkt-detail-gallery { padding: 14px; } }
 .mkt-detail-main {
   position: relative;
   width: 100%;
   max-width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: var(--r-lg);
   background: linear-gradient(135deg, #f4f7ff 0%, #edf8f2 100%);
   border: 1px solid var(--line);
 }
-@media (min-width: 768px) {
-  .mkt-detail-grid .mkt-detail-main { aspect-ratio: 1 / 1; max-width: min(100%, 360px); margin-inline: auto; }
-}
 .mkt-detail-fallback { width: 100%; height: 100%; display: grid; place-items: center; color: var(--faint); }
-.mkt-detail-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
+.mkt-detail-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .mkt-detail-thumb { width: 56px; height: 56px; border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); padding: 0; }
 .mkt-detail-thumb.active { border-color: var(--accent); box-shadow: var(--ring); }
-.mkt-detail-info { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-@media (min-width: 768px) { .mkt-detail-info { padding: 22px 24px; gap: 14px; } }
+.mkt-detail-info { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.mkt-detail-bid-panel {
+  margin-top: 4px;
+  padding: 16px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%);
+  border: 1px solid #ddd6fe;
+}
 .mkt-detail-badges { display: flex; gap: 8px; flex-wrap: wrap; }
 .mkt-detail-title { font-size: clamp(28px, 4vw, 40px); line-height: 1.12; }
-.mkt-detail-grid .mkt-detail-title { font-size: clamp(22px, 3vw, 32px); }
 .mkt-detail-price { font-size: clamp(30px, 4vw, 42px); font-family: var(--font-display); font-weight: 800; color: var(--green-600); letter-spacing: -0.03em; }
 .mkt-detail-meta { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
 .mkt-detail-meta span { display: inline-flex; align-items: center; gap: 6px; }
@@ -5303,13 +5188,6 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
-}
-.mkt-detail-main-col .mkt-bid-history {
-  margin-top: 0;
-  padding: 12px 14px;
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
 }
 .mkt-bid-history h3 { font-size: 15px; margin: 0 0 10px; }
 .mkt-bid-history ul { list-style: none; margin: 0; padding: 0; }
