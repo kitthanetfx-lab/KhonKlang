@@ -1,5 +1,16 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (18:50 UTC)
+
+### Mobile app shells — home / login / register / check-scam / privacy / service
+
+**เป้าหมาย:** แยก UI มือถือ · logic คงใน page.tsx · ใช้ `src/components/mobile/`  
+**ใหม่:** `HomeApp` · `LoginApp` · `RegisterPickApp` · `CheckScamApp` · `TradeApp` · `MeetupApp` · `ConsignApp` · `OnsiteApp` · `ServiceFlowApp`  
+**wire:** `ResponsiveShell` ใน `/`, `/login`, `/register` · `SubPageShell` ใน `/check-scam`, `/service/*` · `PageShell` ใน `/privacy` (แก้ Nav หาย)  
+**CSS:** `.home-app*`, `.login-app*`, `.reg-pick-app*`, `.cs-app*`, `.svc-app*`
+
+---
+
 ## 2026-08-10 (18:45 UTC)
 
 ### Mobile app shells — ตะกร้า / checkout / ดีล / orders
