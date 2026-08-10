@@ -1,5 +1,20 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (11:51)
+
+### Admin desktop full-width — ปลดกรอบแคบทุกหน้าแอดมิน
+
+**แก้ไข**:
+1. **`.admin-page` / `.admin-fee-page`** — ปลด `max-width: 1040px` ให้กินพื้นที่หลัง sidebar เต็มจอ
+2. **`admin-grid` / `admin-fields`** — จอกว้างขึ้นการ์ด/ฟิลด์ต่อแถวมากขึ้น
+3. ปลด Tailwind `max-w-4xl/5xl/6xl` จาก deals, users, sellers, middlemen, deposits, moderate, scam-reports, finance, service-controls, overview
+4. ภาพรวม + การเงิน — สถิติกริดกว้างขึ้น (ถึง 4–5 คอลัมน์)
+5. **layout** — เพิ่ม padding เนื้อหาบนจอ XL
+
+**คงเดิม**: การ์ดรหัสผ่านแอดมิน · drawer รายละเอียด · sidebar
+
+---
+
 ## 2026-08-10 (11:43)
 
 ### Desktop full-width — ปลดกรอบแคบ + จัด layout หลายคอลัมน์ลดสกรอลล์

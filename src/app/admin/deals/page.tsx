@@ -514,7 +514,7 @@ function AdminDealsInner() {
   const isEmpty = isOnsite ? (onsiteJobs !== null && onsiteJobs.length === 0) : (deals !== null && deals.length === 0);
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full">
       <div className="flex items-center gap-2 mb-1">
         <Handshake size={22} className="text-blue-600" />
         <h1 className="text-xl font-bold">ดีล & ข้อพิพาท</h1>
@@ -971,7 +971,7 @@ function AdminDealsInner() {
 
 export default function AdminDeals() {
   return (
-    <Suspense fallback={<div className="max-w-4xl mx-auto py-10 text-center text-gray-500">กำลังโหลด...</div>}>
+    <Suspense fallback={<div className="w-full py-10 text-center text-gray-500">กำลังโหลด...</div>}>
       <AdminDealsInner />
     </Suspense>
   );

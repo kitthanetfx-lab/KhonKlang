@@ -344,7 +344,7 @@ function MiddlemenContent() {
   };
 
   return (
-    <div className="space-y-5 max-w-6xl">
+    <div className="space-y-5 w-full">
       {detail && <DetailPanel app={detail} onClose={() => setDetail(null)} onAction={handleAction} />}
 
       <div className="flex items-center justify-between">

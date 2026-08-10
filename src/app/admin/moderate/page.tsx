@@ -49,7 +49,7 @@ export default function AdminModerate() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full">
       <div className="flex items-center gap-2 mb-1">
         <EyeOff size={22} className="text-violet-500" />
         <h1 className="text-xl font-bold">ตรวจสอบเนื้อหา</h1>

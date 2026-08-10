@@ -90,7 +90,7 @@ export default function MiddlemanDepositsPage() {
   const pendingCount = docs.filter(d => d.status === 'pending_review').length;
 
   return (
-    <div className="space-y-5 max-w-5xl">
+    <div className="space-y-5 w-full">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2"><Banknote size={20} /> เงินค้ำประกันคนกลาง</h1>

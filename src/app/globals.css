@@ -4013,12 +4013,14 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .dark .admin-main { background: #030712; }
 
 .admin-page {
-  max-width: 1040px;
-  margin: 0 auto;
+  max-width: none;
+  width: 100%;
+  margin: 0;
   padding-bottom: 88px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  box-sizing: border-box;
 }
 
 .admin-page__head {
@@ -4159,11 +4161,19 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 
 .admin-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px;
   margin-bottom: 14px;
 }
 .admin-grid--1 { grid-template-columns: 1fr; }
+@media (min-width: 1280px) {
+  .admin-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+}
+@media (min-width: 1600px) {
+  .admin-grid { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+  .admin-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .admin-fields--wide { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+}
 
 .admin-card {
   background: #fff;
@@ -4413,7 +4423,7 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 }
 
 /* legacy aliases (backward compat) */
-.admin-fee-page { max-width: 1040px; padding-bottom: 88px; }
+.admin-fee-page { max-width: none; width: 100%; padding-bottom: 88px; }
 
 /* ── Seller listing modal ── */
 .seller-modal-backdrop {

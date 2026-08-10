@@ -445,7 +445,7 @@ export default function AdminFinance() {
   const pageCount = Math.max(1, Math.ceil((pagination.total || 0) / pagination.pageSize));
 
   return (
-    <div className="mx-auto max-w-[1700px]">
+    <div className="w-full">
       <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -476,7 +476,7 @@ export default function AdminFinance() {
 
       {tab === 'summary' && summary && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
             <SumCard icon={<Clock size={22} className="text-amber-600" />} color="bg-amber-50" label="รายการเงินเข้ารอตรวจ" value={String(summary.incomingCount)} sub={`ค่าสินค้า ${summary.escrowPendingCount} รายการ`} />
             <SumCard icon={<PiggyBank size={22} className="text-blue-600" />} color="bg-blue-50" label="เงินพักในระบบ (Escrow)" value={baht(summary.heldEscrow)} sub="โอนเข้าแล้ว ยังไม่ปล่อย/คืน" />
             <SumCard icon={<ShieldCheck size={22} className="text-violet-600" />} color="bg-violet-50" label="เงินประกันถือไว้ (นัดเจอ)" value={baht(summary.heldMeetupDeposit)} sub="คืนเมื่อเจอกันสำเร็จ" />

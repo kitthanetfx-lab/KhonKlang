@@ -172,7 +172,7 @@ export default function ServiceControlsPage() {
   }
 
   return (
-    <AdminPage className="max-w-4xl">
+    <AdminPage>
       <AdminPageHeader
         icon={<SlidersHorizontal size={22} />}
         title="ควบคุมสถานะบริการ"

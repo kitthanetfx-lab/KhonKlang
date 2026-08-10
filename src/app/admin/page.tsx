@@ -95,7 +95,7 @@ export default function AdminDashboard() {
   const pendingTotal = stats.pendingSellers + stats.pendingMiddlemen;
 
   return (
-    <AdminPage className="max-w-6xl">
+    <AdminPage>
       <AdminPageHeader
         icon={<LayoutDashboard size={22} />}
         title="ภาพรวมระบบ"
@@ -103,7 +103,7 @@ export default function AdminDashboard() {
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         <StatCard icon={<Users size={22} className="text-blue-600" />}
           label="ผู้ใช้ทั้งหมด" value={stats.totalUsers}
           color="bg-blue-50 dark:bg-blue-900/20" href="/admin/users" />
