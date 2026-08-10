@@ -1444,10 +1444,10 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   gap: 26px;
   align-items: start;
 }
-/* รูปหลักล็อก 210px (ครึ่งของ ~420) — คอลัมน์ซ้ายตายตัว ไม่กิน 50% จอ ไม่ใช้ fit-content/% */
+/* แกลเลอรีสไตล์ Shopee — รูปหลัก 450px ไม่จิ๋ว ไม่กินครึ่งจอ */
 @media (min-width: 768px) {
   .mkt-detail-grid {
-    grid-template-columns: 238px minmax(0, 1fr);
+    grid-template-columns: 478px minmax(0, 1fr);
     gap: 24px;
   }
 }
@@ -1455,7 +1455,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .mkt-detail-gallery {
   box-sizing: border-box;
   padding: 14px;
-  width: 238px;
+  width: 478px;
   max-width: 100%;
   justify-self: start;
   align-self: start;
@@ -1466,8 +1466,8 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .mkt-detail-main {
   position: relative;
   box-sizing: border-box;
-  width: 210px;
-  height: 210px;
+  width: 450px;
+  height: 450px;
   max-width: 100%;
   overflow: hidden;
   border-radius: var(--r-lg);
@@ -1483,7 +1483,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 }
 .mkt-detail-fallback { width: 100%; height: 100%; display: grid; place-items: center; color: var(--faint); }
 .mkt-detail-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.mkt-detail-thumb { width: 56px; height: 56px; border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); padding: 0; cursor: pointer; }
+.mkt-detail-thumb { width: 80px; height: 80px; border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); padding: 0; cursor: pointer; }
 .mkt-detail-thumb.active { border-color: var(--accent); box-shadow: var(--ring); }
 .mkt-detail-info { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .mkt-detail-bid-panel {
