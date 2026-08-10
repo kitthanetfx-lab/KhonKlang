@@ -1436,13 +1436,33 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .mkt-detail-shell { min-height: calc(100vh - 70px); background: linear-gradient(180deg, #f6f8fc 0%, #eef3fb 100%); padding: 28px 0 72px; }
 .mkt-detail-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
 .mkt-detail-grid { display: grid; gap: 26px; }
-@media (min-width: 1040px){ .mkt-detail-grid { grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr); align-items: start; } }
+@media (min-width: 640px) {
+  .mkt-detail-gallery { max-width: min(100%, 420px); margin-inline: auto; }
+}
+@media (min-width: 1040px){
+  .mkt-detail-grid {
+    grid-template-columns: minmax(0, 420px) minmax(360px, 1fr);
+    align-items: start;
+    gap: 22px;
+  }
+  .mkt-detail-gallery { max-width: 420px; margin-inline: 0; justify-self: start; }
+}
 .mkt-detail-gallery, .mkt-detail-info { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--sh-sm); }
-.mkt-detail-gallery { padding: 18px; }
-.mkt-detail-main { position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: var(--r-lg); background: linear-gradient(135deg, #f4f7ff 0%, #edf8f2 100%); border: 1px solid var(--line); }
+.mkt-detail-gallery { padding: 12px; }
+@media (min-width: 640px) { .mkt-detail-gallery { padding: 14px; } }
+.mkt-detail-main {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: linear-gradient(135deg, #f4f7ff 0%, #edf8f2 100%);
+  border: 1px solid var(--line);
+}
 .mkt-detail-fallback { width: 100%; height: 100%; display: grid; place-items: center; color: var(--faint); }
-.mkt-detail-thumbs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-.mkt-detail-thumb { width: 84px; height: 84px; border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); padding: 0; }
+.mkt-detail-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.mkt-detail-thumb { width: 56px; height: 56px; border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); padding: 0; }
 .mkt-detail-thumb.active { border-color: var(--accent); box-shadow: var(--ring); }
 .mkt-detail-info { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .mkt-detail-badges { display: flex; gap: 8px; flex-wrap: wrap; }
