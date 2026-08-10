@@ -1,5 +1,13 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (16:00)
+
+### หน้าแพ็คผู้ขาย — ไม่เลือกขนส่งซ้ำ (ใช้ที่ผู้ซื้อเลือกแล้ว)
+
+ผู้ซื้อเลือกขนส่งตอนสั่งซื้อจากตัวเลือกที่ผู้ขายลงไว้ → หน้า SellerPackingPanel แสดงขนส่ง read-only + กรอกแค่เลขพัสดุ · API `seller_done_packing` บังคับใช้ `buyer_shipping_provider` สำหรับออเดอร์ตลาด
+
+---
+
 ## 2026-08-10 (15:55)
 
 ### ขยาย SlipOK auto-verify ครบหมวด (meetup + trade rerun + scaffold consign/onsite)

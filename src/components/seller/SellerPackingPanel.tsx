@@ -49,6 +49,7 @@ export function SellerPackingPanel({ dealId, dealTitle, onDone, onClose }: Props
   const [uploadingStep, setUploadingStep] = useState<1 | 2 | 3 | null>(null);
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
   const [buyerShipping, setBuyerShipping] = useState<BuyerShipping | null>(null);
+  const [buyerShippingProvider, setBuyerShippingProvider] = useState('');
   const [trackingProvider, setTrackingProvider] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -61,7 +62,13 @@ export function SellerPackingPanel({ dealId, dealTitle, onDone, onClose }: Props
     if (!res.ok) throw new Error(d.error || 'โหลดไม่สำเร็จ');
     setEvidence((d.evidence || []).filter((e: EvidenceItem) => e.type === 'packing'));
     setBuyerShipping(d.buyerShipping || null);
-    if (d.deal?.tracking_to_buyer_provider) setTrackingProvider(String(d.deal.tracking_to_buyer_provider));
+    const chosenProvider = String(d.deal?.buyer_shipping_provider || '').trim();
+    setBuyerShippingProvider(chosenProvider);
+    if (d.deal?.tracking_to_buyer_provider) {
+      setTrackingProvider(String(d.deal.tracking_to_buyer_provider));
+    } else if (chosenProvider) {
+      setTrackingProvider(chosenProvider);
+    }
     if (d.deal?.tracking_to_buyer) setTrackingNumber(String(d.deal.tracking_to_buyer));
   }, [dealId]);
 
@@ -136,7 +143,8 @@ export function SellerPackingPanel({ dealId, dealTitle, onDone, onClose }: Props
 
   async function finishPacking() {
     if (!hasAll) { setError('กรุณาอัปโหลดหลักฐานให้ครบทั้ง 3 ขั้นก่อน'); return; }
-    if (!trackingProvider.trim()) { setError('กรุณาเลือกผู้ให้บริการขนส่ง'); return; }
+    const provider = buyerShippingProvider || trackingProvider.trim();
+    if (!provider) { setError('ยังไม่ทราบผู้ให้บริการขนส่ง — รอผู้ซื้อเลือกขนส่งจากตัวเลือกที่ลงไว้'); return; }
     if (!trackingNumber.trim()) { setError('กรุณากรอกเลขพัสดุ'); return; }
     setActing(true);
     setError('');
@@ -148,7 +156,7 @@ export function SellerPackingPanel({ dealId, dealTitle, onDone, onClose }: Props
         body: JSON.stringify({
           action: 'seller_done_packing',
           trackingNumber: trackingNumber.trim(),
-          trackingProvider: trackingProvider.trim(),
+          trackingProvider: provider,
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -189,6 +197,19 @@ export function SellerPackingPanel({ dealId, dealTitle, onDone, onClose }: Props
           {buyerShipping.phone && (
             <a href={`tel:${buyerShipping.phone}`} className="seller-pack-ship-phone">📞 {buyerShipping.phone}</a>
           )}
+          {buyerShippingProvider && (
+            <div className="seller-pack-ship-carrier">
+              🚚 ขนส่งที่ผู้ซื้อเลือก: <strong>{getLogisticsProviderLabel(buyerShippingProvider)}</strong>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!buyerShipping && buyerShippingProvider && (
+        <div className="seller-pack-ship">
+          <div className="seller-pack-ship-carrier">
+            🚚 ขนส่งที่ผู้ซื้อเลือก: <strong>{getLogisticsProviderLabel(buyerShippingProvider)}</strong>
+          </div>
         </div>
       )}
 
@@ -266,15 +287,25 @@ export function SellerPackingPanel({ dealId, dealTitle, onDone, onClose }: Props
       />
 
       <div className="seller-pack-tracking">
-        <label>
-          <span>ผู้ให้บริการโลจิสติกส์ *</span>
-          <select value={trackingProvider} onChange={e => setTrackingProvider(e.target.value)}>
-            <option value="">เลือกผู้ให้บริการ...</option>
-            {TH_LOGISTICS_PROVIDERS.map(p => (
-              <option key={p.id} value={p.id}>{p.label}</option>
-            ))}
-          </select>
-        </label>
+        {buyerShippingProvider ? (
+          <div className="seller-pack-carrier-fixed">
+            <span className="seller-pack-carrier-label">ผู้ให้บริการขนส่ง</span>
+            <div className="seller-pack-carrier-value">
+              {getLogisticsProviderLabel(buyerShippingProvider)}
+              <span className="seller-pack-carrier-note">ผู้ซื้อเลือกแล้ว — ใช้ขนส่งนี้ส่งพัสดุ</span>
+            </div>
+          </div>
+        ) : (
+          <label>
+            <span>ผู้ให้บริการโลจิสติกส์ *</span>
+            <select value={trackingProvider} onChange={e => setTrackingProvider(e.target.value)}>
+              <option value="">เลือกผู้ให้บริการ...</option>
+              {TH_LOGISTICS_PROVIDERS.map(p => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           <span>เลขพัสดุ *</span>
           <input
@@ -284,9 +315,9 @@ export function SellerPackingPanel({ dealId, dealTitle, onDone, onClose }: Props
             placeholder="กรอกเลขพัสดุ"
           />
         </label>
-        {trackingProvider && trackingNumber && (
+        {(buyerShippingProvider || trackingProvider) && trackingNumber && (
           <div className="seller-pack-track-preview">
-            {getLogisticsProviderLabel(trackingProvider)} · <strong>{trackingNumber}</strong>
+            {getLogisticsProviderLabel(buyerShippingProvider || trackingProvider)} · <strong>{trackingNumber}</strong>
           </div>
         )}
       </div>

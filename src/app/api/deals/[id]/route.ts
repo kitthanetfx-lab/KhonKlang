@@ -541,8 +541,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'seller_done_packing': {
         if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const trackingNumber = String(body.trackingNumber || '').trim();
-        const trackingProvider = String(body.trackingProvider || '').trim();
+        let trackingProvider = String(body.trackingProvider || '').trim();
         if (!trackingNumber) return NextResponse.json({ error: 'กรุณากรอกเลขพัสดุ' }, { status: 400 });
+        // ตลาด/ประมูล — ผู้ซื้อเลือกขนส่งแล้วตอนสั่งซื้อ ผู้ขายใช้ตัวเดียวกัน
+        if (isListingCheckoutOrder(deal)) {
+          const buyerChosen = String(deal.buyer_shipping_provider || '').trim();
+          if (buyerChosen) {
+            if (trackingProvider && trackingProvider !== buyerChosen) {
+              return NextResponse.json({ error: 'ต้องใช้ขนส่งที่ผู้ซื้อเลือกไว้แล้ว' }, { status: 400 });
+            }
+            trackingProvider = buyerChosen;
+          }
+        }
         if (!trackingProvider) return NextResponse.json({ error: 'กรุณาเลือกผู้ให้บริการขนส่ง' }, { status: 400 });
         const providerLabel = getLogisticsProviderLabel(trackingProvider);
         if (isDirectShipOrder(deal)) {

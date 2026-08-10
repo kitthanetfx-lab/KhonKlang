@@ -3954,6 +3954,16 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .seller-pack-ship-name { font-weight: 700; color: var(--ink); }
 .seller-pack-ship-addr { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; margin-top: 4px; white-space: pre-wrap; }
 .seller-pack-ship-phone { display: inline-block; margin-top: 8px; font-weight: 700; color: var(--accent-strong); }
+.seller-pack-ship-carrier { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink-2); }
+.seller-pack-ship-carrier strong { color: var(--ink); }
+.seller-pack-carrier-fixed {
+  padding: 12px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+}
+.seller-pack-carrier-label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.seller-pack-carrier-value { font-size: 15px; font-weight: 700; color: var(--ink); }
+.seller-pack-carrier-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
 .seller-pack-steps-guide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .seller-pack-guide-card { min-width: 0; }
 .seller-pack-guide-img {
