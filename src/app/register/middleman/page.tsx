@@ -15,6 +15,8 @@ import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { ConsentModal } from '@/components/ConsentModal';
 import { FEE_DEFAULTS, effectiveRegFee, isPromoActive, type FeeConfig } from '@/lib/fees';
+import { ResponsiveShell } from '@/components/mobile';
+import { RegisterWizardApp } from '@/components/register/RegisterWizardApp';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -310,27 +312,25 @@ function MiddlemanForm() {
     );
   }
 
-  return (
+  const wizardNav = (
     <>
-    {!consentShown && (
-      <ConsentModal
-        onAccept={() => setConsentShown(true)}
-        onDecline={() => router.replace('/register')}
-      />
-    )}
-    <div className="min-h-screen py-10 px-4 sm:px-6 reg-wizard-app-shell">
-      <div className="max-w-xl mx-auto">
-
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 px-4 py-1.5 rounded-full text-sm font-medium mb-3">
-            <Shield className="w-4 h-4" /> สมัครเป็นคนกลาง (Escrow Agent)
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold">ลงทะเบียนคนกลาง</h1>
+      {step < 4 && (
+        <div className={`reg-wiz-nav${step > 1 ? ' reg-wiz-nav--split' : ''}`}>
+          {step > 1 && (
+            <button type="button" onClick={back} className="btn btn-ghost">ย้อนกลับ</button>
+          )}
+          <button type="button" onClick={next} className="btn btn-primary">ถัดไป</button>
         </div>
+      )}
+      {step === 4 && (
+        <button type="button" onClick={back} className="btn btn-ghost btn-block">ย้อนกลับแก้ไขข้อมูล</button>
+      )}
+    </>
+  );
 
-        <div className="glass-panel rounded-2xl p-6 sm:p-8 shadow-xl animate-fade-in">
-          <StepIndicator current={step} />
+  const wizardPanel = (
+        <div className="glass-panel rounded-2xl p-6 sm:p-8 shadow-xl animate-fade-in reg-wiz-panel">
+          <div className="reg-wiz-desktop-steps"><StepIndicator current={step} /></div>
 
           {/* ─────────── STEP 1: Basic Identity ─────────── */}
           {step === 1 && (
@@ -612,11 +612,9 @@ function MiddlemanForm() {
             </div>
           )}
 
-          {/* ─── Navigation ─── */}
-          {error && step < 4 && (
-            <p className="mt-4 text-red-500 text-sm text-center">{error}</p>
-          )}
-
+          {/* Navigation — desktop only (mobile ใช้ sticky footer) */}
+          <div className="reg-wiz-desktop-nav-wrap">
+          {error && step < 4 && <p className="mt-4 text-red-500 text-sm text-center">{error}</p>}
           {step < 4 && (
             <div className={`flex mt-8 gap-3 ${step > 1 ? 'justify-between' : 'justify-end'}`}>
               {step > 1 && (
@@ -633,13 +631,49 @@ function MiddlemanForm() {
           )}
           {step === 4 && (
             <button type="button" onClick={back}
-              className="flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-sm font-medium mx-auto">
+              className="flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-sm font-medium mx-auto reg-wiz-desktop-nav">
               <ArrowLeft className="w-4 h-4" /> ย้อนกลับแก้ไขข้อมูล
             </button>
           )}
+          </div>
         </div>
+  );
+
+  return (
+    <>
+    {!consentShown && (
+      <ConsentModal
+        onAccept={() => setConsentShown(true)}
+        onDecline={() => router.replace('/register')}
+      />
+    )}
+    <ResponsiveShell
+      mobile={
+        <RegisterWizardApp
+          title="ลงทะเบียนคนกลาง"
+          badge="🛡️ สมัครเป็นคนกลาง (Escrow Agent)"
+          steps={STEPS}
+          currentStep={step}
+          error={error && step < 4 ? error : undefined}
+          footer={wizardNav}
+        >
+          {wizardPanel}
+        </RegisterWizardApp>
+      }
+      desktop={
+    <div className="min-h-screen py-10 px-4 sm:px-6">
+      <div className="max-w-xl mx-auto">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 px-4 py-1.5 rounded-full text-sm font-medium mb-3">
+            <Shield className="w-4 h-4" /> สมัครเป็นคนกลาง (Escrow Agent)
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold">ลงทะเบียนคนกลาง</h1>
+        </div>
+        {wizardPanel}
       </div>
     </div>
+      }
+    />
     </>
   );
 }

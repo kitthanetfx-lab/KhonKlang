@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { ResponsiveShell } from '@/components/mobile';
+import { OnsiteAppShell } from '@/components/onsite/OnsiteAppShell';
 
 const PROVINCES = [
   'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร',
@@ -59,14 +61,8 @@ export default function CreateOnsiteJob() {
     finally { setLoading(false); }
   }
 
-  return (
-    <div className="min-h-screen bg-[#0a0f1e] text-white onsite-app-shell">
-      <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
-        <Link href="/service/onsite" className="text-gray-400 hover:text-white">←</Link>
-        <h1 className="text-xl font-bold">สร้างคำขอลงพื้นที่</h1>
-      </div>
-
-      <div className="max-w-lg mx-auto px-4 py-8 space-y-5">
+  const formBody = (
+      <div className="max-w-lg mx-auto px-4 py-8 space-y-5 onsite-app-inner">
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm">{error}</div>
         )}
@@ -134,6 +130,20 @@ export default function CreateOnsiteJob() {
           {loading ? 'กำลังสร้างคำขอ...' : '📋 ส่งคำขอหาคนกลาง'}
         </button>
       </div>
+  );
+
+  return (
+    <ResponsiveShell
+      mobile={<OnsiteAppShell title="สร้างคำขอลงพื้นที่">{formBody}</OnsiteAppShell>}
+      desktop={
+    <div className="min-h-screen bg-[#0a0f1e] text-white onsite-app-shell">
+      <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
+        <Link href="/service/onsite" className="text-gray-400 hover:text-white">←</Link>
+        <h1 className="text-xl font-bold">สร้างคำขอลงพื้นที่</h1>
+      </div>
+      {formBody}
     </div>
+      }
+    />
   );
 }

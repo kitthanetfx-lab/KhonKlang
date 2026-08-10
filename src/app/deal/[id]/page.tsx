@@ -23,6 +23,7 @@ import { MarketplacePaymentSection } from '@/components/marketplace/MarketplaceP
 import { isDirectShipOrder, isMarketplaceOrder, isListingCheckoutOrder, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
+import { DealRoomMobileBar } from '@/components/deal/DealRoomMobileBar';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -5402,7 +5403,7 @@ export default function DealRoom() {
           )}
           {/* Regular deal: แถบแชท + หลักฐาน ซ่อนในโหมด wizard แต่ยังเข้าถึงได้ผ่านปุ่มลิงก์ */}
           {!isSimple && !isMeetup && !isMarketplaceCheckout && (
-          <nav className="dr-tabs" style={{ display: 'none' }}>
+          <nav className="dr-tabs dr-tabs--legacy-hidden">
             {(['steps', 'evidence'] as const).map(k => (
               <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
                 {k === 'steps' ? 'ขั้นตอน' : 'หลักฐาน'}
@@ -5444,7 +5445,7 @@ export default function DealRoom() {
       {/* แถบปุ่มลอย (💬 แชท / 📞 โทร / 📹 วิดีโอ) — แสดงตลอดทุกขั้นตอนของดีล ตั้งแต่มีคู่ดีลเข้ามาจนจบ
           สถานะปุ่ม 📞: ปกติ=กดโทร, กำลังคุย voice bg=ตัวนับเวลาแดงกดเพื่อวางสาย, มีสายเข้า=กระพริบ */}
       {canCall && (
-        <div className="dr-floatbar" role="toolbar" aria-label="การสื่อสารในดีล">
+        <div className="dr-floatbar dr-floatbar--desktop" role="toolbar" aria-label="การสื่อสารในดีล">
           <button type="button" className={`dr-floatbar-btn ${floatChatOpen ? 'active' : ''}`} onClick={() => setFloatChatOpen(v => !v)} title="แชท">
             <span className="ic">💬</span><span>แชท</span>
             {(() => { const n = msgs.filter(m => m.role !== 'system').length; return n > 0 && !floatChatOpen ? <span className="dr-floatbar-badge">{n > 99 ? '99+' : n}</span> : null; })()}
@@ -5532,6 +5533,21 @@ export default function DealRoom() {
           <button className="btn btn-primary btn-sm btn-block" onClick={() => setCallTimedOut(false)}>รับทราบ</button>
         </div>
       )}
+      <DealRoomMobileBar
+        tab={tab === 'evidence' ? 'evidence' : 'steps'}
+        onTab={k => setTab(k)}
+        msgCount={msgs.filter(m => m.role !== 'system').length}
+        canCall={canCall}
+        onChat={() => setFloatChatOpen(v => !v)}
+        chatOpen={floatChatOpen}
+        onVoice={() => {
+          if (voiceBgActive) endCall();
+          else if (incomingCall) acceptIncomingCall();
+          else if (callStatus === 'idle') startCall('voice');
+        }}
+        voiceActive={voiceBgActive || !!incomingCall}
+        voiceLabel={voiceBgActive ? fmtVoiceDur(callSeconds) : incomingCall ? 'รับสาย' : 'โทร'}
+      />
       {showTerms && (() => { const t = termsFor(deal.deal_type); return (
         <div onClick={() => setShowTerms(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 100 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 'var(--r-lg)', maxWidth: 460, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: '22px 20px' }}>

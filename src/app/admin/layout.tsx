@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { ResponsiveShell } from '@/components/mobile';
 import { AdminAppShell } from '@/components/admin/mobile/AdminAppShell';
+import { AdminMobilePage } from '@/components/admin/mobile/AdminMobilePage';
 import { getAdminActiveLabel, getAdminNav } from '@/components/admin/mobile/adminNav';
 
 const ADMIN_DEVICE_STORAGE_KEY = 'kk_admin_device_id';
@@ -317,7 +318,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       desktopClassName="admin-layout-desktop"
       mobile={
         <AdminAppShell locale={locale} adminName={adminName} onLogout={handleLogout}>
-          <div className="admin-app-content">{children}</div>
+          <AdminMobilePage><div className="admin-app-content">{children}</div></AdminMobilePage>
         </AdminAppShell>
       }
       desktop={desktopShell}

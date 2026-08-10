@@ -1,5 +1,29 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-11 (02:15 UTC)
+
+### Mobile Shell — งานค้างครบ (register/onsite/admin/deal/nav)
+
+**Register wizard:** `RegisterWizardApp` wire ใน `/register/seller` + `/register/middleman` — progress bar + sticky ปุ่มบนมือถือ  
+**Onsite:** `OnsiteAppShell` + `ResponsiveShell` ใน `/onsite/create` · `/onsite/[id]`  
+**Deal room:** `DealRoomMobileBar` + CSS `.dr-mobile-bar` ซ่อน floatbar desktop บนมือถือ  
+**Admin:** `AdminMobilePage` wrapper + CSS แปลง table/grid เป็น card stack ทุกหน้า admin  
+**Nav:** แยก `.nav-desktop-actions` / `.nav-compact-actions` + แก้ JSX ปิด tag  
+**CSS:** `.reg-wiz-*` · `.dr-mobile-bar` · `.admin-mobile-page` · `.onsite-app-inner`
+
+---
+
+## 2026-08-11 (01:40 UTC)
+
+### Mobile Shell ทั้งเว็บ — รวม Foundation + ทุกส่วน (รวม Admin)
+
+**Foundation:** `src/components/mobile/` — ResponsiveShell, AppPage, AppHeader, AppSegment, AppSheet, AppListRow, AppBottomNav, ContentPageApp, SubPageShell · CSS `.app-*` breakpoint 767px  
+**Nav:** bottom nav 5 ช่อง แทน mobile-service-tabs  
+**ครอบคลุม:** ตลาด cluster · cart/checkout · deal/orders · service · home/auth · profile/messages/dashboards · admin shell · payment/status/maintenance · register/onsite CSS · ห้องดีล `.dr-app-mobile`  
+**เทคนิค:** logic ใน page.tsx · UI มือถือใน `*App.tsx` · desktop ใน `app-desktop-shell`
+
+---
+
 ## 2026-08-10 (18:52 UTC)
 
 ### Mobile app shells — Admin / Profile / Messages / Dashboard
