@@ -333,32 +333,34 @@ export default function MarketplaceDetailPage() {
                 ) : isAuction ? (
                   auction.phase === 'live' ? (
                     <>
-                      <div className="mkt-bid-form">
-                        <label>ราคา bid ครั้งนี้ (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
-                        <div className="mkt-bid-row">
-                          <input type="number" min={auction.minNextBid} step={auction.bidIncrement} value={bidAmount} onChange={e => setBidAmount(e.target.value)} />
+                      <div className="mkt-detail-bid-panel">
+                        <div className="mkt-bid-form">
+                          <label>ราคา bid ครั้งนี้ (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
+                          <div className="mkt-bid-row">
+                            <input type="number" min={auction.minNextBid} step={auction.bidIncrement} value={bidAmount} onChange={e => setBidAmount(e.target.value)} />
+                          </div>
+                          <label className="mkt-bid-max-label">
+                            ราคาสูงสุดที่สู้ (auto-bid)
+                            <span className="mkt-bid-max-hint">ระบบ bid ให้อัตโนมัติเมื่อมีคน overbid จนถึงเพดานนี้</span>
+                          </label>
+                          <div className="mkt-bid-row">
+                            <input
+                              type="number"
+                              min={auction.minNextBid}
+                              step={auction.bidIncrement}
+                              value={maxBidAmount}
+                              onChange={e => setMaxBidAmount(e.target.value)}
+                              placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
+                            />
+                            <button type="button" className="btn btn-primary btn-lg" onClick={placeBid} disabled={bidding}>
+                              {bidding ? 'กำลัง bid...' : '🔨 Bid'}
+                            </button>
+                          </div>
+                          {myAutoBidMax != null && (
+                            <p className="mkt-bid-auto-active">🤖 ตั้ง auto-bid ไว้สูงสุด ฿{myAutoBidMax.toLocaleString()}</p>
+                          )}
+                          {bidError && <p className="mkt-bid-error">{bidError}</p>}
                         </div>
-                        <label className="mkt-bid-max-label">
-                          ราคาสูงสุดที่สู้ (auto-bid)
-                          <span className="mkt-bid-max-hint">ระบบ bid ให้อัตโนมัติเมื่อมีคน overbid จนถึงเพดานนี้</span>
-                        </label>
-                        <div className="mkt-bid-row">
-                          <input
-                            type="number"
-                            min={auction.minNextBid}
-                            step={auction.bidIncrement}
-                            value={maxBidAmount}
-                            onChange={e => setMaxBidAmount(e.target.value)}
-                            placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
-                          />
-                          <button type="button" className="btn btn-primary btn-lg" onClick={placeBid} disabled={bidding}>
-                            {bidding ? 'กำลัง bid...' : '🔨 Bid'}
-                          </button>
-                        </div>
-                        {myAutoBidMax != null && (
-                          <p className="mkt-bid-auto-active">🤖 ตั้ง auto-bid ไว้สูงสุด ฿{myAutoBidMax.toLocaleString()}</p>
-                        )}
-                        {bidError && <p className="mkt-bid-error">{bidError}</p>}
                       </div>
                       {canSellerChat && (
                         <button type="button" className="btn btn-soft btn-lg" onClick={sellerChatHref}>
