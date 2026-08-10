@@ -5111,6 +5111,58 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .mkt-auction-stat strong { font-size: 14px; color: var(--ink); }
 .mkt-auction-countdown .is-live { color: #7c3aed; font-weight: 800; }
 .mkt-bid-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.mkt-bid-max-label { margin-top: 12px !important; }
+.mkt-bid-max-hint {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.45;
+}
+.mkt-bid-auto-active {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6d28d9;
+}
+.mkt-auction-view-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.mkt-auction-view-tab {
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.mkt-auction-view-tab.is-active {
+  background: #7c3aed;
+  border-color: #6d28d9;
+  color: #fff;
+}
+.lc-badge--my-auction {
+  top: auto !important;
+  bottom: 6px;
+  left: 6px;
+  right: auto;
+  max-width: calc(100% - 12px);
+  font-size: 9px;
+  padding: 4px 8px;
+  background: rgba(15, 23, 42, .88) !important;
+}
+.lc-badge--my-auction-leading { background: rgba(5, 150, 105, .92) !important; }
+.lc-badge--my-auction-outbid { background: rgba(234, 88, 12, .92) !important; }
+.lc-badge--my-auction-won { background: rgba(37, 99, 235, .92) !important; }
+.lc-badge--my-auction-lost { background: rgba(100, 116, 139, .92) !important; }
 .mkt-bid-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .mkt-bid-row input {
   flex: 1;

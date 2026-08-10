@@ -303,6 +303,19 @@ create table auction_bids (
 );
 create index idx_auction_bids_deal on auction_bids(deal_id, created_at desc);
 
+create table auction_auto_bids (
+  deal_id       uuid not null references deals(id) on delete cascade,
+  bidder_id     uuid not null references profiles(id) on delete cascade,
+  bidder_name   text not null default '',
+  max_amount    integer not null check (max_amount > 0),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  primary key (deal_id, bidder_id)
+);
+create index idx_auction_auto_bids_deal on auction_auto_bids(deal_id, max_amount desc);
+create trigger trg_auction_auto_bids_updated_at before update on auction_auto_bids
+  for each row execute function set_updated_at();
+
 -- 4c. deal_images — replaces `imageFileIds` JSON array
 create table deal_images (
   id          uuid primary key default gen_random_uuid(),
@@ -822,6 +835,9 @@ create policy deal_auction_read_all on deal_auction for select using (true);
 
 alter table auction_bids enable row level security;
 create policy auction_bids_read_all on auction_bids for select using (true);
+
+alter table auction_auto_bids enable row level security;
+create policy auction_auto_bids_read_own on auction_auto_bids for select using (bidder_id = auth.uid());
 
 alter table deal_images enable row level security;
 create policy deal_images_participant on deal_images

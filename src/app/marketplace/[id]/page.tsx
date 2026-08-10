@@ -64,6 +64,8 @@ export default function MarketplaceDetailPage() {
   const [auction, setAuction] = useState<AuctionPublic | null>(null);
   const [auctionBids, setAuctionBids] = useState<AuctionBid[]>([]);
   const [bidAmount, setBidAmount] = useState('');
+  const [maxBidAmount, setMaxBidAmount] = useState('');
+  const [myAutoBidMax, setMyAutoBidMax] = useState<number | null>(null);
   const [bidding, setBidding] = useState(false);
   const [bidError, setBidError] = useState('');
 
@@ -78,6 +80,8 @@ export default function MarketplaceDetailPage() {
     setSellerShop(data.sellerShop || null);
     setAuction(data.auction || null);
     setAuctionBids(data.auctionBids || []);
+    setMyAutoBidMax(data.myAutoBidMax ?? null);
+    if (data.myAutoBidMax) setMaxBidAmount(String(data.myAutoBidMax));
     const providers = Array.isArray(data.deal?.shipping_providers) ? data.deal.shipping_providers : [];
     setSelectedShipping(prev => (prev && providers.includes(prev) ? prev : providers[0] || ''));
     if (data.auction?.minNextBid) setBidAmount(String(data.auction.minNextBid));
@@ -174,7 +178,10 @@ export default function MarketplaceDetailPage() {
       const res = await fetch(`/api/auctions/${listing.id}/bid`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: Number(bidAmount) || auction.minNextBid }),
+        body: JSON.stringify({
+          amount: Number(bidAmount) || auction.minNextBid,
+          ...(maxBidAmount ? { maxBid: Number(maxBidAmount) } : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Bid ไม่สำเร็จ');
@@ -327,13 +334,30 @@ export default function MarketplaceDetailPage() {
                   auction.phase === 'live' ? (
                     <>
                       <div className="mkt-bid-form">
-                        <label>ราคา bid (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
+                        <label>ราคา bid ครั้งนี้ (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
                         <div className="mkt-bid-row">
                           <input type="number" min={auction.minNextBid} step={auction.bidIncrement} value={bidAmount} onChange={e => setBidAmount(e.target.value)} />
+                        </div>
+                        <label className="mkt-bid-max-label">
+                          ราคาสูงสุดที่สู้ (auto-bid)
+                          <span className="mkt-bid-max-hint">ระบบ bid ให้อัตโนมัติเมื่อมีคน overbid จนถึงเพดานนี้</span>
+                        </label>
+                        <div className="mkt-bid-row">
+                          <input
+                            type="number"
+                            min={auction.minNextBid}
+                            step={auction.bidIncrement}
+                            value={maxBidAmount}
+                            onChange={e => setMaxBidAmount(e.target.value)}
+                            placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
+                          />
                           <button type="button" className="btn btn-primary btn-lg" onClick={placeBid} disabled={bidding}>
                             {bidding ? 'กำลัง bid...' : '🔨 Bid'}
                           </button>
                         </div>
+                        {myAutoBidMax != null && (
+                          <p className="mkt-bid-auto-active">🤖 ตั้ง auto-bid ไว้สูงสุด ฿{myAutoBidMax.toLocaleString()}</p>
+                        )}
                         {bidError && <p className="mkt-bid-error">{bidError}</p>}
                       </div>
                       {canSellerChat && (

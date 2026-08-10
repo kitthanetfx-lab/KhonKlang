@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { rowToAuctionPublic, type AuctionRow } from '@/lib/auction';
+import { rowToAuctionPublic, type AuctionAutoBidRow, type AuctionRow } from '@/lib/auction';
 import { computeAuctionGp } from '@/lib/fees';
 import { readFeesConfig } from './financeLedger';
 import { notifyUsers } from './notify';
@@ -48,7 +48,6 @@ export async function finalizeAuction(db: SupabaseClient, dealId: string) {
     const fees = await readFeesConfig(db);
     const gp = computeAuctionGp(fees, winningBid);
 
-    // ชนะแล้วเข้า checkout แบบตลาด (ที่อยู่ → โอน → แพ็ค) ไม่ผ่านคนกลาง
     await db.from('deals').update({
       buyer_id: auction.current_bidder_id,
       buyer_name: auction.current_bidder_name || '',
@@ -77,33 +76,34 @@ export async function finalizeAuction(db: SupabaseClient, dealId: string) {
   return { ...auction, ended_at: endedAt };
 }
 
-/** วาง bid */
-export async function placeAuctionBid(
+async function loadLiveAuction(db: SupabaseClient, dealId: string) {
+  const { data: auction } = await db.from('deal_auction').select('*').eq('deal_id', dealId).maybeSingle();
+  if (!auction || auction.ended_at) return null;
+  if (new Date(auction.ends_at).getTime() <= Date.now()) return null;
+  return auction as AuctionRow;
+}
+
+async function loadAutoBids(db: SupabaseClient, dealId: string): Promise<AuctionAutoBidRow[]> {
+  const { data } = await db.from('auction_auto_bids')
+    .select('*')
+    .eq('deal_id', dealId)
+    .order('max_amount', { ascending: false })
+    .order('created_at', { ascending: true });
+  return (data || []) as AuctionAutoBidRow[];
+}
+
+/** บันทึก bid ลง DB (manual หรือ auto) */
+async function recordAuctionBid(
   db: SupabaseClient,
   dealId: string,
+  dealTitle: string,
+  sellerId: string | null,
+  auction: AuctionRow,
   bidderId: string,
   bidderName: string,
-  amount: number,
+  bidAmount: number,
+  opts?: { notify?: boolean; previousBidderId?: string | null },
 ) {
-  const { data: deal } = await db.from('deals').select('id, seller_id, status, deal_type, title').eq('id', dealId).maybeSingle();
-  if (!deal || deal.deal_type !== 'auction') throw new Error('ไม่ใช่รายการประมูล');
-  if (deal.status !== 'posted') throw new Error('ประมูลนี้ปิดแล้ว');
-  if (deal.seller_id === bidderId) throw new Error('ไม่สามารถ bid สินค้าของตัวเองได้');
-
-  const { data: auction } = await db.from('deal_auction').select('*').eq('deal_id', dealId).maybeSingle();
-  if (!auction) throw new Error('ไม่พบข้อมูลประมูล');
-  if (auction.ended_at) throw new Error('ประมูลปิดแล้ว');
-  if (new Date(auction.ends_at).getTime() <= Date.now()) {
-    await finalizeAuction(db, dealId);
-    throw new Error('ประมูลหมดเวลาแล้ว');
-  }
-
-  const pub = rowToAuctionPublic(auction as AuctionRow);
-  const bidAmount = Math.round(amount);
-  if (bidAmount < pub.minNextBid) {
-    throw new Error(`ราคา bid ต่ำเกินไป — ต้องอย่างน้อย ฿${pub.minNextBid.toLocaleString()}`);
-  }
-
   const { data: prior } = await db.from('auction_bids').select('id').eq('deal_id', dealId).eq('bidder_id', bidderId).limit(1);
   const isNewBidder = !(prior?.length);
 
@@ -124,21 +124,158 @@ export async function placeAuctionBid(
 
   await db.from('deals').update({ price: bidAmount }).eq('id', dealId);
 
-  if (deal.seller_id && deal.seller_id !== bidderId) {
-    await notifyUsers(db, [deal.seller_id as string], {
+  if (opts?.notify === false) return;
+
+  if (sellerId && sellerId !== bidderId) {
+    await notifyUsers(db, [sellerId], {
       title: '🔨 มี bid ใหม่ในประมูลของคุณ',
-      body: `"${deal.title}" — bid ล่าสุด ฿${bidAmount.toLocaleString()} โดย ${bidderName}`,
+      body: `"${dealTitle}" — bid ล่าสุด ฿${bidAmount.toLocaleString()} โดย ${bidderName}`,
       link: `/marketplace/${dealId}`,
     }).catch(() => {});
   }
-  if (auction.current_bidder_id && auction.current_bidder_id !== bidderId) {
-    await notifyUsers(db, [auction.current_bidder_id as string], {
+  const prevLeader = opts?.previousBidderId ?? auction.current_bidder_id;
+  if (prevLeader && prevLeader !== bidderId) {
+    await notifyUsers(db, [prevLeader as string], {
       title: '🔨 มีคน overbid คุณแล้ว',
-      body: `"${deal.title}" — มี bid ใหม่ ฿${bidAmount.toLocaleString()}`,
+      body: `"${dealTitle}" — มี bid ใหม่ ฿${bidAmount.toLocaleString()}`,
       link: `/marketplace/${dealId}`,
     }).catch(() => {});
   }
+}
+
+/** หา auto-bid ถัดไปที่ควรวาง */
+function pickNextAutoBid(
+  auction: AuctionRow,
+  autos: AuctionAutoBidRow[],
+): { bidder: AuctionAutoBidRow; amount: number } | null {
+  if (!autos.length) return null;
+  const pub = rowToAuctionPublic(auction);
+  const minNext = pub.minNextBid;
+  const inc = pub.bidIncrement;
+  const sorted = [...autos].sort((a, b) => {
+    if (b.max_amount !== a.max_amount) return b.max_amount - a.max_amount;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
+  const top = sorted[0];
+  const second = sorted.find(a => a.bidder_id !== top.bidder_id) || null;
+
+  if (!second) {
+    if (pub.currentBidderId === top.bidder_id) return null;
+    if (top.max_amount < minNext) return null;
+    return { bidder: top, amount: Math.min(top.max_amount, minNext) };
+  }
+
+  const visibleCap = Math.min(top.max_amount, second.max_amount + inc);
+
+  if (pub.currentBidderId === top.bidder_id) {
+    if (pub.currentBid != null && pub.currentBid >= visibleCap) return null;
+    if (second.max_amount < minNext) return null;
+    return { bidder: second, amount: Math.min(second.max_amount, minNext) };
+  }
+
+  if (top.max_amount < minNext) return null;
+  return { bidder: top, amount: Math.min(top.max_amount, minNext) };
+}
+
+/** วน auto-bid จน stable */
+export async function resolveAutoBids(db: SupabaseClient, dealId: string, dealTitle: string, sellerId: string | null) {
+  for (let round = 0; round < 40; round++) {
+    const auction = await loadLiveAuction(db, dealId);
+    if (!auction) break;
+
+    const autos = await loadAutoBids(db, dealId);
+    const next = pickNextAutoBid(auction, autos);
+    if (!next) break;
+    if (next.bidder.bidder_id === auction.current_bidder_id && next.amount <= (auction.current_bid ?? 0)) break;
+
+    const prevLeader = auction.current_bidder_id;
+    await recordAuctionBid(db, dealId, dealTitle, sellerId, auction, next.bidder.bidder_id, next.bidder.bidder_name, next.amount, {
+      notify: true,
+      previousBidderId: prevLeader,
+    });
+  }
+}
+
+/** วาง bid (+ ตั้ง max auto-bid ได้) */
+export async function placeAuctionBid(
+  db: SupabaseClient,
+  dealId: string,
+  bidderId: string,
+  bidderName: string,
+  amount: number,
+  options?: { maxBid?: number | null },
+) {
+  const { data: deal } = await db.from('deals').select('id, seller_id, status, deal_type, title').eq('id', dealId).maybeSingle();
+  if (!deal || deal.deal_type !== 'auction') throw new Error('ไม่ใช่รายการประมูล');
+  if (deal.status !== 'posted') throw new Error('ประมูลนี้ปิดแล้ว');
+  if (deal.seller_id === bidderId) throw new Error('ไม่สามารถ bid สินค้าของตัวเองได้');
+
+  let auction = await loadLiveAuction(db, dealId);
+  if (!auction) {
+    const { data: raw } = await db.from('deal_auction').select('*').eq('deal_id', dealId).maybeSingle();
+    if (!raw) throw new Error('ไม่พบข้อมูลประมูล');
+    if (raw.ended_at) throw new Error('ประมูลปิดแล้ว');
+    if (new Date(raw.ends_at).getTime() <= Date.now()) {
+      await finalizeAuction(db, dealId);
+      throw new Error('ประมูลหมดเวลาแล้ว');
+    }
+    auction = raw as AuctionRow;
+  }
+
+  const pub = rowToAuctionPublic(auction);
+  let bidAmount = Math.round(amount);
+  const maxBid = options?.maxBid != null && isFinite(options.maxBid) ? Math.round(Number(options.maxBid)) : null;
+
+  if (maxBid != null) {
+    if (maxBid < pub.minNextBid) {
+      throw new Error(`ราคาสูงสุดต้องไม่ต่ำกว่าราคา bid ขั้นต่ำ ฿${pub.minNextBid.toLocaleString()}`);
+    }
+    if (maxBid < bidAmount) {
+      throw new Error('ราคาสูงสุดที่สู้ต้องไม่ต่ำกว่าราคา bid ครั้งนี้');
+    }
+    await db.from('auction_auto_bids').upsert({
+      deal_id: dealId,
+      bidder_id: bidderId,
+      bidder_name: bidderName,
+      max_amount: maxBid,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'deal_id,bidder_id' });
+    bidAmount = Math.min(bidAmount, maxBid);
+  }
+
+  if (bidAmount < pub.minNextBid) {
+    throw new Error(`ราคา bid ต่ำเกินไป — ต้องอย่างน้อย ฿${pub.minNextBid.toLocaleString()}`);
+  }
+
+  const prevLeader = auction.current_bidder_id;
+  await recordAuctionBid(db, dealId, deal.title, deal.seller_id, auction, bidderId, bidderName, bidAmount, {
+    previousBidderId: prevLeader,
+  });
+
+  await resolveAutoBids(db, dealId, deal.title, deal.seller_id);
 
   const { data: updated } = await db.from('deal_auction').select('*').eq('deal_id', dealId).single();
   return rowToAuctionPublic(updated as AuctionRow);
+}
+
+/** deal_id ที่ user เคย bid หรือตั้ง auto-bid */
+export async function getMyAuctionDealIds(db: SupabaseClient, userId: string): Promise<string[]> {
+  const [bidsRes, autoRes] = await Promise.all([
+    db.from('auction_bids').select('deal_id').eq('bidder_id', userId),
+    db.from('auction_auto_bids').select('deal_id').eq('bidder_id', userId),
+  ]);
+  const ids = new Set<string>();
+  for (const row of bidsRes.data || []) ids.add(row.deal_id as string);
+  for (const row of autoRes.data || []) ids.add(row.deal_id as string);
+  return [...ids];
+}
+
+export async function getMyAutoBidMax(db: SupabaseClient, dealId: string, userId: string): Promise<number | null> {
+  const { data } = await db.from('auction_auto_bids')
+    .select('max_amount')
+    .eq('deal_id', dealId)
+    .eq('bidder_id', userId)
+    .maybeSingle();
+  return data?.max_amount != null ? Number(data.max_amount) : null;
 }

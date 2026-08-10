@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import Link from 'next/link';
@@ -12,7 +12,8 @@ import { isCertifiedMode } from '@/lib/listingMode';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
-import type { AuctionPublic } from '@/lib/auction';
+import type { AuctionPublic, MyAuctionStatus } from '@/lib/auction';
+import { MY_AUCTION_STATUS_LABEL } from '@/lib/auction';
 
 type Zone = 'listing' | 'auction';
 
@@ -34,6 +35,7 @@ interface Listing {
   buyer_id: string;
   created_at: string;
   auction?: AuctionPublic;
+  myAuctionStatus?: MyAuctionStatus;
 }
 
 function imgUrl(fileId: string) {
@@ -68,9 +70,12 @@ export default function Marketplace() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const zone: Zone = searchParams.get('zone') === 'auction' ? 'auction' : 'listing';
+  const auctionView = searchParams.get('view') === 'mine' ? 'mine' : 'all';
 
   const [listings, setListings] = useState<Listing[]>([]);
+  const [myAuctions, setMyAuctions] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [myAuctionsLoading, setMyAuctionsLoading] = useState(false);
   const [myId, setMyId] = useState('');
 
   const [search, setSearch] = useState('');
@@ -92,6 +97,14 @@ export default function Marketplace() {
     else params.delete('zone');
     const qs = params.toString();
     router.replace(qs ? `/marketplace?${qs}` : '/marketplace', { scroll: false });
+  }, [router, searchParams]);
+
+  const setAuctionView = useCallback((view: 'all' | 'mine') => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('zone', 'auction');
+    if (view === 'mine') params.set('view', 'mine');
+    else params.delete('view');
+    router.replace(`/marketplace?${params.toString()}`, { scroll: false });
   }, [router, searchParams]);
 
   useEffect(() => {
@@ -124,6 +137,28 @@ export default function Marketplace() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!myId) {
+      setMyAuctions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setMyAuctionsLoading(true);
+      try {
+        const headers = await authHeaders();
+        const res = await fetch('/api/auctions/mine', { headers });
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setMyAuctions(data.deals || []);
+        }
+      } finally {
+        if (!cancelled) setMyAuctionsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [myId]);
+
   const marketListings = listings
     .filter(d => d.status === 'posted')
     .filter(d => d.deal_type !== 'auction')
@@ -145,7 +180,15 @@ export default function Marketplace() {
   if (listingSort === 'ราคา: น้อย→มาก') filteredListings = [...filteredListings].sort((a, b) => a.price - b.price);
   else if (listingSort === 'ราคา: มาก→น้อย') filteredListings = [...filteredListings].sort((a, b) => b.price - a.price);
 
-  let filteredAuctions = auctions
+  const myAuctionStatusMap = useMemo(() => {
+    const m = new Map<string, MyAuctionStatus>();
+    for (const d of myAuctions) {
+      if (d.myAuctionStatus) m.set(d.id, d.myAuctionStatus);
+    }
+    return m;
+  }, [myAuctions]);
+
+  let filteredAuctions = (auctionView === 'mine' ? myAuctions : auctions)
     .filter(d => cat === 'ทั้งหมด' || d.category === cat)
     .filter(d => !province || d.location === province)
     .filter(d => !search ||
@@ -165,6 +208,8 @@ export default function Marketplace() {
   }
 
   const filtered = zone === 'auction' ? filteredAuctions : filteredListings;
+  const isAuction = zone === 'auction';
+  const showAuctionLoading = isAuction && auctionView === 'mine' ? myAuctionsLoading : loading;
 
   function clearFilters() {
     setCat('ทั้งหมด');
@@ -225,6 +270,8 @@ export default function Marketplace() {
     const c2 = AUCTION_CARD_BG[(idx + 2) % AUCTION_CARD_BG.length];
     const hasBids = a.bidCount > 0;
 
+    const myStatus = listing.myAuctionStatus ?? myAuctionStatusMap.get(listing.id);
+
     return (
       <Link
         href={`/marketplace/${listing.id}`}
@@ -234,6 +281,11 @@ export default function Marketplace() {
         <div className="lc-img" style={firstImg ? undefined : { background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)` }}>
           {firstImg ? <img src={firstImg} alt={listing.title} loading="lazy" /> : <span style={{ fontSize: 40 }}>🔨</span>}
           <span className="lc-badge lc-badge--auction">ประมูล</span>
+          {myStatus && (
+            <span className={`lc-badge lc-badge--my-auction lc-badge--my-auction-${myStatus}`}>
+              {MY_AUCTION_STATUS_LABEL[myStatus]}
+            </span>
+          )}
         </div>
         <div className="lc-body lc-body--auction">
           <h3 className="lc-title lc-title--auction">{listing.title}</h3>
@@ -295,8 +347,6 @@ export default function Marketplace() {
       />
     );
   }
-
-  const isAuction = zone === 'auction';
 
   return (
     <>
@@ -412,10 +462,40 @@ export default function Marketplace() {
       </section>
 
       <div id="mkt-results" className="container mkt-container mkt-feed">
+        {isAuction && (
+          <div className="mkt-auction-view-tabs reveal" role="tablist" aria-label="มุมมองประมูล">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={auctionView === 'all'}
+              className={`mkt-auction-view-tab${auctionView === 'all' ? ' is-active' : ''}`}
+              onClick={() => setAuctionView('all')}
+            >
+              ทั้งหมด
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={auctionView === 'mine'}
+              className={`mkt-auction-view-tab${auctionView === 'mine' ? ' is-active' : ''}`}
+              onClick={() => {
+                if (!myId) {
+                  router.push(`/login?returnTo=${encodeURIComponent('/marketplace?zone=auction&view=mine')}`);
+                  return;
+                }
+                setAuctionView('mine');
+              }}
+            >
+              ประมูลของฉัน
+            </button>
+          </div>
+        )}
         <div className="mkt-toolbar">
           <span className="mkt-count">
-            {loading ? 'กำลังโหลด…' : isAuction ? (
-              <>🔨 ประมูล <b>{filtered.length}</b> รายการ</>
+            {showAuctionLoading ? 'กำลังโหลด…' : isAuction ? (
+              auctionView === 'mine'
+                ? <>📋 ประมูลของฉัน <b>{filtered.length}</b> รายการ</>
+                : <>🔨 ประมูล <b>{filtered.length}</b> รายการ</>
             ) : (
               <>แสดง <b>{filtered.length}</b> รายการ{cat !== 'ทั้งหมด' ? ` · ${cat}` : ''}</>
             )}
@@ -454,7 +534,7 @@ export default function Marketplace() {
           </div>
         </div>
 
-        {loading ? (
+        {showAuctionLoading ? (
           <div className="mkt-loading">
             <div className="mkt-spinner" />
           </div>
@@ -463,7 +543,11 @@ export default function Marketplace() {
             <div className="mkt-empty-ic">
               {isAuction ? '🔨' : <Icon name="search" size={32} />}
             </div>
-            <p>{isAuction ? 'ยังไม่มีรายการประมูล' : 'ไม่พบสินค้าที่ตรงกับที่ค้นหา'}</p>
+            <p>
+              {isAuction && auctionView === 'mine'
+                ? 'ยังไม่มีรายการที่คุณเคย bid'
+                : isAuction ? 'ยังไม่มีรายการประมูล' : 'ไม่พบสินค้าที่ตรงกับที่ค้นหา'}
+            </p>
             <div className="mkt-empty-actions">
               {!isAuction && (
                 <button type="button" className="btn btn-soft btn-sm" onClick={clearFilters}>ล้างตัวกรอง</button>

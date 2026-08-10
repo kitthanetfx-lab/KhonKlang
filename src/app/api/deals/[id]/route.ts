@@ -170,8 +170,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     let buyerShipping: { name: string; phone: string; address: string } | null = null;
+    let myAutoBidMax: number | null = null;
+    let myAuctionStatus: string | null = null;
+    let viewerId: string | null = null;
     try {
       const me = await verifyUser(req);
+      viewerId = me.id;
       buyerShipping = await getBuyerShippingForSeller(db, current, me.id, me.role);
     } catch {
       // public view — ไม่ส่งข้อมูลส่วนตัวผู้ซื้อ
@@ -207,6 +211,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ]);
       if (auctionRes.data) auction = rowToAuctionPublic(auctionRes.data as AuctionRow);
       auctionBids = bidsRes.data || [];
+      if (auction && viewerId) {
+        const { getMyAutoBidMax } = await import('../../_lib/auctionSync');
+        const { computeMyAuctionStatus } = await import('@/lib/auction');
+        myAutoBidMax = await getMyAutoBidMax(db, id, viewerId);
+        myAuctionStatus = computeMyAuctionStatus(auction, viewerId, current.buyer_id);
+      }
     }
 
     return NextResponse.json({
@@ -220,6 +230,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       sellerShop,
       auction,
       auctionBids,
+      myAutoBidMax,
+      myAuctionStatus,
     });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

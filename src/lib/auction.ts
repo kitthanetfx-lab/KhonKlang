@@ -162,6 +162,39 @@ export function formatDurationPartsLabel(days: number, hours: number, minutes: n
   return parts.join(' ');
 }
 
+export interface AuctionAutoBidRow {
+  deal_id: string;
+  bidder_id: string;
+  bidder_name: string;
+  max_amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MyAuctionStatus = 'leading' | 'outbid' | 'won' | 'lost' | 'live';
+
+/** สถานะประมูลของฉันในรายการ */
+export function computeMyAuctionStatus(
+  auction: AuctionPublic,
+  myId: string,
+  dealBuyerId?: string | null,
+): MyAuctionStatus {
+  if (auction.endedAt || auction.phase === 'ended') {
+    if (dealBuyerId === myId || auction.currentBidderId === myId) return 'won';
+    return 'lost';
+  }
+  if (auction.currentBidderId === myId) return 'leading';
+  return 'outbid';
+}
+
+export const MY_AUCTION_STATUS_LABEL: Record<MyAuctionStatus, string> = {
+  leading: '🏆 กำลังนำ',
+  outbid: '⚠️ ถูก overbid',
+  won: '✅ ชนะ — รอชำระ',
+  lost: '❌ แพ้/ปิดแล้ว',
+  live: '🔨 กำลังประมูล',
+};
+
 export const AUCTION_DURATION_OPTIONS = [
   { hours: 24, label: '1 วัน' },
   { hours: 72, label: '3 วัน' },
