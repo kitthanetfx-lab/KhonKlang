@@ -1439,17 +1439,26 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   padding-right: max(16px, 1cm);
 }
 .mkt-detail-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-.mkt-detail-grid { display: grid; gap: 26px; }
-@media (min-width: 640px) {
-  .mkt-detail-gallery { max-width: min(100%, 280px); margin-inline: auto; }
+.mkt-detail-grid {
+  display: grid;
+  gap: 26px;
+  align-items: start;
 }
-@media (min-width: 1040px) {
+/* รูปครึ่งหนึ่งของเดิม (420px → 210px) — gallery ไม่ยืดตามคอลัมน์ขวา */
+@media (min-width: 768px) {
   .mkt-detail-grid {
-    grid-template-columns: minmax(0, 280px) minmax(360px, 1fr);
-    align-items: start;
+    grid-template-columns: 210px minmax(0, 1fr);
     gap: 22px;
   }
-  .mkt-detail-gallery { max-width: 280px; margin-inline: 0; justify-self: start; }
+  .mkt-detail-gallery {
+    max-width: 210px;
+    width: 210px;
+    justify-self: start;
+    align-self: start;
+  }
+}
+@media (max-width: 767px) {
+  .mkt-detail-gallery { max-width: min(100%, 210px); margin-inline: auto; }
 }
 .mkt-detail-gallery, .mkt-detail-info { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--sh-sm); }
 .mkt-detail-gallery { padding: 12px; }
@@ -1457,7 +1466,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .mkt-detail-main {
   position: relative;
   width: 100%;
-  max-width: 100%;
+  max-width: 210px;
   aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: var(--r-lg);
@@ -1465,8 +1474,8 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   border: 1px solid var(--line);
 }
 .mkt-detail-fallback { width: 100%; height: 100%; display: grid; place-items: center; color: var(--faint); }
-.mkt-detail-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.mkt-detail-thumb { width: 56px; height: 56px; border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); padding: 0; }
+.mkt-detail-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.mkt-detail-thumb { width: 28px; height: 28px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); padding: 0; }
 .mkt-detail-thumb.active { border-color: var(--accent); box-shadow: var(--ring); }
 .mkt-detail-info { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .mkt-detail-bid-panel {
