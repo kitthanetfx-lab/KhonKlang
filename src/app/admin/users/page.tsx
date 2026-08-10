@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { Search, Users, RefreshCw, MoreVertical } from 'lucide-react';
+import { AdminUsersApp } from '@/components/admin/mobile/AdminUsersApp';
 
 interface AppUser {
   id: string;
@@ -183,7 +184,11 @@ function UsersContent() {
     return true;
   });
 
-  return (
+  const roleCounts = Object.fromEntries(
+    Object.keys(ROLE_CFG).map(k => [k, users.filter(u => userBadgeKeys(u).includes(k)).length]),
+  );
+
+  const desktopView = (
     <div className="space-y-5 w-full">
       <div className="flex items-center justify-between">
         <div>
@@ -291,6 +296,28 @@ function UsersContent() {
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminUsersApp
+          users={users}
+          filtered={filtered}
+          total={total}
+          loading={loading}
+          search={search}
+          onSearch={setSearch}
+          roleFilter={roleFilter}
+          onRoleFilter={setRoleFilter}
+          roleCounts={roleCounts}
+          onRefresh={() => void load()}
+          renderActions={u => <ActionMenu user={u} onRefresh={() => void load()} />}
+          badgeFor={u => userBadgeKeys(u).map(k => ROLE_CFG[k] ?? ROLE_CFG.user)}
+        />
+      </div>
+      <div className="admin-desktop-only">{desktopView}</div>
+    </>
   );
 }
 

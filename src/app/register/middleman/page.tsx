@@ -17,6 +17,7 @@ import { ConsentModal } from '@/components/ConsentModal';
 import { FEE_DEFAULTS, effectiveRegFee, isPromoActive, type FeeConfig } from '@/lib/fees';
 import { ResponsiveShell } from '@/components/mobile';
 import { RegisterWizardApp } from '@/components/register/RegisterWizardApp';
+import { RegisterMiddlemanApp } from '@/components/register/RegisterMiddlemanApp';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -315,7 +316,7 @@ function MiddlemanForm() {
   const wizardNav = (
     <>
       {step < 4 && (
-        <div className={`reg-wiz-nav${step > 1 ? ' reg-wiz-nav--split' : ''}`}>
+        <div className={`reg-app-nav${step > 1 ? ' reg-app-nav--split' : ''}`}>
           {step > 1 && (
             <button type="button" onClick={back} className="btn btn-ghost">ย้อนกลับ</button>
           )}
@@ -654,10 +655,52 @@ function MiddlemanForm() {
           badge="🛡️ สมัครเป็นคนกลาง (Escrow Agent)"
           steps={STEPS}
           currentStep={step}
+          accent="purple"
           error={error && step < 4 ? error : undefined}
           footer={wizardNav}
         >
-          {wizardPanel}
+          <RegisterMiddlemanApp
+            step={step}
+            provinces={PROVINCES}
+            banks={BANKS}
+            displayName={displayName}
+            oauthEmail={oauthEmail}
+            fullNameId={fullNameId}
+            onFullNameId={setFullNameId}
+            idNumber={idNumber}
+            onIdNumber={setIdNumber}
+            categories={categories}
+            onToggleCategory={toggleCategory}
+            workProvince={workProvince}
+            onWorkProvince={setWorkProvince}
+            profileProvince={profileProvince}
+            terms={terms}
+            onTerms={setTerms}
+            idCardFile={idCardFile}
+            onIdCardFile={setIdCardFile}
+            bookbankFile={bookbankFile}
+            onBookbankFile={setBookbankFile}
+            bankAcct={bankAcct}
+            onBankAcct={setBankAcct}
+            bankName={bankName}
+            onBankName={setBankName}
+            bankOwner={bankOwner}
+            onBankOwner={setBankOwner}
+            fees={fees}
+            membershipFee={membershipFee}
+            promoActive={promoActive}
+            qrSrc={qrSrc}
+            ppDigits={ppDigits}
+            copied={copied}
+            onCopyText={copyText}
+            slipFile={slipFile}
+            onSlipFile={setSlipFile}
+            pdpaConsent={pdpaConsent}
+            onPdpaConsent={setPdpaConsent}
+            error={error}
+            submitting={submitting}
+            onSubmit={handleSubmit}
+          />
         </RegisterWizardApp>
       }
       desktop={

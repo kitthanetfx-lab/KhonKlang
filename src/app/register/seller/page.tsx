@@ -17,6 +17,7 @@ import { ConsentModal } from '@/components/ConsentModal';
 import { FEE_DEFAULTS, effectiveRegFee, isPromoActive, type FeeConfig } from '@/lib/fees';
 import { ResponsiveShell } from '@/components/mobile';
 import { RegisterWizardApp } from '@/components/register/RegisterWizardApp';
+import { RegisterSellerApp } from '@/components/register/RegisterSellerApp';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -371,6 +372,12 @@ function SellerForm() {
   const addBranch = () =>
     setBranches(prev => [...prev, newBranch(`สาขา ${prev.length + 1}`)]);
 
+  const fillBranchFromProfile = (id: string) => {
+    if (!profileAddress) return;
+    const parsed = parseProfileAddress(profileAddress);
+    setBranches(prev => prev.map(b => b.id === id ? { ...b, ...parsed } : b));
+  };
+
   // Validation
   const validate = () => {
     setError('');
@@ -522,7 +529,7 @@ function SellerForm() {
   const wizardNav = (
     <>
       {step < 4 && (
-        <div className={`reg-wiz-nav${step > 1 ? ' reg-wiz-nav--split' : ''}`}>
+        <div className={`reg-app-nav${step > 1 ? ' reg-app-nav--split' : ''}`}>
           {step > 1 && (
             <button type="button" onClick={back} className="btn btn-ghost">ย้อนกลับ</button>
           )}
@@ -851,7 +858,68 @@ function SellerForm() {
           error={error && step < 4 ? error : undefined}
           footer={wizardNav}
         >
-          {wizardPanel}
+          <RegisterSellerApp
+            step={step}
+            provinces={PROVINCES}
+            banks={BANKS}
+            displayName={displayName}
+            oauthEmail={oauthEmail}
+            sellerType={sellerType}
+            onSellerType={setSellerType}
+            fullNameId={fullNameId}
+            onFullNameId={setFullNameId}
+            idNumber={idNumber}
+            onIdNumber={setIdNumber}
+            shopName={shopName}
+            onShopName={setShopName}
+            shopTagline={shopTagline}
+            onShopTagline={setShopTagline}
+            shopLogoFile={shopLogoFile}
+            onShopLogoFile={setShopLogoFile}
+            isCorporate={isCorporate}
+            companyName={companyName}
+            onCompanyName={setCompanyName}
+            companyRegNum={companyRegNum}
+            onCompanyRegNum={setCompanyRegNum}
+            branches={branches}
+            profileAddress={profileAddress}
+            onUpdateBranch={updateBranch}
+            onRemoveBranch={removeBranch}
+            onAddBranch={addBranch}
+            onFillBranchFromProfile={fillBranchFromProfile}
+            onlineLink={onlineLink}
+            onOnlineLink={setOnlineLink}
+            idCardFile={idCardFile}
+            onIdCardFile={setIdCardFile}
+            bookbankFile={bookbankFile}
+            onBookbankFile={setBookbankFile}
+            companyCertFile={companyCertFile}
+            onCompanyCertFile={setCompanyCertFile}
+            bankAcct={bankAcct}
+            onBankAcct={setBankAcct}
+            bankName={bankName}
+            onBankName={setBankName}
+            bankOwner={bankOwner}
+            onBankOwner={setBankOwner}
+            companyBankAcct={companyBankAcct}
+            onCompanyBankAcct={setCompanyBankAcct}
+            companyBankName={companyBankName}
+            onCompanyBankName={setCompanyBankName}
+            fees={fees}
+            membershipFee={membershipFee}
+            promoActive={promoActive}
+            qrSrc={qrSrc}
+            ppDigits={ppDigits}
+            copied={copied}
+            onCopyText={copyText}
+            slipFile={slipFile}
+            onSlipFile={setSlipFile}
+            pdpaConsent={pdpaConsent}
+            onPdpaConsent={setPdpaConsent}
+            error={error}
+            submitting={submitting}
+            onSubmit={handleSubmit}
+          />
         </RegisterWizardApp>
       }
       desktop={
