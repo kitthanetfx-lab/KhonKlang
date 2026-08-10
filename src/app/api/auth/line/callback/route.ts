@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { displayName: profile.displayName, pictureUrl: profile.pictureUrl || null },
+      user_metadata: { displayName: profile.displayName, pictureUrl: profile.pictureUrl || null, lineUserId: profile.userId },
     });
     if (createErr && !/already.*registered|already exists/i.test(createErr.message)) {
       throw new Error(`Create user: ${createErr.message}`);
@@ -79,9 +79,22 @@ export async function GET(request: NextRequest) {
       await admin.auth.admin.updateUserById(userId, {
         password,
         email_confirm: true,
-        user_metadata: { displayName: profile.displayName, pictureUrl: profile.pictureUrl || null },
+        user_metadata: { displayName: profile.displayName, pictureUrl: profile.pictureUrl || null, lineUserId: profile.userId },
       }).catch(() => {});
     }
+
+    // ผูก LINE userId กับโปรไฟล์ — ใช้ push แจ้ง overbid ผ่าน OA แม้ปิดเว็บ
+    try {
+      await admin.from('profiles').upsert({
+        id: userId,
+        email,
+        display_name: profile.displayName || null,
+        line_user_id: profile.userId,
+      }, { onConflict: 'id' });
+    } catch { /* best-effort */ }
+    try {
+      await admin.from('profiles').update({ line_user_id: profile.userId }).eq('id', userId);
+    } catch { /* best-effort */ }
 
     // 6. Sign in as that user (anon-key client call) to mint a real session.
     const anon = createClient(

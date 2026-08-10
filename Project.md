@@ -1,5 +1,18 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (19:48)
+
+### Auto-bid คงอยู่แม้ปิดเว็บ + จำนวนเงินต่อบิด + แจ้ง LINE OA
+
+**A) Persist:** `loadListing` ส่ง auth เสมอ → คืน `myAutoBidMax`/`step` จาก DB · `clearAutoBid` เฉพาะตอนเคยตั้งแล้วผู้ใช้กดปิด  
+**B) ต่อบิด:** คอลัมน์ `auction_auto_bids.step_amount` · UI ช่อง「จำนวนเงินต่อบิด」· `resolveAutoBids` สู้ทีละ step (≥ ขั้นต่ำรายการ) จนถึงเพดาน — รันบนเซิร์ฟเวอร์แม้ปิดเว็บ  
+**C) LINE OA:** `profiles.line_user_id` ผูกตอน LINE Login · แจ้ง overbid + bid ใหม่ถึงผู้ขายผ่าน Messaging API · ปุ่มเพิ่มเพื่อน OA ในหน้ารายละเอียด/โปรไฟล์  
+
+**Migration:** `0033_auto_bid_step_and_line_user.sql` (ต้องรันบน Supabase)  
+**Env:** `NEXT_PUBLIC_LINE_OA_ADD_FRIEND_URL` + `LINE_MESSAGING_CHANNEL_ACCESS_TOKEN` (มีอยู่แล้วสำหรับแอดมิน)
+
+---
+
 ## 2026-08-10 (19:16)
 
 ### กล่อง Bid — เพดาน Auto-bid เหนือปุ่ม Bid + เห็นชัด

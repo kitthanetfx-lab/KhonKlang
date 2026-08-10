@@ -171,8 +171,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     let buyerShipping: { name: string; phone: string; address: string } | null = null;
     let myAutoBidMax: number | null = null;
+    let myAutoBidStep: number | null = null;
     let myAuctionStatus: string | null = null;
     let viewerId: string | null = null;
+    let hasLineNotify = false;
     try {
       const me = await verifyUser(req);
       viewerId = me.id;
@@ -212,10 +214,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (auctionRes.data) auction = rowToAuctionPublic(auctionRes.data as AuctionRow);
       auctionBids = bidsRes.data || [];
       if (auction && viewerId) {
-        const { getMyAutoBidMax } = await import('../../_lib/auctionSync');
+        const { getMyAutoBid } = await import('../../_lib/auctionSync');
         const { computeMyAuctionStatus } = await import('@/lib/auction');
-        myAutoBidMax = await getMyAutoBidMax(db, id, viewerId);
+        const mine = await getMyAutoBid(db, id, viewerId);
+        myAutoBidMax = mine?.maxAmount ?? null;
+        myAutoBidStep = mine?.stepAmount ? mine.stepAmount : null;
         myAuctionStatus = computeMyAuctionStatus(auction, viewerId, current.buyer_id);
+        const { data: vp } = await db.from('profiles').select('line_user_id').eq('id', viewerId).maybeSingle();
+        hasLineNotify = Boolean(String(vp?.line_user_id || '').trim());
       }
     }
 
@@ -231,7 +237,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       auction,
       auctionBids,
       myAutoBidMax,
+      myAutoBidStep,
       myAuctionStatus,
+      hasLineNotify,
+      lineOaUrl: process.env.NEXT_PUBLIC_LINE_OA_ADD_FRIEND_URL || process.env.NEXT_PUBLIC_LINE_OA_URL || '',
     });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

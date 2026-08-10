@@ -1,8 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { rowToAuctionPublic, type AuctionAutoBidRow, type AuctionRow } from '@/lib/auction';
+import { autoBidStepAmount, rowToAuctionPublic, type AuctionAutoBidRow, type AuctionRow } from '@/lib/auction';
 import { computeAuctionGp } from '@/lib/fees';
 import { readFeesConfig } from './financeLedger';
 import { notifyUsers } from './notify';
+import { notifyUserLineOverbid, notifySellerLineNewBid } from '@/lib/lineUserNotify';
 
 /** แนบข้อมูลประมูลให้รายการ deals */
 export async function attachAuctions<T extends { id: string; deal_type?: string }>(
@@ -132,6 +133,12 @@ async function recordAuctionBid(
       body: `"${dealTitle}" — bid ล่าสุด ฿${bidAmount.toLocaleString()} โดย ${bidderName}`,
       link: `/marketplace/${dealId}`,
     }).catch(() => {});
+    await notifySellerLineNewBid(db, sellerId, {
+      title: dealTitle,
+      amount: bidAmount,
+      dealId,
+      bidderName,
+    }).catch(() => {});
   }
   const prevLeader = opts?.previousBidderId ?? auction.current_bidder_id;
   if (prevLeader && prevLeader !== bidderId) {
@@ -140,10 +147,15 @@ async function recordAuctionBid(
       body: `"${dealTitle}" — มี bid ใหม่ ฿${bidAmount.toLocaleString()}`,
       link: `/marketplace/${dealId}`,
     }).catch(() => {});
+    await notifyUserLineOverbid(db, prevLeader as string, {
+      title: dealTitle,
+      amount: bidAmount,
+      dealId,
+    }).catch(() => {});
   }
 }
 
-/** หา auto-bid ถัดไปที่ควรวาง */
+/** หา auto-bid ถัดไปที่ควรวาง — สู้ทีละ step ของผู้ตั้ง (อย่างน้อยขั้นต่ำรายการ) */
 function pickNextAutoBid(
   auction: AuctionRow,
   autos: AuctionAutoBidRow[],
@@ -157,25 +169,39 @@ function pickNextAutoBid(
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 
+  const nextAmountFor = (auto: AuctionAutoBidRow) => {
+    const step = autoBidStepAmount(inc, auto.step_amount);
+    if (pub.currentBid == null) return Math.min(auto.max_amount, minNext);
+    const jump = pub.currentBid + step;
+    return Math.min(auto.max_amount, Math.max(minNext, jump));
+  };
+
   const top = sorted[0];
   const second = sorted.find(a => a.bidder_id !== top.bidder_id) || null;
 
   if (!second) {
     if (pub.currentBidderId === top.bidder_id) return null;
     if (top.max_amount < minNext) return null;
-    return { bidder: top, amount: Math.min(top.max_amount, minNext) };
+    const amount = nextAmountFor(top);
+    if (amount < minNext) return null;
+    return { bidder: top, amount };
   }
 
-  const visibleCap = Math.min(top.max_amount, second.max_amount + inc);
+  const topStep = autoBidStepAmount(inc, top.step_amount);
+  const visibleCap = Math.min(top.max_amount, second.max_amount + topStep);
 
   if (pub.currentBidderId === top.bidder_id) {
     if (pub.currentBid != null && pub.currentBid >= visibleCap) return null;
     if (second.max_amount < minNext) return null;
-    return { bidder: second, amount: Math.min(second.max_amount, minNext) };
+    const amount = nextAmountFor(second);
+    if (amount < minNext) return null;
+    return { bidder: second, amount };
   }
 
   if (top.max_amount < minNext) return null;
-  return { bidder: top, amount: Math.min(top.max_amount, minNext) };
+  const amount = nextAmountFor(top);
+  if (amount < minNext) return null;
+  return { bidder: top, amount };
 }
 
 /** วน auto-bid จน stable */
@@ -204,7 +230,7 @@ export async function placeAuctionBid(
   bidderId: string,
   bidderName: string,
   amount: number,
-  options?: { maxBid?: number | null; clearAutoBid?: boolean },
+  options?: { maxBid?: number | null; stepAmount?: number | null; clearAutoBid?: boolean },
 ) {
   const { data: deal } = await db.from('deals').select('id, seller_id, status, deal_type, title').eq('id', dealId).maybeSingle();
   if (!deal || deal.deal_type !== 'auction') throw new Error('ไม่ใช่รายการประมูล');
@@ -226,6 +252,9 @@ export async function placeAuctionBid(
   const pub = rowToAuctionPublic(auction);
   let bidAmount = Math.round(amount);
   const maxBid = options?.maxBid != null && isFinite(options.maxBid) ? Math.round(Number(options.maxBid)) : null;
+  const stepAmount = options?.stepAmount != null && isFinite(options.stepAmount)
+    ? Math.max(0, Math.round(Number(options.stepAmount)))
+    : 0;
 
   if (options?.clearAutoBid) {
     await db.from('auction_auto_bids').delete().eq('deal_id', dealId).eq('bidder_id', bidderId);
@@ -236,11 +265,16 @@ export async function placeAuctionBid(
     if (maxBid < bidAmount) {
       throw new Error('ราคาสูงสุดที่สู้ต้องไม่ต่ำกว่าราคา bid ครั้งนี้');
     }
+    const effectiveStep = autoBidStepAmount(pub.bidIncrement, stepAmount);
+    if (stepAmount > 0 && stepAmount < pub.bidIncrement) {
+      throw new Error(`จำนวนเงินต่อบิดต้องไม่ต่ำกว่าขั้นต่ำรายการ ฿${pub.bidIncrement.toLocaleString()}`);
+    }
     await db.from('auction_auto_bids').upsert({
       deal_id: dealId,
       bidder_id: bidderId,
       bidder_name: bidderName,
       max_amount: maxBid,
+      step_amount: stepAmount > 0 ? effectiveStep : 0,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'deal_id,bidder_id' });
     bidAmount = Math.min(bidAmount, maxBid);
@@ -273,11 +307,25 @@ export async function getMyAuctionDealIds(db: SupabaseClient, userId: string): P
   return [...ids];
 }
 
-export async function getMyAutoBidMax(db: SupabaseClient, dealId: string, userId: string): Promise<number | null> {
+export async function getMyAutoBid(
+  db: SupabaseClient,
+  dealId: string,
+  userId: string,
+): Promise<{ maxAmount: number; stepAmount: number } | null> {
   const { data } = await db.from('auction_auto_bids')
-    .select('max_amount')
+    .select('max_amount, step_amount')
     .eq('deal_id', dealId)
     .eq('bidder_id', userId)
     .maybeSingle();
-  return data?.max_amount != null ? Number(data.max_amount) : null;
+  if (data?.max_amount == null) return null;
+  return {
+    maxAmount: Number(data.max_amount),
+    stepAmount: Number(data.step_amount) || 0,
+  };
+}
+
+/** @deprecated ใช้ getMyAutoBid */
+export async function getMyAutoBidMax(db: SupabaseClient, dealId: string, userId: string): Promise<number | null> {
+  const row = await getMyAutoBid(db, dealId, userId);
+  return row?.maxAmount ?? null;
 }

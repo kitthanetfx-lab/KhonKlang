@@ -167,8 +167,19 @@ export interface AuctionAutoBidRow {
   bidder_id: string;
   bidder_name: string;
   max_amount: number;
+  /** จำนวนเงินต่อบิดของ auto; 0 = ใช้ขั้นต่ำรายการ */
+  step_amount?: number;
   created_at: string;
   updated_at: string;
+}
+
+export function autoBidStepAmount(
+  auctionIncrement: number,
+  stepAmount?: number | null,
+): number {
+  const base = Math.max(1, Math.round(Number(auctionIncrement) || 1));
+  const custom = Math.round(Number(stepAmount) || 0);
+  return custom > 0 ? Math.max(base, custom) : base;
 }
 
 export type MyAuctionStatus = 'leading' | 'outbid' | 'won' | 'lost' | 'live';

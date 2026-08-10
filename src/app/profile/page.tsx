@@ -317,6 +317,36 @@ function ProfilePage() {
           </div>
         )}
 
+        <div className="pf-card">
+          <div className="pf-card-title">แจ้งเตือน LINE OA (ประมูล)</div>
+          {prefs.line_user_id ? (
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--green-600, #15803d)', fontWeight: 600 }}>
+              ✓ ผูก LINE แล้ว — จะแจ้งเมื่อมีคน overbid คุณ แม้ปิดเว็บ
+            </p>
+          ) : (
+            <>
+              <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
+                เพิ่มเพื่อน Official Account แล้วเข้าสู่ระบบด้วย LINE หนึ่งครั้ง เพื่อรับแจ้งเมื่อสินค้าถูกประมูลสูงกว่า
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {process.env.NEXT_PUBLIC_LINE_OA_ADD_FRIEND_URL ? (
+                  <a
+                    className="btn btn-soft btn-sm"
+                    href={process.env.NEXT_PUBLIC_LINE_OA_ADD_FRIEND_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    เพิ่มเพื่อน LINE OA
+                  </a>
+                ) : null}
+                <a className="btn btn-soft btn-sm" href={`/api/auth/line?returnTo=${encodeURIComponent('/profile')}`}>
+                  เชื่อมด้วย LINE Login
+                </a>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Bank info — บัญชีรับเงินของผู้ใช้ (แก้ไขได้ทุก role) — ขึ้นก่อนเพราะสำคัญที่สุด */}
         <div className="pf-card">
           <div className="pf-card-title">บัญชีธนาคาร (สำหรับรับเงิน)</div>

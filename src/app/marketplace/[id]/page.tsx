@@ -65,13 +65,19 @@ export default function MarketplaceDetailPage() {
   const [auctionBids, setAuctionBids] = useState<AuctionBid[]>([]);
   const [bidAmount, setBidAmount] = useState('');
   const [maxBidAmount, setMaxBidAmount] = useState('');
+  const [bidStepAmount, setBidStepAmount] = useState('');
   const [autoBidOn, setAutoBidOn] = useState(false);
   const [myAutoBidMax, setMyAutoBidMax] = useState<number | null>(null);
+  const [myAutoBidStep, setMyAutoBidStep] = useState<number | null>(null);
+  const [hasLineNotify, setHasLineNotify] = useState(false);
+  const [lineOaUrl, setLineOaUrl] = useState('');
   const [bidding, setBidding] = useState(false);
   const [bidError, setBidError] = useState('');
 
-  async function loadListing() {
-    const res = await fetch(`/api/deals/${listingId}`);
+  async function loadListing(authOverride?: Record<string, string>) {
+    const headers = authOverride
+      || (Object.keys(hdrs).length ? hdrs : await authHeaders());
+    const res = await fetch(`/api/deals/${listingId}`, { headers });
     const data = await res.json();
     if (!res.ok) {
       setError(data.error || 'ไม่พบสินค้า');
@@ -81,28 +87,44 @@ export default function MarketplaceDetailPage() {
     setSellerShop(data.sellerShop || null);
     setAuction(data.auction || null);
     setAuctionBids(data.auctionBids || []);
+    setHasLineNotify(Boolean(data.hasLineNotify));
+    setLineOaUrl(String(data.lineOaUrl || ''));
     const autoMax = data.myAutoBidMax ?? null;
+    const autoStep = data.myAutoBidStep != null ? Number(data.myAutoBidStep) : null;
     setMyAutoBidMax(autoMax);
+    setMyAutoBidStep(autoStep && autoStep > 0 ? autoStep : null);
     if (autoMax != null) {
       setMaxBidAmount(String(autoMax));
       setAutoBidOn(true);
+      if (autoStep && autoStep > 0) setBidStepAmount(String(autoStep));
+      else if (data.auction?.bidIncrement) setBidStepAmount(String(data.auction.bidIncrement));
     }
-    // ไม่บังคับปิด autoBidOn ตอน poll — ผู้ใช้อาจเปิดรอกรอกอยู่
     const providers = Array.isArray(data.deal?.shipping_providers) ? data.deal.shipping_providers : [];
     setSelectedShipping(prev => (prev && providers.includes(prev) ? prev : providers[0] || ''));
     if (data.auction?.minNextBid) setBidAmount(String(data.auction.minNextBid));
   }
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        await loadListing();
+        const { data: { user } } = await supabase.auth.getUser();
+        let headers: Record<string, string> = {};
+        if (user) {
+          headers = await authHeaders();
+          if (!cancelled) {
+            setMyId(user.id);
+            setHdrs(headers);
+          }
+        }
+        if (!cancelled) await loadListing(headers);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
+        if (!cancelled) setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, [listingId]);
 
   useEffect(() => {
@@ -110,16 +132,6 @@ export default function MarketplaceDetailPage() {
     const t = setInterval(() => { void loadListing(); }, 15000);
     return () => clearInterval(t);
   }, [auction?.phase, listingId]);
-
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setMyId(user.id);
-        setHdrs(await authHeaders());
-      }
-    })();
-  }, []);
 
   const images = useMemo(() => {
     if (!listing) return [] as string[];
@@ -180,19 +192,28 @@ export default function MarketplaceDetailPage() {
       setBidError('กรุณาใส่ราคาสูงสุดสำหรับ Auto-bid หรือปิด Auto-bid');
       return;
     }
+    if (autoBidOn && bidStepAmount && Number(bidStepAmount) < auction.bidIncrement) {
+      setBidError(`จำนวนเงินต่อบิดต้องไม่ต่ำกว่า ฿${auction.bidIncrement.toLocaleString()}`);
+      return;
+    }
     setBidding(true);
     setBidError('');
     try {
       const headers = Object.keys(hdrs).length ? hdrs : await authHeaders();
+      const payload: Record<string, unknown> = {
+        amount: Number(bidAmount) || auction.minNextBid,
+      };
+      if (autoBidOn) {
+        payload.maxBid = Number(maxBidAmount);
+        if (bidStepAmount) payload.stepAmount = Number(bidStepAmount);
+      } else if (myAutoBidMax != null) {
+        // ลบเฉพาะเมื่อเคยมี Auto-bid ใน DB แล้วผู้ใช้กดปิด
+        payload.clearAutoBid = true;
+      }
       const res = await fetch(`/api/auctions/${listing.id}/bid`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: Number(bidAmount) || auction.minNextBid,
-          ...(autoBidOn
-            ? { maxBid: Number(maxBidAmount) }
-            : { clearAutoBid: true }),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Bid ไม่สำเร็จ');
@@ -202,10 +223,11 @@ export default function MarketplaceDetailPage() {
       }
       if (!autoBidOn) {
         setMyAutoBidMax(null);
+        setMyAutoBidStep(null);
         setMaxBidAmount('');
-        setAutoBidOn(false);
+        setBidStepAmount('');
       }
-      await loadListing();
+      await loadListing(headers);
     } catch (err: unknown) {
       setBidError(err instanceof Error ? err.message : 'Bid ไม่สำเร็จ');
     } finally {
@@ -353,13 +375,57 @@ export default function MarketplaceDetailPage() {
                           onChange={e => setMaxBidAmount(e.target.value)}
                           placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
                         />
-                        <p className="pd-bid-hint">ระบบ bid ให้อัตโนมัติเมื่อถูก overbid จนถึงเพดานนี้</p>
+                        <label className="pd-bid-lbl" htmlFor="pd-bid-step" style={{ marginTop: 8 }}>
+                          จำนวนเงินต่อบิด (อย่างน้อย ฿{auction.bidIncrement.toLocaleString()})
+                        </label>
+                        <input
+                          id="pd-bid-step"
+                          className="pd-bid-input"
+                          type="number"
+                          min={auction.bidIncrement}
+                          step={auction.bidIncrement}
+                          value={bidStepAmount || String(auction.bidIncrement)}
+                          onChange={e => setBidStepAmount(e.target.value)}
+                        />
+                        <p className="pd-bid-hint">
+                          ถูก overbid แล้วระบบจะสู้เพิ่มทีละจำนวนนี้ จนถึงเพดาน — ทำงานแม้ปิดเว็บ
+                        </p>
                         {myAutoBidMax != null && (
-                          <p className="pd-bid-auto">บันทึกไว้ ฿{myAutoBidMax.toLocaleString()} — กด Bid เพื่ออัปเดต</p>
+                          <p className="pd-bid-auto">
+                            บันทึกไว้เพดาน ฿{myAutoBidMax.toLocaleString()}
+                            {myAutoBidStep ? ` · ต่อบิด ฿${myAutoBidStep.toLocaleString()}` : ''}
+                            {' — กด Bid เพื่ออัปเดต'}
+                          </p>
                         )}
                       </div>
                     )}
                   </div>
+
+                  {myId && (
+                    <div className="pd-line-oa">
+                      {hasLineNotify ? (
+                        <p className="pd-line-oa-ok">✓ พร้อมรับแจ้ง overbid ผ่าน LINE OA</p>
+                      ) : (
+                        <>
+                          <p className="pd-line-oa-title">รับแจ้งเตือนเมื่อถูกประมูลสูงกว่า</p>
+                          <p className="pd-bid-hint">เพิ่มเพื่อน LINE OA แล้วเข้าสู่ระบบด้วย LINE หนึ่งครั้งเพื่อผูกบัญชี</p>
+                          <div className="pd-line-oa-actions">
+                            {lineOaUrl ? (
+                              <a className="btn btn-soft btn-sm" href={lineOaUrl} target="_blank" rel="noreferrer">
+                                เพิ่มเพื่อน LINE OA
+                              </a>
+                            ) : null}
+                            <a
+                              className="btn btn-soft btn-sm"
+                              href={`/api/auth/line?returnTo=${encodeURIComponent(`/marketplace/${listing.id}`)}`}
+                            >
+                              เชื่อมด้วย LINE Login
+                            </a>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   <div className="pd-bid-row">
                     <div className="pd-bid-field">

@@ -1821,6 +1821,30 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   font-size: 13px;
   color: #b22441;
 }
+.pd-line-oa {
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+.pd-line-oa-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #166534;
+}
+.pd-line-oa-ok {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #15803d;
+}
+.pd-line-oa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
 
 .pd-ship-lbl { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 8px; }
 .pd-ship-list { display: flex; flex-wrap: wrap; gap: 8px; }
