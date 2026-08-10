@@ -1791,6 +1791,10 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   border-top-color: var(--accent);
   animation: dashSpin .8s linear infinite;
 }
+/* alias เก่า — หน้าอื่นยังใช้ loading/empty/fallback */
+.mkt-detail-loading { width: 42px; height: 42px; margin: 120px auto 0; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: dashSpin .8s linear infinite; }
+.mkt-detail-empty { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--sh-sm); min-height: 320px; display: grid; place-items: center; gap: 14px; padding: 32px; text-align: center; color: var(--muted); }
+.mkt-detail-fallback { width: 100%; height: 100%; display: grid; place-items: center; color: var(--faint); }
 
 /* ตลาด — โอนเงิน (flow แยกจากดีลผ่านกลาง) */
 .mkt-pay-summary { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px; margin: 4px 0 12px; font-size: 13px; }
