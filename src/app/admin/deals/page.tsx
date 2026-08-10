@@ -284,7 +284,7 @@ function AdminDealsInner() {
         q?.ok ? `✅ ${q.message}` : `❌ ${q?.code || '?'} — ${q?.message || ''}`,
         '',
         'Vercel → Settings → Environment Variables:',
-        'SLIPOK_BRANCH_ID=69043',
+        'SLIPOK_BRANCH_ID=69043  (แค่เลข — ไม่ใส่ URL)',
         'SLIPOK_API_KEY=SLIPOK1G8AFJQ',
         'แล้วกด Redeploy',
       ];

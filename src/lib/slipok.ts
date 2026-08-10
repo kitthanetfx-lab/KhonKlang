@@ -129,12 +129,28 @@ function toFetchBody(body: BodyInit | Buffer): BodyInit {
   return body;
 }
 
+/** ดึง branch ID — env ใส่แค่ `69043` ไม่ใช่ URL ทั้งเส้น (ถ้าวาง URL มาจะดึงเลขท้ายให้) */
+function resolveSlipokBranchId(raw?: string): string {
+  const v = String(raw || '').trim();
+  if (!v) return '';
+  const fromUrl = v.match(/apikey\/(\d+)\/?$/i);
+  if (fromUrl) return fromUrl[1];
+  const digits = v.match(/^(\d+)$/);
+  if (digits) return digits[1];
+  return v.replace(/\/$/, '').split('/').pop()?.match(/^(\d+)$/)?.[1] || v;
+}
+
+function slipokCredentials(): { branchId: string; apiKey: string } {
+  return {
+    branchId: resolveSlipokBranchId(process.env.SLIPOK_BRANCH_ID),
+    apiKey: process.env.SLIPOK_API_KEY?.trim() || '',
+  };
+}
 /** ตรวจ quota / credentials ก่อนส่งสลิป — คืน 1003 ถ้าแพ็กเกจหมดอายุ */
 export async function checkSlipokQuota(): Promise<SlipResult> {
-  const branchId = process.env.SLIPOK_BRANCH_ID?.trim();
-  const apiKey = process.env.SLIPOK_API_KEY?.trim();
+  const { branchId, apiKey } = slipokCredentials();
   if (!branchId || !apiKey) {
-    return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
+    return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK — SLIPOK_BRANCH_ID ใส่แค่เลข เช่น 69043' };
   }
   try {
     const res = await fetch(`https://api.slipok.com/api/line/apikey/${encodeURIComponent(branchId)}/quota`, {
@@ -162,7 +178,7 @@ export async function checkSlipokQuota(): Promise<SlipResult> {
 }
 
 export function slipokBranchHint(): string {
-  const id = process.env.SLIPOK_BRANCH_ID?.trim() || '';
+  const id = resolveSlipokBranchId(process.env.SLIPOK_BRANCH_ID);
   return id.length >= 3 ? id.slice(-3) : (id || '?');
 }
 
@@ -185,10 +201,9 @@ async function postSlipok(
   headers: Record<string, string>,
   via: SlipResult['via'],
 ): Promise<SlipResult> {
-  const branchId = process.env.SLIPOK_BRANCH_ID?.trim();
-  const apiKey = process.env.SLIPOK_API_KEY?.trim();
+  const { branchId, apiKey } = slipokCredentials();
   if (!branchId || !apiKey) {
-    return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
+    return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK — SLIPOK_BRANCH_ID ใส่แค่เลข เช่น 69043' };
   }
   try {
     const res = await fetch(`https://api.slipok.com/api/line/apikey/${encodeURIComponent(branchId)}`, {
@@ -277,7 +292,8 @@ export function isSlipImageFile(fileId: string): boolean {
 }
 
 export function isSlipokConfigured(): boolean {
-  return Boolean(process.env.SLIPOK_BRANCH_ID?.trim() && process.env.SLIPOK_API_KEY?.trim());
+  const { branchId, apiKey } = slipokCredentials();
+  return Boolean(branchId && apiKey);
 }
 
 /** ข้อความภาษาไทยสำหรับรหัส SlipOK 1000–1014 และข้อผิดพลาดภายใน */
