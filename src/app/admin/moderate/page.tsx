@@ -3,6 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { Megaphone, Star, Loader2, Trash2, EyeOff, CheckCircle2, Store, RotateCcw } from 'lucide-react';
+import {
+  AdminModerateApp,
+  AdminModerateWantedCard,
+  AdminModerateReviewCard,
+  AdminModerateListingCard,
+  AdminModerateEmpty,
+} from '@/components/admin/mobile/AdminModerateApp';
 
 interface Wanted { id: string; user_name: string; title: string; detail: string; buy_mode: string; status: string; province: string; created_at: string }
 interface Review { id: string; reviewer_name: string; reviewer_role: string; target_role: string; rating: number; comment: string; tags: string[]; created_at: string }
@@ -49,6 +56,63 @@ export default function AdminModerate() {
   }
 
   return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminModerateApp tab={tab} loading={items === null} onTab={setTab}>
+          {items !== null && items.length === 0 && <AdminModerateEmpty />}
+          {tab === 'wanted' && (items as Wanted[] || []).map(w => (
+            <AdminModerateWantedCard
+              key={w.id}
+              title={w.title}
+              detail={w.detail}
+              userName={w.user_name}
+              province={w.province}
+              status={w.status}
+              createdAt={w.created_at}
+              actions={w.status === 'open' ? (
+                <button type="button" onClick={() => act(w.id, 'wanted', 'remove')} disabled={!!acting}
+                  className="text-xs text-red-600">{acting === w.id ? '…' : 'ปิดประกาศ'}</button>
+              ) : undefined}
+            />
+          ))}
+          {tab === 'reviews' && (items as Review[] || []).map(rv => (
+            <AdminModerateReviewCard
+              key={rv.id}
+              rating={rv.rating}
+              comment={rv.comment}
+              reviewerName={rv.reviewer_name}
+              reviewerRole={rv.reviewer_role}
+              targetRole={rv.target_role}
+              createdAt={rv.created_at}
+              actions={
+                <button type="button" onClick={() => act(rv.id, 'reviews', 'delete')} disabled={!!acting}
+                  className="text-xs text-red-600">{acting === rv.id ? '…' : 'ลบ'}</button>
+              }
+            />
+          ))}
+          {tab === 'listings' && (items as Listing[] || []).map(l => {
+            const removed = l.status !== 'posted';
+            return (
+              <AdminModerateListingCard
+                key={l.id}
+                title={l.title}
+                price={l.price}
+                sellerName={l.seller_name}
+                location={l.location}
+                category={l.category}
+                removed={removed}
+                createdAt={l.created_at}
+                actions={
+                  <button type="button" onClick={() => act(l.id, 'listings', removed ? 'restore' : 'remove')} disabled={!!acting}
+                    className="text-xs text-red-600">{acting === l.id ? '…' : removed ? 'คืนประกาศ' : 'ถอดประกาศ'}</button>
+                }
+              />
+            );
+          })}
+        </AdminModerateApp>
+      </div>
+
+      <div className="admin-desktop-only">
     <div className="w-full">
       <div className="flex items-center gap-2 mb-1">
         <EyeOff size={22} className="text-violet-500" />
@@ -140,5 +204,7 @@ export default function AdminModerate() {
         })}
       </div>
     </div>
+      </div>
+    </>
   );
 }

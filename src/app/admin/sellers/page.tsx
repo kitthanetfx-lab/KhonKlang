@@ -10,6 +10,7 @@ import {
   Search, CheckCircle2, XCircle, Eye,
   Store, RefreshCw, FileText, Download,
 } from 'lucide-react';
+import { AdminSellersApp } from '@/components/admin/mobile/AdminSellersApp';
 
 interface SellerApp {
   id: string;
@@ -307,10 +308,33 @@ function SellersContent() {
   };
 
   return (
-    <div className="space-y-5 w-full">
+    <>
       {detail && (
         <DetailPanel app={detail} onClose={() => setDetail(null)} onAction={handleAction} />
       )}
+
+      <div className="admin-mobile-only">
+        <AdminSellersApp
+          apps={apps}
+          loading={loading}
+          search={search}
+          statusFilter={statusFilter}
+          pendingCount={apps.filter(a => a.status === 'pending_review').length}
+          onSearch={setSearch}
+          onStatusFilter={setStatus}
+          onRefresh={() => load()}
+          onSelect={a => { const full = apps.find(x => x.id === a.id); if (full) setDetail(full); }}
+          renderActions={a => a.status === 'pending_review' ? (
+            <div className="flex flex-col gap-1">
+              <button type="button" className="text-xs text-red-600" onClick={e => { e.stopPropagation(); void handleAction(a.id, 'reject'); }}>ปฏิเสธ</button>
+              <button type="button" className="text-xs text-green-600" onClick={e => { e.stopPropagation(); void handleAction(a.id, 'approve'); }}>อนุมัติ</button>
+            </div>
+          ) : undefined}
+        />
+      </div>
+
+      <div className="admin-desktop-only">
+    <div className="space-y-5 w-full">
 
       <div className="flex items-center justify-between">
         <div>
@@ -413,6 +437,8 @@ function SellersContent() {
         )}
       </div>
     </div>
+      </div>
+    </>
   );
 }
 

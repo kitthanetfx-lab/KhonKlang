@@ -20,6 +20,7 @@ import {
   AdminCard,
   AdminLoading,
 } from '@/components/admin/AdminUI';
+import { AdminServiceControlsApp } from '@/components/admin/mobile/AdminServiceControlsApp';
 
 export default function ServiceControlsPage() {
   const [services, setServices] = useState<ServiceControlMap | null>(null);
@@ -172,6 +173,35 @@ export default function ServiceControlsPage() {
   }
 
   return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminServiceControlsApp
+          services={services}
+          loading={services === null && !error}
+          error={error}
+          videoUrl={videoUrl}
+          videoLoaded={videoLoaded}
+          videoSaving={videoSaving}
+          videoSaved={videoSaved}
+          videoError={videoError}
+          dirty={dirty}
+          saving={saving}
+          saved={saved}
+          onVideoUrlChange={v => { setVideoUrl(v); setVideoSaved(false); }}
+          onSaveVideo={saveVideoUrl}
+          onSave={save}
+          setSiteMaintenance={setSiteMaintenance}
+          setServiceNote={setServiceNote}
+          setServiceEnabled={setServiceEnabled}
+          setSlipAutoMode={setSlipAutoMode}
+          setSlipManualThreshold={setSlipManualThreshold}
+          setSiteReopenAt={setSiteReopenAt}
+          toLocalInput={toLocalInput}
+          fromLocalInput={fromLocalInput}
+        />
+      </div>
+
+      <div className="admin-desktop-only">
     <AdminPage>
       <AdminPageHeader
         icon={<SlidersHorizontal size={22} />}
@@ -336,5 +366,7 @@ export default function ServiceControlsPage() {
         </>
       )}
     </AdminPage>
+      </div>
+    </>
   );
 }

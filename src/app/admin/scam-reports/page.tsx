@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authHeaders, fileViewUrl, REPORT_BUCKET } from '@/lib/supabase';
 import { ShieldAlert, CheckCircle2, XCircle, Loader2, ExternalLink } from 'lucide-react';
+import { AdminScamReportsApp } from '@/components/admin/mobile/AdminScamReportsApp';
 
 const fileUrl = (id: string) => fileViewUrl(REPORT_BUCKET, id);
 
@@ -56,6 +57,25 @@ export default function AdminScamReports() {
   }
 
   return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminScamReportsApp
+          tab={tab}
+          reports={reports}
+          onTab={setTab}
+          fileUrl={fileUrl}
+          renderActions={r => (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => act(r.id, 'reject')} disabled={!!acting}
+                className="text-xs text-gray-600">ปฏิเสธ</button>
+              <button type="button" onClick={() => act(r.id, 'approve')} disabled={!!acting}
+                className="text-xs text-green-600">{acting === r.id ? '…' : 'เผยแพร่'}</button>
+            </div>
+          )}
+        />
+      </div>
+
+      <div className="admin-desktop-only">
     <div className="w-full">
       <div className="flex items-center gap-2 mb-1">
         <ShieldAlert size={22} className="text-red-500" />
@@ -146,5 +166,7 @@ export default function AdminScamReports() {
         })}
       </div>
     </div>
+      </div>
+    </>
   );
 }

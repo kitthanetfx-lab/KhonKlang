@@ -2,10 +2,50 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { MobileShell, DesktopShell } from '@/components/mobile/shells';
+import { RegisterSelectApp } from '@/components/mobile/RegisterSelectApp';
 
 export default function RegisterSelectPage() {
   const controls = useServiceControls();
+
+  const sellerCard = {
+    href: controls.isEnabled('sellerRegistration') ? '/register/seller' : undefined,
+    disabled: !controls.isEnabled('sellerRegistration'),
+    icon: '🛒',
+    iconBg: '#eef4ff',
+    title: 'สมัครเป็นผู้ขาย',
+    desc: 'ลงขายสินค้าในตลาด KhonGlang และรับการคุ้มครองจากระบบ Escrow',
+    feats: ['✅ ลงประกาศสินค้าได้ไม่จำกัด', '✅ เพิ่มความน่าเชื่อถือ', '✅ รองรับ Certified', '✅ Dashboard จัดการดีล'],
+    fee: 'ค่าสมาชิก ฿199/ปี',
+    cta: controls.isEnabled('sellerRegistration') ? 'สมัครเลย →' : 'ปิดชั่วคราว',
+    ctaColor: controls.isEnabled('sellerRegistration') ? undefined : '#b7791f',
+    notice: !controls.isEnabled('sellerRegistration') ? controls.message('sellerRegistration') : undefined,
+  };
+
+  const middlemanCard = {
+    href: controls.isEnabled('middlemanRegistration') ? '/register/middleman' : undefined,
+    disabled: !controls.isEnabled('middlemanRegistration'),
+    icon: '🤝',
+    iconBg: '#e9faf2',
+    title: 'สมัครเป็นคนกลาง',
+    desc: 'รับค่าบริการจากการดูแลธุรกรรม สร้างรายได้จากความน่าเชื่อถือ',
+    feats: ['✅ สร้างรายได้เสริม', '✅ 4 ระดับ Bronze–Platinum', '✅ รับงานได้ทุกที่', '✅ คืนเงินประกันได้'],
+    fee: 'เงินประกัน ฿1,000–50,000',
+    cta: controls.isEnabled('middlemanRegistration') ? 'สมัครเลย →' : 'ปิดชั่วคราว',
+    ctaColor: controls.isEnabled('middlemanRegistration') ? 'var(--green-600)' : '#b7791f',
+    notice: !controls.isEnabled('middlemanRegistration') ? controls.message('middlemanRegistration') : undefined,
+  };
+
   return (
+    <>
+      <MobileShell>
+        <RegisterSelectApp seller={sellerCard} middleman={middlemanCard} />
+        <p style={{ textAlign: 'center', padding: '0 14px 20px', fontSize: 13, color: 'var(--muted)' }}>
+          มีบัญชีแล้ว? <Link href="/login" style={{ color: 'var(--accent)' }}>เข้าสู่ระบบ</Link>
+        </p>
+      </MobileShell>
+
+      <DesktopShell>
     <div className="rsel-page">
       <div className="rsel-inner">
         <div className="rsel-header">
@@ -71,5 +111,7 @@ export default function RegisterSelectPage() {
         </div>
       </div>
     </div>
+      </DesktopShell>
+    </>
   );
 }

@@ -23,6 +23,7 @@ import { MarketplacePaymentSection } from '@/components/marketplace/MarketplaceP
 import { isDirectShipOrder, isMarketplaceOrder, isListingCheckoutOrder, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
+import { DealRoomApp, DealAppFloatBtn } from '@/components/mobile/DealRoomApp';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -5332,145 +5333,177 @@ export default function DealRoom() {
   }
 
   // ─── Main render ─────────────────────────────────────────────────────────
+  const dealSubtitle = `${dealCode(deal.id)} · ${statusText(deal)} · ฿${deal.price.toLocaleString()}${deal.created_at ? ` · สร้าง ${formatDealCreatedAt(deal.created_at)}` : ''}`;
+  const chatBadge = (() => { const n = msgs.filter(m => m.role !== 'system').length; return n > 0 && !floatChatOpen ? (n > 99 ? '99+' : n) : undefined; })();
+
+  const dealWizardBody = (
+    <>
+      {tab === 'steps' && isMarketplaceCheckout && renderMarketplaceWizard()}
+      {tab === 'steps' && isSimple && !isMarketplaceCheckout && renderSimpleWizard()}
+      {tab === 'steps' && isMeetup && renderMeetupWizard()}
+      {tab === 'steps' && !isSimple && !isMeetup && !isMarketplaceCheckout && renderRegularWizard()}
+      {floatChatOpen && (
+        <FloatingChatBox
+          msgs={msgs}
+          myId={myId}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          sending={sending}
+          acting={acting}
+          fileInputRef={callFileInputRef}
+          onSend={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }}
+          onUpload={async (files) => { for (const f of files) { if (!isVideoFile(f) && f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
+          onClose={() => setFloatChatOpen(false)}
+          onPin={saveMsgEvidence}
+          onAutoScroll={() => chatBottomRef.current?.scrollIntoView({ behavior: 'auto' })}
+          title="💬 แชทดีล"
+          closedHint={!chatIsOpen() ? '⏳ รอบุคคลที่เกี่ยวข้องเข้าร่วมดีลก่อนจึงจะแชทได้' : undefined}
+        />
+      )}
+      {tab === 'evidence' && renderEvidencePanel()}
+    </>
+  );
+
+  const videoCallOverlay = (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0d1117', minHeight: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,.4)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>
+          {callStatus === 'outgoing' ? '📞 กำลังโทร…' : callStatus === 'connecting' ? '🔗 กำลังเชื่อมต่อ…' : '📹 วิดีโอคอล'} (จำกัด 10 นาทีต่อครั้ง)
+        </span>
+        {isActiveCall && <CallRecorder dealId={dealId} onSaveEvidence={saveCallEvidence} />}
+      </div>
+      <div style={{ flex: 1, minHeight: '60vh' }}>
+        <DealVideoCall
+          dealId={dealId}
+          getAuthHeaders={getAuthHeaders}
+          onEnd={endCall}
+          mode="video"
+          onTimeout={() => { setCallTimedOut(true); endCall(); }}
+          onConnected={() => { if (callStatus === 'connecting') setCallStatus('active'); }}
+          onAnswered={onCallAnswered}
+        />
+      </div>
+      {floatChatOpen && (
+        <FloatingChatBox
+          msgs={msgs}
+          myId={myId}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          sending={sending}
+          acting={acting}
+          fileInputRef={callFileInputRef}
+          onSend={() => { if (chatInput.trim()) sendMsg(chatInput); }}
+          onUpload={async (files) => { for (const f of files) { if (!isVideoFile(f) && f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
+          onClose={() => setFloatChatOpen(false)}
+          onPin={saveMsgEvidence}
+          onAutoScroll={() => chatBottomRef.current?.scrollIntoView({ behavior: 'auto' })}
+          title="💬 แชทระหว่างคอล"
+        />
+      )}
+    </div>
+  );
+
+  const mobileFloatBar = canCall ? (
+    <>
+      <DealAppFloatBtn active={floatChatOpen} onClick={() => setFloatChatOpen(v => !v)} icon="💬" label="แชท" badge={chatBadge} />
+      {voiceBgActive ? (
+        <DealAppFloatBtn className="voice-active" onClick={endCall} icon="📞" label={fmtVoiceDur(callSeconds)} />
+      ) : incomingCall ? (
+        <DealAppFloatBtn className="ringing" onClick={acceptIncomingCall} icon="📞" label="รับสาย" />
+      ) : callStatus === 'idle' ? (
+        <DealAppFloatBtn onClick={() => startCall('voice')} icon="📞" label="โทร" />
+      ) : null}
+      {callStatus === 'idle' && !incomingCall && (
+        <DealAppFloatBtn disabled icon="📹" label="วิดีโอ" />
+      )}
+    </>
+  ) : undefined;
+
   return (
-    <div className="dr-root">
-      <InAppBanner />
-      <header className="dr-header">
-        <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
-        <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{dealCode(deal.id)} · {statusText(deal)} · ฿{deal.price.toLocaleString()}{deal.created_at ? ` · สร้าง ${formatDealCreatedAt(deal.created_at)}` : ''}</div></div>
-        <div className="dr-hctas">
-          <HeaderAccountActions showNotify />
-          {/* ปุ่มแชร์ลิงก์เอาออกแล้ว — แชร์ใช้ครั้งเดียวตอนสร้างดีล ไม่จำเป็นต้องมีในหน้าดีล
-              ปุ่มโทรคุย/วิดีโอคอล/แชท ย้ายไปเป็นแถบลอยด้านล่าง (.dr-floatbar) แสดงตลอดทุกขั้นตอน */}
-        </div>
-      </header>
+    <>
+      <div className="deal-mobile-shell">
+        <DealRoomApp
+          title={deal.title}
+          subtitle={dealSubtitle}
+          onBack={() => router.back()}
+          showTabs={isMeetup}
+          tab={tab === 'evidence' ? 'evidence' : 'steps'}
+          onTab={setTab}
+          inVideoCall={isInCall && callMode === 'video'}
+          videoCallOverlay={videoCallOverlay}
+          floatBar={mobileFloatBar}
+        >
+          {dealWizardBody}
+        </DealRoomApp>
+      </div>
 
-      {/* ─── โหมดคอล (outgoing/connecting/active) — เปิดเต็มจอเฉพาะ video ตอน active ─── */}
-      {isInCall && callMode === 'video' ? (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0d1117', minHeight: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,.4)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>
-              {callStatus === 'outgoing' ? '📞 กำลังโทร…' : callStatus === 'connecting' ? '🔗 กำลังเชื่อมต่อ…' : '📹 วิดีโอคอล'} (จำกัด 10 นาทีต่อครั้ง)
-            </span>
-            {isActiveCall && <CallRecorder dealId={dealId} onSaveEvidence={saveCallEvidence} />}
-          </div>
-          <div style={{ flex: 1, minHeight: '60vh' }}>
-            <DealVideoCall
-              dealId={dealId}
-              getAuthHeaders={getAuthHeaders}
-              onEnd={endCall}
-              mode="video"
-              onTimeout={() => { setCallTimedOut(true); endCall(); }}
-              onConnected={() => { if (callStatus === 'connecting') setCallStatus('active'); }}
-              onAnswered={onCallAnswered}
-            />
-          </div>
-          {/* กล่องแชทลอยซ้อนบนคอล — เรียกจากปุ่ม 💬 ในแถบลอยด้านล่าง (floatChatOpen) */}
-          {floatChatOpen && (
-            <FloatingChatBox
-              msgs={msgs}
-              myId={myId}
-              chatInput={chatInput}
-              setChatInput={setChatInput}
-              sending={sending}
-              acting={acting}
-              fileInputRef={callFileInputRef}
-              onSend={() => { if (chatInput.trim()) sendMsg(chatInput); }}
-              onUpload={async (files) => { for (const f of files) { if (!isVideoFile(f) && f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
-              onClose={() => setFloatChatOpen(false)}
-              onPin={saveMsgEvidence}
-              onAutoScroll={() => chatBottomRef.current?.scrollIntoView({ behavior: 'auto' })}
-              title="💬 แชทระหว่างคอล"
-            />
+      <div className="deal-desktop-shell">
+        <div className="dr-root">
+          <InAppBanner />
+          <header className="dr-header">
+            <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
+            <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{dealSubtitle}</div></div>
+            <div className="dr-hctas">
+              <HeaderAccountActions showNotify />
+            </div>
+          </header>
+
+          {isInCall && callMode === 'video' ? videoCallOverlay : (
+            <>
+              {isMeetup && (
+              <nav className="dr-tabs">
+                {(['steps', 'evidence'] as const).map(k => (
+                  <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
+                    {k === 'steps' ? 'ขั้นตอน' : 'หลักฐาน'}
+                  </button>
+                ))}
+              </nav>
+              )}
+              {!isSimple && !isMeetup && !isMarketplaceCheckout && (
+              <nav className="dr-tabs" style={{ display: 'none' }}>
+                {(['steps', 'evidence'] as const).map(k => (
+                  <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
+                    {k === 'steps' ? 'ขั้นตอน' : 'หลักฐาน'}
+                  </button>
+                ))}
+              </nav>
+              )}
+
+              <main className="dr-body">
+                {dealWizardBody}
+              </main>
+            </>
           )}
-        </div>
-      ) : (
-        <>
-          {/* (เดิมมี banner "มีวิดีโอคอลกำลังดำเนินอยู่" ด้านบน — ย้ายออกแล้ว
-              ใช้ popup รับสายลอยกลางล่าง + ปุ่ม 📞 กระพริบ แทน เพื่อความเรียบร้อย) */}
-          {/* regular + simple: wizard มี progress bar ของตัวเองแล้ว — ไม่ต้องแสดง progress bar แยก */}
 
-          {/* แชทย้ายไปปุ่มลอยด้านล่างแล้ว — เหลือเฉพาะแท็บ ขั้นตอน/หลักฐาน (meetup) */}
-          {isMeetup && (
-          <nav className="dr-tabs">
-            {(['steps', 'evidence'] as const).map(k => (
-              <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
-                {k === 'steps' ? 'ขั้นตอน' : 'หลักฐาน'}
+          {canCall && (
+            <div className="dr-floatbar" role="toolbar" aria-label="การสื่อสารในดีล">
+              <button type="button" className={`dr-floatbar-btn ${floatChatOpen ? 'active' : ''}`} onClick={() => setFloatChatOpen(v => !v)} title="แชท">
+                <span className="ic">💬</span><span>แชท</span>
+                {chatBadge != null && <span className="dr-floatbar-badge">{chatBadge}</span>}
               </button>
-            ))}
-          </nav>
-          )}
-          {/* Regular deal: แถบแชท + หลักฐาน ซ่อนในโหมด wizard แต่ยังเข้าถึงได้ผ่านปุ่มลิงก์ */}
-          {!isSimple && !isMeetup && !isMarketplaceCheckout && (
-          <nav className="dr-tabs" style={{ display: 'none' }}>
-            {(['steps', 'evidence'] as const).map(k => (
-              <button key={k} className={`dr-tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
-                {k === 'steps' ? 'ขั้นตอน' : 'หลักฐาน'}
-              </button>
-            ))}
-          </nav>
-          )}
-
-          <main className="dr-body">
-            {tab === 'steps' && isMarketplaceCheckout && renderMarketplaceWizard()}
-            {tab === 'steps' && isSimple && !isMarketplaceCheckout && renderSimpleWizard()}
-            {tab === 'steps' && isMeetup && renderMeetupWizard()}
-            {tab === 'steps' && !isSimple && !isMeetup && !isMarketplaceCheckout && renderRegularWizard()}
-
-            {/* กล่องแชทลอย — เรียกจากปุ่ม 💬 ในแถบลอยด้านล่าง (floatChatOpen) */}
-            {floatChatOpen && (
-              <FloatingChatBox
-                msgs={msgs}
-                myId={myId}
-                chatInput={chatInput}
-                setChatInput={setChatInput}
-                sending={sending}
-                acting={acting}
-                fileInputRef={callFileInputRef}
-                onSend={() => { if (chatInput.trim() && chatIsOpen()) sendMsg(chatInput); }}
-                onUpload={async (files) => { for (const f of files) { if (!isVideoFile(f) && f.size > 50 * 1024 * 1024) { alert(`${f.name} ใหญ่เกิน 50MB`); continue; } await uploadFile(f); } }}
-                onClose={() => setFloatChatOpen(false)}
-                onPin={saveMsgEvidence}
-                onAutoScroll={() => chatBottomRef.current?.scrollIntoView({ behavior: 'auto' })}
-                title="💬 แชทดีล"
-                closedHint={!chatIsOpen() ? '⏳ รอบุคคลที่เกี่ยวข้องเข้าร่วมดีลก่อนจึงจะแชทได้' : undefined}
-              />
-            )}
-
-            {tab === 'evidence' && renderEvidencePanel()}
-          </main>
-        </>
-      )}
-      {/* แถบปุ่มลอย (💬 แชท / 📞 โทร / 📹 วิดีโอ) — แสดงตลอดทุกขั้นตอนของดีล ตั้งแต่มีคู่ดีลเข้ามาจนจบ
-          สถานะปุ่ม 📞: ปกติ=กดโทร, กำลังคุย voice bg=ตัวนับเวลาแดงกดเพื่อวางสาย, มีสายเข้า=กระพริบ */}
-      {canCall && (
-        <div className="dr-floatbar" role="toolbar" aria-label="การสื่อสารในดีล">
-          <button type="button" className={`dr-floatbar-btn ${floatChatOpen ? 'active' : ''}`} onClick={() => setFloatChatOpen(v => !v)} title="แชท">
-            <span className="ic">💬</span><span>แชท</span>
-            {(() => { const n = msgs.filter(m => m.role !== 'system').length; return n > 0 && !floatChatOpen ? <span className="dr-floatbar-badge">{n > 99 ? '99+' : n}</span> : null; })()}
-          </button>
-          {/* ปุ่มโทรเสียง — เปลี่ยนตามสถานะ */}
-          {voiceBgActive ? (
-            <button type="button" className="dr-floatbar-btn voice-active" onClick={endCall} title="วางสาย">
-              <span className="ic">📞</span><span className="dur">{fmtVoiceDur(callSeconds)}</span>
-            </button>
-          ) : incomingCall ? (
-            <button type="button" className="dr-floatbar-btn ringing" onClick={acceptIncomingCall} title="รับสายเรียกเข้า">
-              <span className="ic">📞</span><span>รับสาย</span>
-            </button>
-          ) : callStatus === 'idle' ? (
-            <button type="button" className="dr-floatbar-btn voice" onClick={() => startCall('voice')} title="โทรเสียง">
-              <span className="ic">📞</span><span>โทร</span>
-            </button>
-          ) : null}
-          {/* ปุ่มวิดีโอคอล — ปิดใช้งานเนื่องจากฟังก์ชันนี้ยังทำไม่เสร็จ */}
-          {callStatus === 'idle' && !incomingCall && (
-            <button type="button" className="dr-floatbar-btn video" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="วิดีโอคอล (ยังไม่พร้อมใช้งาน)">
-              <span className="ic">📹</span><span>วิดีโอ</span>
-            </button>
+              {voiceBgActive ? (
+                <button type="button" className="dr-floatbar-btn voice-active" onClick={endCall} title="วางสาย">
+                  <span className="ic">📞</span><span className="dur">{fmtVoiceDur(callSeconds)}</span>
+                </button>
+              ) : incomingCall ? (
+                <button type="button" className="dr-floatbar-btn ringing" onClick={acceptIncomingCall} title="รับสายเรียกเข้า">
+                  <span className="ic">📞</span><span>รับสาย</span>
+                </button>
+              ) : callStatus === 'idle' ? (
+                <button type="button" className="dr-floatbar-btn voice" onClick={() => startCall('voice')} title="โทรเสียง">
+                  <span className="ic">📞</span><span>โทร</span>
+                </button>
+              ) : null}
+              {callStatus === 'idle' && !incomingCall && (
+                <button type="button" className="dr-floatbar-btn video" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="วิดีโอคอล (ยังไม่พร้อมใช้งาน)">
+                  <span className="ic">📹</span><span>วิดีโอ</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
+
       {/* voice call background — mount DealVideoCall แบบซ่อน
           ครอบ outgoing/connecting/active เพื่อให้ useRemoteParticipants detect รับสายได้ตลอด
           (เสียงทำงานตลอด, แสดง tile เฉพาะตอน active) */}
@@ -5607,6 +5640,6 @@ export default function DealRoom() {
           <span className="up-spin" aria-hidden="true" />
         </div>
       )}
-    </div>
+    </>
   );
 }

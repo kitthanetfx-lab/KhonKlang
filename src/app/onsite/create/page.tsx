@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { MobileShell, DesktopShell } from '@/components/mobile/shells';
+import { OnsiteCreateApp } from '@/components/mobile/OnsiteCreateApp';
 
 const PROVINCES = [
   'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร',
@@ -39,7 +41,8 @@ export default function CreateOnsiteJob() {
     return <ServiceDisabledNotice title="สร้างคำขอลงพื้นที่" message={controls.message('onsite')} backHref="/service/onsite" backLabel="กลับไปหน้าบริการ" />;
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!itemDescription || !sellerLocation || !sellerProvince) {
       setError('กรุณากรอกข้อมูลสินค้า ที่อยู่ และจังหวัดให้ครบ');
       return;
@@ -59,7 +62,25 @@ export default function CreateOnsiteJob() {
     finally { setLoading(false); }
   }
 
+  const formProps = {
+    provinces: PROVINCES,
+    itemDescription, setItemDescription,
+    itemPrice, setItemPrice,
+    sellerLocation, setSellerLocation,
+    sellerProvince, setSellerProvince,
+    sellerContact, setSellerContact,
+    maxBudget, setMaxBudget,
+    loading, error,
+    onSubmit: handleSubmit,
+    onBack: () => router.back(),
+  };
+
   return (
+    <>
+      <MobileShell>
+        <OnsiteCreateApp {...formProps} />
+      </MobileShell>
+      <DesktopShell>
     <div className="min-h-screen bg-[#0a0f1e] text-white">
       <div className="bg-[#111827] border-b border-white/10 px-4 py-4 flex items-center gap-3">
         <Link href="/service/onsite" className="text-gray-400 hover:text-white">←</Link>
@@ -71,7 +92,6 @@ export default function CreateOnsiteJob() {
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm">{error}</div>
         )}
 
-        {/* Item description */}
         <div>
           <label className="text-sm text-gray-400 mb-1.5 block">รายละเอียดสินค้าที่ต้องการตรวจ *</label>
           <textarea value={itemDescription} onChange={e => setItemDescription(e.target.value)}
@@ -80,7 +100,6 @@ export default function CreateOnsiteJob() {
           />
         </div>
 
-        {/* Item price */}
         <div>
           <label className="text-sm text-gray-400 mb-1.5 block">ราคาสินค้าที่ตกลงกับผู้ขาย (บาท)</label>
           <input type="number" value={itemPrice} onChange={e => setItemPrice(e.target.value)}
@@ -89,7 +108,6 @@ export default function CreateOnsiteJob() {
           />
         </div>
 
-        {/* Province */}
         <div>
           <label className="text-sm text-gray-400 mb-1.5 block">จังหวัดที่ตั้งสินค้า *</label>
           <select value={sellerProvince} onChange={e => setSellerProvince(e.target.value)}
@@ -100,7 +118,6 @@ export default function CreateOnsiteJob() {
           </select>
         </div>
 
-        {/* Seller location */}
         <div>
           <label className="text-sm text-gray-400 mb-1.5 block">ที่อยู่/สถานที่นัดพบผู้ขาย *</label>
           <textarea value={sellerLocation} onChange={e => setSellerLocation(e.target.value)}
@@ -109,7 +126,6 @@ export default function CreateOnsiteJob() {
           />
         </div>
 
-        {/* Seller contact */}
         <div>
           <label className="text-sm text-gray-400 mb-1.5 block">เบอร์ติดต่อผู้ขาย (ให้คนกลางนัดเวลา)</label>
           <input type="text" value={sellerContact} onChange={e => setSellerContact(e.target.value)}
@@ -118,7 +134,6 @@ export default function CreateOnsiteJob() {
           />
         </div>
 
-        {/* Max budget */}
         <div>
           <label className="text-sm text-gray-400 mb-1.5 block">งบค่าบริการสูงสุดที่ยอมรับได้ (บาท)</label>
           <input type="number" value={maxBudget} onChange={e => setMaxBudget(e.target.value)}
@@ -128,12 +143,14 @@ export default function CreateOnsiteJob() {
           {maxBudget && <p className="text-xs text-gray-500 mt-1">คนกลางจะเห็นงบนี้และเสนอราคาภายในขอบเขตที่เหมาะสม</p>}
         </div>
 
-        <button onClick={handleSubmit} disabled={loading || !controls.isEnabled('onsite')}
+        <button onClick={() => handleSubmit()} disabled={loading || !controls.isEnabled('onsite')}
           className="w-full py-4 rounded-2xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-lg transition"
         >
           {loading ? 'กำลังสร้างคำขอ...' : '📋 ส่งคำขอหาคนกลาง'}
         </button>
       </div>
     </div>
+      </DesktopShell>
+    </>
   );
 }

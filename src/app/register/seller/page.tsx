@@ -15,6 +15,8 @@ import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { ConsentModal } from '@/components/ConsentModal';
 import { FEE_DEFAULTS, effectiveRegFee, isPromoActive, type FeeConfig } from '@/lib/fees';
+import { MobileShell, DesktopShell } from '@/components/mobile/shells';
+import { RegisterWizardApp } from '@/components/mobile/RegisterWizardApp';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -517,26 +519,8 @@ function SellerForm() {
     </div>
   );
 
-  return (
+  const stepFields = (
     <>
-    {!consentShown && (
-      <ConsentModal
-        onAccept={() => setConsentShown(true)}
-        onDecline={() => router.replace('/register')}
-      />
-    )}
-    <div className="min-h-screen py-10 px-4 sm:px-6">
-      <div className="max-w-xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-1.5 rounded-full text-sm font-medium mb-3">
-            <Store className="w-4 h-4" /> สมัครเป็นผู้ขายในเครือคนกลาง
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold">ลงทะเบียนผู้ขาย</h1>
-        </div>
-
-        <div className="glass-panel rounded-2xl p-6 sm:p-8 shadow-xl animate-fade-in">
-          <StepIndicator current={step} />
-
           {/* ───── STEP 1: Basic Identity ───── */}
           {step === 1 && (
             <div className="space-y-6">
@@ -803,6 +787,68 @@ function SellerForm() {
               </button>
             </div>
           )}
+    </>
+  );
+
+  const mobileFooter = step < 4 ? (
+    <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+      {step > 1 && (
+        <button type="button" onClick={back}
+          className="btn btn-ghost"
+          style={{ flex: 1, minHeight: 48 }}>
+          <ArrowLeft className="w-4 h-4" /> ย้อนกลับ
+        </button>
+      )}
+      <button type="button" onClick={next}
+        className="btn btn-primary"
+        style={{ flex: 1, minHeight: 48 }}>
+        ถัดไป <ArrowRight className="w-4 h-4" />
+      </button>
+    </div>
+  ) : (
+    <button type="button" onClick={back}
+      className="btn btn-ghost btn-block"
+      style={{ minHeight: 48 }}>
+      <ArrowLeft className="w-4 h-4" /> ย้อนกลับแก้ไขข้อมูล
+    </button>
+  );
+
+  return (
+    <>
+    {!consentShown && (
+      <ConsentModal
+        onAccept={() => setConsentShown(true)}
+        onDecline={() => router.replace('/register')}
+      />
+    )}
+    <MobileShell>
+      <RegisterWizardApp
+        title="ลงทะเบียนผู้ขาย"
+        badge={<><Store className="w-4 h-4" /> สมัครเป็นผู้ขายในเครือคนกลาง</>}
+        steps={STEPS}
+        currentStep={step}
+        onBack={() => router.back()}
+        footer={mobileFooter}
+      >
+        <div className="reg-app-form">
+          {stepFields}
+          {error && step < 4 && <p className="app-field-error">{error}</p>}
+        </div>
+      </RegisterWizardApp>
+    </MobileShell>
+    <DesktopShell>
+    <div className="min-h-screen py-10 px-4 sm:px-6">
+      <div className="max-w-xl mx-auto">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-1.5 rounded-full text-sm font-medium mb-3">
+            <Store className="w-4 h-4" /> สมัครเป็นผู้ขายในเครือคนกลาง
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold">ลงทะเบียนผู้ขาย</h1>
+        </div>
+
+        <div className="glass-panel rounded-2xl p-6 sm:p-8 shadow-xl animate-fade-in">
+          <StepIndicator current={step} />
+          {stepFields}
 
           {/* Navigation */}
           {error && step < 4 && <p className="mt-4 text-red-500 text-sm text-center">{error}</p>}
@@ -829,6 +875,7 @@ function SellerForm() {
         </div>
       </div>
     </div>
+    </DesktopShell>
     </>
   );
 }

@@ -23,6 +23,12 @@ import {
   Download,
   RefreshCw,
 } from 'lucide-react';
+import {
+  AdminFinanceApp,
+  AdminFinanceDetailSheet,
+  AdminFinanceDetailLink,
+  type FinanceGroupRow,
+} from '@/components/admin/mobile/AdminFinanceApp';
 
 // bucket ที่มาจาก API ยังเป็นชื่อแบบเดิม ('deal_files' / 'kyc_docs') — แมปไปยัง bucket จริงใน Supabase Storage
 const fileUrl = (bucket: string, id: string) => fileViewUrl(bucket === 'kyc_docs' ? KYC_BUCKET : DEAL_BUCKET, id);
@@ -443,8 +449,88 @@ export default function AdminFinance() {
   const groupedRows = groupRowsByReference(filteredRows);
 
   const pageCount = Math.max(1, Math.ceil((pagination.total || 0) / pagination.pageSize));
+  const mobileGroups: FinanceGroupRow[] = groupedRows;
 
   return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminFinanceApp
+          tab={tab}
+          filter={filter}
+          search={search}
+          loading={rows === null}
+          summary={summary}
+          groups={mobileGroups}
+          page={pagination.page}
+          pageCount={pageCount}
+          hasNext={pagination.hasNext}
+          filters={currentFilters}
+          onTab={t => { setTab(t); setFilter('all'); setPagination(prev => ({ ...prev, page: 1 })); }}
+          onFilter={f => { setFilter(f); setPagination(prev => ({ ...prev, page: 1 })); }}
+          onSearch={setSearch}
+          onRefresh={() => void refreshProjection()}
+          refreshing={refreshing}
+          onPrevPage={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+          onNextPage={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+          onSelectGroup={g => setSelected(g as FinanceGroup)}
+          detailPanel={selected ? (
+            <AdminFinanceDetailSheet
+              open
+              title={selected.title}
+              subtitle={selected.referenceCode}
+              onClose={() => setSelected(null)}
+            >
+              <div className="admin-app-stat-grid mb-3">
+                <div className="admin-app-stat-tile">
+                  <div className="admin-app-stat-val">{selected.price ? baht(selected.price) : '-'}</div>
+                  <div className="admin-app-stat-lbl">ราคาสินค้า</div>
+                </div>
+                <div className="admin-app-stat-tile">
+                  <div className="admin-app-stat-val">{baht(selected.totalExpected)}</div>
+                  <div className="admin-app-stat-lbl">ยอดรวม</div>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">ผู้ซื้อ: {selected.buyerName || '-'} · ผู้ขาย: {selected.sellerName || '-'}</p>
+              <p className="text-sm text-gray-600 mt-1">คนกลาง: {selected.middlemanName || '-'} · {selected.dealStatus || '-'}</p>
+              <AdminFinanceDetailLink href={selected.detailUrl} />
+              <div className="admin-app-actions mt-4">
+                {selected.rows.map(item => {
+                  const row = item as FinanceRow;
+                  const canMarkOutgoing = (row.source === 'payout' || row.source === 'refund') && row.txnStatus === 'pending';
+                  return (
+                    <div key={row.key} className="admin-app-form-card w-full mb-2">
+                      <p className="font-semibold text-sm">{row.purpose}</p>
+                      <p className="text-xs text-gray-500">{baht(row.expected)}</p>
+                      <div className="admin-app-actions">
+                        {row.canApprove && (
+                          <>
+                            <button type="button" className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs"
+                              onClick={() => void act(row.refId, 'approve_payment')} disabled={acting === row.refId}>อนุมัติ</button>
+                            <button type="button" className="bg-gray-100 px-3 py-1.5 rounded-lg text-xs"
+                              onClick={() => void act(row.refId, 'reject_payment')} disabled={!!acting}>ปฏิเสธ</button>
+                          </>
+                        )}
+                        {canMarkOutgoing && (
+                          <button type="button" className="bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs"
+                            onClick={() => void act(row.refId, row.source === 'payout' ? 'mark_payout_sent' : 'mark_refund_sent')} disabled={!!acting}>
+                            แนบสลิปโอนแล้ว
+                          </button>
+                        )}
+                        {row.fileId && (
+                          <button type="button" className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs"
+                            onClick={() => void verifySlip(row)} disabled={verifying === row.key}>ตรวจสลิป</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </AdminFinanceDetailSheet>
+          ) : undefined}
+        />
+      </div>
+
+      <div className="admin-desktop-only">
     <div className="w-full">
       <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
         <div>
@@ -843,6 +929,8 @@ export default function AdminFinance() {
         </>
       )}
     </div>
+      </div>
+    </>
   );
 }
 

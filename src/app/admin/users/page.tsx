@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { Search, Users, RefreshCw, MoreVertical } from 'lucide-react';
+import { AdminUsersApp } from '@/components/admin/mobile/AdminUsersApp';
 
 interface AppUser {
   id: string;
@@ -184,6 +185,22 @@ function UsersContent() {
   });
 
   return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminUsersApp
+          users={users}
+          total={total}
+          loading={loading}
+          search={search}
+          roleFilter={roleFilter}
+          onSearch={setSearch}
+          onRoleFilter={setRoleFilter}
+          onRefresh={() => load()}
+          renderActions={u => <ActionMenu user={u} onRefresh={() => load()} />}
+        />
+      </div>
+
+      <div className="admin-desktop-only">
     <div className="space-y-5 w-full">
       <div className="flex items-center justify-between">
         <div>
@@ -291,6 +308,8 @@ function UsersContent() {
         </div>
       </div>
     </div>
+      </div>
+    </>
   );
 }
 

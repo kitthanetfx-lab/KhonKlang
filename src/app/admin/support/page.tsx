@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { CallSession, type CallSessionState } from '@/lib/callSession';
 import { SUPPORT_CALLS_COMING_SOON, SUPPORT_CALLS_ENABLED, SUPPORT_CALLS_PREPARE_TEXT } from '@/lib/supportCallFeature';
+import { AdminSupportApp } from '@/components/admin/mobile/AdminSupportApp';
 
 type CallStatus = 'idle' | 'customer_requesting' | 'staff_ringing' | 'connecting' | 'active' | 'ended';
 
@@ -278,8 +279,63 @@ export default function AdminSupportPage() {
   }
 
   return (
+    <>
+      <audio ref={audioRef} autoPlay className="hidden" />
+      <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleImagePick} />
+
+      <div className="admin-mobile-only">
+        <AdminSupportApp
+          threads={threads}
+          filtered={filtered}
+          search={search}
+          onSearch={setSearch}
+          selected={selected}
+          onSelect={setSelected}
+          threadName={thread?.customer_name}
+          threadSub={thread?.assigned_staff_name ? `ดูแลโดย ${thread.assigned_staff_name}` : 'ยังไม่มีพนักงานรับเรื่อง'}
+          msgs={msgs}
+          input={input}
+          onInput={setInput}
+          onSend={send}
+          sending={sending}
+          onBack={() => setSelected('')}
+          onImagePick={() => fileInputRef.current?.click()}
+          uploading={uploading}
+          timeShort={timeShort}
+          dayShort={dayShort}
+          readByCustomer={m => !!(thread?.last_read_by_customer_at && m.sender_role === 'staff' && !m.pending && m.created_at <= thread.last_read_by_customer_at)}
+          callBanner={callFeatureLocked ? (
+            <div className="mx-[var(--app-pad,14px)] mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {SUPPORT_CALLS_PREPARE_TEXT} · {SUPPORT_CALLS_COMING_SOON}
+            </div>
+          ) : callStatus === 'customer_requesting' ? (
+            <div className="mx-[var(--app-pad,14px)] mb-2 flex items-center justify-between rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              <span>ลูกค้าขอให้โทรกลับ</span>
+              <span className="flex gap-2">
+                <button type="button" className="w-10 h-10 rounded-full bg-green-600 text-white" onClick={() => void callAction('approve')}>📞</button>
+                <button type="button" className="w-10 h-10 rounded-full bg-rose-600 text-white" onClick={() => void callAction('decline')}>✕</button>
+              </span>
+            </div>
+          ) : (callStatus === 'active' || callState === 'active') ? (
+            <div className="mx-[var(--app-pad,14px)] mb-2 flex items-center justify-between rounded-xl bg-green-50 px-3 py-2 text-sm text-green-700">
+              <span>สายกำลังคุย · {mm}:{ss}</span>
+              <span className="flex gap-2">
+                <button type="button" className="w-10 h-10 rounded-full border" onClick={toggleMute}>{muted ? '🔇' : '🎤'}</button>
+                <button type="button" className="w-10 h-10 rounded-full bg-rose-600 text-white" onClick={() => void callAction('hangup')}>✕</button>
+              </span>
+            </div>
+          ) : undefined}
+          headerActions={selected && (!callStatus || callStatus === 'idle' || callStatus === 'ended') ? (
+            <button type="button" disabled={callFeatureLocked} onClick={() => { if (!callFeatureLocked) void callAction('call'); }}
+              className="text-xs font-semibold text-green-700 px-2 py-1 rounded-lg bg-green-50">
+              {callFeatureLocked ? SUPPORT_CALLS_COMING_SOON : 'โทร'}
+            </button>
+          ) : undefined}
+        />
+      </div>
+
+      <div className="admin-desktop-only">
     <div className="h-full flex flex-col">
-      <audio ref={audioRef} autoPlay />
       <div className="flex items-center gap-2 mb-1">
         <MessageCircle size={22} className="text-blue-500" />
         <h1 className="text-xl font-bold">แชทลูกค้า</h1>
@@ -466,5 +522,7 @@ export default function AdminSupportPage() {
         </div>
       </div>
     </div>
+      </div>
+    </>
   );
 }

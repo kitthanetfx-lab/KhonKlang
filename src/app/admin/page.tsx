@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { authHeaders } from '@/lib/supabase';
 import { Users, Store, Shield, Clock, CheckCircle2, TrendingUp, ArrowRight, MapPin, LayoutDashboard } from 'lucide-react';
 import { AdminPage, AdminPageHeader, AdminAlert, AdminLoading } from '@/components/admin/AdminUI';
+import { AdminDashboardApp } from '@/components/admin/mobile/AdminDashboardApp';
 
 interface Stats {
   totalUsers: number;
@@ -71,30 +72,36 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const headers = await authHeaders();
-        const res = await fetch('/api/admin/stats', { headers });
-        if (res.status === 403) { router.replace('/'); return; }
-        if (!res.ok) throw new Error('Failed to load stats');
-        setStats(await res.json());
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [router]);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/admin/stats', { headers });
+      if (res.status === 403) { router.replace('/'); return; }
+      if (!res.ok) throw new Error('Failed to load stats');
+      setStats(await res.json());
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (loading) return <AdminLoading />;
+  useEffect(() => { void load(); }, [router]);
 
-  if (error) return <AdminPage><AdminAlert type="error">{error}</AdminAlert></AdminPage>;
-  if (!stats) return null;
-
-  const pendingTotal = stats.pendingSellers + stats.pendingMiddlemen;
+  const pendingTotal = stats ? stats.pendingSellers + stats.pendingMiddlemen : 0;
 
   return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminDashboardApp stats={stats} loading={loading} error={error} onRefresh={() => load()} refreshing={loading} />
+      </div>
+
+      <div className="admin-desktop-only">
+    {loading ? <AdminLoading /> : error ? (
+      <AdminPage><AdminAlert type="error">{error}</AdminAlert></AdminPage>
+    ) : !stats ? null : (
     <AdminPage>
       <AdminPageHeader
         icon={<LayoutDashboard size={22} />}
@@ -209,5 +216,8 @@ export default function AdminDashboard() {
         </div>
       </div>
     </AdminPage>
+    )}
+      </div>
+    </>
   );
 }

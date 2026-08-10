@@ -11,6 +11,7 @@ import { splitDealFeeComponents } from '@/lib/financeLedger';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { ADMIN_DEAL_CATEGORIES, type AdminDealCategory, parseAdminDealCategory } from '@/lib/adminDealCategory';
 import { isListingCheckoutOrder, marketplaceBuyerPayAmount, marketplaceShippingCost } from '@/lib/marketplaceOrder';
+import { AdminDealsApp, AdminDealCompactCard } from '@/components/admin/mobile/AdminDealsApp';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -563,6 +564,54 @@ function AdminDealsInner() {
   const isEmpty = isOnsite ? (onsiteJobs !== null && onsiteJobs.length === 0) : (deals !== null && deals.length === 0);
 
   return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminDealsApp
+          category={category}
+          tab={tab}
+          counts={counts}
+          categories={ADMIN_DEAL_CATEGORIES}
+          tabs={TABS}
+          activeCategoryDesc={activeCategoryMeta?.desc}
+          isLoading={isLoading}
+          isEmpty={isEmpty}
+          onCategoryChange={c => { setCategory(c); setTab('active'); }}
+          onTabChange={setTab}
+        >
+          {isOnsite && onsiteJobs?.map(j => {
+            const st = ONSITE_STATUS_LABEL[j.status] || { label: j.status, cls: 'bg-gray-100 text-gray-600' };
+            return (
+              <AdminDealCompactCard
+                key={j.id}
+                title={j.item_description}
+                statusLabel={st.label}
+                statusCls={st.cls}
+                price={Number(j.max_budget) > 0 ? `งบ ฿${Number(j.max_budget).toLocaleString()}` : undefined}
+                subtitle={`${j.buyer_name || '-'} · ${j.seller_province || '-'} · ${formatDealCreatedAt(j.created_at)}`}
+                href={`/onsite/${j.id}`}
+              />
+            );
+          })}
+          {!isOnsite && deals?.map(d => {
+            const st = statusBadge(d);
+            const pay = isListingCheckoutOrder(d) ? marketplaceBuyerPayAmount(d) : Number(d.price || 0);
+            return (
+              <AdminDealCompactCard
+                key={d.id}
+                code={dealCode(d.id)}
+                title={d.title}
+                statusLabel={st.label}
+                statusCls={st.cls}
+                price={`฿${pay.toLocaleString()}`}
+                subtitle={`${d.seller_name || '-'} · ${d.buyer_name || '-'}${d.middleman_name ? ` · ${d.middleman_name}` : ''}`}
+                href={`/deal/${d.id}`}
+              />
+            );
+          })}
+        </AdminDealsApp>
+      </div>
+
+      <div className="admin-desktop-only">
     <div className="w-full">
       <div className="flex items-center gap-2 mb-1">
         <Handshake size={22} className="text-blue-600" />
@@ -1071,6 +1120,8 @@ function AdminDealsInner() {
         </div>
       )}
     </div>
+      </div>
+    </>
   );
 }
 

@@ -1,5 +1,23 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-11 (09:40)
+
+### Mobile Shell REDesign — ครบทุกหน้าใน scope (ตลาด/ประมูล pattern)
+
+**ปัญหา:** รอบก่อนห่อ markup desktop ด้วย shell บางๆ — ไม่ใช่ redesign จริง / ค้าง register, onsite, admin, deal
+
+**แก้ (markup แยก mobile/desktop ทุกหน้าใน scope):**
+- **Shared:** `src/components/mobile/shells.tsx`, CSS `.app-mobile-shell` / `.app-desktop-shell` + tokens ใน `globals.css`
+- **ตลาด/ประมูล list:** `MarketplaceApp` + `.mkt-app-*` (ทำแล้วก่อนหน้า)
+- **Register:** `RegisterSelectApp`, `RegisterWizardApp` → `/register`, `/register/seller`, `/register/middleman`
+- **Onsite:** `OnsiteCreateApp`, `OnsiteDetailApp` + `OnsiteAppShell` → `/onsite/create`, `/onsite/[id]`
+- **Deal room:** `DealRoomApp` + `DealAppFloatBtn` → `/deal/[id]` (header/tabs/floatbar แบบแอป, overlay ร่วมนอก shell)
+- **Admin 12 หน้า:** `Admin*App` ทุกหน้า (dashboard, deals, finance, deposits, middlemen, sellers, moderate, scam-reports, users, service-controls, settings, support) + `admin-mobile-only` / `admin-desktop-only`
+
+**เช็คแล้ว:** ทุกหน้าใน scope 02:15 (register/onsite/admin/deal) มี mobile shell แยก markup แล้ว — ไม่ใช่แค่ responsive wrap
+
+---
+
 ## 2026-08-11 (00:55)
 
 ### ตลาด/ประมูลมือถือ — โครง UI/UX ใหม่แบบแอป (แยกจากเดสก์ท็อป)

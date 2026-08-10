@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { Banknote, CheckCircle2, XCircle, RefreshCw, Eye, FileText } from 'lucide-react';
+import { AdminMiddlemanDepositsApp } from '@/components/admin/mobile/AdminMiddlemanDepositsApp';
 
 interface MiddlemanInfo {
   display_name?: string;
@@ -90,6 +91,38 @@ export default function MiddlemanDepositsPage() {
   const pendingCount = docs.filter(d => d.status === 'pending_review').length;
 
   return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminMiddlemanDepositsApp
+          docs={docs}
+          loading={loading}
+          statusFilter={statusFilter}
+          pendingCount={pendingCount}
+          onStatusFilter={setStatusFilter}
+          onRefresh={() => load()}
+          renderActions={d => d.status === 'pending_review' ? (
+            rejectingId === d.id ? (
+              <div className="flex flex-col gap-2 min-w-[140px]">
+                <textarea className="w-full border rounded-lg px-2 py-1 text-xs resize-none" rows={2}
+                  placeholder="เหตุผลปฏิเสธ" value={reason} onChange={e => setReason(e.target.value)} />
+                <div className="flex gap-1">
+                  <button type="button" className="flex-1 py-1 text-xs border rounded-lg" onClick={() => { setRejectingId(null); setReason(''); }}>ยกเลิก</button>
+                  <button type="button" className="flex-1 py-1 text-xs bg-red-600 text-white rounded-lg" onClick={() => act(d.id, 'reject', reason)} disabled={acting}>ยืนยัน</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <button type="button" className="text-xs text-red-600" onClick={() => setRejectingId(d.id)}><XCircle size={13} /> ปฏิเสธ</button>
+                <button type="button" className="text-xs text-green-600" onClick={() => act(d.id, 'approve')} disabled={acting}><CheckCircle2 size={13} /> อนุมัติ</button>
+              </div>
+            )
+          ) : d.slip_file_id ? (
+            <a href={fileViewUrl(DEAL_BUCKET, d.slip_file_id)} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600"><Eye size={12} /> สลิป</a>
+          ) : null}
+        />
+      </div>
+
+      <div className="admin-desktop-only">
     <div className="space-y-5 w-full">
       <div className="flex items-center justify-between">
         <div>
@@ -183,5 +216,7 @@ export default function MiddlemanDepositsPage() {
         )}
       </div>
     </div>
+      </div>
+    </>
   );
 }

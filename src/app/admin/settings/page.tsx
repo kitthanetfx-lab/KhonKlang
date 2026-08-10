@@ -23,6 +23,7 @@ import {
   AdminSectionNote,
   AdminLoading,
 } from '@/components/admin/AdminUI';
+import { AdminSettingsApp } from '@/components/admin/mobile/AdminSettingsApp';
 
 type TabId = 'trade' | 'services' | 'members' | 'account';
 type BoolKey = 'promoEnabled' | 'promoFree';
@@ -223,6 +224,29 @@ export default function SettingsPage() {
   }
 
   return (
+    <>
+      <div className="admin-mobile-only">
+        <AdminSettingsApp
+          fees={fees}
+          loading={fees === null && !error}
+          error={error}
+          tab={tab}
+          dirty={dirty}
+          saving={saving}
+          saved={saved}
+          fieldErrors={fieldErrors}
+          qrUploading={qrUploading}
+          qrUrl={qrUrl}
+          onTab={switchTab}
+          onSave={save}
+          setField={(k, v) => setField(k as NumKey, v)}
+          setStr={(k, v) => setStr(k as StrKey, v)}
+          setBool={(k, v) => setBool(k as BoolKey, v)}
+          uploadQr={uploadQr}
+        />
+      </div>
+
+      <div className="admin-desktop-only">
     <AdminPage>
       <AdminPageHeader
         icon={<Settings size={22} />}
@@ -459,5 +483,7 @@ export default function SettingsPage() {
         <AdminStickyBar onSave={save} saving={saving} saved={saved} dirty={dirty} label="บันทึกค่าธรรมเนียม" />
       )}
     </AdminPage>
+      </div>
+    </>
   );
 }
