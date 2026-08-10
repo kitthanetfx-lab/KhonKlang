@@ -1,5 +1,18 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (14:35)
+
+### SlipOK ยัง fail — แก้ส่งไฟล์ + signed URL + ปุ่มตรวจซ้ำ
+
+**แก้เพิ่ม**:
+1. ใช้ `File` จาก `node:buffer` แทน Blob (multipart บน Node/Vercel)
+2. fallback: upload → **signed URL** → public URL
+3. ไม่ส่ง `amount` ให้ SlipOK (เช็คยอดฝั่งเราแทน)
+4. ปุ่มแอดมิน **ตรวจอัตโนมัติอีกครั้ง** (`rerun_slip_verify`)
+5. `reject_reason` แสดงช่องทาง เช่น `[สลิปผู้ซื้อ · upload]`
+
+---
+
 ## 2026-08-10 (14:20)
 
 ### แก้ SlipOK ตรวจสลิปผิด (โหลดรูปจาก URL ไม่ได้)

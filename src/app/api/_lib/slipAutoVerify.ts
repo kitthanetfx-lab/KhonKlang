@@ -171,7 +171,8 @@ async function verifyOneSide(
   expectedAmount: number,
   companyBankAcct: string,
 ): Promise<SlipCheckEvaluation> {
-  const result = await verifySlipByFileId(fileId, expectedAmount > 0 ? expectedAmount : undefined);
+  // ยอดตรวจใน evaluateSlipCheck ฝั่งเรา — ไม่ส่ง amount ให้ SlipOK (ลด false reject)
+  const result = await verifySlipByFileId(fileId);
   return evaluateSlipCheck(result, {
     expectedAmount,
     companyBankAcct,
@@ -291,7 +292,8 @@ export async function runAutoSlipVerification(
       else latestDeal = { ...latestDeal, reject_reason: '' };
       passedSides.push({ side, evaluation, fileId, expected });
     } else {
-      const rejectReason = `[สลิป${sideLabel}] ${reasonText}`.slice(0, 500);
+      const via = evaluation.raw.via ? ` · ${evaluation.raw.via}` : '';
+      const rejectReason = `[สลิป${sideLabel}${via}] ${reasonText}`.slice(0, 500);
       await db.from('deals').update({ reject_reason: rejectReason }).eq('id', dealId);
       latestDeal = { ...latestDeal, reject_reason: rejectReason };
       await insertSystemMsg(

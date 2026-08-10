@@ -355,6 +355,30 @@ export async function PATCH(req: NextRequest) {
         });
         break;
       }
+      case 'rerun_slip_verify': {
+        if (!deal.payment_slip_file_id) {
+          return NextResponse.json({ error: 'ยังไม่มีสลิปผู้ซื้อ' }, { status: 400 });
+        }
+        if (deal.deal_type === 'meetup') {
+          return NextResponse.json({ error: 'ดีลนัดรับใช้การตรวจสลิปแยก' }, { status: 400 });
+        }
+        await db.from('deals').update({
+          reject_reason: '',
+          payment_slip_verified_at: null,
+        }).eq('id', id);
+        const { runAutoSlipVerification } = await import('../../_lib/slipAutoVerify');
+        const autoResult = await runAutoSlipVerification(db, id, 'buyer');
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ',
+          role: 'system', type: 'system',
+          content: '🔄 แอดมินสั่งตรวจสลิปอัตโนมัติอีกครั้ง',
+        });
+        const { data: updated } = await db.from('deals').select('*').eq('id', id).maybeSingle();
+        if (updated) await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated, {
+          skipSteps: autoResult.skipConfirmPayLine ? ['confirm_pay'] : [],
+        });
+        return NextResponse.json({ deal: autoResult.deal || updated });
+      }
       case 'delete_deal': {
         await deleteDealById(db, id);
         return NextResponse.json({ ok: true });

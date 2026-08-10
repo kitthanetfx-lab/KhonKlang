@@ -830,8 +830,15 @@ function AdminDealsInner() {
                 {d.status === 'payment_uploaded' && d.deal_type !== 'meetup' && (
                   <>
                     <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1.5 w-full">
-                      🤖 ระบบตรวจสลิปอัตโนมัติเมื่ออัปโหลด — ผ่านแล้วจะแจ้ง LINE และอนุมัติเมื่อครบทุกใบ
+                      🤖 ระบบตรวจสลิปอัตโนมัติเมื่ออัปโหลด — ผ่านแล้วจะแจ้ง LINE · ถ้าผลผิดกด「ตรวจอัตโนมัติอีกครั้ง」
                     </p>
+                    {d.payment_slip_file_id && !buyerSlipVerified && (
+                      <button onClick={() => act(d.id, 'rerun_slip_verify')} disabled={!!acting}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1 disabled:opacity-50">
+                        {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                        ตรวจอัตโนมัติอีกครั้ง
+                      </button>
+                    )}
                     {buyerSlipVerified ? (
                       <span className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">✅ สลิปผู้ซื้อถูกต้อง</span>
                     ) : d.payment_slip_file_id ? (
