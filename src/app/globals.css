@@ -4913,6 +4913,21 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   color: #7c3aed;
   font-weight: 700;
 }
+.lc-auction-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  font-size: 11px;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+@media (min-width: 640px) { .lc-auction-foot { font-size: 12px; } }
+.lc-auction-foot-sep {
+  color: var(--faint);
+  user-select: none;
+}
+.lc-auction-foot .lc-auction-bid-step { font-size: inherit; }
 
 /* countdown component variants */
 .auction-countdown { font-variant-numeric: tabular-nums; }

@@ -234,17 +234,6 @@ export default function Marketplace() {
         <div className="lc-img" style={firstImg ? undefined : { background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)` }}>
           {firstImg ? <img src={firstImg} alt={listing.title} loading="lazy" /> : <span style={{ fontSize: 40 }}>🔨</span>}
           <span className="lc-badge lc-badge--auction">ประมูล</span>
-          {a.phase === 'live' && (
-            <span className="lc-auction-timer">
-              <AuctionCountdown endsAt={a.endsAt} endedAt={a.endedAt} variant="overlay" liveClassName="is-live" />
-            </span>
-          )}
-          {a.phase === 'ended' && (
-            <span className="lc-auction-timer lc-auction-timer--ended">ปิดแล้ว</span>
-          )}
-          <span className="lc-auction-price-badge">
-            {hasBids ? 'ปัจจุบัน' : 'เริ่ม'} ฿{a.leadingPrice.toLocaleString()}
-          </span>
         </div>
         <div className="lc-body lc-body--auction">
           <div className="lc-auction-hero-stats">
@@ -271,13 +260,22 @@ export default function Marketplace() {
             </div>
           </div>
           <h3 className="lc-title lc-title--auction">{listing.title}</h3>
-          <div className="lc-auction-meta">
+          <div className="lc-auction-foot">
             <span>👥 {a.uniqueBidderCount} คน</span>
+            <span className="lc-auction-foot-sep">·</span>
             <span className="lc-auction-bid-step">+฿{a.bidIncrement.toLocaleString()}/bid</span>
-          </div>
-          <div className="lc-meta">
-            {listing.location && <span>📍 {listing.location}</span>}
-            {listing.condition && <span>{listing.condition}</span>}
+            {listing.location && (
+              <>
+                <span className="lc-auction-foot-sep">·</span>
+                <span>📍 {listing.location}</span>
+              </>
+            )}
+            {listing.condition && (
+              <>
+                <span className="lc-auction-foot-sep">·</span>
+                <span>{listing.condition}</span>
+              </>
+            )}
           </div>
           {(listing.seller_id === myId || listing.buyer_id === myId) && (
             <span className="lc-mine">{listing.seller_id === myId ? 'ของคุณ' : 'เข้าร่วมแล้ว'}</span>
