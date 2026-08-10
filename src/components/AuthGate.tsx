@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { isProfileComplete, REQUIRED_PROFILE_FIELDS } from '@/lib/profileComplete';
@@ -12,11 +12,9 @@ import { isProfileComplete, REQUIRED_PROFILE_FIELDS } from '@/lib/profileComplet
  * โปรไฟล์ (ชื่อ-นามสกุล-เบอร์โทร-บัญชีธนาคาร) ไม่บังคับกรอกทันทีหลังสมัคร
  * แต่ถ้าพยายามเข้า "หน้าบริการ" ใดๆ (สร้างดีล, สมัครผู้ขาย/คนกลาง, dashboard ฯลฯ)
  * ก่อนกรอกโปรไฟล์ครบ จะถูก redirect ไป /profile?returnTo=<หน้าที่ตั้งใจไป>
- * เพื่อให้กรอกข้อมูลให้ครบก่อน แล้วระบบจะพาไปหน้าเดิมโดยอัตโนมัติ
  *
- * หมายเหตุสถาปัตยกรรม: โปรเจกต์นี้ใช้ @supabase/supabase-js (ไม่ใช่ @supabase/ssr)
- * และเก็บ session ไว้ใน localStorage ของ browser เท่านั้น ไม่มี cookie ที่ middleware.ts
- * (ฝั่ง server) จะอ่านได้ ฉะนั้นการบังคับล็อกอิน/กรอกโปรไฟล์ต้องทำฝั่ง client แบบนี้
+ * หมายเหตุ: สลับหน้าภายในแอปที่เคยผ่าน gate แล้วจะไม่รีเช็คทั้งก้อนใหม่
+ * (กันหน้า admin/ดีล ถูกเด้งไปล็อกอินหรือโหลดซ้ำตอนคลิกเมนู)
  */
 
 const PUBLIC_PATHS = [
@@ -27,7 +25,6 @@ const PUBLIC_PATHS = [
   '/terms',
 ];
 
-// หน้าที่ต้องกรอกโปรไฟล์ครบก่อนถึงจะเข้าได้ — "หน้าบริการ" ทั้งหมด
 const PROFILE_REQUIRED_PATHS = [
   '/deal',
   '/register/seller',
@@ -51,11 +48,9 @@ function isProfileRequiredPath(path: string) {
 }
 
 interface GateState {
-  /** false = ยังกรอกข้อมูลบังคับไม่ครบ — หน้า /profile ต้องบังคับโหมดกรอกข้อมูลและซ่อนทางออกทั้งหมด */
   profileComplete: boolean;
 }
 const ProfileGateContext = createContext<GateState>({ profileComplete: true });
-/** ให้ component ลูก (เช่น HomeButton) เช็คว่าควรซ่อนตัวเองหรือไม่ระหว่างบังคับกรอกโปรไฟล์ */
 export function useProfileGate() {
   return useContext(ProfileGateContext);
 }
@@ -66,6 +61,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [profileComplete, setProfileComplete] = useState(true);
+  const checkedRef = useRef(false);
+  const authedRef = useRef(false);
+  const profileCompleteRef = useRef(true);
 
   useEffect(() => {
     let active = true;
@@ -76,13 +74,28 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // เคยผ่าน gate แล้ว — สลับหน้าไม่ต้อง unload ลูกทั้งหมดใหม่
+      if (authedRef.current && checkedRef.current) {
+        if (
+          !profileCompleteRef.current
+          && isProfileRequiredPath(pathname)
+          && !pathname.startsWith('/profile')
+        ) {
+          router.replace(`/profile?returnTo=${encodeURIComponent(pathname)}`);
+        }
+        return;
+      }
+
       const { data } = await supabase.auth.getSession();
       if (!active) return;
       if (!data.session) {
         router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
         return;
       }
-      if (active) setAuthed(true);
+      if (active) {
+        setAuthed(true);
+        authedRef.current = true;
+      }
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -93,12 +106,14 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
       const complete = isProfileComplete(profile as Record<string, unknown> | null);
       setProfileComplete(complete);
+      profileCompleteRef.current = complete;
 
       if (!complete && isProfileRequiredPath(pathname)) {
         router.replace(`/profile?returnTo=${encodeURIComponent(pathname)}`);
         return;
       }
       setChecked(true);
+      checkedRef.current = true;
     }
 
     check();
@@ -106,6 +121,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
       if (!session && !isPublicPath(pathname)) {
+        authedRef.current = false;
+        checkedRef.current = false;
+        setAuthed(false);
+        setChecked(false);
         router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
       }
     });

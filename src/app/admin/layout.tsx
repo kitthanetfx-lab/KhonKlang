@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 const ADMIN_DEVICE_STORAGE_KEY = 'kk_admin_device_id';
+const ADMIN_UNLOCK_STORAGE_KEY = 'kk_admin_panel_unlock';
 const ADMIN_TRUST_DAYS = 30;
 
 function getOrCreateAdminDeviceId(): string {
@@ -25,6 +26,40 @@ function getOrCreateAdminDeviceId(): string {
   } catch {
     return `tmp_${Date.now().toString(36)}`;
   }
+}
+
+function readLocalUnlock(userId: string): boolean {
+  try {
+    const raw = localStorage.getItem(ADMIN_UNLOCK_STORAGE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw) as { uid?: string; did?: string; exp?: number };
+    if (!data?.uid || !data?.did || !data?.exp) return false;
+    if (data.uid !== userId) return false;
+    if (data.did !== getOrCreateAdminDeviceId()) return false;
+    if (Date.now() > Number(data.exp)) {
+      localStorage.removeItem(ADMIN_UNLOCK_STORAGE_KEY);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function writeLocalUnlock(userId: string) {
+  try {
+    localStorage.setItem(ADMIN_UNLOCK_STORAGE_KEY, JSON.stringify({
+      uid: userId,
+      did: getOrCreateAdminDeviceId(),
+      exp: Date.now() + ADMIN_TRUST_DAYS * 24 * 60 * 60 * 1000,
+    }));
+  } catch {
+    // ignore
+  }
+}
+
+function clearLocalUnlock() {
+  try { localStorage.removeItem(ADMIN_UNLOCK_STORAGE_KEY); } catch { /* ignore */ }
 }
 
 function getAdminNav(locale: 'th' | 'en') {
@@ -79,6 +114,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     e.preventDefault();
     setPwChecking(true); setPwError('');
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.replace('/login'); return; }
       const headers = await authHeaders();
       const deviceId = getOrCreateAdminDeviceId();
       const res = await fetch('/api/admin/verify-password', {
@@ -89,6 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { setPwError(d.error || 'รหัสผ่านไม่ถูกต้อง'); return; }
+      writeLocalUnlock(user.id);
       setPwVerified(true);
     } catch {
       setPwError('เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่');
@@ -98,6 +136,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   async function clearAdminTrust() {
+    clearLocalUnlock();
     try {
       const headers = await authHeaders();
       await fetch('/api/admin/verify-password', {
@@ -110,33 +149,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }
 
+  // เช็คสิทธิ์ครั้งเดียวตอนเข้าแอดมิน — อย่าผูก pathname (กันถามรหัสใหม่ทุกครั้งที่สลับเมนู)
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { router.replace('/login'); return; }
         const { data: profile } = await supabase.from('profiles').select('role, display_name').eq('id', user.id).maybeSingle();
         if (profile?.role !== 'admin') { router.replace('/'); return; }
+        if (cancelled) return;
         setAdminName(profile.display_name || 'Admin');
 
-        // เช็ค cookie จำเครื่อง — บัญชีแอดมิน + อุปกรณ์เดิม
+        // 1) localStorage จำเครื่อง (เร็ว ข้ามหน้าได้ทันที)
+        if (readLocalUnlock(user.id)) {
+          setPwVerified(true);
+          setChecking(false);
+          return;
+        }
+
+        // 2) cookie ฝั่งเซิร์ฟเวอร์
         const headers = await authHeaders();
         const deviceId = getOrCreateAdminDeviceId();
         const trustRes = await fetch(`/api/admin/verify-password?deviceId=${encodeURIComponent(deviceId)}`, {
           headers,
           credentials: 'same-origin',
         }).catch(() => null);
+        if (cancelled) return;
         if (trustRes?.ok) {
           const trust = await trustRes.json().catch(() => ({}));
-          if (trust?.trusted) setPwVerified(true);
+          if (trust?.trusted) {
+            writeLocalUnlock(user.id);
+            setPwVerified(true);
+          }
         }
 
         setChecking(false);
       } catch {
-        router.replace('/login');
+        if (!cancelled) router.replace('/login');
       }
     })();
-  }, [router, pathname]);
+    return () => { cancelled = true; };
+  }, [router]);
 
   if (checking) {
     return (
