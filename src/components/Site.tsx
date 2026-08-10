@@ -10,6 +10,7 @@ import { MarketplaceOrdersIcon } from './MarketplaceOrdersIcon';
 import { InAppBanner } from './InAppBanner';
 import { useAppPreferences } from './AppPreferences';
 import { useUser } from '@/lib/useUser';
+import { AppBottomNav } from '@/components/mobile/AppBottomNav';
 
 /* ---------- hooks ---------- */
 export function useScrolled(threshold = 8) {
@@ -304,6 +305,7 @@ export function Nav({ active }: { active?: string }) {
         </Link>
       ))}
     </div>
+    <AppBottomNav />
     </>
   );
 }

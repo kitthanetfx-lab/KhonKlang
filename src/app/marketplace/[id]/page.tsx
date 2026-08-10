@@ -7,6 +7,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Nav, Footer } from '@/components/Site';
 import { Icon } from '@/components/Icon';
+import { ResponsiveShell } from '@/components/mobile';
+import { MarketplaceDetailApp } from '@/components/marketplace/MarketplaceDetailApp';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { isCertifiedMode, supportsSellerChat } from '@/lib/listingMode';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
@@ -235,11 +237,61 @@ export default function MarketplaceDetailPage() {
     }
   }
 
+  const isOwner = listing ? listing.seller_id === myId : false;
+  const auctionData = listing?.deal_type === 'auction' ? auction : null;
+  const isAuction = Boolean(auctionData);
+  const canSellerChat = listing ? supportsSellerChat(listing.selling_mode) : false;
+  const displayPrice = isAuction && auctionData ? auctionData.leadingPrice : (listing?.price || 0);
+  const shippingProviders = listing?.shipping_providers || [];
+  const shippingCost = listing?.shipping_cost ?? 0;
+  const buyState = listing ? marketplaceListingBuyState(listing, myId || undefined) : 'unavailable';
+
+  const mobileApp = (
+    <MarketplaceDetailApp
+      loading={loading}
+      error={error}
+      listing={listing}
+      sellerShop={sellerShop}
+      images={images}
+      displayImage={displayImage}
+      onMainImageChange={setMainImage}
+      myId={myId}
+      isOwner={isOwner}
+      isAuction={isAuction}
+      auction={auctionData}
+      auctionBids={auctionBids}
+      displayPrice={displayPrice}
+      shippingProviders={shippingProviders}
+      shippingCost={shippingCost}
+      buyState={buyState}
+      selectedShipping={selectedShipping}
+      onSelectedShippingChange={setSelectedShipping}
+      joining={joining}
+      bidding={bidding}
+      bidAmount={bidAmount}
+      onBidAmountChange={setBidAmount}
+      maxBidAmount={maxBidAmount}
+      onMaxBidAmountChange={setMaxBidAmount}
+      bidStepAmount={bidStepAmount}
+      onBidStepAmountChange={setBidStepAmount}
+      autoBidOn={autoBidOn}
+      onAutoBidToggle={() => setAutoBidOn(v => !v)}
+      myAutoBidMax={myAutoBidMax}
+      myAutoBidStep={myAutoBidStep}
+      hasLineNotify={hasLineNotify}
+      lineOaUrl={lineOaUrl}
+      bidError={bidError}
+      onBuy={buyViaEscrow}
+      onBid={placeBid}
+      onSellerChat={sellerChatHref}
+    />
+  );
+
   if (loading) {
     return (
       <>
         <Nav active="market" />
-        <div className="pd-shell"><div className="pd-loading" /></div>
+        <ResponsiveShell mobile={mobileApp} desktop={<div className="pd-shell"><div className="pd-loading" /></div>} />
       </>
     );
   }
@@ -248,28 +300,29 @@ export default function MarketplaceDetailPage() {
     return (
       <>
         <Nav active="market" />
-        <div className="pd-shell">
-          <div className="pd-empty">
-            <div className="mkt-empty-ic"><Icon name="search" size={32} /></div>
-            <p>{error || 'ไม่พบสินค้าที่ต้องการ'}</p>
-            <Link href="/marketplace" className="btn btn-primary">กลับสู่ตลาด</Link>
-          </div>
-        </div>
+        <ResponsiveShell
+          mobile={mobileApp}
+          desktop={
+            <div className="pd-shell">
+              <div className="pd-empty">
+                <div className="mkt-empty-ic"><Icon name="search" size={32} /></div>
+                <p>{error || 'ไม่พบสินค้าที่ต้องการ'}</p>
+                <Link href="/marketplace" className="btn btn-primary">กลับสู่ตลาด</Link>
+              </div>
+            </div>
+          }
+        />
       </>
     );
   }
 
-  const isOwner = listing.seller_id === myId;
-  const isAuction = listing.deal_type === 'auction' && auction;
-  const canSellerChat = supportsSellerChat(listing.selling_mode);
-  const displayPrice = isAuction ? auction.leadingPrice : (listing.price || 0);
-  const shippingProviders = listing.shipping_providers || [];
-  const shippingCost = listing.shipping_cost ?? 0;
-  const buyState = marketplaceListingBuyState(listing, myId || undefined);
-
   return (
     <>
       <Nav active="market" />
+      <ResponsiveShell
+        mobile={mobileApp}
+        desktop={
+          <>
       <div className="pd-shell">
         <div className="container">
           <Link
@@ -320,36 +373,36 @@ export default function MarketplaceDetailPage() {
 
               <div className="pd-price-box">
                 <span className="pd-price-lbl">
-                  {isAuction && auction.bidCount > 0 ? 'ราคาปัจจุบัน' : isAuction ? 'ราคาเริ่ม' : 'ราคา'}
+                  {isAuction && auctionData && auctionData.bidCount > 0 ? 'ราคาปัจจุบัน' : isAuction ? 'ราคาเริ่ม' : 'ราคา'}
                 </span>
                 <span className="pd-price">฿{displayPrice.toLocaleString()}</span>
               </div>
 
-              {isAuction && (
+              {auctionData && (
                 <div className="pd-auction">
                   <div className="pd-auction-cell">
                     <span className="pd-auction-lbl">เหลือเวลา</span>
                     <strong className="pd-auction-val">
-                      <AuctionCountdown endsAt={auction.endsAt} endedAt={auction.endedAt} liveClassName="is-live" />
+                      <AuctionCountdown endsAt={auctionData.endsAt} endedAt={auctionData.endedAt} liveClassName="is-live" />
                     </strong>
                   </div>
                   <div className="pd-auction-cell">
                     <span className="pd-auction-lbl">ผู้ประมูล</span>
-                    <strong className="pd-auction-val">{auction.uniqueBidderCount} คน · {auction.bidCount} bid</strong>
+                    <strong className="pd-auction-val">{auctionData.uniqueBidderCount} คน · {auctionData.bidCount} bid</strong>
                   </div>
                   <div className="pd-auction-cell">
                     <span className="pd-auction-lbl">นำอยู่</span>
-                    <strong className="pd-auction-val">{auction.currentBidderName || '— ยังไม่มี'}</strong>
+                    <strong className="pd-auction-val">{auctionData.currentBidderName || '— ยังไม่มี'}</strong>
                   </div>
                   <div className="pd-auction-cell">
                     <span className="pd-auction-lbl">บิทครั้งละ</span>
-                    <strong className="pd-auction-val">฿{auction.bidIncrement.toLocaleString()}</strong>
+                    <strong className="pd-auction-val">฿{auctionData.bidIncrement.toLocaleString()}</strong>
                   </div>
                 </div>
               )}
 
               {/* ประมูล: กล่อง Bid — เพดาน Auto-bid เหนือปุ่ม Bid (ลำดับสายตา + contrast) */}
-              {isAuction && !isOwner && auction.phase === 'live' && (
+              {auctionData && !isOwner && auctionData.phase === 'live' && (
                 <div className="pd-bid">
                   <div className="pd-autobid">
                     <button
@@ -369,22 +422,22 @@ export default function MarketplaceDetailPage() {
                           id="pd-max-bid"
                           className="pd-bid-input pd-bid-input--max"
                           type="number"
-                          min={auction.minNextBid}
-                          step={auction.bidIncrement}
+                          min={auctionData.minNextBid}
+                          step={auctionData.bidIncrement}
                           value={maxBidAmount}
                           onChange={e => setMaxBidAmount(e.target.value)}
-                          placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
+                          placeholder={`เช่น ${(auctionData.minNextBid + auctionData.bidIncrement * 5).toLocaleString()}`}
                         />
                         <label className="pd-bid-lbl" htmlFor="pd-bid-step" style={{ marginTop: 8 }}>
-                          จำนวนเงินต่อบิด (อย่างน้อย ฿{auction.bidIncrement.toLocaleString()})
+                          จำนวนเงินต่อบิด (อย่างน้อย ฿{auctionData.bidIncrement.toLocaleString()})
                         </label>
                         <input
                           id="pd-bid-step"
                           className="pd-bid-input"
                           type="number"
-                          min={auction.bidIncrement}
-                          step={auction.bidIncrement}
-                          value={bidStepAmount || String(auction.bidIncrement)}
+                          min={auctionData.bidIncrement}
+                          step={auctionData.bidIncrement}
+                          value={bidStepAmount || String(auctionData.bidIncrement)}
                           onChange={e => setBidStepAmount(e.target.value)}
                         />
                         <p className="pd-bid-hint">
@@ -429,13 +482,13 @@ export default function MarketplaceDetailPage() {
 
                   <div className="pd-bid-row">
                     <div className="pd-bid-field">
-                      <label className="pd-bid-lbl" htmlFor="pd-bid-amount">ราคา bid (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
+                      <label className="pd-bid-lbl" htmlFor="pd-bid-amount">ราคา bid (ขั้นต่ำ ฿{auctionData.minNextBid.toLocaleString()})</label>
                       <input
                         id="pd-bid-amount"
                         className="pd-bid-input"
                         type="number"
-                        min={auction.minNextBid}
-                        step={auction.bidIncrement}
+                        min={auctionData.minNextBid}
+                        step={auctionData.bidIncrement}
                         value={bidAmount}
                         onChange={e => setBidAmount(e.target.value)}
                       />
@@ -456,12 +509,12 @@ export default function MarketplaceDetailPage() {
                 </div>
               )}
 
-              {isAuction && !isOwner && auction.phase !== 'live' && (
+              {auctionData && !isOwner && auctionData.phase !== 'live' && (
                 <div className="pd-note">
                   <div className="pd-note-title">
-                    {listing.buyer_id || auction.endedAt ? 'ขายแล้ว · ประมูลปิด' : 'ประมูลปิดแล้ว'}
+                    {listing.buyer_id || auctionData.endedAt ? 'ขายแล้ว · ประมูลปิด' : 'ประมูลปิดแล้ว'}
                   </div>
-                  <p>{auction.currentBidderName ? `ผู้ชนะ: ${auction.currentBidderName} · ฿${(auction.currentBid || displayPrice).toLocaleString()}` : 'ไม่มีผู้ bid'}</p>
+                  <p>{auctionData.currentBidderName ? `ผู้ชนะ: ${auctionData.currentBidderName} · ฿${(auctionData.currentBid || displayPrice).toLocaleString()}` : 'ไม่มีผู้ bid'}</p>
                   {myId && listing.buyer_id === myId && (
                     <Link href={`/cart/checkout/${listing.id}`} className="btn btn-primary btn-lg" style={{ marginTop: 12 }}>
                       ไปชำระเงิน / ติดตามสถานะ →
@@ -586,6 +639,9 @@ export default function MarketplaceDetailPage() {
         </div>
       </div>
       <Footer />
+          </>
+        }
+      />
     </>
   );
 }

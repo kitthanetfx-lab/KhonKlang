@@ -1,5 +1,16 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (18:52 UTC)
+
+### Mobile app shells — marketplace detail / shop / wanted
+
+**เป้าหมาย:** ขยาย mobile foundation ไป cluster ตลาด · logic คงใน page.tsx · primary action ไม่ต้องเลื่อนมาก  
+**ใหม่:** `MarketplaceDetailApp` (gallery snap · sticky bid/ซื้อ · Auto-bid ใน AppSheet) · `ShopApp` · `WantedApp`  
+**wire:** `ResponsiveShell` ใน `/marketplace/[id]` · `/shop/[sellerId]` · `/wanted`  
+**foundation:** checkout `src/components/mobile/` จาก branch mobile-app-shells + CSS `.app-detail-*` `.shop-app-*` `.wanted-app-*`
+
+---
+
 ## 2026-08-11 (00:55)
 
 ### ตลาด/ประมูลมือถือ — โครง UI/UX ใหม่แบบแอป (แยกจากเดสก์ท็อป)
