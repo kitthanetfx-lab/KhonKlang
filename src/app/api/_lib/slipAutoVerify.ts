@@ -236,6 +236,148 @@ async function tryAutoApprove(db: SupabaseClient, dealId: string, deal: Record<s
   return updated;
 }
 
+function meetupExpectedAmount(md: Record<string, unknown>, side: SlipSide): number {
+  const deposit = Number(md.deposit) || 0;
+  const fee = side === 'buyer' ? Number(md.buyer_fee || 0) : Number(md.seller_fee || 0);
+  return deposit + fee;
+}
+
+async function markMeetupSideVerified(db: SupabaseClient, dealId: string, side: SlipSide) {
+  const field = side === 'buyer' ? 'buyer_slip_verified_at' : 'seller_slip_verified_at';
+  await db.from('deal_meetup').upsert({ deal_id: dealId, [field]: new Date().toISOString() }, { onConflict: 'deal_id' });
+}
+
+async function tryAutoMeetupReady(
+  db: SupabaseClient,
+  dealId: string,
+  deal: Record<string, unknown>,
+  md: Record<string, unknown>,
+) {
+  if (deal.deal_type !== 'meetup' || deal.status !== 'payment_uploaded') return null;
+  if (!md.buyer_slip_verified_at || !md.seller_slip_verified_at) return null;
+
+  const before = await loadAdminDealSnapshot(db, deal as AdminDealRow);
+  const { data: updated } = await db.from('deals').update({ status: 'meetup_ready', reject_reason: '' }).eq('id', dealId).select().single();
+  if (!updated) return null;
+
+  const msg = '🤖 ระบบตรวจสลิปเงินประกันครบและอนุมัติอัตโนมัติ — เริ่มขั้นตอนนัดพบได้';
+  await insertSystemMsg(db, dealId, msg);
+
+  const recipients = [updated.buyer_id, updated.seller_id].filter((x): x is string => typeof x === 'string' && !!x);
+  if (recipients.length) {
+    await notifyUsers(db, recipients, {
+      title: `ยืนยันเงินประกัน: ${updated.title || 'ดีล'}`,
+      body: msg,
+      link: `/deal/${dealId}`,
+    });
+  }
+
+  await syncDealLedger(db, updated as Record<string, unknown>).catch(() => {});
+  await maybeNotifyAdminLineQueues(db, before, updated);
+  return updated;
+}
+
+/** ตรวจสลิปเงินประกัน meetup อัตโนมัติ — แจ้ง LINE ครั้งเดียว (ผ่าน/ไม่ผ่าน) */
+export async function runAutoMeetupSlipVerification(
+  db: SupabaseClient,
+  dealId: string,
+  trigger: 'buyer' | 'seller' | 'both' = 'both',
+): Promise<{ deal: Record<string, unknown>; skipConfirmPayLine: boolean }> {
+  const { data: deal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
+  if (!deal || deal.deal_type !== 'meetup') {
+    return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+  }
+  if (!['payment_pending', 'payment_uploaded'].includes(String(deal.status))) {
+    return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+  }
+
+  const controls = await readServiceControlsConfig(db);
+  const dealPrice = Number(deal.price || 0);
+  if (!shouldAutoVerifySlip(controls, dealPrice)) {
+    return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+  }
+  if (!isSlipokConfigured()) {
+    return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+  }
+
+  const { data: md } = await db.from('deal_meetup').select('*').eq('deal_id', dealId).maybeSingle();
+  if (!md) return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+
+  const fees = await readFeesConfig(db);
+  const companyBankAcct = fees.companyBankAcct || '';
+
+  let latestDeal = deal as Record<string, unknown>;
+  const sides: SlipSide[] = [];
+  if (trigger === 'both' || trigger === 'buyer') sides.push('buyer');
+  if (trigger === 'both' || trigger === 'seller') sides.push('seller');
+
+  type PendingNotify = { side: SlipSide; evaluation: SlipCheckEvaluation; fileId: string; expected: number };
+  const passedSides: PendingNotify[] = [];
+  let anySlipChecked = false;
+
+  for (const side of sides) {
+    const fileId = side === 'buyer' ? String(md.buyer_slip || '') : String(md.seller_slip || '');
+    const alreadyVerified = side === 'buyer' ? !!md.buyer_slip_verified_at : !!md.seller_slip_verified_at;
+    if (!fileId || alreadyVerified) continue;
+
+    anySlipChecked = true;
+    const expected = meetupExpectedAmount(md, side);
+    const evaluation = await verifyOneSide(deal, fileId, expected, companyBankAcct);
+    const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
+    const reasonText = evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน';
+
+    if (evaluation.pass) {
+      await markMeetupSideVerified(db, dealId, side);
+      await db.from('deals').update({ reject_reason: '' }).eq('id', dealId);
+      await insertSystemMsg(
+        db,
+        dealId,
+        `🤖 ระบบตรวจสลิปเงินประกัน${sideLabel}ผ่านอัตโนมัติ — ยอด ฿${Number(evaluation.slip?.amount || expected).toLocaleString()}${evaluation.slip?.transRef ? ` · ref ${evaluation.slip.transRef}` : ''}`,
+      );
+      latestDeal = { ...latestDeal, reject_reason: '' };
+      passedSides.push({ side, evaluation, fileId, expected });
+    } else {
+      const via = evaluation.raw.via ? ` · ${evaluation.raw.via}` : '';
+      const rejectReason = `[สลิปประกัน${sideLabel}${via}] ${reasonText}`.slice(0, 500);
+      await db.from('deals').update({ reject_reason: rejectReason }).eq('id', dealId);
+      latestDeal = { ...latestDeal, reject_reason: rejectReason };
+      await insertSystemMsg(
+        db,
+        dealId,
+        `⚠️ สลิปเงินประกัน${sideLabel}ไม่ผ่าน — ${reasonText} (รอแอดมินตรวจสอบ)`,
+      );
+      await notifyAdminLineSlipResult({
+        deal: latestDeal,
+        side,
+        evaluation,
+        slipUrl: isSlipImageFile(fileId) ? dealSlipPublicUrl(fileId) : '',
+        autoApproved: false,
+        expectedAmount: expected,
+      });
+    }
+  }
+
+  const { data: freshDeal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
+  const { data: freshMd } = await db.from('deal_meetup').select('*').eq('deal_id', dealId).maybeSingle();
+  if (!freshDeal || !freshMd) return { deal: latestDeal, skipConfirmPayLine: anySlipChecked };
+
+  const approved = await tryAutoMeetupReady(db, dealId, freshDeal, freshMd);
+  const finalDeal = (approved || freshDeal) as Record<string, unknown>;
+
+  for (const passed of passedSides) {
+    await notifyAdminLineSlipResult({
+      deal: finalDeal,
+      side: passed.side,
+      evaluation: passed.evaluation,
+      slipUrl: isSlipImageFile(passed.fileId) ? dealSlipPublicUrl(passed.fileId) : '',
+      autoApproved: !!approved,
+      expectedAmount: passed.expected,
+    });
+  }
+
+  return { deal: finalDeal, skipConfirmPayLine: anySlipChecked };
+}
+
 /** ตรวจสลิปอัตโนมัติหลังอัปสลิป — แจ้ง LINE ครั้งเดียว (ผ่าน/ไม่ผ่าน) */
 export async function runAutoSlipVerification(
   db: SupabaseClient,
@@ -243,8 +385,11 @@ export async function runAutoSlipVerification(
   trigger: 'buyer' | 'seller' | 'both' = 'both',
 ): Promise<{ deal: Record<string, unknown>; skipConfirmPayLine: boolean }> {
   const { data: deal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
-  if (!deal || deal.deal_type === 'meetup') {
-    return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
+  if (!deal) {
+    return { deal: {} as Record<string, unknown>, skipConfirmPayLine: false };
+  }
+  if (deal.deal_type === 'meetup') {
+    return runAutoMeetupSlipVerification(db, dealId, trigger);
   }
   if (!['payment_pending', 'payment_uploaded', 'posted'].includes(String(deal.status))) {
     return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };

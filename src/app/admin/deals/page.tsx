@@ -15,7 +15,8 @@ import { isListingCheckoutOrder, marketplaceBuyerPayAmount, marketplaceShippingC
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
 interface DealMeetup {
-  deposit: number; refunded_at?: string; buyer_met: boolean; seller_met: boolean;
+  deposit: number; buyer_fee?: number; seller_fee?: number;
+  refunded_at?: string; buyer_met: boolean; seller_met: boolean;
   buyer_slip?: string; seller_slip?: string;
   buyer_slip_verified_at?: string; seller_slip_verified_at?: string;
   refund_outcome?: 'buyer_all' | 'seller_all' | 'both' | 'frozen';
@@ -293,6 +294,20 @@ function AdminDealsInner() {
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok) { load(tab, category); loadCounts(category); } else alert(d.error || `ลบไม่สำเร็จ (${r.status})`);
+    } finally { setActing(''); }
+  }
+
+  async function rerunSlipVerify(id: string, side: 'buyer' | 'seller') {
+    setActing(id);
+    try {
+      const headers = await authHeaders();
+      const r = await fetch('/api/admin/deals', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'rerun_slip_verify', whichSlip: side }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { load(tab, category); loadCounts(category); } else alert(d.error || `ตรวจไม่สำเร็จ (${r.status})`);
     } finally { setActing(''); }
   }
 
@@ -863,10 +878,10 @@ function AdminDealsInner() {
                       🤖 ระบบตรวจสลิปอัตโนมัติเมื่ออัปโหลด — ผ่านแล้วจะแจ้ง LINE · ถ้าผลผิดกด「ตรวจอัตโนมัติอีกครั้ง」
                     </p>
                     {d.payment_slip_file_id && !buyerSlipVerified && (
-                      <button onClick={() => act(d.id, 'rerun_slip_verify')} disabled={!!acting}
+                      <button onClick={() => rerunSlipVerify(d.id, 'buyer')} disabled={!!acting}
                         className="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1 disabled:opacity-50">
                         {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
-                        ตรวจอัตโนมัติอีกครั้ง
+                        ตรวจสลิปผู้ซื้ออัตโนมัติอีกครั้ง
                       </button>
                     )}
                     {buyerSlipVerified ? (
@@ -889,7 +904,14 @@ function AdminDealsInner() {
                       sellerSlipVerified ? (
                         <span className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">✅ สลิปผู้ขายถูกต้อง</span>
                       ) : d.priceState?.seller_fee_slip ? (
-                        <span className="inline-flex gap-1">
+                        <span className="inline-flex flex-wrap gap-1 items-center">
+                          {!sellerSlipVerified && (
+                            <button onClick={() => rerunSlipVerify(d.id, 'seller')} disabled={!!acting}
+                              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1 disabled:opacity-50">
+                              {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                              ตรวจสลิปผู้ขายอัตโนมัติอีกครั้ง
+                            </button>
+                          )}
                           <button onClick={() => verifyNormalSlip(d.id, 'seller', true)} disabled={!!acting}
                             className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
                             <CheckCircle2 size={14} /> สลิปผู้ขายถูกต้อง
@@ -919,14 +941,32 @@ function AdminDealsInner() {
                 {/* ข้อ5: meetup รอตรวจสลิป — ปุ่มตรวจถูกต้อง/ไม่ถูกต้อง รายฝ่าย */}
                 {needsSlipVerify && (
                   <div className="flex flex-wrap gap-2 items-center">
+                    <p className="text-xs text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-2 py-1.5 w-full">
+                      🤖 ระบบตรวจสลิปเงินประกันอัตโนมัติ — ยอดต่อฝ่าย = ประกัน + ค่าบริการ · ครบทั้งสองฝ่าย → เริ่มนัดพบ
+                    </p>
                     {(['buyer', 'seller'] as const).map(side => {
                       const slip = side === 'buyer' ? d.meetup?.buyer_slip : d.meetup?.seller_slip;
                       const verified = side === 'buyer' ? d.meetup?.buyer_slip_verified_at : d.meetup?.seller_slip_verified_at;
+                      const deposit = Number(d.meetup?.deposit || 0);
+                      const fee = side === 'buyer' ? Number(d.meetup?.buyer_fee || 0) : Number(d.meetup?.seller_fee || 0);
+                      const expected = deposit + fee;
                       const lbl = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
-                      if (verified) return <span key={side} className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">✅ สลิป{lbl} ถูกต้อง</span>;
-                      if (!slip) return <span key={side} className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-500 border border-gray-200">⏳ {lbl} ยังไม่อัปสลิป</span>;
+                      if (verified) return (
+                        <span key={side} className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">
+                          ✅ สลิป{lbl} ถูกต้อง{expected > 0 ? ` (฿${expected.toLocaleString()})` : ''}
+                        </span>
+                      );
+                      if (!slip) return <span key={side} className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-500 border border-gray-200">⏳ {lbl} ยังไม่อัปสลิป{expected > 0 ? ` (ต้องโอน ฿${expected.toLocaleString()})` : ''}</span>;
                       return (
-                        <span key={side} className="inline-flex gap-1">
+                        <span key={side} className="inline-flex flex-wrap gap-1 items-center">
+                          {expected > 0 && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-100">ยอด{lbl} ฿{expected.toLocaleString()}</span>
+                          )}
+                          <button onClick={() => rerunSlipVerify(d.id, side)} disabled={!!acting}
+                            className="px-2 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1 disabled:opacity-50">
+                            {acting === d.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                            ตรวจอัตโนมัติ
+                          </button>
                           <button onClick={() => verifySlip(d.id, side, true)} disabled={!!acting}
                             className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
                             <CheckCircle2 size={14} /> สลิป{lbl} ถูกต้อง

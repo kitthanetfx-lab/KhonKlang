@@ -361,22 +361,55 @@ export async function PATCH(req: NextRequest) {
         break;
       }
       case 'rerun_slip_verify': {
-        if (!deal.payment_slip_file_id) {
-          return NextResponse.json({ error: 'ยังไม่มีสลิปผู้ซื้อ' }, { status: 400 });
-        }
+        const side: 'buyer' | 'seller' = whichSlip === 'seller' ? 'seller' : 'buyer';
+        const { runAutoSlipVerification, runAutoMeetupSlipVerification } = await import('../../_lib/slipAutoVerify');
+
         if (deal.deal_type === 'meetup') {
-          return NextResponse.json({ error: 'ดีลนัดรับใช้การตรวจสลิปแยก' }, { status: 400 });
+          const { data: md } = await db.from('deal_meetup').select('*').eq('deal_id', id).maybeSingle();
+          const slipField = side === 'buyer' ? 'buyer_slip' : 'seller_slip';
+          if (!md?.[slipField]) {
+            return NextResponse.json({ error: `ยังไม่มีสลิป${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}` }, { status: 400 });
+          }
+          await db.from('deal_meetup').upsert({
+            deal_id: id,
+            [`${side}_slip_verified_at`]: null,
+          }, { onConflict: 'deal_id' });
+          await db.from('deals').update({ reject_reason: '' }).eq('id', id);
+          const autoResult = await runAutoMeetupSlipVerification(db, id, side);
+          await db.from('messages').insert({
+            deal_id: id, sender_id: null, sender_name: 'ระบบ',
+            role: 'system', type: 'system',
+            content: `🔄 แอดมินสั่งตรวจสลิปเงินประกัน${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}อัตโนมัติอีกครั้ง`,
+          });
+          const { data: updated } = await db.from('deals').select('*').eq('id', id).maybeSingle();
+          if (updated) await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated, {
+            skipSteps: autoResult.skipConfirmPayLine ? ['confirm_pay'] : [],
+          });
+          return NextResponse.json({ deal: autoResult.deal || updated });
         }
-        await db.from('deals').update({
-          reject_reason: '',
-          payment_slip_verified_at: null,
-        }).eq('id', id);
-        const { runAutoSlipVerification } = await import('../../_lib/slipAutoVerify');
-        const autoResult = await runAutoSlipVerification(db, id, 'buyer');
+
+        if (side === 'buyer') {
+          if (!deal.payment_slip_file_id) {
+            return NextResponse.json({ error: 'ยังไม่มีสลิปผู้ซื้อ' }, { status: 400 });
+          }
+          await db.from('deals').update({
+            reject_reason: '',
+            payment_slip_verified_at: null,
+          }).eq('id', id);
+        } else {
+          if (!priceState?.seller_fee_slip) {
+            return NextResponse.json({ error: 'ยังไม่มีสลิปค่าบริการของผู้ขาย' }, { status: 400 });
+          }
+          await db.from('deal_price_state').upsert({
+            deal_id: id,
+            seller_fee_slip_verified_at: null,
+          }, { onConflict: 'deal_id' });
+        }
+        const autoResult = await runAutoSlipVerification(db, id, side);
         await db.from('messages').insert({
           deal_id: id, sender_id: null, sender_name: 'ระบบ',
           role: 'system', type: 'system',
-          content: '🔄 แอดมินสั่งตรวจสลิปอัตโนมัติอีกครั้ง',
+          content: `🔄 แอดมินสั่งตรวจสลิป${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}อัตโนมัติอีกครั้ง`,
         });
         const { data: updated } = await db.from('deals').select('*').eq('id', id).maybeSingle();
         if (updated) await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated, {

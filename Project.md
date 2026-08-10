@@ -1,5 +1,18 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (15:55)
+
+### ขยาย SlipOK auto-verify ครบหมวด (meetup + trade rerun + scaffold consign/onsite)
+
+**ดีลซื้อขาย / ตลาด** — คงเดิม + rerun สลิปผู้ขายได้แล้ว
+**ประกันเดินทาง (meetup)** — `runAutoMeetupSlipVerification()` ตรวจยอด = ประกัน + ค่าบริการฝ่ายนั้น · trigger หลัง `meetup_deposit` · ครบทั้งสองฝ่าย → `meetup_ready` + LINE
+**ฝากขาย (consign)** — stub `slipVerifyScaffold.ts` รอ flow จริง
+**ออนไซต์ (onsite)** — migration 0031 เพิ่ม `payment_slip_file_id` / `verified_at` / `slip_reject_reason` + stub รอ flow อัปสลิป
+
+ไฟล์: `slipAutoVerify.ts`, `slipVerifyScaffold.ts`, `deals/[id]/route.ts`, `admin/deals/route.ts`, `admin/deals/page.tsx`, `0031_slip_verify_scaffold.sql`
+
+---
+
 ## 2026-08-10 (15:50)
 
 ### ลบ popup debug SlipOK / ปุ่มเช็ค Vercel env ออกจากแอดมิน

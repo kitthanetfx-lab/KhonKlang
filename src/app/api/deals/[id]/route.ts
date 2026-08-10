@@ -5,7 +5,7 @@ import { notifyUsers } from '../../_lib/notify';
 import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
 import { loadAdminDealSnapshot } from '../../_lib/adminDealQueue';
 import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
-import { runAutoSlipVerification } from '../../_lib/slipAutoVerify';
+import { runAutoSlipVerification, runAutoMeetupSlipVerification } from '../../_lib/slipAutoVerify';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide, computeMarketplaceGp } from '@/lib/fees';
 import { getLogisticsProviderLabel, sanitizeShippingProviders } from '@/lib/logistics';
@@ -1143,6 +1143,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         skipConfirmPayLine = autoResult.skipConfirmPayLine;
       } catch (err) {
         console.error('[slipAutoVerify]', err);
+      }
+    }
+    if (action === 'meetup_deposit') {
+      try {
+        const trigger = isBuyer ? 'buyer' : 'seller';
+        const autoResult = await runAutoMeetupSlipVerification(db, id, trigger);
+        updated = autoResult.deal as typeof updated;
+        skipConfirmPayLine = autoResult.skipConfirmPayLine;
+      } catch (err) {
+        console.error('[slipAutoVerify meetup]', err);
       }
     }
 

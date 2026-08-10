@@ -177,7 +177,9 @@ export async function notifyAdminLineSlipResult(params: {
 
   let headline: string;
   if (evaluation.pass && autoApproved) {
-    headline = `✅ ตรวจสลิป${sideLabel} — ผ่าน · อนุมัติอัตโนมัติแล้ว (เริ่มแพ็คได้)`;
+    headline = String(deal.deal_type || '') === 'meetup'
+      ? `✅ ตรวจสลิป${sideLabel} — ผ่าน · อนุมัติอัตโนมัติแล้ว (เริ่มนัดพบได้)`
+      : `✅ ตรวจสลิป${sideLabel} — ผ่าน · อนุมัติอัตโนมัติแล้ว (เริ่มแพ็คได้)`;
   } else if (evaluation.pass) {
     headline = `✅ ตรวจสลิป${sideLabel} — ผ่าน · รอแอดมินยืนยัน`;
   } else {
