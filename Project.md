@@ -1,5 +1,17 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (14:45)
+
+### SlipOK 404 — multipart manual + วินิจฉัยชัดขึ้น
+
+**แก้**:
+1. ส่งไฟล์ SlipOK ด้วย **multipart manual** (Buffer) แทน FormData/Blob
+2. public URL ใช้ `getPublicUrl()` จาก Supabase client
+3. HTTP 404 → แจ้ง **ตรวจ SLIPOK_BRANCH_ID** (ไม่ใช่ bucket)
+4. `reject_reason` / log มี trail เช่น `storage:ok(45kb) → upload:1011`
+
+---
+
 ## 2026-08-10 (14:35)
 
 ### SlipOK ยัง fail — แก้ส่งไฟล์ + signed URL + ปุ่มตรวจซ้ำ

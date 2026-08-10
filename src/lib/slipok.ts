@@ -49,10 +49,10 @@ function norm(d: RawSlip): SlipInfo {
   };
 }
 
+/** URL public สำหรับแสดงผล (sync — ใช้ pattern เดียวกับ getPublicUrl) */
 export function dealSlipPublicUrl(fileId: string): string {
   const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
   if (!base || !fileId) return '';
-  // object key อาจมี `/` — encode ทีละ segment ให้ตรงกับ getPublicUrl
   const path = fileId.split('/').map(encodeURIComponent).join('/');
   return `${base}/storage/v1/object/public/deal-files/${path}`;
 }
@@ -62,6 +62,34 @@ function slipImageMime(fileId: string): string {
   if (ext === 'png') return 'image/png';
   if (ext === 'webp') return 'image/webp';
   return 'image/jpeg';
+}
+
+function buildMultipartBody(
+  fileField: string,
+  filename: string,
+  mime: string,
+  fileData: Buffer,
+  fields: Record<string, string>,
+): { body: Buffer; contentType: string } {
+  const boundary = `----SlipOK${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  const chunks: Buffer[] = [];
+
+  for (const [name, value] of Object.entries(fields)) {
+    chunks.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
+    ));
+  }
+
+  chunks.push(Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="${fileField}"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`,
+  ));
+  chunks.push(fileData);
+  chunks.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+  return {
+    body: Buffer.concat(chunks),
+    contentType: `multipart/form-data; boundary=${boundary}`,
+  };
 }
 
 function parseSlipokApiResponse(res: Response, j: Record<string, unknown>, via?: SlipResult['via']): SlipResult {
@@ -86,20 +114,34 @@ function parseSlipokApiResponse(res: Response, j: Record<string, unknown>, via?:
   };
 }
 
-async function postSlipok(body: BodyInit, headers: Record<string, string>, via: SlipResult['via']): Promise<SlipResult> {
+async function postSlipok(
+  body: BodyInit | Buffer,
+  headers: Record<string, string>,
+  via: SlipResult['via'],
+): Promise<SlipResult> {
   const branchId = process.env.SLIPOK_BRANCH_ID?.trim();
   const apiKey = process.env.SLIPOK_API_KEY?.trim();
   if (!branchId || !apiKey) {
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
   try {
-    const res = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}`, {
+    const res = await fetch(`https://api.slipok.com/api/line/apikey/${encodeURIComponent(branchId)}`, {
       method: 'POST',
       headers: { ...headers, 'x-authorization': apiKey },
       body,
     });
-    const j = await res.json().catch(() => ({} as Record<string, unknown>));
-    return parseSlipokApiResponse(res, j, via);
+    const text = await res.text();
+    let j: Record<string, unknown> = {};
+    try {
+      j = text ? JSON.parse(text) as Record<string, unknown> : {};
+    } catch {
+      console.error('[slipok] non-json response', via, res.status, text.slice(0, 200));
+    }
+    const result = parseSlipokApiResponse(res, j, via);
+    if (!result.ok) {
+      console.error('[slipok] verify failed', via, result.code, result.message, 'http', res.status);
+    }
+    return result;
   } catch (err) {
     console.error('[slipok] post failed', via, err);
     return { ok: false, code: 'network', message: 'เชื่อมต่อ SlipOK ไม่ได้' };
@@ -109,6 +151,11 @@ async function postSlipok(body: BodyInit, headers: Record<string, string>, via: 
 async function getStorageAdmin() {
   const { getAdminClient } = await import('@/lib/supabaseServer');
   return getAdminClient();
+}
+
+async function getDealSlipPublicUrlFromStorage(fileId: string): Promise<string> {
+  const db = await getStorageAdmin();
+  return db.storage.from('deal-files').getPublicUrl(fileId).data.publicUrl;
 }
 
 async function downloadDealSlipFile(fileId: string): Promise<{ bytes: Buffer; filename: string } | null> {
@@ -150,6 +197,14 @@ function shouldRetryWithUrl(result: SlipResult): boolean {
   return c === '404' || c === '1000' || c === '1005' || c === '1006' || c === 'network';
 }
 
+function mergeAttemptErrors(attempts: string[], last: SlipResult): SlipResult {
+  if (attempts.length === 0) return last;
+  return {
+    ...last,
+    message: `${last.message} [${attempts.join(' → ')}]`,
+  };
+}
+
 export function isSlipImageFile(fileId: string): boolean {
   const ext = fileId.split('.').pop()?.toLowerCase() || '';
   return ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'webp';
@@ -162,8 +217,8 @@ export function isSlipokConfigured(): boolean {
 /** ข้อความภาษาไทยสำหรับรหัส SlipOK 1000–1014 และข้อผิดพลาดภายใน */
 const SLIPOK_CODE_TH: Record<string, string> = {
   '1000': 'กรุณาระบุ QR Code / ไฟล์รูป / URL สลิปให้ครบ',
-  '1001': 'ไม่พบข้อมูลสาขา — ตรวจสอบ SLIPOK_BRANCH_ID',
-  '1002': 'API Key SlipOK ไม่ถูกต้อง',
+  '1001': 'ไม่พบข้อมูลสาขา — ตรวจสอบ SLIPOK_BRANCH_ID ใน Vercel',
+  '1002': 'API Key SlipOK ไม่ถูกต้อง — ตรวจสอบ SLIPOK_API_KEY',
   '1003': 'แพ็กเกจ SlipOK หมดอายุแล้ว',
   '1004': 'แพ็กเกจ SlipOK ใช้เกินโควต้า — กรุณาต่ออายุแพ็กเกจ',
   '1005': 'ไฟล์ไม่ใช่รูปภาพ (รองรับ JPG, PNG, WEBP)',
@@ -176,13 +231,14 @@ const SLIPOK_CODE_TH: Record<string, string> = {
   '1012': 'สลิปซ้ำ — เคยใช้ในระบบแล้ว',
   '1013': 'ยอดที่ส่งตรวจไม่ตรงกับยอดบนสลิป',
   '1014': 'บัญชีผู้รับไม่ตรงกับบัญชีหลักของร้าน',
+  storage_download: 'โหลดไฟล์สลิปจาก storage ไม่ได้ — ตรวจ SUPABASE_SERVICE_ROLE_KEY',
   no_config: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)',
   not_image: 'ไฟล์ไม่ใช่รูปสลิป (รองรับ JPG/PNG) — รอแอดมินตรวจด้วยตนเอง',
   network: 'เชื่อมต่อ SlipOK ไม่ได้',
 };
 
 const SLIPOK_MESSAGE_ALIASES: Array<{ pattern: RegExp; text: string }> = [
-  { pattern: /^not found$/i, text: SLIPOK_CODE_TH['1011'] },
+  { pattern: /^not found$/i, text: SLIPOK_CODE_TH['1001'] },
   { pattern: /slip.?not.?found/i, text: SLIPOK_CODE_TH['1011'] },
   { pattern: /qrcode.?not.?found/i, text: SLIPOK_CODE_TH['1007'] },
   { pattern: /duplicate/i, text: SLIPOK_CODE_TH['1012'] },
@@ -193,21 +249,18 @@ const SLIPOK_MESSAGE_ALIASES: Array<{ pattern: RegExp; text: string }> = [
 export function formatSlipokError(code: string, message?: string): string {
   const c = String(code || '').trim();
   if (SLIPOK_CODE_TH[c]) return SLIPOK_CODE_TH[c];
-  if (c === '404') {
-    return 'SlipOK อ่านรูปสลิปไม่ได้ — ตรวจ bucket/storage หรือลองอัปสลิปใหม่';
-  }
+  if (c === '404') return SLIPOK_CODE_TH['1001'];
   const raw = String(message || '').trim();
   if (raw) {
     for (const { pattern, text } of SLIPOK_MESSAGE_ALIASES) {
       if (pattern.test(raw)) return text;
     }
-    // ข้อความไทยจาก SlipOK ใช้ได้เลย
     if (/[\u0E00-\u0E7F]/.test(raw)) return raw;
   }
   return raw || 'สลิปไม่ผ่านการตรวจสอบ';
 }
 
-/** ตรวจสลipจาก URL (signed หรือ public) */
+/** ตรวจสลิปจาก URL (signed หรือ public) */
 export async function verifySlipByUrl(imageUrl: string, expectedAmount?: number): Promise<SlipResult> {
   if (!isSlipokConfigured()) {
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
@@ -218,7 +271,7 @@ export async function verifySlipByUrl(imageUrl: string, expectedAmount?: number)
   return postSlipok(JSON.stringify(body), { 'Content-Type': 'application/json' }, via);
 }
 
-/** ตรวจสลิปจาก bytes — ส่งไฟล์ตรงให้ SlipOK */
+/** ตรวจสลิปจาก bytes — multipart แบบ manual (เสถียรบน Node/Vercel) */
 export async function verifySlipByImageBytes(
   imageBytes: Buffer,
   filename: string,
@@ -227,13 +280,11 @@ export async function verifySlipByImageBytes(
   if (!isSlipokConfigured()) {
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
-  const form = new FormData();
   const mime = slipImageMime(filename);
-  const bytes = Uint8Array.from(imageBytes);
-  form.append('files', new Blob([bytes], { type: mime }), filename);
-  form.append('log', 'true');
-  if (expectedAmount != null && expectedAmount > 0) form.append('amount', String(Math.round(expectedAmount)));
-  return postSlipok(form, {}, 'upload');
+  const fields: Record<string, string> = { log: 'true' };
+  if (expectedAmount != null && expectedAmount > 0) fields.amount = String(Math.round(expectedAmount));
+  const { body, contentType } = buildMultipartBody('files', filename, mime, imageBytes, fields);
+  return postSlipok(body, { 'Content-Type': contentType }, 'upload');
 }
 
 export async function verifySlipByFileId(fileId: string, expectedAmount?: number): Promise<SlipResult> {
@@ -241,19 +292,33 @@ export async function verifySlipByFileId(fileId: string, expectedAmount?: number
     return { ok: false, code: 'not_image', message: 'ไฟล์ไม่ใช่รูปสลิป (รองรับ JPG/PNG) — รอแอดมินตรวจด้วยตนเอง' };
   }
 
+  const attempts: string[] = [];
+  let last: SlipResult = { ok: false, code: 'unknown', message: 'ตรวจสลิปไม่สำเร็จ' };
+
   const local = await downloadDealSlipFile(fileId);
-  if (local) {
-    const uploaded = await verifySlipByImageBytes(local.bytes, local.filename, expectedAmount);
-    if (uploaded.ok || !shouldRetryWithUrl(uploaded)) return uploaded;
-    console.warn('[slipok] upload path failed, retry signed url', fileId, uploaded.code, uploaded.message);
+  if (!local) {
+    attempts.push('storage:fail');
+    last = { ok: false, code: 'storage_download', message: SLIPOK_CODE_TH.storage_download, via: 'upload' };
+  } else {
+    attempts.push(`storage:ok(${local.bytes.length}b)`);
+    last = await verifySlipByImageBytes(local.bytes, local.filename, expectedAmount);
+    if (last.ok) return last;
+    attempts.push(`upload:${last.code}`);
+    if (!shouldRetryWithUrl(last)) return mergeAttemptErrors(attempts, last);
   }
 
   const signed = await getDealSlipSignedUrl(fileId);
   if (signed) {
-    const viaSigned = await verifySlipByUrl(signed, expectedAmount);
-    if (viaSigned.ok || !shouldRetryWithUrl(viaSigned)) return viaSigned;
-    console.warn('[slipok] signed url failed, retry public', fileId, viaSigned.code, viaSigned.message);
+    last = await verifySlipByUrl(signed, expectedAmount);
+    if (last.ok) return last;
+    attempts.push(`signed:${last.code}`);
+    if (!shouldRetryWithUrl(last)) return mergeAttemptErrors(attempts, last);
+  } else {
+    attempts.push('signed:fail');
   }
 
-  return verifySlipByUrl(dealSlipPublicUrl(fileId), expectedAmount);
+  const publicUrl = await getDealSlipPublicUrlFromStorage(fileId);
+  last = await verifySlipByUrl(publicUrl || dealSlipPublicUrl(fileId), expectedAmount);
+  attempts.push(`public:${last.code}`);
+  return mergeAttemptErrors(attempts, last);
 }
