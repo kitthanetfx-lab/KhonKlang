@@ -404,15 +404,17 @@ export default function MiddlemanDashboard() {
           ))}
         </div>
 
-        {tab === 'active' && (active.length === 0 ? (
-          <div className="dash-empty">
-            <div className="dash-empty-icon">🤝</div>
-            <p>ยังไม่มีดีลที่กำลังดำเนินการ</p>
-            <p style={{ fontSize: 13, marginTop: 8 }}>รอผู้ซื้อเลือกคุณเป็นคนกลาง</p>
-            <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={refresh} disabled={refreshing}>🔄 ตรวจสอบอีกครั้ง</button>
-          </div>
-        ) : active.map(d => <DealCard key={d.id} deal={d} />))}
-        {tab === 'history' && (history.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติ</p></div> : history.map(d => <DealCard key={d.id} deal={d} />))}
+        <div className="dash-mm-grid">
+          {tab === 'active' && (active.length === 0 ? (
+            <div className="dash-empty">
+              <div className="dash-empty-icon">🤝</div>
+              <p>ยังไม่มีดีลที่กำลังดำเนินการ</p>
+              <p style={{ fontSize: 13, marginTop: 8 }}>รอผู้ซื้อเลือกคุณเป็นคนกลาง</p>
+              <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={refresh} disabled={refreshing}>🔄 ตรวจสอบอีกครั้ง</button>
+            </div>
+          ) : active.map(d => <DealCard key={d.id} deal={d} />))}
+          {tab === 'history' && (history.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติ</p></div> : history.map(d => <DealCard key={d.id} deal={d} />))}
+        </div>
       </main>
     </div>
   );

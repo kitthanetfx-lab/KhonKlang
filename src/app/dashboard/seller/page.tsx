@@ -415,181 +415,189 @@ export default function SellerDashboard() {
         <div className="dash-head-actions"><button className="btn btn-primary btn-sm" onClick={() => { setPostError(''); setPostDone(false); setPostModal('pick'); }}>+ ลงขาย</button></div>
       </header>
 
-      <section className="dash-body" style={{ paddingBottom: 0 }}>
-        {shopError && <div className="shop-alert shop-alert--err">⚠️ {shopError}</div>}
-        {shopSaved && <div className="shop-alert shop-alert--ok">✅ บันทึกป้ายร้านแล้ว</div>}
+      <div className="dash-shell">
+        <section className="dash-shop-col">
+          <div className="dash-body" style={{ paddingBottom: 0 }}>
+            {shopError && <div className="shop-alert shop-alert--err">⚠️ {shopError}</div>}
+            {shopSaved && <div className="shop-alert shop-alert--ok">✅ บันทึกป้ายร้านแล้ว</div>}
 
-        <div className="shop-sign-card">
-          <div
-            className="shop-sign-banner"
-            style={shopBannerUrl ? { backgroundImage: `url(${shopBannerUrl})` } : undefined}
-          >
-            {!shopBannerUrl && <div className="shop-sign-banner-fallback" />}
-            {shopEditOpen && (
-              <label className="shop-sign-upload shop-sign-upload--banner">
-                {shopImageUploading === 'banner' ? '⏳' : '📷 เปลี่ยนแบนเนอร์'}
-                <input type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadShopImage('banner', f); e.target.value = ''; }} />
-              </label>
-            )}
-          </div>
-          <div className="shop-sign-body">
-            <div className="shop-sign-avatar-wrap">
-              {shopAvatarUrl ? (
-                <img src={shopAvatarUrl} alt="" className="shop-sign-avatar" />
-              ) : (
-                <div className="shop-sign-avatar shop-sign-avatar--empty">🏪</div>
-              )}
-              {shopEditOpen && (
-                <label className="shop-sign-upload shop-sign-upload--avatar">
-                  {shopImageUploading === 'avatar' ? '⏳' : '📷'}
-                  <input type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadShopImage('avatar', f); e.target.value = ''; }} />
-                </label>
-              )}
-            </div>
-            <div className="shop-sign-info">
-              <h2 className="shop-sign-name">{shopName || 'ตั้งชื่อร้านของคุณ'}</h2>
-              {shopTagline && <p className="shop-sign-tagline">{shopTagline}</p>}
-              {shopLocation && <p className="shop-sign-loc">📍 {shopLocation}</p>}
-            </div>
-            <div className="shop-sign-actions">
-              {shopPublic && shopName && myId && (
-                <Link href={`/shop/${myId}`} className="btn btn-ghost btn-sm" target="_blank">ดูหน้าร้าน ↗</Link>
-              )}
-              <button type="button" className="btn btn-soft btn-sm" onClick={() => setShopEditOpen(v => !v)}>
-                {shopEditOpen ? 'ปิดการแก้ไข' : '✏️ แก้ป้ายร้าน'}
-              </button>
-            </div>
-          </div>
-          {shopStats && (
-            <div className="shop-sign-stats">
-              <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.listingCount}</span><span className="shop-sign-stat-lbl">สินค้าในร้าน</span></div>
-              <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.soldCount}</span><span className="shop-sign-stat-lbl">ขายแล้ว</span></div>
-              <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.boughtCount}</span><span className="shop-sign-stat-lbl">ซื้อสำเร็จ</span></div>
-              <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.successfulDeals}</span><span className="shop-sign-stat-lbl">ดีลสำเร็จ</span></div>
-              <div className="shop-sign-stat shop-sign-stat--rating">
-                <span className="shop-sign-stat-val">{shopStats.reviewScore > 0 ? shopStats.reviewScore.toFixed(1) : '—'}</span>
-                <span className="shop-sign-stat-lbl">{shopStats.reviewCount > 0 ? `${stars(shopStats.reviewScore)} (${shopStats.reviewCount})` : 'ยังไม่มีรีวิว'}</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {shopEditOpen && (
-          <div className="form-section shop-edit-panel">
-            <h3 style={{ marginBottom: 12 }}>ตั้งค่าป้ายร้าน</h3>
-            <div className="form-field">
-              <label>แบนเนอร์ร้าน</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                {shopBannerUrl && (
-                  <img src={shopBannerUrl} alt="" style={{ width: 120, height: 48, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }} />
+            <div className="shop-sign-card">
+              <div
+                className="shop-sign-banner"
+                style={shopBannerUrl ? { backgroundImage: `url(${shopBannerUrl})` } : undefined}
+              >
+                {!shopBannerUrl && <div className="shop-sign-banner-fallback" />}
+                {shopEditOpen && (
+                  <label className="shop-sign-upload shop-sign-upload--banner">
+                    {shopImageUploading === 'banner' ? '⏳' : '📷 เปลี่ยนแบนเนอร์'}
+                    <input type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadShopImage('banner', f); e.target.value = ''; }} />
+                  </label>
                 )}
-                <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
-                  {shopImageUploading === 'banner' ? 'กำลังอัปโหลด...' : shopBannerUrl ? 'เปลี่ยนแบนเนอร์' : 'อัปโหลดแบนเนอร์'}
-                  <input type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadShopImage('banner', f); e.target.value = ''; }} />
-                </label>
               </div>
-            </div>
-            <div className="form-field">
-              <label>ชื่อร้าน</label>
-              <input type="text" value={shopName} onChange={e => setShopName(e.target.value)} placeholder="เช่น Kitt IT Shop" maxLength={120} />
-            </div>
-            <div className="form-field">
-              <label>คำโปรยร้าน</label>
-              <input type="text" value={shopTagline} onChange={e => setShopTagline(e.target.value)} placeholder="เช่น ของมือสองคุณภาพ ส่งไวทั่วไทย" maxLength={200} />
-            </div>
-            <div className="form-field">
-              <label>ที่ตั้งร้าน (จังหวัด)</label>
-              <select value={shopLocation} onChange={e => setShopLocation(e.target.value)}>
-                <option value="">เลือกจังหวัด...</option>
-                {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-            <div className="form-field">
-              <label>ที่อยู่ร้าน (รายละเอียด)</label>
-              <textarea rows={2} value={shopAddress} onChange={e => setShopAddress(e.target.value)} placeholder="เลขที่ ซอย แขวง/ตำบล..." maxLength={500} />
-            </div>
-            <label className="filter-row shop-public-toggle" onClick={() => setShopPublic(v => !v)}>
-              <span>เปิดหน้าร้าน public ให้ผู้ซื้อเข้าชมได้</span>
-              <input type="checkbox" checked={shopPublic} readOnly />
-            </label>
-            <button type="button" className="btn btn-primary btn-sm" onClick={saveShop} disabled={shopSaving}>
-              {shopSaving ? 'กำลังบันทึก...' : 'บันทึกป้ายร้าน'}
-            </button>
-          </div>
-        )}
-      </section>
-
-      <nav className="dash-tabs-wrap">
-        {([
-          { k: 'selling', l: `กำลังขาย (${sellingDeals.length})` },
-          { k: 'packing', l: `ขอแพคกิ้ง (${packingDeals.length})` },
-          { k: 'shipping', l: `เตรียมจัดส่ง (${shippingDeals.length})` },
-          { k: 'done', l: `สำเร็จ (${doneDeals.length})` },
-          { k: 'history', l: `ประวัติ (${historyDeals.length})` },
-        ] as const).map(({ k, l }) => (
-          <button key={k} className={`dash-tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
-        ))}
-      </nav>
-
-      <main className="dash-body">
-        <div className="dash-stats">
-          <div className="dash-stat"><div className="dash-stat-val">{packingDeals.length}</div><div className="dash-stat-lbl">รอแพค</div></div>
-          <div className="dash-stat"><div className="dash-stat-val">{shippingDeals.length}</div><div className="dash-stat-lbl">กำลังส่ง</div></div>
-          <div className="dash-stat"><div className="dash-stat-val">{doneDeals.length}</div><div className="dash-stat-lbl">สำเร็จ</div></div>
-          <div className="dash-stat"><div className="dash-stat-val" style={{ fontSize: 17 }}>฿{totalRev.toLocaleString()}</div><div className="dash-stat-lbl">รายได้รวม</div></div>
-        </div>
-
-        {tab === 'selling' && (sellingDeals.length === 0 ? (
-          <div className="dash-empty">
-            <div className="dash-empty-icon">📦</div>
-            <p>ยังไม่มีประกาศที่กำลังดำเนินการ</p>
-            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setPostModal('pick')}>+ ลงประกาศใหม่</button>
-          </div>
-        ) : sellingDeals.map(d => <DealCard key={d.id} deal={d} />))}
-
-        {tab === 'packing' && (
-          packingDeals.length === 0 ? (
-            <div className="dash-empty"><p>ไม่มีสินค้ารอแพค</p></div>
-          ) : (
-            <div className="seller-pack-list">
-              {packingOpenDeal ? (
-                <SellerPackingPanel
-                  dealId={packingOpenDeal.id}
-                  dealTitle={packingOpenDeal.title}
-                  onClose={() => setPackingDealId('')}
-                  onDone={async () => {
-                    setPackingDealId('');
-                    const headers = await authHeaders();
-                    await fetchDeals(headers);
-                    setTab('shipping');
-                  }}
-                />
-              ) : null}
-              {packingDeals.map(d => (
-                <div key={d.id}>
-                  <DealCard deal={d} />
-                  {packingDealId !== d.id && (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-block"
-                      style={{ marginTop: -8, marginBottom: 12 }}
-                      onClick={() => setPackingDealId(d.id)}
-                    >
-                      📦 เปิดหน้าแพ็คสินค้า
-                    </button>
+              <div className="shop-sign-body">
+                <div className="shop-sign-avatar-wrap">
+                  {shopAvatarUrl ? (
+                    <img src={shopAvatarUrl} alt="" className="shop-sign-avatar" />
+                  ) : (
+                    <div className="shop-sign-avatar shop-sign-avatar--empty">🏪</div>
+                  )}
+                  {shopEditOpen && (
+                    <label className="shop-sign-upload shop-sign-upload--avatar">
+                      {shopImageUploading === 'avatar' ? '⏳' : '📷'}
+                      <input type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadShopImage('avatar', f); e.target.value = ''; }} />
+                    </label>
                   )}
                 </div>
-              ))}
+                <div className="shop-sign-info">
+                  <h2 className="shop-sign-name">{shopName || 'ตั้งชื่อร้านของคุณ'}</h2>
+                  {shopTagline && <p className="shop-sign-tagline">{shopTagline}</p>}
+                  {shopLocation && <p className="shop-sign-loc">📍 {shopLocation}</p>}
+                </div>
+                <div className="shop-sign-actions">
+                  {shopPublic && shopName && myId && (
+                    <Link href={`/shop/${myId}`} className="btn btn-ghost btn-sm" target="_blank">ดูหน้าร้าน ↗</Link>
+                  )}
+                  <button type="button" className="btn btn-soft btn-sm" onClick={() => setShopEditOpen(v => !v)}>
+                    {shopEditOpen ? 'ปิดการแก้ไข' : '✏️ แก้ป้ายร้าน'}
+                  </button>
+                </div>
+              </div>
+              {shopStats && (
+                <div className="shop-sign-stats">
+                  <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.listingCount}</span><span className="shop-sign-stat-lbl">สินค้าในร้าน</span></div>
+                  <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.soldCount}</span><span className="shop-sign-stat-lbl">ขายแล้ว</span></div>
+                  <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.boughtCount}</span><span className="shop-sign-stat-lbl">ซื้อสำเร็จ</span></div>
+                  <div className="shop-sign-stat"><span className="shop-sign-stat-val">{shopStats.successfulDeals}</span><span className="shop-sign-stat-lbl">ดีลสำเร็จ</span></div>
+                  <div className="shop-sign-stat shop-sign-stat--rating">
+                    <span className="shop-sign-stat-val">{shopStats.reviewScore > 0 ? shopStats.reviewScore.toFixed(1) : '—'}</span>
+                    <span className="shop-sign-stat-lbl">{shopStats.reviewCount > 0 ? `${stars(shopStats.reviewScore)} (${shopStats.reviewCount})` : 'ยังไม่มีรีวิว'}</span>
+                  </div>
+                </div>
+              )}
             </div>
-          )
-        )}
 
-        {tab === 'shipping' && (shippingDeals.length === 0 ? <div className="dash-empty"><p>ไม่มีสินค้ารอจัดส่ง</p></div> : shippingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+            {shopEditOpen && (
+              <div className="form-section shop-edit-panel">
+                <h3 style={{ marginBottom: 12 }}>ตั้งค่าป้ายร้าน</h3>
+                <div className="form-field">
+                  <label>แบนเนอร์ร้าน</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    {shopBannerUrl && (
+                      <img src={shopBannerUrl} alt="" style={{ width: 120, height: 48, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }} />
+                    )}
+                    <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                      {shopImageUploading === 'banner' ? 'กำลังอัปโหลด...' : shopBannerUrl ? 'เปลี่ยนแบนเนอร์' : 'อัปโหลดแบนเนอร์'}
+                      <input type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadShopImage('banner', f); e.target.value = ''; }} />
+                    </label>
+                  </div>
+                </div>
+                <div className="form-field">
+                  <label>ชื่อร้าน</label>
+                  <input type="text" value={shopName} onChange={e => setShopName(e.target.value)} placeholder="เช่น Kitt IT Shop" maxLength={120} />
+                </div>
+                <div className="form-field">
+                  <label>คำโปรยร้าน</label>
+                  <input type="text" value={shopTagline} onChange={e => setShopTagline(e.target.value)} placeholder="เช่น ของมือสองคุณภาพ ส่งไวทั่วไทย" maxLength={200} />
+                </div>
+                <div className="form-field">
+                  <label>ที่ตั้งร้าน (จังหวัด)</label>
+                  <select value={shopLocation} onChange={e => setShopLocation(e.target.value)}>
+                    <option value="">เลือกจังหวัด...</option>
+                    {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label>ที่อยู่ร้าน (รายละเอียด)</label>
+                  <textarea rows={2} value={shopAddress} onChange={e => setShopAddress(e.target.value)} placeholder="เลขที่ ซอย แขวง/ตำบล..." maxLength={500} />
+                </div>
+                <label className="filter-row shop-public-toggle" onClick={() => setShopPublic(v => !v)}>
+                  <span>เปิดหน้าร้าน public ให้ผู้ซื้อเข้าชมได้</span>
+                  <input type="checkbox" checked={shopPublic} readOnly />
+                </label>
+                <button type="button" className="btn btn-primary btn-sm" onClick={saveShop} disabled={shopSaving}>
+                  {shopSaving ? 'กำลังบันทึก...' : 'บันทึกป้ายร้าน'}
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
 
-        {tab === 'done' && (doneDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีออเดอร์สำเร็จ</p></div> : doneDeals.map(d => <DealCard key={d.id} deal={d} />))}
+        <section className="dash-work-col">
+          <nav className="dash-tabs-wrap">
+            {([
+              { k: 'selling', l: `กำลังขาย (${sellingDeals.length})` },
+              { k: 'packing', l: `ขอแพคกิ้ง (${packingDeals.length})` },
+              { k: 'shipping', l: `เตรียมจัดส่ง (${shippingDeals.length})` },
+              { k: 'done', l: `สำเร็จ (${doneDeals.length})` },
+              { k: 'history', l: `ประวัติ (${historyDeals.length})` },
+            ] as const).map(({ k, l }) => (
+              <button key={k} className={`dash-tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
+            ))}
+          </nav>
 
-        {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.id} deal={d} />))}
-      </main>
+          <main className="dash-body">
+            <div className="dash-stats">
+              <div className="dash-stat"><div className="dash-stat-val">{packingDeals.length}</div><div className="dash-stat-lbl">รอแพค</div></div>
+              <div className="dash-stat"><div className="dash-stat-val">{shippingDeals.length}</div><div className="dash-stat-lbl">กำลังส่ง</div></div>
+              <div className="dash-stat"><div className="dash-stat-val">{doneDeals.length}</div><div className="dash-stat-lbl">สำเร็จ</div></div>
+              <div className="dash-stat"><div className="dash-stat-val" style={{ fontSize: 17 }}>฿{totalRev.toLocaleString()}</div><div className="dash-stat-lbl">รายได้รวม</div></div>
+            </div>
+
+            <div className="dash-deal-grid">
+              {tab === 'selling' && (sellingDeals.length === 0 ? (
+                <div className="dash-empty">
+                  <div className="dash-empty-icon">📦</div>
+                  <p>ยังไม่มีประกาศที่กำลังดำเนินการ</p>
+                  <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setPostModal('pick')}>+ ลงประกาศใหม่</button>
+                </div>
+              ) : sellingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+
+              {tab === 'packing' && (
+                packingDeals.length === 0 ? (
+                  <div className="dash-empty"><p>ไม่มีสินค้ารอแพค</p></div>
+                ) : (
+                  <div className="seller-pack-list">
+                    {packingOpenDeal ? (
+                      <SellerPackingPanel
+                        dealId={packingOpenDeal.id}
+                        dealTitle={packingOpenDeal.title}
+                        onClose={() => setPackingDealId('')}
+                        onDone={async () => {
+                          setPackingDealId('');
+                          const headers = await authHeaders();
+                          await fetchDeals(headers);
+                          setTab('shipping');
+                        }}
+                      />
+                    ) : null}
+                    {packingDeals.map(d => (
+                      <div key={d.id}>
+                        <DealCard deal={d} />
+                        {packingDealId !== d.id && (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-block"
+                            style={{ marginTop: -8, marginBottom: 12 }}
+                            onClick={() => setPackingDealId(d.id)}
+                          >
+                            📦 เปิดหน้าแพ็คสินค้า
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {tab === 'shipping' && (shippingDeals.length === 0 ? <div className="dash-empty"><p>ไม่มีสินค้ารอจัดส่ง</p></div> : shippingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+
+              {tab === 'done' && (doneDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีออเดอร์สำเร็จ</p></div> : doneDeals.map(d => <DealCard key={d.id} deal={d} />))}
+
+              {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.id} deal={d} />))}
+            </div>
+          </main>
+        </section>
+      </div>
 
       {postModal && (
         <div className="seller-modal-backdrop" onClick={closePostModal}>
