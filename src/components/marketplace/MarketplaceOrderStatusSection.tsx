@@ -131,7 +131,7 @@ export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived
       )}
 
       {order.status === 'completed' && (
-        <p className="mkt-co-success">✅ คำสั่งซื้อสำเร็จ — ขอบคุณที่ใช้บริการ</p>
+        <p className="mkt-co-success">✅ คำสั่งซื้อสำเร็จ — ช่วยให้ดาวรีวิวผู้ขายด้านล่างนะคะ</p>
       )}
 
       {order.status === 'cancelled' && (

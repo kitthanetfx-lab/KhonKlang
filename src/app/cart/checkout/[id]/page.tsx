@@ -10,6 +10,7 @@ import { Icon } from '@/components/Icon';
 import { MarketplacePaymentSection } from '@/components/marketplace/MarketplacePaymentSection';
 import { MarketplaceShippingSection } from '@/components/marketplace/MarketplaceShippingSection';
 import { MarketplaceOrderStatusSection } from '@/components/marketplace/MarketplaceOrderStatusSection';
+import { MarketplaceReviewBlock } from '@/components/marketplace/MarketplaceReviewBlock';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
 import { marketplaceCheckoutStepIndex, type MarketplaceCheckoutPhase } from '@/lib/marketplaceOrder';
@@ -25,6 +26,11 @@ interface CheckoutData {
     status: string;
     statusLabel: string;
     sellerName: string;
+    sellerId?: string;
+    buyerId?: string;
+    buyerName?: string;
+    middlemanId?: string;
+    middlemanName?: string;
     paymentSlipFileId: string;
     shippingProviderLabel: string;
     trackingNumber: string;
@@ -309,19 +315,34 @@ export default function CartCheckoutPage() {
               )}
 
               {phase === 'status' && (
-                <MarketplaceOrderStatusSection
-                  order={{
-                    status: order.status,
-                    statusLabel: order.statusLabel,
-                    trackingNumber: order.trackingNumber,
-                    trackingProvider: order.trackingProvider,
-                    paymentSlipFileId: order.paymentSlipFileId,
-                    packingSteps: order.packingSteps,
-                  }}
-                  acting={acting}
-                  onConfirmReceived={confirmReceived}
-                  onCancel={['posted', 'payment_pending'].includes(order.status) && !order.paymentSlipFileId ? cancelOrder : undefined}
-                />
+                <>
+                  <MarketplaceOrderStatusSection
+                    order={{
+                      status: order.status,
+                      statusLabel: order.statusLabel,
+                      trackingNumber: order.trackingNumber,
+                      trackingProvider: order.trackingProvider,
+                      paymentSlipFileId: order.paymentSlipFileId,
+                      packingSteps: order.packingSteps,
+                    }}
+                    acting={acting}
+                    onConfirmReceived={confirmReceived}
+                    onCancel={['posted', 'payment_pending'].includes(order.status) && !order.paymentSlipFileId ? cancelOrder : undefined}
+                  />
+                  {order.status === 'completed' && order.sellerId && (
+                    <MarketplaceReviewBlock
+                      deal={{
+                        id: order.id,
+                        buyer_id: order.buyerId || '',
+                        buyer_name: order.buyerName || profile.displayName,
+                        seller_id: order.sellerId,
+                        seller_name: order.sellerName,
+                        middleman_id: order.middlemanId || '',
+                        middleman_name: order.middlemanName || '',
+                      }}
+                    />
+                  )}
+                </>
               )}
             </main>
           </div>
