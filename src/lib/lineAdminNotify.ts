@@ -222,6 +222,46 @@ export async function notifyAdminLineSlipResult(params: {
   await sendLineAdminMessages(messages);
 }
 
+/** แจ้ง LINE เมื่อแอดมินตีกลับสลิป (ไม่ผ่าน) — ระบุเหตุผลชัดเจน */
+export async function notifyAdminLineSlipRejected(params: {
+  deal: Record<string, unknown>;
+  side: 'buyer' | 'seller';
+  reason: string;
+  slipFileId?: string;
+}): Promise<void> {
+  const { deal, side, reason, slipFileId } = params;
+  const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
+  const num = String(deal.deal_number || String(deal.id || '').slice(0, 8).toUpperCase());
+  const title = String(deal.title || 'ดีล');
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
+  const category = getDealCategory({
+    source: String(deal.source || ''),
+    status: String(deal.status || ''),
+    deal_type: String(deal.deal_type || ''),
+  });
+  const catLabel = getAdminCategoryLabel(category);
+  const buyer = String(deal.buyer_name || '-').trim() || '-';
+  const seller = String(deal.seller_name || '-').trim() || '-';
+  const price = Number(deal.price || 0).toLocaleString('th-TH');
+
+  const lines = [
+    `[กลางฮับ · ${catLabel}] ❌ สลิป${sideLabel}ไม่ผ่าน — แอดมินตีกลับ`,
+    `${num} · ${title}`,
+    `ผู้ขาย: ${seller}`,
+    `ผู้ซื้อ: ${buyer}`,
+    `มูลค่าสินค้า ฿${price}`,
+    `เหตุผล: ${reason.trim()}`,
+    `${appUrl}${adminDealsPagePath(category, 'confirm_pay')}`,
+  ];
+
+  const messages: LineMessage[] = [{ type: 'text', text: lines.join('\n').slice(0, 5000) }];
+  if (slipFileId && isLineImageFile(slipFileId) && messages.length < 5) {
+    const url = slipPublicUrl(slipFileId);
+    messages.push({ type: 'image', originalContentUrl: url, previewImageUrl: url });
+  }
+  await sendLineAdminMessages(messages);
+}
+
 /** @deprecated ใช้ notifyAdminLineSlipResult แทน — คงไว้เพื่อ backward compat */
 export async function notifyAdminLineSlipCheck(params: {
   deal: Record<string, unknown>;

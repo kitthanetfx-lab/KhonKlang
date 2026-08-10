@@ -8,6 +8,7 @@ import {
   type AdminDealSnapshot,
 } from '../../_lib/adminDealQueue';
 import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
+import { notifyUsers } from '../../_lib/notify';
 import {
   dealMatchesCategory,
   isBareListing,
@@ -17,6 +18,40 @@ import {
 } from '@/lib/adminDealCategory';
 import { readFeesConfig } from '../../_lib/financeLedger';
 import { isListingCheckoutOrder } from '@/lib/marketplaceOrder';
+import { notifyAdminLineSlipRejected } from '@/lib/lineAdminNotify';
+
+async function notifySlipRejected(params: {
+  db: ReturnType<typeof getAdminClient>;
+  deal: Record<string, unknown>;
+  whichSlip: 'buyer' | 'seller';
+  reason: string;
+  slipFileId?: string | null;
+}) {
+  const { db, deal, whichSlip, reason, slipFileId } = params;
+  const trimmed = reason.trim();
+  const sideLabel = whichSlip === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
+  const dealId = String(deal.id || '');
+  const isMkt = isListingCheckoutOrder(deal);
+  const title = String(deal.title || 'ดีล');
+
+  await notifyAdminLineSlipRejected({
+    deal,
+    side: whichSlip,
+    reason: trimmed,
+    slipFileId: slipFileId || undefined,
+  });
+
+  const affectedUserId = whichSlip === 'buyer' ? deal.buyer_id : deal.seller_id;
+  const link = isMkt && whichSlip === 'buyer'
+    ? `/cart/checkout/${dealId}`
+    : isMkt && whichSlip === 'seller'
+      ? '/dashboard/seller'
+      : `/deal/${dealId}`;
+  const body = `สลิป${sideLabel}ไม่ผ่านการตรวจสอบ: ${trimmed} — กรุณาอัปโหลดสลิปใหม่`;
+  if (typeof affectedUserId === 'string' && affectedUserId) {
+    await notifyUsers(db, [affectedUserId], { title: `ตรวจสลิป: ${title}`, body, link });
+  }
+}
 
 async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string | null) {
   if (!uid) return null;
@@ -234,10 +269,15 @@ export async function PATCH(req: NextRequest) {
       case 'verify_payment_slip': {
         if (deal.deal_type === 'meetup') return NextResponse.json({ error: 'ดีลนี้ใช้การตรวจสลิปแบบนัดรับอยู่แล้ว' }, { status: 400 });
         if (whichSlip !== 'buyer' && whichSlip !== 'seller') return NextResponse.json({ error: 'whichSlip ไม่ถูกต้อง' }, { status: 400 });
+        if (!ok && !String(note || '').trim()) {
+          return NextResponse.json({ error: 'กรุณาระบุเหตุผลที่สลิปไม่ผ่าน' }, { status: 400 });
+        }
         const sideLabel = whichSlip === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
+        const rejectReason = String(note || '').trim();
         let msg = '';
         if (whichSlip === 'buyer') {
           if (!deal.payment_slip_file_id) return NextResponse.json({ error: 'ยังไม่มีสลิปผู้ซื้อ' }, { status: 400 });
+          const buyerSlipId = deal.payment_slip_file_id as string;
           if (ok) {
             await db.from('deals').update({ payment_slip_verified_at: new Date().toISOString() }).eq('id', id);
             msg = sellerSlipRequired && !priceState?.seller_fee_slip_verified_at
@@ -249,13 +289,15 @@ export async function PATCH(req: NextRequest) {
               status: mkt ? 'posted' : 'payment_pending',
               payment_slip_file_id: null,
               payment_slip_verified_at: null,
-              reject_reason: note || null,
+              reject_reason: rejectReason,
             }).eq('id', id);
-            msg = `❌ สลิป${sideLabel}ไม่ถูกต้อง — กรุณาอัปโหลดใหม่อีกครั้ง${note ? ` (${note})` : ''}`;
+            msg = `❌ สลิป${sideLabel}ไม่ถูกต้อง — กรุณาอัปโหลดใหม่อีกครั้ง (${rejectReason})`;
+            await notifySlipRejected({ db, deal, whichSlip: 'buyer', reason: rejectReason, slipFileId: buyerSlipId });
           }
         } else {
           if (!sellerSlipRequired) return NextResponse.json({ error: 'ดีลนี้ไม่ต้องมีสลิปค่าบริการฝั่งผู้ขาย' }, { status: 400 });
           if (!priceState?.seller_fee_slip) return NextResponse.json({ error: 'ยังไม่มีสลิปค่าบริการของผู้ขาย' }, { status: 400 });
+          const sellerSlipId = priceState.seller_fee_slip as string;
           if (ok) {
             await db.from('deal_price_state').upsert({ deal_id: id, seller_fee_slip_verified_at: new Date().toISOString() }, { onConflict: 'deal_id' });
             msg = deal.payment_slip_verified_at
@@ -263,7 +305,9 @@ export async function PATCH(req: NextRequest) {
               : '✅ ศูนย์กลางตรวจสลิปค่าบริการของผู้ขายแล้ว (ถูกต้อง) — รอตรวจสลิปผู้ซื้อ';
           } else {
             await db.from('deal_price_state').upsert({ deal_id: id, seller_fee_slip: null, seller_fee_slip_verified_at: null }, { onConflict: 'deal_id' });
-            msg = `❌ สลิป${sideLabel}ไม่ถูกต้อง — กรุณาอัปโหลดใหม่อีกครั้ง${note ? ` (${note})` : ''}`;
+            await db.from('deals').update({ reject_reason: rejectReason }).eq('id', id);
+            msg = `❌ สลิป${sideLabel}ไม่ถูกต้อง — กรุณาอัปโหลดใหม่อีกครั้ง (${rejectReason})`;
+            await notifySlipRejected({ db, deal, whichSlip: 'seller', reason: rejectReason, slipFileId: sellerSlipId });
           }
         }
         await db.from('messages').insert({
@@ -276,9 +320,13 @@ export async function PATCH(req: NextRequest) {
         // ข้อ5: ศูนย์กลางตรวจสลิปเงินประกันรายฝ่าย (whichSlip = buyer|seller, ok = true/false)
         if (deal.deal_type !== 'meetup') return NextResponse.json({ error: 'ดีลนี้ไม่ใช่รับประกันเดินทาง' }, { status: 400 });
         if (whichSlip !== 'buyer' && whichSlip !== 'seller') return NextResponse.json({ error: 'whichSlip ไม่ถูกต้อง' }, { status: 400 });
+        if (!ok && !String(note || '').trim()) {
+          return NextResponse.json({ error: 'กรุณาระบุเหตุผลที่สลิปไม่ผ่าน' }, { status: 400 });
+        }
         const { data: md } = await db.from('deal_meetup').select('*').eq('deal_id', id).maybeSingle();
         if (!md) return NextResponse.json({ error: 'ไม่พบข้อมูลเงินประกัน' }, { status: 404 });
         const sideLabel = whichSlip === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
+        const rejectReason = String(note || '').trim();
         let msg = '';
         if (ok) {
           await db.from('deal_meetup').upsert({ deal_id: id, [`${whichSlip}_slip_verified_at`]: new Date().toISOString() }, { onConflict: 'deal_id' });
@@ -291,10 +339,12 @@ export async function PATCH(req: NextRequest) {
             msg = `✅ ศูนย์กลางตรวจสลิป${sideLabel}แล้ว (ถูกต้อง) — รออีกฝ่าย`;
           }
         } else {
+          const slipFileId = whichSlip === 'buyer' ? md.buyer_slip : md.seller_slip;
           // ตีกลับ: ล้างสลิป+ผลตรวจของฝ่ายนั้น แล้วถอยสถานะกลับไปวางเงินใหม่
           await db.from('deal_meetup').upsert({ deal_id: id, [`${whichSlip}_slip`]: null, [`${whichSlip}_slip_verified_at`]: null }, { onConflict: 'deal_id' });
-          await db.from('deals').update({ status: 'payment_pending' }).eq('id', id);
-          msg = `❌ สลิป${sideLabel}ไม่ถูกต้อง — กรุณาวางเงินประกันและอัปสลิปใหม่อีกครั้ง${note ? ` (${note})` : ''}`;
+          await db.from('deals').update({ status: 'payment_pending', reject_reason: rejectReason }).eq('id', id);
+          msg = `❌ สลิป${sideLabel}ไม่ถูกต้อง — กรุณาวางเงินประกันและอัปสลิปใหม่อีกครั้ง (${rejectReason})`;
+          await notifySlipRejected({ db, deal, whichSlip, reason: rejectReason, slipFileId });
         }
         await db.from('messages').insert({
           deal_id: id, sender_id: null, sender_name: 'ระบบ', role: 'system', type: 'system', content: msg,

@@ -1,5 +1,32 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (13:25)
+
+### ตีกลับสลิป — บังคับเหตุผล + แจ้ง LINE
+
+**พฤติกรรม**:
+1. แอดมินกด「ไม่ถูกต้อง」ต้องกรอกเหตุผล (UI + API 400 ถ้าว่าง)
+2. ส่ง LINE แอดมิน (`notifyAdminLineSlipRejected`) พร้อมเหตุผล + รูปสลิป (ถ้ามี)
+3. แจ้งผู้ใช้ที่เกี่ยวข้องในแอป (push/in-app) พร้อมเหตุผล + ลิงก์กลับไปอัปสลิปใหม่
+4. ครอบคลุมทั้ง `verify_payment_slip` (ตลาด/ดีลปกติ) และ `verify_meetup_slip` (นัดรับ)
+
+**ไฟล์**:
+- `src/lib/lineAdminNotify.ts` — ฟังก์ชัน `notifyAdminLineSlipRejected`
+- `src/app/api/admin/deals/route.ts` — บังคับ note + แจ้ง LINE/ผู้ใช้
+- `src/app/admin/deals/page.tsx` — prompt บังคับกรอกเหตุผล
+
+---
+
+## 2026-08-10 (13:07)
+
+### แก้แบนเนอร์ร้านหายหลังรีเฟรช
+
+**สาเหตุ**: อัปโหลดแบนเนอร์/อวatar แค่ขึ้น storage + state ในเบราว์เซอร์ ยังไม่ PATCH ลง DB จนกด「บันทึกป้ายร้าน」
+
+**แก้ไข**: `uploadShopImage` เรียก `persistShop` บันทึก `shop_banner_file_id` / `shop_avatar_file_id` ทันทีหลังอัปโหลดสำเร็จ
+
+---
+
 ## 2026-08-10 (12:45)
 
 ### แก้แอดมินสลับหน้าแล้วโดนถามรหัส/ล็อกอินใหม่
