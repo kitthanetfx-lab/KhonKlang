@@ -31,6 +31,7 @@ export function MarketplaceReviewBlock({ deal, onReviewed }: Props) {
 
   return (
     <div className="mkt-co-review">
+      <div className="mkt-co-review-banner">⭐ ให้ดาวรีวิวผู้ขาย — ช่วยให้คนอื่นตัดสินใจได้ง่ายขึ้น</div>
       <ReviewPanel
         deal={deal}
         myRole="buyer"

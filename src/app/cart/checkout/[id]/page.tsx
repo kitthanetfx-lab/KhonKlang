@@ -157,6 +157,7 @@ export default function CartCheckoutPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'ยืนยันไม่สำเร็จ');
       await refresh();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'ยืนยันไม่สำเร็จ');
     } finally {
@@ -316,19 +317,6 @@ export default function CartCheckoutPage() {
 
               {phase === 'status' && (
                 <>
-                  <MarketplaceOrderStatusSection
-                    order={{
-                      status: order.status,
-                      statusLabel: order.statusLabel,
-                      trackingNumber: order.trackingNumber,
-                      trackingProvider: order.trackingProvider,
-                      paymentSlipFileId: order.paymentSlipFileId,
-                      packingSteps: order.packingSteps,
-                    }}
-                    acting={acting}
-                    onConfirmReceived={confirmReceived}
-                    onCancel={['posted', 'payment_pending'].includes(order.status) && !order.paymentSlipFileId ? cancelOrder : undefined}
-                  />
                   {order.status === 'completed' && order.sellerId && (
                     <MarketplaceReviewBlock
                       deal={{
@@ -342,6 +330,19 @@ export default function CartCheckoutPage() {
                       }}
                     />
                   )}
+                  <MarketplaceOrderStatusSection
+                    order={{
+                      status: order.status,
+                      statusLabel: order.statusLabel,
+                      trackingNumber: order.trackingNumber,
+                      trackingProvider: order.trackingProvider,
+                      paymentSlipFileId: order.paymentSlipFileId,
+                      packingSteps: order.packingSteps,
+                    }}
+                    acting={acting}
+                    onConfirmReceived={confirmReceived}
+                    onCancel={['posted', 'payment_pending'].includes(order.status) && !order.paymentSlipFileId ? cancelOrder : undefined}
+                  />
                 </>
               )}
             </main>

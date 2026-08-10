@@ -1352,7 +1352,37 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .mkt-co-summary-total strong { color: var(--green-600); font-family: var(--font-display); font-size: 20px; }
 .mkt-co-main { display: flex; flex-direction: column; gap: 12px; }
 .mkt-co-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 18px 16px; box-shadow: var(--sh-xs); }
-.mkt-co-review { margin-top: 16px; }
+.mkt-co-review { margin-top: 0; margin-bottom: 16px; }
+.mkt-co-review-banner {
+  margin-bottom: 10px; padding: 12px 14px; border-radius: var(--r-lg);
+  background: linear-gradient(135deg, #fff8e6 0%, #fff 100%);
+  border: 1px solid #f5d77a; font-size: 14px; font-weight: 700; color: #92400e;
+}
+.mkt-co-review .rv-card { border: 2px solid color-mix(in srgb, var(--accent) 25%, var(--line)); }
+.mkt-co-packing-media--click {
+  cursor: pointer; border: none; padding: 0; width: 100%; font: inherit; color: inherit;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.mkt-co-packing-media--click:hover { transform: scale(1.02); box-shadow: 0 4px 14px rgba(15,23,42,.12); }
+.mkt-co-packing-media--click:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mkt-co-packing-zoom {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 8px;
+  font-size: 11px; font-weight: 700; text-align: center;
+  background: linear-gradient(transparent, rgba(15,23,42,.72)); color: #fff;
+}
+.mkt-co-packing-media { position: relative; }
+.mkt-co-lightbox {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(15,23,42,.78); display: grid; place-items: center; padding: 16px;
+}
+.mkt-co-lightbox-inner {
+  width: min(960px, 100%); max-height: min(92vh, 900px);
+  background: var(--surface); border-radius: var(--r-xl); padding: 14px;
+  display: flex; flex-direction: column; gap: 10px; box-shadow: var(--sh-lg);
+}
+.mkt-co-lightbox-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mkt-co-lightbox-body { flex: 1; min-height: 0; display: grid; place-items: center; overflow: auto; }
+.mkt-co-lightbox-media { max-width: 100%; max-height: min(72vh, 760px); width: auto; height: auto; object-fit: contain; border-radius: var(--r-md); }
 .mkt-co-card h2 { font-size: 16px; font-weight: 700; margin: 0; color: var(--ink); }
 .mkt-co-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .mkt-co-ship-note { font-size: 13px; color: var(--muted); margin: 0 0 12px; }

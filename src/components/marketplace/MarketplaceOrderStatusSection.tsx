@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { marketplaceOrderStatusLabel } from '@/lib/marketplaceOrder';
@@ -40,6 +41,7 @@ function isVideo(name?: string) {
 }
 
 export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived, onCancel }: Props) {
+  const [lightbox, setLightbox] = useState<{ url: string; label: string; isVideo: boolean } | null>(null);
   const label = order.statusLabel || marketplaceOrderStatusLabel(order.status);
   const trackingUrl = order.trackingNumber && order.trackingProvider
     ? buildTrackingUrl(order.trackingProvider, order.trackingNumber)
@@ -90,15 +92,27 @@ export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived
               {packingSteps.map(step => (
                 <div key={step.step} className={`mkt-co-packing-slot${step.uploaded ? ' done' : ''}`}>
                   <div className="mkt-co-packing-label">ขั้น {step.step} · {step.label}</div>
-                  <div className="mkt-co-packing-media">
-                    {step.uploaded && step.fileId ? (
-                      isVideo(step.fileName)
-                        ? <video src={mediaUrl(step.fileId)} controls />
-                        : <img src={mediaUrl(step.fileId)} alt={step.label} />
-                    ) : (
+                  {step.uploaded && step.fileId ? (
+                    <button
+                      type="button"
+                      className="mkt-co-packing-media mkt-co-packing-media--click"
+                      onClick={() => setLightbox({
+                        url: mediaUrl(step.fileId!),
+                        label: step.label,
+                        isVideo: isVideo(step.fileName),
+                      })}
+                      aria-label={`ดู${step.label}ขนาดเต็ม`}
+                    >
+                      {isVideo(step.fileName)
+                        ? <video src={mediaUrl(step.fileId)} muted playsInline />
+                        : <img src={mediaUrl(step.fileId)} alt={step.label} />}
+                      <span className="mkt-co-packing-zoom">🔍 แตะดูขนาดเต็ม</span>
+                    </button>
+                  ) : (
+                    <div className="mkt-co-packing-media">
                       <span>{step.step}</span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <div className="mkt-co-packing-caption">
                     {step.uploaded ? `✅ ${step.label}` : `⏳ รอ${step.label}`}
                   </div>
@@ -131,7 +145,7 @@ export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived
       )}
 
       {order.status === 'completed' && (
-        <p className="mkt-co-success">✅ คำสั่งซื้อสำเร็จ — ช่วยให้ดาวรีวิวผู้ขายด้านล่างนะคะ</p>
+        <p className="mkt-co-success">✅ คำสั่งซื้อสำเร็จ — ขอบคุณที่ใช้บริการ</p>
       )}
 
       {order.status === 'cancelled' && (
@@ -147,6 +161,33 @@ export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived
       <Link href="/cart?tab=orders" className="btn btn-ghost btn-block" style={{ marginTop: 8 }}>
         ดูคำสั่งซื้อทั้งหมด
       </Link>
+
+      {lightbox && (
+        <div
+          className="mkt-co-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={lightbox.label}
+          onClick={() => setLightbox(null)}
+        >
+          <div className="mkt-co-lightbox-inner" onClick={e => e.stopPropagation()}>
+            <div className="mkt-co-lightbox-head">
+              <strong>{lightbox.label}</strong>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setLightbox(null)}>ปิด ✕</button>
+            </div>
+            <div className="mkt-co-lightbox-body">
+              {lightbox.isVideo ? (
+                <video src={lightbox.url} controls autoPlay className="mkt-co-lightbox-media" />
+              ) : (
+                <img src={lightbox.url} alt={lightbox.label} className="mkt-co-lightbox-media" />
+              )}
+            </div>
+            <a href={lightbox.url} target="_blank" rel="noreferrer" className="btn btn-soft btn-sm btn-block">
+              เปิดในแท็บใหม่ ↗
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
