@@ -236,6 +236,7 @@ export default function Marketplace() {
           <span className="lc-badge lc-badge--auction">ประมูล</span>
         </div>
         <div className="lc-body lc-body--auction">
+          <h3 className="lc-title lc-title--auction">{listing.title}</h3>
           <div className="lc-auction-hero-stats">
             <div className="lc-ahs lc-ahs--price">
               <span className="lc-ahs-label">{hasBids ? 'ราคาปัจจุบัน' : 'ราคาเริ่ม'}</span>
@@ -259,9 +260,8 @@ export default function Marketplace() {
               </span>
             </div>
           </div>
-          <h3 className="lc-title lc-title--auction">{listing.title}</h3>
           <div className="lc-auction-foot">
-            <span>👥 {a.uniqueBidderCount} คน</span>
+            <span className="lc-auction-foot-bidders">👥 {a.uniqueBidderCount} คน bid</span>
             <span className="lc-auction-foot-sep">·</span>
             <span className="lc-auction-bid-step">+฿{a.bidIncrement.toLocaleString()}/bid</span>
             {listing.location && (

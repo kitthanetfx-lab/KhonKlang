@@ -1252,17 +1252,20 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   .mkt-grid { gap: 16px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 .mkt-grid--auction {
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
-@media (min-width: 540px) {
-  .mkt-grid--auction { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (min-width: 480px) {
+  .mkt-grid--auction { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
 }
-@media (min-width: 900px) {
-  .mkt-grid--auction { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (min-width: 768px) {
+  .mkt-grid--auction { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 }
-@media (min-width: 1200px) {
-  .mkt-grid--auction { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (min-width: 1024px) {
+  .mkt-grid--auction { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .mkt-grid--auction { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
 }
 @media (min-width: 768px) {
   .mkt-orders-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -4798,8 +4801,9 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   box-shadow: 0 8px 28px rgba(124, 58, 237, .18);
 }
 .lc-badge--auction { background: #7c3aed !important; }
-.lc-body--auction { padding: 12px 12px 14px; gap: 8px; }
-@media (min-width: 640px) { .lc-body--auction { padding: 14px 14px 16px; gap: 10px; } }
+.lc-card--auction .lc-img { aspect-ratio: 4 / 3; }
+.lc-body--auction { padding: 8px 9px 10px; gap: 5px; }
+@media (min-width: 640px) { .lc-body--auction { padding: 9px 10px 11px; gap: 6px; } }
 
 /* ราคาบadge บนรูป — สไตล์ Yahoo */
 .lc-auction-price-badge {
@@ -4844,12 +4848,9 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 /* สถิติหลัก 3 ช่อง — ราคา · เวลา · ผู้นำ */
 .lc-auction-hero-stats {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-@media (min-width: 400px) {
-  .lc-auction-hero-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 0;
 }
 .lc-ahs {
   display: flex;
@@ -4857,22 +4858,23 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 10px 6px;
-  border-radius: var(--r-md);
-  min-height: 72px;
-  gap: 4px;
+  padding: 5px 3px;
+  border-radius: var(--r-sm);
+  min-height: 0;
+  gap: 2px;
 }
 .lc-ahs-label {
-  font-size: 10px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: .03em;
   text-transform: uppercase;
   opacity: .85;
+  line-height: 1.2;
 }
 .lc-ahs-value {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(16px, 4vw, 20px);
+  font-size: 13px;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;
@@ -4882,13 +4884,13 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   border: 1px solid #fecaca;
 }
 .lc-ahs--price .lc-ahs-label { color: #991b1b; }
-.lc-ahs--price .lc-ahs-value { color: #dc2626; font-size: clamp(18px, 4.5vw, 22px); }
+.lc-ahs--price .lc-ahs-value { color: #dc2626; font-size: 14px; }
 .lc-ahs--time {
   background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
   border: 1px solid #fde68a;
 }
 .lc-ahs--time .lc-ahs-label { color: #92400e; }
-.lc-ahs--time.lc-ahs--ended .lc-ahs-value { color: #64748b; font-size: 14px; }
+.lc-ahs--time.lc-ahs--ended .lc-ahs-value { color: #64748b; font-size: 11px; }
 .lc-ahs--leader {
   background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
   border: 1px solid #a7f3d0;
@@ -4896,7 +4898,7 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .lc-ahs--leader .lc-ahs-label { color: #065f46; }
 .lc-ahs-value--leader {
   color: #059669;
-  font-size: clamp(12px, 3vw, 14px) !important;
+  font-size: 10px !important;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4904,11 +4906,23 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   max-width: 100%;
 }
 .lc-title--auction {
-  font-weight: 600;
-  font-size: 13px;
+  order: 0;
+  font-weight: 800;
+  font-size: 15px;
   line-height: 1.35;
-  margin-top: 2px;
+  color: var(--ink);
+  margin: 0 0 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 0;
+  letter-spacing: -.01em;
 }
+@media (min-width: 640px) { .lc-title--auction { font-size: 16px; } }
+.lc-card--auction .auction-countdown--card .acd-days { font-size: 10px; }
+.lc-card--auction .auction-countdown--card .acd-days strong { font-size: 12px; }
+.lc-card--auction .auction-countdown--card .acd-clock { font-size: 12px; letter-spacing: .04em; }
 .lc-auction-bid-step {
   color: #7c3aed;
   font-weight: 700;
@@ -4917,12 +4931,18 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0 6px;
+  gap: 0 5px;
   font-size: 11px;
-  color: var(--ink-2);
+  color: var(--muted);
   line-height: 1.4;
 }
 @media (min-width: 640px) { .lc-auction-foot { font-size: 12px; } }
+.lc-auction-foot-bidders {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+@media (min-width: 640px) { .lc-auction-foot-bidders { font-size: 14px; } }
 .lc-auction-foot-sep {
   color: var(--faint);
   user-select: none;
@@ -5002,6 +5022,41 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .auction-duration-label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--ink); }
 .auction-duration-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .auction-duration-hint { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+/* ฟอร์มลงประมูล — สไตล์ Yahoo ให้ match ตลาด */
+.seller-auction-yahoo { margin-bottom: 12px; }
+.seller-auction-yahoo-body { padding: 14px; display: grid; gap: 12px; }
+@media (min-width: 640px) { .seller-auction-yahoo-body { padding: 16px 18px; gap: 14px; } }
+.seller-auction-title-field { margin: 0 !important; }
+.seller-auction-title-field label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.seller-auction-title-input {
+  width: 100%;
+  border: 2px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fff;
+}
+.seller-auction-title-input:focus {
+  outline: none;
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, .12);
+}
+.seller-auction-yahoo-row { flex-wrap: wrap; }
+.seller-auction-bid-input { max-width: 140px; flex: 0 1 120px !important; }
+.seller-auction-duration-section { padding-top: 12px; margin: 0; border-top: 1px solid var(--line); }
+.seller-auction-yahoo .mkt-yahoo-cat-select select { min-width: 100px; max-width: 120px; }
+
 .mkt-auction-countdown.is-live { color: #6d28d9; font-variant-numeric: tabular-nums; }
 .auction-countdown { font-variant-numeric: tabular-nums; }
 .lc-auction-meta {

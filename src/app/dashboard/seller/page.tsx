@@ -702,50 +702,89 @@ export default function SellerDashboard() {
                   </div>
                 </div>
 
-                <div className="form-field">
-                  <label>ชื่อสินค้า / บริการ *</label>
-                  <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="เช่น iPhone 15 Pro Max 256GB สีดำ" />
-                </div>
-
-                <div className="form-row-2">
-                  <div className="form-field" style={{ margin: 0 }}>
-                    <label>{postModal === 'auction' ? 'ราคาเริ่มประมูล (บาท) *' : 'ราคาที่คุณต้องการได้ (บาท) *'}</label>
-                    <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" min="0" />
-                  </div>
-                  <div className="form-field" style={{ margin: 0 }}>
-                    <label>หมวดหมู่</label>
-                    <select value={category} onChange={e => setCategory(e.target.value)}>
-                      <option value="">เลือก...</option>
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {postModal === 'auction' && (
-                  <>
-                    <div className="form-row-2">
-                      <div className="form-field" style={{ margin: 0 }}>
-                        <label>บิทครั้งละ (บาท) *</label>
-                        <input type="number" value={bidIncrement} onChange={e => setBidIncrement(e.target.value)} min="1" placeholder="10" />
+                {postModal === 'auction' ? (
+                  <div className="mkt-yahoo-panel seller-auction-yahoo">
+                    <div className="mkt-yahoo-search-row">
+                      <div className="mkt-yahoo-brand">
+                        <span className="mkt-yahoo-brand-ic">🔨</span>
+                        <span className="mkt-yahoo-brand-txt">ลงสินค้าประมูล</span>
                       </div>
                     </div>
-                    <div className="auction-duration-picker">
-                      <label className="auction-duration-label">ระยะเวลาประมูล *</label>
-                      <div className="auction-duration-grid">
-                        <div className="form-field" style={{ margin: 0 }}>
-                          <label>วัน</label>
-                          <input type="number" min="0" max="30" value={durationDays} onChange={e => setDurationDays(e.target.value)} />
-                        </div>
-                        <div className="form-field" style={{ margin: 0 }}>
-                          <label>ชั่วโมง</label>
-                          <input type="number" min="0" max="23" value={durationHoursPart} onChange={e => setDurationHoursPart(e.target.value)} />
-                        </div>
-                        <div className="form-field" style={{ margin: 0 }}>
-                          <label>นาที</label>
-                          <input type="number" min="0" max="59" value={durationMinutesPart} onChange={e => setDurationMinutesPart(e.target.value)} />
-                        </div>
+                    <div className="seller-auction-yahoo-body">
+                      <div className="form-field seller-auction-title-field">
+                        <label>ชื่อสินค้า / บริการ *</label>
+                        <input
+                          type="text"
+                          className="seller-auction-title-input"
+                          value={title}
+                          onChange={e => setTitle(e.target.value)}
+                          placeholder="เช่น iPhone 15 Pro Max 256GB สีดำ"
+                        />
                       </div>
-                      <p className="auction-duration-hint">ปิดประมูลใน <strong>{auctionDurationPreview()}</strong> · นับถอยหลังทุกวินาทีบนตลาด</p>
+                      <div className="mkt-yahoo-search seller-auction-yahoo-row">
+                        <label className="mkt-yahoo-cat-select">
+                          <select value={category} onChange={e => setCategory(e.target.value)} aria-label="หมวดหมู่">
+                            <option value="">หมวดหมู่</option>
+                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </label>
+                        <input
+                          type="number"
+                          className="mkt-yahoo-input"
+                          value={price}
+                          onChange={e => setPrice(e.target.value)}
+                          placeholder="ราคาเริ่มประมูล (บาท)"
+                          min="0"
+                          aria-label="ราคาเริ่มประมูล"
+                        />
+                        <input
+                          type="number"
+                          className="mkt-yahoo-input seller-auction-bid-input"
+                          value={bidIncrement}
+                          onChange={e => setBidIncrement(e.target.value)}
+                          min="1"
+                          placeholder="บิทครั้งละ (บาท)"
+                          aria-label="บิทครั้งละ"
+                        />
+                      </div>
+                      <div className="mkt-yahoo-cats seller-auction-duration-section">
+                        <span className="mkt-yahoo-cats-title">ระยะเวลาประมูล *</span>
+                        <div className="auction-duration-grid">
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label>วัน</label>
+                            <input type="number" min="0" max="30" value={durationDays} onChange={e => setDurationDays(e.target.value)} />
+                          </div>
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label>ชั่วโมง</label>
+                            <input type="number" min="0" max="23" value={durationHoursPart} onChange={e => setDurationHoursPart(e.target.value)} />
+                          </div>
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label>นาที</label>
+                            <input type="number" min="0" max="59" value={durationMinutesPart} onChange={e => setDurationMinutesPart(e.target.value)} />
+                          </div>
+                        </div>
+                        <p className="auction-duration-hint">ปิดประมูลใน <strong>{auctionDurationPreview()}</strong> · นับถอยหลังทุกวินาทีบนตลาด</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="form-field">
+                      <label>ชื่อสินค้า / บริการ *</label>
+                      <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="เช่น iPhone 15 Pro Max 256GB สีดำ" />
+                    </div>
+                    <div className="form-row-2">
+                      <div className="form-field" style={{ margin: 0 }}>
+                        <label>ราคาที่คุณต้องการได้ (บาท) *</label>
+                        <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" min="0" />
+                      </div>
+                      <div className="form-field" style={{ margin: 0 }}>
+                        <label>หมวดหมู่</label>
+                        <select value={category} onChange={e => setCategory(e.target.value)}>
+                          <option value="">เลือก...</option>
+                          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
                     </div>
                   </>
                 )}
