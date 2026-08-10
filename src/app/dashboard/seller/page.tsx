@@ -371,13 +371,24 @@ export default function SellerDashboard() {
   const listingGpPreview = price && Number(price) > 0 && postModal === 'listing' ? computeMarketplaceGp(feeConfig, Number(price)) : null;
   const auctionGpPreview = price && Number(price) > 0 && postModal === 'auction' ? computeAuctionGp(feeConfig, Number(price)) : null;
 
+  useEffect(() => {
+    if (tab === 'packing' && packingDeals.length === 1 && !packingDealId) {
+      setPackingDealId(packingDeals[0].id);
+    }
+  }, [tab, packingDeals, packingDealId]);
+
   if (loading) return (
     <div className="dash-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'dashSpin .8s linear infinite' }} />
     </div>
   );
 
-  function DealCard({ deal }: { deal: Deal }) {
+  function openPacking(dealId: string) {
+    setTab('packing');
+    setPackingDealId(dealId);
+  }
+
+  function DealCard({ deal, hidePackButton = false }: { deal: Deal; hidePackButton?: boolean }) {
     const firstImg = deal.images?.length ? imgUrl(deal.images[0]) : '';
     const isStore = isListingStoreOrder(deal);
     const statusLabel = isStore ? sellerListingStatusLabel(deal) : (STATUS_LABEL[deal.status] || deal.status);
@@ -406,8 +417,8 @@ export default function SellerDashboard() {
           {canEdit && (
             <button type="button" className="btn btn-soft btn-sm" onClick={() => openEditListing(deal)}>✏️ แก้ไข</button>
           )}
-          {needsPack && (
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => { setTab('packing'); setPackingDealId(deal.id); }}>
+          {needsPack && !hidePackButton && tab !== 'packing' && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => openPacking(deal.id)}>
               📦 แพ็คสินค้า
             </button>
           )}
@@ -573,34 +584,43 @@ export default function SellerDashboard() {
               {tab === 'packing' && (
                 packingDeals.length === 0 ? (
                   <div className="dash-empty"><p>ไม่มีสินค้ารอแพค</p></div>
+                ) : packingOpenDeal ? (
+                  <div className="seller-pack-list">
+                    {packingDeals.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ alignSelf: 'flex-start', marginBottom: 4 }}
+                        onClick={() => setPackingDealId('')}
+                      >
+                        ← เลือกออเดอร์อื่น
+                      </button>
+                    )}
+                    <SellerPackingPanel
+                      dealId={packingOpenDeal.id}
+                      dealTitle={packingOpenDeal.title}
+                      onClose={() => setPackingDealId('')}
+                      onDone={async () => {
+                        setPackingDealId('');
+                        const headers = await authHeaders();
+                        await fetchDeals(headers);
+                        setTab('shipping');
+                      }}
+                    />
+                  </div>
                 ) : (
                   <div className="seller-pack-list">
-                    {packingOpenDeal ? (
-                      <SellerPackingPanel
-                        dealId={packingOpenDeal.id}
-                        dealTitle={packingOpenDeal.title}
-                        onClose={() => setPackingDealId('')}
-                        onDone={async () => {
-                          setPackingDealId('');
-                          const headers = await authHeaders();
-                          await fetchDeals(headers);
-                          setTab('shipping');
-                        }}
-                      />
-                    ) : null}
                     {packingDeals.map(d => (
                       <div key={d.id}>
-                        <DealCard deal={d} />
-                        {packingDealId !== d.id && (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-block"
-                            style={{ marginTop: -8, marginBottom: 12 }}
-                            onClick={() => setPackingDealId(d.id)}
-                          >
-                            📦 เปิดหน้าแพ็คสินค้า
-                          </button>
-                        )}
+                        <DealCard deal={d} hidePackButton />
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-block"
+                          style={{ marginTop: 8, marginBottom: 12 }}
+                          onClick={() => setPackingDealId(d.id)}
+                        >
+                          📦 เริ่มแพ็คสินค้า
+                        </button>
                       </div>
                     ))}
                   </div>

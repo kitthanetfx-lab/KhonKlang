@@ -316,6 +316,7 @@ export default function CartCheckoutPage() {
                     trackingNumber: order.trackingNumber,
                     trackingProvider: order.trackingProvider,
                     paymentSlipFileId: order.paymentSlipFileId,
+                    packingSteps: order.packingSteps,
                   }}
                   acting={acting}
                   onConfirmReceived={confirmReceived}

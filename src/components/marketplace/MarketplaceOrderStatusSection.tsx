@@ -46,8 +46,8 @@ export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived
     : '';
   const packingSteps = order.packingSteps || [];
   const packingUploadedCount = packingSteps.filter(s => s.uploaded).length;
-  const showPacking = ['packing', 'shipped_to_buyer', 'delivered', 'completed'].includes(order.status)
-    || packingUploadedCount > 0;
+  const showPacking = packingUploadedCount > 0
+    || ['packing', 'shipped_to_buyer', 'delivered', 'completed'].includes(order.status);
 
   const steps = [
     { key: 'pay', label: 'ชำระเงิน', done: !!order.paymentSlipFileId || !['posted', 'payment_pending'].includes(order.status) },
@@ -80,28 +80,32 @@ export function MarketplaceOrderStatusSection({ order, acting, onConfirmReceived
         </p>
       )}
 
-      {showPacking && packingSteps.length > 0 && (
+      {showPacking && (
         <div className="mkt-co-packing">
-          <div className="mkt-co-packing-title">หลักฐานจากผู้ขาย</div>
-          <div className="mkt-co-packing-grid">
-            {packingSteps.map(step => (
-              <div key={step.step} className={`mkt-co-packing-slot${step.uploaded ? ' done' : ''}`}>
-                <div className="mkt-co-packing-label">ขั้น {step.step}</div>
-                <div className="mkt-co-packing-media">
-                  {step.uploaded && step.fileId ? (
-                    isVideo(step.fileName)
-                      ? <video src={mediaUrl(step.fileId)} controls />
-                      : <img src={mediaUrl(step.fileId)} alt={step.label} />
-                  ) : (
-                    <span>{step.step}</span>
-                  )}
+          <div className="mkt-co-packing-title">📷 หลักฐานแพ็คจากผู้ขาย</div>
+          {packingUploadedCount === 0 ? (
+            <p className="mkt-co-hint">ผู้ขายยังไม่ได้อัปโหลดรูป/วิดีโอแพ็ค — จะแสดงที่นี่เมื่ออัปแล้ว</p>
+          ) : (
+            <div className="mkt-co-packing-grid">
+              {packingSteps.map(step => (
+                <div key={step.step} className={`mkt-co-packing-slot${step.uploaded ? ' done' : ''}`}>
+                  <div className="mkt-co-packing-label">ขั้น {step.step} · {step.label}</div>
+                  <div className="mkt-co-packing-media">
+                    {step.uploaded && step.fileId ? (
+                      isVideo(step.fileName)
+                        ? <video src={mediaUrl(step.fileId)} controls />
+                        : <img src={mediaUrl(step.fileId)} alt={step.label} />
+                    ) : (
+                      <span>{step.step}</span>
+                    )}
+                  </div>
+                  <div className="mkt-co-packing-caption">
+                    {step.uploaded ? `✅ ${step.label}` : `⏳ รอ${step.label}`}
+                  </div>
                 </div>
-                <div className="mkt-co-packing-caption">
-                  {step.uploaded ? `✅ ${step.label}` : `⏳ รอ${step.label}`}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
