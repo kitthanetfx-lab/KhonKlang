@@ -14,6 +14,7 @@ import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import type { AuctionPublic, MyAuctionStatus } from '@/lib/auction';
 import { MY_AUCTION_STATUS_LABEL } from '@/lib/auction';
+import { MarketplaceApp } from '@/components/marketplace/MarketplaceApp';
 
 type Zone = 'listing' | 'auction';
 
@@ -356,6 +357,38 @@ export default function Marketplace() {
     <>
       <Nav active="market" />
 
+      {/* มือถือ: โครงแอปแยก — ซ่อนด้วย CSS ≥768px */}
+      <div className="mkt-mobile-shell">
+        <MarketplaceApp
+          zone={zone}
+          auctionView={auctionView}
+          myId={myId}
+          loading={showAuctionLoading}
+          items={filtered}
+          cats={CATS}
+          provinces={PROVINCES}
+          search={search}
+          cat={cat}
+          province={province}
+          certified={certified}
+          listingSort={listingSort}
+          auctionSort={auctionSort}
+          imgUrl={imgUrl}
+          onZone={setZone}
+          onAuctionView={setAuctionView}
+          onSearch={setSearch}
+          onCat={setCat}
+          onProvince={setProvince}
+          onCertified={setCertified}
+          onListingSort={setListingSort}
+          onAuctionSort={setAuctionSort}
+          onClearFilters={clearFilters}
+          myStatusMap={myAuctionStatusMap}
+        />
+      </div>
+
+      {/* เดสก์ท็อป: โครงเดิม — ซ่อนด้วย CSS ≤767px */}
+      <div className="mkt-desktop-shell">
       <section className={`mkt-hero${isAuction ? ' mkt-hero--auction' : ''}`}>
         <div className="container mkt-container mkt-hero-inner">
           <div className="mkt-hero-top">
@@ -574,8 +607,11 @@ export default function Marketplace() {
           </div>
         )}
       </div>
+      </div>
 
-      <Footer />
+      <div className="mkt-desktop-shell">
+        <Footer />
+      </div>
     </>
   );
 }
