@@ -29,6 +29,7 @@ interface DealPriceState {
 interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
 interface Deal {
   id: string; title: string; price: number; status: string; deal_type?: string;
+  source?: string;
   buyer_name: string; seller_name: string; middleman_name: string; middleman_id?: string;
   buyer_id?: string; seller_id?: string;
   creator_id?: string;
@@ -117,6 +118,17 @@ const TABS = [
 ];
 
 const TAB_KEYS = new Set(TABS.map(t => t.k));
+
+function isMarketListing(d: Deal): boolean {
+  return d.source === 'listing';
+}
+
+/** ยกเลิกคำสั่งซื้อผู้ซื้อ — ไม่ลบประกาศขาย */
+function canCancelMarketCheckout(d: Deal): boolean {
+  if (!isMarketListing(d) || !d.buyer_id) return false;
+  if (['packing', 'shipped_to_buyer', 'delivered', 'completed', 'cancelled'].includes(d.status)) return false;
+  return ['posted', 'payment_pending', 'payment_uploaded'].includes(d.status);
+}
 
 function AdminDealsInner() {
   const searchParams = useSearchParams();
@@ -241,7 +253,7 @@ function AdminDealsInner() {
         body: JSON.stringify({ id, action, note }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) load(tab, category);
+      if (r.ok) { load(tab, category); loadCounts(category); }
       else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
     } finally { setActing(''); }
   }
@@ -954,11 +966,27 @@ function AdminDealsInner() {
                     {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนค่าคนกลางแล้ว — แนบสลิป
                   </button>
                 )}
-                {/* ข้อ3: ลบดีลถาวร — ทุกดีล (ชิดขวา) */}
-                <button onClick={() => del(d.id)} disabled={!!acting} title="ลบดีลถาวร (รวมรูปสลิป)"
-                  className="ml-auto px-3 py-1.5 rounded-lg text-sm font-medium bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 flex items-center gap-1 disabled:opacity-50">
-                  {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} ลบดีล
-                </button>
+                {category === 'market' && canCancelMarketCheckout(d) && (
+                  <button
+                    onClick={() => act(
+                      d.id,
+                      'cancel_marketplace_checkout',
+                      'เหตุผลที่ยกเลิกคำสั่งซื้อ (ไม่บังคับ — ประกาศขายยังอยู่):',
+                    )}
+                    disabled={!!acting}
+                    title="ยกเลิกคำสั่งซื้อผู้ซื้อ — ไม่ลบประกาศขายของผู้ขาย"
+                    className="ml-auto px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 flex items-center gap-1 disabled:opacity-50">
+                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                    ยกเลิกคำสั่งซื้อ
+                  </button>
+                )}
+                {/* ลบดีลถาวร — ไม่ใช้กับประกาศตลาด (จะลบโพสต์ขาย) */}
+                {!isMarketListing(d) && (
+                  <button onClick={() => del(d.id)} disabled={!!acting} title="ลบดีลถาวร (รวมรูปสลิป)"
+                    className={`${category !== 'market' || !canCancelMarketCheckout(d) ? 'ml-auto ' : ''}px-3 py-1.5 rounded-lg text-sm font-medium bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 flex items-center gap-1 disabled:opacity-50`}>
+                    {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} ลบดีล
+                  </button>
+                )}
               </div>
             </div>
           );

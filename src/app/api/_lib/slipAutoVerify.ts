@@ -6,6 +6,7 @@ import {
   isSlipImageFile,
   verifySlipByFileId,
   isSlipokConfigured,
+  formatSlipokError,
   type SlipInfo,
   type SlipResult,
 } from '@/lib/slipok';
@@ -69,15 +70,15 @@ export function evaluateSlipCheck(
   const warnings: string[] = [];
 
   if (result.code === 'no_config') {
-    return { pass: false, reasons: [result.message], warnings, slip: result.slip, raw: result };
+    return { pass: false, reasons: [formatSlipokError('no_config')], warnings, slip: result.slip, raw: result };
   }
   if (result.code === 'not_image') {
-    return { pass: false, reasons: [result.message], warnings, slip: result.slip, raw: result };
+    return { pass: false, reasons: [formatSlipokError('not_image')], warnings, slip: result.slip, raw: result };
   }
   if (!result.ok) {
-    if (result.duplicate) reasons.push('สลิปซ้ำ — เคยใช้ในระบบแล้ว');
-    else if (result.wrongReceiver) reasons.push('บัญชีผู้รับไม่ตรงบัญชีบริษัท');
-    else reasons.push(result.message || 'สลิปไม่ผ่านการตรวจสอบ');
+    if (result.duplicate) reasons.push(formatSlipokError('1012'));
+    else if (result.wrongReceiver) reasons.push(formatSlipokError('1014'));
+    else reasons.push(formatSlipokError(result.code, result.message));
     return { pass: false, reasons, warnings, slip: result.slip, raw: result };
   }
 

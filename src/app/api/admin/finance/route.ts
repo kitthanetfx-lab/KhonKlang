@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../../_lib/notify';
-import { verifySlipByUrl, dealSlipPublicUrl } from '@/lib/slipok';
+import { verifySlipByUrl, dealSlipPublicUrl, formatSlipokError } from '@/lib/slipok';
 import { getBankInfoMap, type BankInfo } from '@/lib/bankInfo';
 import { readFeesConfig, syncDealLedger, syncFinanceProjection } from '../../_lib/financeLedger';
 
@@ -518,10 +518,11 @@ export async function PATCH(req: NextRequest) {
       if (!fileId) return NextResponse.json({ error: 'ไม่มีไฟล์สลิป' }, { status: 400 });
       const b = bucket === 'kyc_docs' ? 'kyc_docs' : 'deal_files';
       const result = await verifySlipByUrl(slipUrl(b, String(fileId)));
+      const formatted = { ...result, message: formatSlipokError(result.code, result.message) };
       const exp = Number(expected) || 0;
       const slipAmount = result.slip?.amount;
       const amountMatch = (slipAmount != null && exp > 0) ? Math.abs(slipAmount - exp) < 0.5 : null;
-      return NextResponse.json({ result, expected: exp, amountMatch });
+      return NextResponse.json({ result: formatted, expected: exp, amountMatch });
     }
 
     if (action === 'mark_payout_sent' || action === 'mark_refund_sent' || action === 'mark_middleman_fee_sent') {

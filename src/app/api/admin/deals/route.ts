@@ -15,8 +15,9 @@ import {
   parseAdminDealCategory,
   type AdminStatusTab,
 } from '@/lib/adminDealCategory';
-import { readFeesConfig } from '../../_lib/financeLedger';
-import { isListingCheckoutOrder } from '@/lib/marketplaceOrder';
+import { readFeesConfig, syncDealLedger } from '../../_lib/financeLedger';
+import { isListingCheckoutOrder, isMarketplaceSold } from '@/lib/marketplaceOrder';
+import { notifyUsers } from '../../_lib/notify';
 
 async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string | null) {
   if (!uid) return null;
@@ -298,6 +299,59 @@ export async function PATCH(req: NextRequest) {
         }
         await db.from('messages').insert({
           deal_id: id, sender_id: null, sender_name: 'ระบบ', role: 'system', type: 'system', content: msg,
+        });
+        break;
+      }
+      case 'cancel_marketplace_checkout': {
+        if (!isListingCheckoutOrder(deal)) {
+          return NextResponse.json({ error: 'ใช้ได้เฉพาะคำสั่งซื้อตลาด/ประมูล' }, { status: 400 });
+        }
+        if (!deal.buyer_id) {
+          return NextResponse.json({ error: 'ดีลนี้ยังไม่มีผู้ซื้อ' }, { status: 400 });
+        }
+        if (isMarketplaceSold(deal)) {
+          return NextResponse.json({ error: 'ขายแล้ว/กำลังจัดส่ง — ยกเลิกไม่ได้' }, { status: 400 });
+        }
+        if (!['posted', 'payment_pending', 'payment_uploaded'].includes(String(deal.status))) {
+          return NextResponse.json({ error: 'สถานะดีลนี้ยกเลิกคำสั่งซื้อไม่ได้' }, { status: 400 });
+        }
+        const reason = String(note || 'แอดมินยกเลิกคำสั่งซื้อ').slice(0, 500);
+        const buyerId = String(deal.buyer_id);
+        let msg = '';
+        if (deal.deal_type === 'auction') {
+          await db.from('deals').update({
+            status: 'cancelled',
+            reject_reason: reason,
+            payment_slip_file_id: null,
+            payment_slip_verified_at: null,
+            middleman_confirmed_payment: false,
+          }).eq('id', id);
+          msg = `แอดมินยกเลิกคำสั่งซื้อประมูล${note ? `: ${note}` : ''}`;
+        } else {
+          await db.from('deals').update({
+            status: 'posted',
+            buyer_id: null,
+            buyer_name: null,
+            buyer_shipping_provider: null,
+            payment_slip_file_id: null,
+            payment_slip_verified_at: null,
+            middleman_confirmed_payment: false,
+            reject_reason: reason,
+          }).eq('id', id);
+          await db.from('deal_price_state').upsert(
+            { deal_id: id, buyer_shipping_confirmed_at: null },
+            { onConflict: 'deal_id' },
+          );
+          msg = `แอดมินยกเลิกคำสั่งซื้อ — เปิดขายต่อบนตลาด${note ? `: ${note}` : ''}`;
+        }
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ',
+          role: 'system', type: 'system', content: msg,
+        });
+        await notifyUsers(db, [buyerId], {
+          title: `ยกเลิกคำสั่งซื้อ: ${deal.title || 'สินค้า'}`,
+          body: msg,
+          link: deal.deal_type === 'auction' ? `/marketplace/${id}` : `/marketplace/${id}`,
         });
         break;
       }
