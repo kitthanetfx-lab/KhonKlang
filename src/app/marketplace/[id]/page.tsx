@@ -87,6 +87,7 @@ export default function MarketplaceDetailPage() {
       setMaxBidAmount(String(autoMax));
       setAutoBidOn(true);
     }
+    // ไม่บังคับปิด autoBidOn ตอน poll — ผู้ใช้อาจเปิดรอกรอกอยู่
     const providers = Array.isArray(data.deal?.shipping_providers) ? data.deal.shipping_providers : [];
     setSelectedShipping(prev => (prev && providers.includes(prev) ? prev : providers[0] || ''));
     if (data.auction?.minNextBid) setBidAmount(String(data.auction.minNextBid));
@@ -202,6 +203,7 @@ export default function MarketplaceDetailPage() {
       if (!autoBidOn) {
         setMyAutoBidMax(null);
         setMaxBidAmount('');
+        setAutoBidOn(false);
       }
       await loadListing();
     } catch (err: unknown) {
