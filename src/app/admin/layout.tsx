@@ -10,6 +10,23 @@ import {
   LogOut, Menu, ChevronRight, Bell, ShieldAlert, Handshake, EyeOff, Wallet, MessageCircle, Banknote,
 } from 'lucide-react';
 
+const ADMIN_DEVICE_STORAGE_KEY = 'kk_admin_device_id';
+const ADMIN_TRUST_DAYS = 30;
+
+function getOrCreateAdminDeviceId(): string {
+  try {
+    const existing = localStorage.getItem(ADMIN_DEVICE_STORAGE_KEY);
+    if (existing && existing.length >= 8) return existing;
+    const id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+      ? crypto.randomUUID()
+      : `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+    localStorage.setItem(ADMIN_DEVICE_STORAGE_KEY, id);
+    return id;
+  } catch {
+    return `tmp_${Date.now().toString(36)}`;
+  }
+}
+
 function getAdminNav(locale: 'th' | 'en') {
   return locale === 'th'
     ? [
@@ -51,8 +68,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [checking, setChecking]   = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ชั้นความปลอดภัยที่ 2 — ต้องกรอกรหัสผ่านหน้าแอดมินทุกครั้งที่เข้ามาใหม่ (ไม่เก็บสถานะไว้ที่ไหน
-  // รีเฟรชหรือกลับเข้ามาใหม่ต้องกรอกอีก) นอกเหนือจากล็อกอิน + role admin ตามปกติ
+  // ชั้นความปลอดภัยที่ 2 — รหัสผ่านแผงแอดมิน
+  // ถ้าอุปกรณ์ + บัญชีแอดมินตรงกันและมี cookie จำเครื่อง (30 วัน) จะข้ามฟอร์ม
   const [pwVerified, setPwVerified] = useState(false);
   const [pwInput, setPwInput]       = useState('');
   const [pwChecking, setPwChecking] = useState(false);
@@ -63,10 +80,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setPwChecking(true); setPwError('');
     try {
       const headers = await authHeaders();
+      const deviceId = getOrCreateAdminDeviceId();
       const res = await fetch('/api/admin/verify-password', {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pwInput }),
+        credentials: 'same-origin',
+        body: JSON.stringify({ password: pwInput, deviceId }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { setPwError(d.error || 'รหัสผ่านไม่ถูกต้อง'); return; }
@@ -78,6 +97,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }
 
+  async function clearAdminTrust() {
+    try {
+      const headers = await authHeaders();
+      await fetch('/api/admin/verify-password', {
+        method: 'DELETE',
+        headers,
+        credentials: 'same-origin',
+      }).catch(() => null);
+    } catch {
+      // ignore
+    }
+  }
+
   useEffect(() => {
     (async () => {
       try {
@@ -86,6 +118,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const { data: profile } = await supabase.from('profiles').select('role, display_name').eq('id', user.id).maybeSingle();
         if (profile?.role !== 'admin') { router.replace('/'); return; }
         setAdminName(profile.display_name || 'Admin');
+
+        // เช็ค cookie จำเครื่อง — บัญชีแอดมิน + อุปกรณ์เดิม
+        const headers = await authHeaders();
+        const deviceId = getOrCreateAdminDeviceId();
+        const trustRes = await fetch(`/api/admin/verify-password?deviceId=${encodeURIComponent(deviceId)}`, {
+          headers,
+          credentials: 'same-origin',
+        }).catch(() => null);
+        if (trustRes?.ok) {
+          const trust = await trustRes.json().catch(() => ({}));
+          if (trust?.trusted) setPwVerified(true);
+        }
+
         setChecking(false);
       } catch {
         router.replace('/login');
@@ -112,7 +157,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {locale === 'th' ? 'ยืนยันรหัสผ่านแอดมิน' : 'Admin password required'}
             </h1>
             <p className="text-sm text-gray-500">
-              {locale === 'th' ? 'กรอกรหัสผ่านชั้นที่ 2 เพื่อเข้าหน้าแอดมิน' : 'Enter the second-factor password to continue'}
+              {locale === 'th'
+                ? `กรอกรหัสผ่านชั้นที่ 2 — เครื่องนี้จะจำไว้ ${ADMIN_TRUST_DAYS} วันถ้าบัญชีแอดมินตรงกัน`
+                : `Enter the second-factor password — this device stays trusted for ${ADMIN_TRUST_DAYS} days`}
             </p>
           </div>
           <input
@@ -128,6 +175,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="w-full py-2.5 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             {pwChecking ? (locale === 'th' ? 'กำลังตรวจสอบ...' : 'Checking...') : (locale === 'th' ? 'เข้าสู่ระบบแอดมิน' : 'Continue')}
           </button>
+          <p className="text-xs text-gray-400 text-center leading-relaxed">
+            {locale === 'th'
+              ? 'ครั้งถัดไปบนอุปกรณ์นี้ไม่ต้องใส่รหัสซ้ำ จนกว่าจะครบกำหนดหรือออกจากระบบ'
+              : 'Next visits on this device skip the password until expiry or sign-out'}
+          </p>
         </form>
       </div>
     );
@@ -179,6 +231,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <button
               onClick={async () => {
+                await clearAdminTrust();
                 await supabase.auth.signOut().catch(() => {
                   // Continue even if the remote session is already gone.
                 });
