@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { isCertifiedMode } from '@/lib/listingMode';
 import { computeMarketplaceGp, computeAuctionGp, FEE_DEFAULTS, type FeeConfig } from '@/lib/fees';
-import { AUCTION_DURATION_OPTIONS } from '@/lib/auction';
+import { formatDurationPartsLabel } from '@/lib/auction';
 import { ShippingCarrierPicker } from '@/components/ShippingCarrierPicker';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
 import { SellerPackingPanel } from '@/components/seller/SellerPackingPanel';
@@ -101,7 +101,9 @@ export default function SellerDashboard() {
   const [postError, setPostError] = useState('');
   const [postDone, setPostDone] = useState(false);
   const [bidIncrement, setBidIncrement] = useState('10');
-  const [durationHours, setDurationHours] = useState(72);
+  const [durationDays, setDurationDays] = useState('3');
+  const [durationHoursPart, setDurationHoursPart] = useState('0');
+  const [durationMinutesPart, setDurationMinutesPart] = useState('0');
   const [shippingCost, setShippingCost] = useState('0');
   const [shippingProviders, setShippingProviders] = useState<string[]>([]);
   const [carrierPickerOpen, setCarrierPickerOpen] = useState(false);
@@ -109,7 +111,8 @@ export default function SellerDashboard() {
 
   function resetListingForm() {
     setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation('');
-    setImages([]); setPostError(''); setBidIncrement('10'); setDurationHours(72);
+    setImages([]); setPostError(''); setBidIncrement('10');
+    setDurationDays('3'); setDurationHoursPart('0'); setDurationMinutesPart('0');
     setShippingCost('0'); setShippingProviders([]); setEditDealId('');
   }
 
@@ -252,6 +255,19 @@ export default function SellerDashboard() {
     }
   }
 
+  function buildAuctionDurationPayload() {
+    return {
+      durationDays: Math.max(0, Math.min(30, Math.round(Number(durationDays) || 0))),
+      durationHoursPart: Math.max(0, Math.min(23, Math.round(Number(durationHoursPart) || 0))),
+      durationMinutesPart: Math.max(0, Math.min(59, Math.round(Number(durationMinutesPart) || 0))),
+    };
+  }
+
+  function auctionDurationPreview() {
+    const d = buildAuctionDurationPayload();
+    return formatDurationPartsLabel(d.durationDays, d.durationHoursPart, d.durationMinutesPart);
+  }
+
   async function handlePost() {
     if (!title || !price) { setPostError('กรุณากรอกชื่อสินค้าและราคา'); return; }
     if (!condition) { setPostError('กรุณาเลือกสภาพสินค้า'); return; }
@@ -297,7 +313,7 @@ export default function SellerDashboard() {
           category, condition, location, creatorRole: 'seller', source: 'listing',
           shippingCost: Number(shippingCost) || 0, shippingProviders,
           dealType: 'auction', imageFileIds: images.map(i => i.fileId),
-          auctionData: { bidIncrement: inc, durationHours },
+          auctionData: { bidIncrement: inc, ...buildAuctionDurationPayload() },
         }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
@@ -340,7 +356,7 @@ export default function SellerDashboard() {
           title, description, price: Number(price), category, condition, location,
           shippingCost: Number(shippingCost) || 0, shippingProviders,
           imageFileIds: images.map(i => i.fileId),
-          ...(postModal === 'auction' ? { auctionData: { bidIncrement: inc, durationHours } } : {}),
+          ...(postModal === 'auction' ? { auctionData: { bidIncrement: inc, ...buildAuctionDurationPayload() } } : {}),
         }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'บันทึกไม่สำเร็จ'); return; }
@@ -706,20 +722,32 @@ export default function SellerDashboard() {
                 </div>
 
                 {postModal === 'auction' && (
-                  <div className="form-row-2">
-                    <div className="form-field" style={{ margin: 0 }}>
-                      <label>บิทครั้งละ (บาท) *</label>
-                      <input type="number" value={bidIncrement} onChange={e => setBidIncrement(e.target.value)} min="1" placeholder="10" />
+                  <>
+                    <div className="form-row-2">
+                      <div className="form-field" style={{ margin: 0 }}>
+                        <label>บิทครั้งละ (บาท) *</label>
+                        <input type="number" value={bidIncrement} onChange={e => setBidIncrement(e.target.value)} min="1" placeholder="10" />
+                      </div>
                     </div>
-                    <div className="form-field" style={{ margin: 0 }}>
-                      <label>ระยะเวลาประมูล</label>
-                      <select value={durationHours} onChange={e => setDurationHours(Number(e.target.value))}>
-                        {AUCTION_DURATION_OPTIONS.map(o => (
-                          <option key={o.hours} value={o.hours}>{o.label}</option>
-                        ))}
-                      </select>
+                    <div className="auction-duration-picker">
+                      <label className="auction-duration-label">ระยะเวลาประมูล *</label>
+                      <div className="auction-duration-grid">
+                        <div className="form-field" style={{ margin: 0 }}>
+                          <label>วัน</label>
+                          <input type="number" min="0" max="30" value={durationDays} onChange={e => setDurationDays(e.target.value)} />
+                        </div>
+                        <div className="form-field" style={{ margin: 0 }}>
+                          <label>ชั่วโมง</label>
+                          <input type="number" min="0" max="23" value={durationHoursPart} onChange={e => setDurationHoursPart(e.target.value)} />
+                        </div>
+                        <div className="form-field" style={{ margin: 0 }}>
+                          <label>นาที</label>
+                          <input type="number" min="0" max="59" value={durationMinutesPart} onChange={e => setDurationMinutesPart(e.target.value)} />
+                        </div>
+                      </div>
+                      <p className="auction-duration-hint">ปิดประมูลใน <strong>{auctionDurationPreview()}</strong> · นับถอยหลังทุกวินาทีบนตลาด</p>
                     </div>
-                  </div>
+                  </>
                 )}
 
                 {listingGpPreview && (

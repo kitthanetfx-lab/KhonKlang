@@ -4617,13 +4617,38 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   position: absolute;
   left: 8px;
   bottom: 8px;
-  background: rgba(0,0,0,.72);
+  z-index: 2;
+  background: rgba(0,0,0,.78);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
+  font-variant-numeric: tabular-nums;
 }
+.lc-auction-timer.is-live { color: #fde68a; }
+.lc-auction-timer--ended { background: rgba(100,116,139,.88); }
+.lc-auction-countdown-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border: 1px solid #ddd6fe;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5b21b6;
+  font-variant-numeric: tabular-nums;
+}
+.lc-auction-countdown-bar .is-live { color: #6d28d9; }
+.auction-duration-picker { margin: 12px 0 4px; }
+.auction-duration-label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--ink); }
+.auction-duration-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.auction-duration-hint { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.mkt-auction-countdown.is-live { color: #6d28d9; font-variant-numeric: tabular-nums; }
+.auction-countdown { font-variant-numeric: tabular-nums; }
 .lc-auction-meta {
   display: flex;
   flex-wrap: wrap;

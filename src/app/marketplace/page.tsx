@@ -235,11 +235,19 @@ export default function Marketplace() {
           <span className="lc-badge lc-badge--auction">ประมูล</span>
           {a.phase === 'live' && (
             <span className="lc-auction-timer">
-              <AuctionCountdown endsAt={a.endsAt} endedAt={a.endedAt} />
+              <AuctionCountdown endsAt={a.endsAt} endedAt={a.endedAt} liveClassName="is-live" />
             </span>
+          )}
+          {a.phase === 'ended' && (
+            <span className="lc-auction-timer lc-auction-timer--ended">ปิดแล้ว</span>
           )}
         </div>
         <div className="lc-body">
+          {a.phase === 'live' && (
+            <div className="lc-auction-countdown-bar">
+              <AuctionCountdown endsAt={a.endsAt} endedAt={a.endedAt} liveClassName="is-live" />
+            </div>
+          )}
           <div className="lc-price">
             {a.bidCount > 0 ? 'ปัจจุบัน ' : 'เริ่ม '}
             ฿{a.leadingPrice.toLocaleString()}

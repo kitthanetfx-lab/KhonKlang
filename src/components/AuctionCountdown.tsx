@@ -22,7 +22,7 @@ export function AuctionCountdown({
   const phase = getAuctionPhase(endsAt, endedAt, now);
   const label = phase === 'ended' ? 'ปิดแล้ว' : formatAuctionCountdown(endsAt, now);
   return (
-    <span className={`${className}${phase === 'live' ? ` ${liveClassName}` : ''}`}>
+    <span className={`auction-countdown${className ? ` ${className}` : ''}${phase === 'live' && liveClassName ? ` ${liveClassName}` : ''}`}>
       {phase === 'live' ? '⏱ ' : ''}{label}
     </span>
   );

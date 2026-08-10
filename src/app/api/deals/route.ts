@@ -5,6 +5,7 @@ import { readServiceControlsConfig } from '../_lib/appConfig';
 import { syncDealLedger, readFeesConfig } from '../_lib/financeLedger';
 import { computeMarketplaceGp } from '@/lib/fees';
 import { sanitizeShippingProviders } from '@/lib/logistics';
+import { computeAuctionEndsAt, type AuctionDurationInput } from '@/lib/auction';
 import { attachAuctions, syncExpiredAuctions } from '../_lib/auctionSync';
 
 // แนบ images: string[] (file_id เรียงตาม position) ให้แต่ละดีล — แทน imageFileIds JSON blob เดิมบน deals row
@@ -151,10 +152,9 @@ export async function POST(req: NextRequest) {
     if (error || !doc) throw new Error(error?.message || 'create deal failed');
 
     if (isAuction && source === 'listing') {
-      const ad = auctionData || {};
+      const ad = (auctionData || {}) as AuctionDurationInput & { bidIncrement?: number };
       const bidIncrement = Math.max(1, Math.round(Number(ad.bidIncrement) || 10));
-      const durationHours = Math.max(1, Math.min(720, Math.round(Number(ad.durationHours) || 72)));
-      const endsAt = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+      const endsAt = computeAuctionEndsAt(ad);
       const { error: aErr } = await db.from('deal_auction').insert({
         deal_id: doc.id,
         display_start_price: dealPrice,

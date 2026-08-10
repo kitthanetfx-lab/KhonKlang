@@ -94,6 +94,55 @@ export function formatAuctionCountdown(endsAt: string, now = Date.now()): string
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
+export const AUCTION_MAX_DURATION_MINUTES = 30 * 24 * 60; // 30 วัน
+
+export type AuctionDurationInput = {
+  durationMinutes?: number;
+  /** @deprecated ใช้ durationDays + durationHours + durationMinutes แทน */
+  durationHours?: number;
+  durationDays?: number;
+  durationHoursPart?: number;
+  durationMinutesPart?: number;
+};
+
+/** คำนวณระยะเวลาประมูลเป็น ms — อย่างน้อย 1 นาที */
+export function resolveAuctionDurationMs(input: AuctionDurationInput): number {
+  if (input.durationMinutes != null && Number.isFinite(Number(input.durationMinutes))) {
+    const m = Math.round(Number(input.durationMinutes));
+    const clamped = Math.max(1, Math.min(AUCTION_MAX_DURATION_MINUTES, m));
+    return clamped * 60 * 1000;
+  }
+  // legacy: ส่ง durationHours อย่างเดียว
+  if (
+    input.durationDays == null
+    && input.durationHoursPart == null
+    && input.durationMinutesPart == null
+    && input.durationHours != null
+  ) {
+    const h = Math.max(1, Math.min(720, Math.round(Number(input.durationHours) || 72)));
+    return h * 3600 * 1000;
+  }
+  const days = Math.max(0, Math.min(30, Math.round(Number(input.durationDays) || 0)));
+  const hours = Math.max(0, Math.min(23, Math.round(Number(input.durationHoursPart ?? input.durationHours) || 0)));
+  const minutes = Math.max(0, Math.min(59, Math.round(Number(input.durationMinutesPart) || 0)));
+  const totalMinutes = days * 24 * 60 + hours * 60 + minutes;
+  const clamped = Math.max(1, Math.min(AUCTION_MAX_DURATION_MINUTES, totalMinutes));
+  return clamped * 60 * 1000;
+}
+
+export function computeAuctionEndsAt(input: AuctionDurationInput, from = Date.now()): string {
+  return new Date(from + resolveAuctionDurationMs(input)).toISOString();
+}
+
+export function formatDurationPartsLabel(days: number, hours: number, minutes: number): string {
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} วัน`);
+  if (hours > 0) parts.push(`${hours} ชม.`);
+  if (minutes > 0) parts.push(`${minutes} นาที`);
+  if (!parts.length) return '1 นาที';
+  return parts.join(' ');
+}
+
 export const AUCTION_DURATION_OPTIONS = [
   { hours: 24, label: '1 วัน' },
   { hours: 72, label: '3 วัน' },

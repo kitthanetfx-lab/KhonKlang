@@ -17,7 +17,7 @@ import {
   isMarketplaceSold,
 } from '@/lib/marketplaceOrder';
 import { finalizeAuction } from '../../_lib/auctionSync';
-import { rowToAuctionPublic, type AuctionRow } from '@/lib/auction';
+import { rowToAuctionPublic, computeAuctionEndsAt, type AuctionRow, type AuctionDurationInput } from '@/lib/auction';
 
 // หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
 async function getAdminIds(db: SupabaseClient): Promise<string[]> {
@@ -994,9 +994,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           const ad = body.auctionData as Record<string, unknown>;
           const auctionPatch: Record<string, unknown> = {};
           if (ad.bidIncrement != null) auctionPatch.bid_increment = Math.max(1, Math.round(Number(ad.bidIncrement) || 10));
-          if (ad.durationHours != null) {
-            const hours = Math.max(1, Math.min(720, Math.round(Number(ad.durationHours) || 72)));
-            auctionPatch.ends_at = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+          const hasDuration = ad.durationMinutes != null
+            || ad.durationDays != null
+            || ad.durationHoursPart != null
+            || ad.durationMinutesPart != null
+            || ad.durationHours != null;
+          if (hasDuration) {
+            auctionPatch.ends_at = computeAuctionEndsAt(ad as AuctionDurationInput);
           }
           if (body.price != null) auctionPatch.display_start_price = nextPrice;
           if (Object.keys(auctionPatch).length) {
