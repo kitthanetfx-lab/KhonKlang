@@ -78,20 +78,39 @@ export function rowToAuctionPublic(row: AuctionRow, now = Date.now()): AuctionPu
   return pub;
 }
 
+export type AuctionCountdownParts = {
+  days: number;
+  h: number;
+  m: number;
+  s: number;
+  totalMs: number;
+  ended: boolean;
+};
+
+/** แยกส่วนตัวเลขนับถอยหลัง — ใช้แสดง UI แบบใหญ่บนการ์ด */
+export function parseAuctionCountdownParts(endsAt: string, now = Date.now()): AuctionCountdownParts {
+  const end = new Date(endsAt).getTime();
+  if (!isFinite(end)) return { days: 0, h: 0, m: 0, s: 0, totalMs: 0, ended: true };
+  const diff = Math.max(0, end - now);
+  const sec = Math.floor(diff / 1000);
+  return {
+    days: Math.floor(sec / 86400),
+    h: Math.floor((sec % 86400) / 3600),
+    m: Math.floor((sec % 3600) / 60),
+    s: sec % 60,
+    totalMs: diff,
+    ended: diff === 0,
+  };
+}
+
 /** แสดงเวลานับถอยหลัง HH:MM:SS หรือ DD วัน HH:MM:SS */
 export function formatAuctionCountdown(endsAt: string, now = Date.now()): string {
-  const end = new Date(endsAt).getTime();
-  if (!isFinite(end)) return '—';
-  const diff = Math.max(0, end - now);
-  if (diff === 0) return 'ปิดแล้ว';
-  const sec = Math.floor(diff / 1000);
-  const days = Math.floor(sec / 86400);
-  const h = Math.floor((sec % 86400) / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
+  const p = parseAuctionCountdownParts(endsAt, now);
+  if (!isFinite(new Date(endsAt).getTime())) return '—';
+  if (p.ended) return 'ปิดแล้ว';
   const pad = (n: number) => String(n).padStart(2, '0');
-  if (days > 0) return `${days} วัน ${pad(h)}:${pad(m)}:${pad(s)}`;
-  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  if (p.days > 0) return `${p.days} วัน ${pad(p.h)}:${pad(p.m)}:${pad(p.s)}`;
+  return `${pad(p.h)}:${pad(p.m)}:${pad(p.s)}`;
 }
 
 export const AUCTION_MAX_DURATION_MINUTES = 30 * 24 * 60; // 30 วัน

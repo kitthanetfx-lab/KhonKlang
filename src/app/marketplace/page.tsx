@@ -223,6 +223,7 @@ export default function Marketplace() {
     const firstImg = listing.images?.[0] ? imgUrl(listing.images[0]) : '';
     const c1 = AUCTION_CARD_BG[idx % AUCTION_CARD_BG.length];
     const c2 = AUCTION_CARD_BG[(idx + 2) % AUCTION_CARD_BG.length];
+    const hasBids = a.bidCount > 0;
 
     return (
       <Link
@@ -235,28 +236,44 @@ export default function Marketplace() {
           <span className="lc-badge lc-badge--auction">ประมูล</span>
           {a.phase === 'live' && (
             <span className="lc-auction-timer">
-              <AuctionCountdown endsAt={a.endsAt} endedAt={a.endedAt} liveClassName="is-live" />
+              <AuctionCountdown endsAt={a.endsAt} endedAt={a.endedAt} variant="overlay" liveClassName="is-live" />
             </span>
           )}
           {a.phase === 'ended' && (
             <span className="lc-auction-timer lc-auction-timer--ended">ปิดแล้ว</span>
           )}
+          <span className="lc-auction-price-badge">
+            {hasBids ? 'ปัจจุบัน' : 'เริ่ม'} ฿{a.leadingPrice.toLocaleString()}
+          </span>
         </div>
-        <div className="lc-body">
-          {a.phase === 'live' && (
-            <div className="lc-auction-countdown-bar">
-              <AuctionCountdown endsAt={a.endsAt} endedAt={a.endedAt} liveClassName="is-live" />
+        <div className="lc-body lc-body--auction">
+          <div className="lc-auction-hero-stats">
+            <div className="lc-ahs lc-ahs--price">
+              <span className="lc-ahs-label">{hasBids ? 'ราคาปัจจุบัน' : 'ราคาเริ่ม'}</span>
+              <span className="lc-ahs-value">฿{a.leadingPrice.toLocaleString()}</span>
             </div>
-          )}
-          <div className="lc-price">
-            {a.bidCount > 0 ? 'ปัจจุบัน ' : 'เริ่ม '}
-            ฿{a.leadingPrice.toLocaleString()}
+            {a.phase === 'live' ? (
+              <div className="lc-ahs lc-ahs--time">
+                <span className="lc-ahs-label">เหลือเวลา</span>
+                <AuctionCountdown endsAt={a.endsAt} endedAt={a.endedAt} variant="card" liveClassName="is-live" />
+              </div>
+            ) : (
+              <div className="lc-ahs lc-ahs--time lc-ahs--ended">
+                <span className="lc-ahs-label">สถานะ</span>
+                <span className="lc-ahs-value">ปิดแล้ว</span>
+              </div>
+            )}
+            <div className="lc-ahs lc-ahs--leader">
+              <span className="lc-ahs-label">ผู้นำ</span>
+              <span className="lc-ahs-value lc-ahs-value--leader">
+                {a.currentBidderName ? `🏆 ${a.currentBidderName}` : 'ยังไม่มี bid'}
+              </span>
+            </div>
           </div>
-          <h3 className="lc-title">{listing.title}</h3>
+          <h3 className="lc-title lc-title--auction">{listing.title}</h3>
           <div className="lc-auction-meta">
             <span>👥 {a.uniqueBidderCount} คน</span>
-            <span>{a.currentBidderName ? `🏆 ${a.currentBidderName}` : 'ยังไม่มี bid'}</span>
-            <span>+฿{a.bidIncrement.toLocaleString()}/bid</span>
+            <span className="lc-auction-bid-step">+฿{a.bidIncrement.toLocaleString()}/bid</span>
           </div>
           <div className="lc-meta">
             {listing.location && <span>📍 {listing.location}</span>}
@@ -288,7 +305,7 @@ export default function Marketplace() {
       <Nav active="market" />
 
       <section className={`mkt-hero${isAuction ? ' mkt-hero--auction' : ''}`}>
-        <div className="container mkt-hero-inner">
+        <div className="container mkt-container mkt-hero-inner">
           <div className="mkt-hero-top">
             <div className="mkt-hero-copy">
               <div className="mkt-mode-tabs reveal" role="tablist" aria-label="โซนตลาด">
@@ -333,36 +350,70 @@ export default function Marketplace() {
             </div>
           </div>
 
-          <div className="mkt-search reveal" style={{ ['--d' as string]: '100ms' }}>
-            <Icon name="search" size={18} style={{ color: 'var(--faint)', flexShrink: 0 }} />
-            <input
-              type="search"
-              placeholder={isAuction ? 'ค้นหาสินค้าประมูล…' : 'ค้นหา iPhone, รถมือสอง, ไอดีเกม…'}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <button type="button" className="btn btn-primary btn-sm mkt-search-btn">ค้นหา</button>
-          </div>
-
-          <div className="mkt-cats reveal" role="tablist" aria-label="หมวดหมู่" style={{ ['--d' as string]: '120ms' }}>
-            {CATS.map(c => (
-              <button
-                key={c}
-                type="button"
-                role="tab"
-                aria-selected={cat === c}
-                className={`mkt-cat-tab ${cat === c ? 'is-active' : ''}`}
-                onClick={() => setCat(c)}
+          <div className="mkt-yahoo-panel reveal" style={{ ['--d' as string]: '100ms' }}>
+            <div className="mkt-yahoo-search-row">
+              <div className="mkt-yahoo-brand" aria-hidden>
+                {isAuction ? (
+                  <>
+                    <span className="mkt-yahoo-brand-ic">🔨</span>
+                    <span className="mkt-yahoo-brand-txt">ตลาดประมูล</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="store" size={22} />
+                    <span className="mkt-yahoo-brand-txt">ตลาดซื้อขาย</span>
+                  </>
+                )}
+              </div>
+              <form
+                className="mkt-yahoo-search"
+                onSubmit={e => { e.preventDefault(); }}
+                role="search"
               >
-                <Icon name={CAT_ICON[c] || 'box'} size={15} />
-                <span>{c}</span>
-              </button>
-            ))}
+                <label className="mkt-yahoo-cat-select">
+                  <span className="mkt-yahoo-cat-btn">หมวดหมู่</span>
+                  <select
+                    value={cat}
+                    onChange={e => setCat(e.target.value)}
+                    aria-label="เลือกหมวดหมู่"
+                  >
+                    {CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+                <input
+                  type="search"
+                  className="mkt-yahoo-input"
+                  placeholder={isAuction ? 'ค้นหาสินค้าประมูล…' : 'ค้นหา iPhone, รถมือสอง, ไอดีเกม…'}
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  aria-label="ค้นหาสินค้า"
+                />
+                <button type="submit" className="mkt-yahoo-submit">ค้นหา</button>
+              </form>
+            </div>
+            <div className="mkt-yahoo-cats" role="tablist" aria-label="หมวดหมู่">
+              <span className="mkt-yahoo-cats-title">หมวดหมู่</span>
+              <div className="mkt-yahoo-cat-grid">
+                {CATS.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    role="tab"
+                    aria-selected={cat === c}
+                    className={`mkt-yahoo-cat-chip${cat === c ? ' is-active' : ''}`}
+                    onClick={() => setCat(c)}
+                  >
+                    <Icon name={CAT_ICON[c] || 'box'} size={14} />
+                    <span>{c}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <div id="mkt-results" className="container mkt-feed">
+      <div id="mkt-results" className="container mkt-container mkt-feed">
         <div className="mkt-toolbar">
           <span className="mkt-count">
             {loading ? 'กำลังโหลด…' : isAuction ? (
@@ -429,7 +480,7 @@ export default function Marketplace() {
             </div>
           </div>
         ) : (
-          <div className="mkt-grid">
+          <div className={`mkt-grid${isAuction ? ' mkt-grid--auction' : ''}`}>
             {isAuction
               ? filteredAuctions.map((item, i) => <AuctionCard key={item.id} listing={item} idx={i} />)
               : filteredListings.map((item, i) => <ListingCard key={item.id} listing={item} idx={i} />)
