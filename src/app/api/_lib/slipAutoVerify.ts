@@ -75,7 +75,10 @@ export function evaluateSlipCheck(
   if (result.code === 'not_image') {
     return { pass: false, reasons: [formatSlipokError('not_image')], warnings, slip: result.slip, raw: result };
   }
-  if (!result.ok) {
+
+  // 1012 สลิปซ้ำ แต่ SlipOK ส่งข้อมูลสลิปมา = อ่านได้แล้วครั้งก่อน → ใช้ตรวจยอดต่อ
+  const slipFromDup = !result.ok && result.duplicate && result.slip;
+  if (!result.ok && !slipFromDup) {
     if (result.duplicate) reasons.push(formatSlipokError('1012'));
     else if (result.wrongReceiver) reasons.push(formatSlipokError('1014'));
     else reasons.push(formatSlipokError(result.code, result.message));
@@ -86,6 +89,10 @@ export function evaluateSlipCheck(
   if (!slip) {
     reasons.push('ไม่ได้รับข้อมูลจากสลิป');
     return { pass: false, reasons, warnings, slip, raw: result };
+  }
+
+  if (slipFromDup) {
+    warnings.push('สลิปเคยส่งตรวจใน SlipOK แล้ว — ใช้ข้อมูลเดิมตรวจยอด');
   }
 
   const expected = Math.round(Number(opts.expectedAmount) || 0);
