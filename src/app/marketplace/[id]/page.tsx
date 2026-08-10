@@ -326,26 +326,9 @@ export default function MarketplaceDetailPage() {
                 </div>
               )}
 
-              {/* ประมูล: กล่อง Bid ขึ้นมาก่อน เพื่อไม่ต้องเลื่อน */}
+              {/* ประมูล: กล่อง Bid — เพดาน Auto-bid เหนือปุ่ม Bid (ลำดับสายตา + contrast) */}
               {isAuction && !isOwner && auction.phase === 'live' && (
                 <div className="pd-bid">
-                  <div className="pd-bid-row">
-                    <div className="pd-bid-field">
-                      <label className="pd-bid-lbl">ราคา bid (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
-                      <input
-                        className="pd-bid-input"
-                        type="number"
-                        min={auction.minNextBid}
-                        step={auction.bidIncrement}
-                        value={bidAmount}
-                        onChange={e => setBidAmount(e.target.value)}
-                      />
-                    </div>
-                    <button type="button" className="btn btn-primary btn-lg pd-bid-btn" onClick={placeBid} disabled={bidding}>
-                      {bidding ? '...' : '🔨 Bid'}
-                    </button>
-                  </div>
-
                   <div className="pd-autobid">
                     <button
                       type="button"
@@ -357,12 +340,12 @@ export default function MarketplaceDetailPage() {
                     </button>
                     {autoBidOn && (
                       <div className="pd-autobid-panel">
-                        <label className="pd-bid-lbl">
-                          ราคาสูงสุดที่สู้
-                          <span className="pd-bid-hint">ระบบ bid ให้อัตโนมัติเมื่อถูก overbid จนถึงเพดานนี้</span>
+                        <label className="pd-bid-lbl pd-bid-lbl--max" htmlFor="pd-max-bid">
+                          ราคาสูงสุดที่สู้ (เพดาน Auto-bid)
                         </label>
                         <input
-                          className="pd-bid-input"
+                          id="pd-max-bid"
+                          className="pd-bid-input pd-bid-input--max"
                           type="number"
                           min={auction.minNextBid}
                           step={auction.bidIncrement}
@@ -370,11 +353,30 @@ export default function MarketplaceDetailPage() {
                           onChange={e => setMaxBidAmount(e.target.value)}
                           placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
                         />
+                        <p className="pd-bid-hint">ระบบ bid ให้อัตโนมัติเมื่อถูก overbid จนถึงเพดานนี้</p>
                         {myAutoBidMax != null && (
-                          <p className="pd-bid-auto">เพดานที่บันทึกไว้ ฿{myAutoBidMax.toLocaleString()} — กด Bid เพื่ออัปเดต</p>
+                          <p className="pd-bid-auto">บันทึกไว้ ฿{myAutoBidMax.toLocaleString()} — กด Bid เพื่ออัปเดต</p>
                         )}
                       </div>
                     )}
+                  </div>
+
+                  <div className="pd-bid-row">
+                    <div className="pd-bid-field">
+                      <label className="pd-bid-lbl" htmlFor="pd-bid-amount">ราคา bid (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
+                      <input
+                        id="pd-bid-amount"
+                        className="pd-bid-input"
+                        type="number"
+                        min={auction.minNextBid}
+                        step={auction.bidIncrement}
+                        value={bidAmount}
+                        onChange={e => setBidAmount(e.target.value)}
+                      />
+                    </div>
+                    <button type="button" className="btn btn-primary btn-lg pd-bid-btn" onClick={placeBid} disabled={bidding}>
+                      {bidding ? '...' : '🔨 Bid'}
+                    </button>
                   </div>
 
                   <div className="pd-bid-foot">
