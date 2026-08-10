@@ -140,6 +140,13 @@ function parseSlipokApiResponse(res: Response, j: Record<string, unknown>, via?:
   };
 }
 
+function toFetchBody(body: BodyInit | Uint8Array): BodyInit {
+  if (!(body instanceof Uint8Array)) return body;
+  const copy = new Uint8Array(body.byteLength);
+  copy.set(body);
+  return new Blob([copy]);
+}
+
 async function postSlipok(
   body: BodyInit | Uint8Array,
   headers: Record<string, string>,
@@ -151,11 +158,10 @@ async function postSlipok(
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
   try {
-    const fetchBody: BodyInit = body instanceof Uint8Array ? new Blob([body]) : body;
     const res = await fetch(`https://api.slipok.com/api/line/apikey/${encodeURIComponent(branchId)}`, {
       method: 'POST',
       headers: { ...headers, 'x-authorization': apiKey },
-      body: fetchBody,
+      body: toFetchBody(body),
     });
     const text = await res.text();
     let j: Record<string, unknown> = {};
