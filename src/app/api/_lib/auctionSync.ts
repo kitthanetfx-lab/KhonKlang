@@ -204,7 +204,7 @@ export async function placeAuctionBid(
   bidderId: string,
   bidderName: string,
   amount: number,
-  options?: { maxBid?: number | null },
+  options?: { maxBid?: number | null; clearAutoBid?: boolean },
 ) {
   const { data: deal } = await db.from('deals').select('id, seller_id, status, deal_type, title').eq('id', dealId).maybeSingle();
   if (!deal || deal.deal_type !== 'auction') throw new Error('ไม่ใช่รายการประมูล');
@@ -227,7 +227,9 @@ export async function placeAuctionBid(
   let bidAmount = Math.round(amount);
   const maxBid = options?.maxBid != null && isFinite(options.maxBid) ? Math.round(Number(options.maxBid)) : null;
 
-  if (maxBid != null) {
+  if (options?.clearAutoBid) {
+    await db.from('auction_auto_bids').delete().eq('deal_id', dealId).eq('bidder_id', bidderId);
+  } else if (maxBid != null) {
     if (maxBid < pub.minNextBid) {
       throw new Error(`ราคาสูงสุดต้องไม่ต่ำกว่าราคา bid ขั้นต่ำ ฿${pub.minNextBid.toLocaleString()}`);
     }
