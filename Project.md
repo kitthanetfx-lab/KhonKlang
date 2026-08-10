@@ -1,5 +1,16 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (15:15)
+
+### วินิจฉัย SlipOK จริง — แพ็กเกจหมดอายุ (1003) + preflight quota
+
+**ทดสob API ด้วย branch 69043**: ส่งสลิปได้ → ตอบ **1003 Package หมดอายุ** (ไม่ใช่ 1000)
+**dashboard ว่าง**: ไม่มีสลิปผ่าน + แพ็กหมดอายุ
+**1000 บน production**: Vercel env อาจไม่ตรง 69043 หรือ body ว่าง
+**โค้ด**: preflight quota ก่อนตรวจ, ส่ง Buffer multipart ตรง, URL ใช้ JSON
+
+---
+
 ## 2026-08-10 (15:05)
 
 ### แก้ build error slipok.ts — Uint8Array → Blob ก่อน fetch

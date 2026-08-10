@@ -67,7 +67,7 @@ function slipImageMime(fileId: string): string {
 function buildMultipartBody(
   fields: Record<string, string>,
   file?: { field: string; filename: string; mime: string; data: Buffer },
-): { body: Uint8Array; contentType: string } {
+): { body: Buffer; contentType: string } {
   const boundary = `----SlipOK${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
   const chunks: Buffer[] = [];
 
@@ -87,27 +87,9 @@ function buildMultipartBody(
 
   chunks.push(Buffer.from(`--${boundary}--\r\n`));
   return {
-    body: Uint8Array.from(Buffer.concat(chunks)),
+    body: Buffer.concat(chunks),
     contentType: `multipart/form-data; boundary=${boundary}`,
   };
-}
-
-function buildSlipokFormData(opts: {
-  url?: string;
-  file?: { bytes: Buffer; filename: string; mime: string };
-  expectedAmount?: number;
-}): FormData {
-  const form = new FormData();
-  form.append('log', 'true');
-  if (opts.url) form.append('url', opts.url);
-  if (opts.file) {
-    const blob = new Blob([Uint8Array.from(opts.file.bytes)], { type: opts.file.mime });
-    form.append('files', blob, opts.file.filename);
-  }
-  if (opts.expectedAmount != null && opts.expectedAmount > 0) {
-    form.append('amount', String(Math.round(opts.expectedAmount)));
-  }
-  return form;
 }
 
 function slipokTextFields(expectedAmount?: number): Record<string, string> {
@@ -140,15 +122,53 @@ function parseSlipokApiResponse(res: Response, j: Record<string, unknown>, via?:
   };
 }
 
-function toFetchBody(body: BodyInit | Uint8Array): BodyInit {
-  if (!(body instanceof Uint8Array)) return body;
-  const copy = new Uint8Array(body.byteLength);
-  copy.set(body);
-  return new Blob([copy]);
+function toFetchBody(body: BodyInit | Buffer): BodyInit {
+  if (Buffer.isBuffer(body)) return body as unknown as BodyInit;
+  return body;
+}
+
+/** ตรวจ quota / credentials ก่อนส่งสลิป — คืน 1003 ถ้าแพ็กเกจหมดอายุ */
+export async function checkSlipokQuota(): Promise<SlipResult> {
+  const branchId = process.env.SLIPOK_BRANCH_ID?.trim();
+  const apiKey = process.env.SLIPOK_API_KEY?.trim();
+  if (!branchId || !apiKey) {
+    return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
+  }
+  try {
+    const res = await fetch(`https://api.slipok.com/api/line/apikey/${encodeURIComponent(branchId)}/quota`, {
+      headers: { 'x-authorization': apiKey },
+    });
+    const text = await res.text();
+    let j: Record<string, unknown> = {};
+    try {
+      j = text ? JSON.parse(text) as Record<string, unknown> : {};
+    } catch {
+      return { ok: false, code: String(res.status), message: `SlipOK quota ตอบไม่ใช่ JSON (${res.status})` };
+    }
+    if (res.ok && j.success && j.data) {
+      const quota = (j.data as Record<string, unknown>).quota;
+      return { ok: true, code: 'ok', message: `โควต้า SlipOK คงเหลือ ${String(quota ?? '?')}` };
+    }
+    return {
+      ok: false,
+      code: String(j.code ?? res.status),
+      message: String(j.message || 'ตรวจ quota SlipOK ไม่สำเร็จ'),
+    };
+  } catch {
+    return { ok: false, code: 'network', message: 'เชื่อมต่อ SlipOK ไม่ได้' };
+  }
+}
+
+async function preflightSlipok(): Promise<SlipResult | null> {
+  const quota = await checkSlipokQuota();
+  if (quota.ok) return null;
+  const fatal = ['1001', '1002', '1003', '1004', 'no_config', 'network'];
+  if (fatal.includes(quota.code)) return quota;
+  return null;
 }
 
 async function postSlipok(
-  body: BodyInit | Uint8Array,
+  body: BodyInit | Buffer,
   headers: Record<string, string>,
   via: SlipResult['via'],
 ): Promise<SlipResult> {
@@ -249,7 +269,7 @@ export function isSlipokConfigured(): boolean {
 
 /** ข้อความภาษาไทยสำหรับรหัส SlipOK 1000–1014 และข้อผิดพลาดภายใน */
 const SLIPOK_CODE_TH: Record<string, string> = {
-  '1000': 'SlipOK ไม่ได้รับไฟล์/URL จากระบบ (สลิปไม่ได้ขาด) — ลองตรวจซ้ำ',
+  '1000': 'SlipOK ไม่ได้รับไฟล์/URL (body ว่างหรือ env ผิด — ควรได้ 1003 ถ้า credentials ถูกและแพ็กหมดอายุ)',
   '1001': 'ไม่พบข้อมูลสาขา — ตรวจสอบ SLIPOK_BRANCH_ID ใน Vercel',
   '1002': 'API Key SlipOK ไม่ถูกต้อง — ตรวจสอบ SLIPOK_API_KEY',
   '1003': 'แพ็กเกจ SlipOK หมดอายุแล้ว',
@@ -296,27 +316,18 @@ export function formatSlipokError(code: string, message?: string): string {
   return (raw || 'สลิปไม่ผ่านการตรวจสอบ') + trail;
 }
 
-/** ตรวจสลิปจาก URL — ลอง urlencoded แล้ว multipart (FormData บน Vercel มักส่ง body ว่าง) */
+/** ตรวจสลิปจาก URL — JSON ตาม SlipOK API Guide v1.13 */
 export async function verifySlipByUrl(imageUrl: string, expectedAmount?: number): Promise<SlipResult> {
   if (!isSlipokConfigured()) {
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
   const via: SlipResult['via'] = imageUrl.includes('token=') ? 'signed_url' : 'public_url';
-  const fields = { url: imageUrl, ...slipokTextFields(expectedAmount) };
-
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) params.set(k, v);
-  let last = await postSlipok(params, {}, via);
-  if (last.ok || last.code !== '1000') return last;
-
-  const { body, contentType } = buildMultipartBody(fields);
-  last = await postSlipok(body, { 'Content-Type': contentType }, via);
-  if (last.ok || last.code !== '1000') return last;
-
-  return postSlipok(buildSlipokFormData({ url: imageUrl, expectedAmount }), {}, via);
+  const payload: Record<string, unknown> = { url: imageUrl, log: true };
+  if (expectedAmount != null && expectedAmount > 0) payload.amount = Math.round(expectedAmount);
+  return postSlipok(JSON.stringify(payload), { 'Content-Type': 'application/json' }, via);
 }
 
-/** ตรวจสลิปจาก bytes — multipart manual ก่อน (เสถียรบน Node/Vercel) */
+/** ตรวจสลิปจาก bytes — multipart manual (Buffer ตรง ไม่แปลง Blob) */
 export async function verifySlipByImageBytes(
   imageBytes: Buffer,
   filename: string,
@@ -332,19 +343,21 @@ export async function verifySlipByImageBytes(
     mime,
     data: imageBytes,
   });
-  let last = await postSlipok(body, { 'Content-Type': contentType }, 'upload');
-  if (last.ok || last.code !== '1000') return last;
-
-  return postSlipok(
-    buildSlipokFormData({ file: { bytes: imageBytes, filename, mime }, expectedAmount }),
-    {},
-    'upload',
-  );
+  return postSlipok(body, { 'Content-Type': contentType }, 'upload');
 }
 
 export async function verifySlipByFileId(fileId: string, expectedAmount?: number): Promise<SlipResult> {
   if (!isSlipImageFile(fileId)) {
     return { ok: false, code: 'not_image', message: 'ไฟล์ไม่ใช่รูปสลิป (รองรับ JPG/PNG) — รอแอดมินตรวจด้วยตนเอง' };
+  }
+
+  const branchHint = process.env.SLIPOK_BRANCH_ID?.trim().slice(-3) || '?';
+  const preflight = await preflightSlipok();
+  if (preflight) {
+    return {
+      ...preflight,
+      message: `${preflight.message} [branch:…${branchHint}]`,
+    };
   }
 
   const attempts: string[] = [];
