@@ -183,9 +183,31 @@ export default function SellerDashboard() {
   }
   function removeImage(fileId: string) { setImages(prev => prev.filter(i => i.fileId !== fileId)); }
 
+  async function persistShop(overrides?: { shopAvatarFileId?: string; shopBannerFileId?: string }) {
+    const headers = await authHeaders();
+    const res = await fetch('/api/seller/shop', {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        shopName,
+        shopTagline,
+        shopLocation,
+        shopAddress,
+        shopPublic,
+        shopAvatarFileId: overrides?.shopAvatarFileId ?? shopAvatarFileId,
+        shopBannerFileId: overrides?.shopBannerFileId ?? shopBannerFileId,
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
+    if (d.stats) setShopStats(d.stats);
+    return d;
+  }
+
   async function uploadShopImage(kind: 'avatar' | 'banner', file: File) {
     setShopImageUploading(kind);
     setShopError('');
+    setShopSaved(false);
     try {
       const headers = await authHeaders();
       const fd = new FormData();
@@ -193,13 +215,20 @@ export default function SellerDashboard() {
       const res = await fetch('/api/upload-deal', { method: 'POST', headers, body: fd });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || 'อัปโหลดไม่สำเร็จ');
+      const fileId = String(d.fileId || '');
+      if (!fileId) throw new Error('อัปโหลดไม่สำเร็จ');
+      const previewUrl = d.url || fileViewUrl(DEAL_BUCKET, fileId);
       if (kind === 'avatar') {
-        setShopAvatarFileId(d.fileId);
-        setShopAvatarUrl(d.url || fileViewUrl(DEAL_BUCKET, d.fileId));
+        setShopAvatarFileId(fileId);
+        setShopAvatarUrl(previewUrl);
+        await persistShop({ shopAvatarFileId: fileId });
       } else {
-        setShopBannerFileId(d.fileId);
-        setShopBannerUrl(d.url || fileViewUrl(DEAL_BUCKET, d.fileId));
+        setShopBannerFileId(fileId);
+        setShopBannerUrl(previewUrl);
+        await persistShop({ shopBannerFileId: fileId });
       }
+      setShopSaved(true);
+      setTimeout(() => setShopSaved(false), 2000);
     } catch (err: unknown) {
       setShopError(err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ');
     } finally {
@@ -212,18 +241,7 @@ export default function SellerDashboard() {
     setShopSaved(false);
     setShopError('');
     try {
-      const headers = await authHeaders();
-      const res = await fetch('/api/seller/shop', {
-        method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shopName, shopTagline, shopLocation, shopAddress, shopPublic,
-          shopAvatarFileId, shopBannerFileId,
-        }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
-      if (d.stats) setShopStats(d.stats);
+      await persistShop();
       setShopSaved(true);
       setShopEditOpen(false);
       setTimeout(() => setShopSaved(false), 2000);
