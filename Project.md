@@ -1,5 +1,16 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (18:52 UTC)
+
+### Mobile app shells — Admin / Profile / Messages / Dashboard
+
+**เป้าหมาย:** แยก markup มือถือออกจาก desktop ด้วย `ResponsiveShell` (≤767px) · logic คงใน page  
+**ใหม่:** `AdminAppShell` (top bar + drawer) · `ProfileApp` · `MessagesApp` (master-detail) · `SellerDashboardApp` · `MiddlemanDashboardApp` (mobile tabs)  
+**wire:** `admin/layout.tsx` → mobile=`AdminAppShell` + `admin-layout-desktop` · `/profile` · `/messages` · `/dashboard/seller` · `/dashboard/middleman`  
+**CSS:** `.admin-app*`, `.pf-app*`, `.dm-app*`, `.dash-app*`
+
+---
+
 ## 2026-08-10 (18:50 UTC)
 
 ### Mobile app shells — home / login / register / check-scam / privacy / service
