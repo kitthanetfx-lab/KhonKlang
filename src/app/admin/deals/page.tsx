@@ -265,12 +265,7 @@ function AdminDealsInner() {
   // ข้อ5: ศูนย์กลางตรวจสลิปเงินประกันรายฝ่าย
   async function verifySlip(id: string, side: 'buyer' | 'seller', ok: boolean) {
     let note = '';
-    if (!ok) {
-      const v = window.prompt(`เหตุผลที่สลิป${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ไม่ถูกต้อง (บังคับ — ระบบจะแจ้ง LINE และผู้ใช้):`);
-      if (v === null) return;
-      note = v.trim();
-      if (!note) { alert('กรุณาระบุเหตุผลที่สลิปไม่ผ่าน'); return; }
-    }
+    if (!ok) { const v = window.prompt(`เหตุผลที่สลิป${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ไม่ถูกต้อง (ระบบจะถอยให้อีกฝ่ายวางใหม่):`); if (v === null) return; note = v; }
     setActing(id);
     try {
       const headers = await authHeaders();
@@ -292,10 +287,9 @@ function AdminDealsInner() {
   async function verifyNormalSlip(id: string, side: 'buyer' | 'seller', ok: boolean) {
     let note = '';
     if (!ok) {
-      const v = window.prompt(`เหตุผลที่สลิป${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ไม่ถูกต้อง (บังคับ — ระบบจะแจ้ง LINE และผู้ใช้):`);
+      const v = window.prompt(`เหตุผลที่สลิป${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}ไม่ถูกต้อง:`);
       if (v === null) return;
-      note = v.trim();
-      if (!note) { alert('กรุณาระบุเหตุผลที่สลิปไม่ผ่าน'); return; }
+      note = v;
     }
     setActing(id);
     try {

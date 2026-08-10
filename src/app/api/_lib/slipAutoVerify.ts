@@ -262,7 +262,8 @@ export async function runAutoSlipVerification(
   if (trigger === 'both' || trigger === 'seller') sides.push('seller');
 
   type PendingNotify = { side: SlipSide; evaluation: SlipCheckEvaluation; fileId: string; expected: number };
-  const pendingNotify: PendingNotify[] = [];
+  const passedSides: PendingNotify[] = [];
+  let anySlipChecked = false;
 
   for (const side of sides) {
     const fileId = side === 'buyer' ? String(deal.payment_slip_file_id || '') : String(priceState?.seller_fee_slip || '');
@@ -271,47 +272,60 @@ export async function runAutoSlipVerification(
     if (!fileId || alreadyVerified) continue;
     if (side === 'seller' && !amounts.sellerRequired) continue;
 
+    anySlipChecked = true;
     const expected = side === 'buyer' ? amounts.buyer : amounts.seller;
     const evaluation = await verifyOneSide(deal, fileId, expected, companyBankAcct);
     const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
-
-    pendingNotify.push({ side, evaluation, fileId, expected });
+    const reasonText = evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน';
 
     if (evaluation.pass) {
       await markSideVerified(db, dealId, side);
+      await db.from('deals').update({ reject_reason: '' }).eq('id', dealId);
       await insertSystemMsg(
         db,
         dealId,
         `🤖 ระบบตรวจสลิป${sideLabel}ผ่านอัตโนมัติ — ยอด ฿${Number(evaluation.slip?.amount || expected).toLocaleString()}${evaluation.slip?.transRef ? ` · ref ${evaluation.slip.transRef}` : ''}`,
       );
-      if (side === 'buyer') latestDeal = { ...latestDeal, payment_slip_verified_at: new Date().toISOString() };
+      if (side === 'buyer') latestDeal = { ...latestDeal, payment_slip_verified_at: new Date().toISOString(), reject_reason: '' };
+      else latestDeal = { ...latestDeal, reject_reason: '' };
+      passedSides.push({ side, evaluation, fileId, expected });
     } else {
+      const rejectReason = `[สลิป${sideLabel}] ${reasonText}`.slice(0, 500);
+      await db.from('deals').update({ reject_reason: rejectReason }).eq('id', dealId);
+      latestDeal = { ...latestDeal, reject_reason: rejectReason };
       await insertSystemMsg(
         db,
         dealId,
-        `⚠️ สลิป${sideLabel}มีปัญหา — รอแอดมินตรวจสอบ (${evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน'})`,
+        `⚠️ สลิป${sideLabel}ไม่ผ่าน — ${reasonText} (รอแอดมินตรวจสอบ)`,
       );
+      await notifyAdminLineSlipResult({
+        deal: latestDeal,
+        side,
+        evaluation,
+        slipUrl: isSlipImageFile(fileId) ? dealSlipPublicUrl(fileId) : '',
+        autoApproved: false,
+        expectedAmount: expected,
+      });
     }
   }
 
   const { data: freshDeal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
   const { data: freshPrice } = await db.from('deal_price_state').select('*').eq('deal_id', dealId).maybeSingle();
-  if (!freshDeal) return { deal: latestDeal, skipConfirmPayLine: pendingNotify.length > 0 };
+  if (!freshDeal) return { deal: latestDeal, skipConfirmPayLine: anySlipChecked };
 
   const approved = await tryAutoApprove(db, dealId, freshDeal, freshPrice);
   const finalDeal = (approved || freshDeal) as Record<string, unknown>;
 
-  if (pendingNotify.length > 0) {
-    const primary = pendingNotify[pendingNotify.length - 1];
+  for (const passed of passedSides) {
     await notifyAdminLineSlipResult({
       deal: finalDeal,
-      side: primary.side,
-      evaluation: primary.evaluation,
-      slipUrl: isSlipImageFile(primary.fileId) ? dealSlipPublicUrl(primary.fileId) : '',
+      side: passed.side,
+      evaluation: passed.evaluation,
+      slipUrl: isSlipImageFile(passed.fileId) ? dealSlipPublicUrl(passed.fileId) : '',
       autoApproved: !!approved,
-      expectedAmount: primary.expected,
+      expectedAmount: passed.expected,
     });
   }
 
-  return { deal: finalDeal, skipConfirmPayLine: pendingNotify.length > 0 };
+  return { deal: finalDeal, skipConfirmPayLine: anySlipChecked };
 }
