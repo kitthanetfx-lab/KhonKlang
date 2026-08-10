@@ -50,6 +50,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ counts });
     }
 
+    if (filter === 'slipok_health') {
+      const { getSlipokHealth } = await import('@/lib/slipok');
+      return NextResponse.json(await getSlipokHealth());
+    }
+
     const statusTab = filter as AdminStatusTab;
 
     if (category === 'consign') {
@@ -367,6 +372,8 @@ export async function PATCH(req: NextRequest) {
           payment_slip_verified_at: null,
         }).eq('id', id);
         const { runAutoSlipVerification } = await import('../../_lib/slipAutoVerify');
+        const { getSlipokHealth } = await import('@/lib/slipok');
+        const slipokHealth = await getSlipokHealth();
         const autoResult = await runAutoSlipVerification(db, id, 'buyer');
         await db.from('messages').insert({
           deal_id: id, sender_id: null, sender_name: 'ระบบ',
@@ -377,7 +384,7 @@ export async function PATCH(req: NextRequest) {
         if (updated) await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated, {
           skipSteps: autoResult.skipConfirmPayLine ? ['confirm_pay'] : [],
         });
-        return NextResponse.json({ deal: autoResult.deal || updated });
+        return NextResponse.json({ deal: autoResult.deal || updated, slipokHealth });
       }
       case 'delete_deal': {
         await deleteDealById(db, id);

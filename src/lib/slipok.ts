@@ -1,5 +1,7 @@
 // ตรวจสลิปโอนเงินผ่าน SlipOK (https://slipok.com) — ใช้ฝั่ง server เท่านั้น (มี API key)
-// ตั้งค่าใน .env.local: SLIPOK_BRANCH_ID, SLIPOK_API_KEY (และเพิ่มใน Vercel ด้วย)
+// ตั้งค่าใน .env.local: SLIPOK_BRANCH_ID=69043, SLIPOK_API_KEY=... (และเพิ่มใน Vercel ด้วย)
+
+import { File as NodeFile } from 'node:buffer';
 
 export interface SlipInfo {
   amount: number;
@@ -159,12 +161,23 @@ export async function checkSlipokQuota(): Promise<SlipResult> {
   }
 }
 
-async function preflightSlipok(): Promise<SlipResult | null> {
+export function slipokBranchHint(): string {
+  const id = process.env.SLIPOK_BRANCH_ID?.trim() || '';
+  return id.length >= 3 ? id.slice(-3) : (id || '?');
+}
+
+/** สถานะ env + quota บน server ปัจจุบัน (ใช้ debug Vercel) */
+export async function getSlipokHealth(): Promise<{
+  configured: boolean;
+  branchHint: string;
+  quota: SlipResult | null;
+}> {
+  const configured = isSlipokConfigured();
+  if (!configured) {
+    return { configured: false, branchHint: '?', quota: null };
+  }
   const quota = await checkSlipokQuota();
-  if (quota.ok) return null;
-  const fatal = ['1001', '1002', '1003', '1004', 'no_config', 'network'];
-  if (fatal.includes(quota.code)) return quota;
-  return null;
+  return { configured: true, branchHint: slipokBranchHint(), quota };
 }
 
 async function postSlipok(
@@ -269,7 +282,7 @@ export function isSlipokConfigured(): boolean {
 
 /** ข้อความภาษาไทยสำหรับรหัส SlipOK 1000–1014 และข้อผิดพลาดภายใน */
 const SLIPOK_CODE_TH: Record<string, string> = {
-  '1000': 'SlipOK ไม่ได้รับไฟล์/URL (body ว่างหรือ env ผิด — ควรได้ 1003 ถ้า credentials ถูกและแพ็กหมดอายุ)',
+  '1000': 'SlipOK ไม่ได้รับไฟล์/URL — Vercel env ผิดหรือยังไม่ Redeploy (quota ok แต่ upload 1000 = credentials ไม่ตรง 69043)',
   '1001': 'ไม่พบข้อมูลสาขา — ตรวจสอบ SLIPOK_BRANCH_ID ใน Vercel',
   '1002': 'API Key SlipOK ไม่ถูกต้อง — ตรวจสอบ SLIPOK_API_KEY',
   '1003': 'แพ็กเกจ SlipOK หมดอายุแล้ว',
@@ -327,7 +340,7 @@ export async function verifySlipByUrl(imageUrl: string, expectedAmount?: number)
   return postSlipok(JSON.stringify(payload), { 'Content-Type': 'application/json' }, via);
 }
 
-/** ตรวจสลิปจาก bytes — multipart manual (Buffer ตรง ไม่แปลง Blob) */
+/** ตรวจสลิปจาก bytes — FormData+File (Node 20+) แล้ว fallback multipart manual */
 export async function verifySlipByImageBytes(
   imageBytes: Buffer,
   filename: string,
@@ -337,6 +350,15 @@ export async function verifySlipByImageBytes(
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
   const mime = slipImageMime(filename);
+  const form = new FormData();
+  form.append('files', new NodeFile([Uint8Array.from(imageBytes)], filename, { type: mime }) as unknown as Blob);
+  form.append('log', 'true');
+  if (expectedAmount != null && expectedAmount > 0) {
+    form.append('amount', String(Math.round(expectedAmount)));
+  }
+  let last = await postSlipok(form, {}, 'upload');
+  if (last.ok || last.code !== '1000') return last;
+
   const { body, contentType } = buildMultipartBody(slipokTextFields(expectedAmount), {
     field: 'files',
     filename,
@@ -351,16 +373,22 @@ export async function verifySlipByFileId(fileId: string, expectedAmount?: number
     return { ok: false, code: 'not_image', message: 'ไฟล์ไม่ใช่รูปสลิป (รองรับ JPG/PNG) — รอแอดมินตรวจด้วยตนเอง' };
   }
 
-  const branchHint = process.env.SLIPOK_BRANCH_ID?.trim().slice(-3) || '?';
-  const preflight = await preflightSlipok();
-  if (preflight) {
-    return {
-      ...preflight,
-      message: `${preflight.message} [branch:…${branchHint}]`,
-    };
+  const branchHint = slipokBranchHint();
+  const attempts: string[] = [`branch:…${branchHint}`];
+
+  const quota = await checkSlipokQuota();
+  if (quota.ok) {
+    attempts.push('quota:ok');
+  } else {
+    attempts.push(`quota:${quota.code}`);
+    if (['1001', '1002', '1003', '1004', 'no_config', 'network'].includes(quota.code)) {
+      return mergeAttemptErrors(attempts, {
+        ...quota,
+        message: `${quota.message} — ตรวจ SLIPOK_* บน Vercel (ต้องเป็น branch 69043)`,
+      });
+    }
   }
 
-  const attempts: string[] = [];
   let last: SlipResult = { ok: false, code: 'unknown', message: 'ตรวจสลิปไม่สำเร็จ' };
 
   const local = await downloadDealSlipFile(fileId);

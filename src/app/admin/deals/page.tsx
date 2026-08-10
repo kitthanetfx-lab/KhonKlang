@@ -253,8 +253,42 @@ function AdminDealsInner() {
         body: JSON.stringify({ id, action, note }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { load(tab, category); loadCounts(category); }
+      if (r.ok) {
+        if (d.slipokHealth) {
+          const h = d.slipokHealth as { configured?: boolean; branchHint?: string; quota?: { ok?: boolean; code?: string; message?: string } };
+          const q = h.quota;
+          const quotaLine = !h.configured
+            ? 'ยังไม่ตั้ง SLIPOK_* บน Vercel'
+            : q?.ok
+              ? `quota OK · branch …${h.branchHint || '?'} · ${q.message || ''}`
+              : `quota FAIL ${q?.code || '?'} · branch …${h.branchHint || '?'} · ${q?.message || ''}`;
+          alert(`SlipOK บน server:\n${quotaLine}\n\nถ้า branch ไม่ใช่ 043 → แก้ Vercel env แล้ว Redeploy`);
+        }
+        load(tab, category);
+        loadCounts(category);
+      }
       else alert(d.error || `บันทึกไม่สำเร็จ (${r.status})`);
+    } finally { setActing(''); }
+  }
+
+  async function checkSlipokHealth() {
+    setActing('slipok');
+    try {
+      const headers = await authHeaders();
+      const r = await fetch('/api/admin/deals?filter=slipok_health', { headers });
+      const h = await r.json().catch(() => ({}));
+      if (!r.ok) { alert(h.error || `เช็คไม่สำเร็จ (${r.status})`); return; }
+      const q = h.quota as { ok?: boolean; code?: string; message?: string } | null;
+      const lines = [
+        h.configured ? `branch …${h.branchHint} (ต้องเป็น …043)` : 'ยังไม่ตั้ง SLIPOK_*',
+        q?.ok ? `✅ ${q.message}` : `❌ ${q?.code || '?'} — ${q?.message || ''}`,
+        '',
+        'Vercel → Settings → Environment Variables:',
+        'SLIPOK_BRANCH_ID=69043',
+        'SLIPOK_API_KEY=SLIPOK1G8AFJQ',
+        'แล้วกด Redeploy',
+      ];
+      alert(lines.join('\n'));
     } finally { setActing(''); }
   }
 
@@ -832,6 +866,10 @@ function AdminDealsInner() {
                     <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1.5 w-full">
                       🤖 ระบบตรวจสลิปอัตโนมัติเมื่ออัปโหลด — ผ่านแล้วจะแจ้ง LINE · ถ้าผลผิดกด「ตรวจอัตโนมัติอีกครั้ง」
                     </p>
+                    <button type="button" onClick={() => void checkSlipokHealth()} disabled={!!acting}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 disabled:opacity-50">
+                      {acting === 'slipok' ? 'กำลังเช็ค…' : 'เช็ค SlipOK (Vercel env)'}
+                    </button>
                     {d.payment_slip_file_id && !buyerSlipVerified && (
                       <button onClick={() => act(d.id, 'rerun_slip_verify')} disabled={!!acting}
                         className="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1 disabled:opacity-50">

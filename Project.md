@@ -1,5 +1,15 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (15:25)
+
+### SlipOK ต่อแพ็กแล้ว — API ใช้ได้ แต่ Vercel env ยังผิด
+
+**ทดสob API**: quota OK, สลิปผ่าน ฿13 (ref 20260810141132…) — โค้ด+สลิปถูก
+**production 1000**: Vercel ยังไม่ได้ตั้ง SLIPOK_BRANCH_ID=69043 / key ที่ถูก
+**เพิ่ม**: ปุ่ม「เช็ค SlipOK (Vercel env)」+ trail `branch:…043 quota:ok`
+
+---
+
 ## 2026-08-10 (15:15)
 
 ### วินิจฉัย SlipOK จริง — แพ็กเกจหมดอายุ (1003) + preflight quota
