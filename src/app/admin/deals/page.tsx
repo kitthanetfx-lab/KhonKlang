@@ -10,6 +10,7 @@ import { FeeConfig, FEE_DEFAULTS, computeDealFees, computeSimpleDealShare, simpl
 import { splitDealFeeComponents } from '@/lib/financeLedger';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { ADMIN_DEAL_CATEGORIES, type AdminDealCategory, parseAdminDealCategory } from '@/lib/adminDealCategory';
+import { isListingCheckoutOrder, marketplaceBuyerPayAmount, marketplaceShippingCost } from '@/lib/marketplaceOrder';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -30,6 +31,7 @@ interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
 interface Deal {
   id: string; title: string; price: number; status: string; deal_type?: string;
   source?: string;
+  shipping_cost?: number | null;
   buyer_name: string; seller_name: string; middleman_name: string; middleman_id?: string;
   buyer_id?: string; seller_id?: string;
   creator_id?: string;
@@ -181,6 +183,23 @@ function AdminDealsInner() {
     });
   }
 
+  function renderMarketPayPanel(d: Deal) {
+    if (!isListingCheckoutOrder(d)) return null;
+    const ship = marketplaceShippingCost(d);
+    const pay = marketplaceBuyerPayAmount(d);
+    return (
+      <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 px-3 py-2 text-xs space-y-1">
+        <p className="font-semibold text-emerald-800 dark:text-emerald-200">🛒 ยอดชำระตลาด/ประมูล</p>
+        <p className="text-gray-600 dark:text-gray-300">
+          ราคาสินค้า: <span className="font-mono font-semibold">฿{Number(d.price || 0).toLocaleString()}</span>
+          {ship > 0 && <> · ค่าขนส่ง: <span className="font-mono font-semibold">฿{ship.toLocaleString()}</span></>}
+        </p>
+        <p className="text-emerald-800 dark:text-emerald-200">
+          ยอดที่ผู้ซื้อต้องโอน (ตรวจสลิป): <span className="font-mono font-bold text-base">฿{pay.toLocaleString()}</span>
+        </p>
+      </div>
+    );
+  }
   function renderSimpleSharePanel(d: Deal) {
     const share = simpleShareOf(d);
     if (!share) return null;
@@ -696,7 +715,14 @@ function AdminDealsInner() {
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.label}</span>
                       {d.deal_type === 'meetup' && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">นัดรับ</span>}
                       {d.deal_type === 'simple' && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">แบบง่าย</span>}
-                      <span className="font-mono text-sm font-bold text-green-600">฿{Number(d.price || 0).toLocaleString()}</span>
+                      {isListingCheckoutOrder(d) ? (
+                        <>
+                          <span className="font-mono text-sm text-gray-500">สินค้า ฿{Number(d.price || 0).toLocaleString()}</span>
+                          <span className="font-mono text-sm font-bold text-green-600">โอน ฿{marketplaceBuyerPayAmount(d).toLocaleString()}</span>
+                        </>
+                      ) : (
+                        <span className="font-mono text-sm font-bold text-green-600">฿{Number(d.price || 0).toLocaleString()}</span>
+                      )}
                     </div>
                     <p className="font-semibold mt-1.5 text-gray-900 dark:text-gray-100">{d.title}</p>
                     <p className="text-xs text-gray-500 mt-1">
@@ -719,6 +745,7 @@ function AdminDealsInner() {
 
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                 <p className="text-[11px] font-bold text-orange-700 uppercase tracking-wide mb-2">② ค่าสินค้า + คอมมิชชั่น / บัญชีโอน</p>
+                {renderMarketPayPanel(d)}
                 {renderSimpleSharePanel(d)}
                 {refund && refundStage && !refund.refundedAt && refund.outcome !== 'frozen' && (
                   <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs space-y-1">
