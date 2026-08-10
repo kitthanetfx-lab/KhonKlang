@@ -1,5 +1,20 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (14:20)
+
+### แก้ SlipOK ตรวจสลิปผิด (โหลดรูปจาก URL ไม่ได้)
+
+**สาเหตุ**: ส่งแค่ public URL ให้ SlipOK — bucket อาจไม่ public หรือ path มี `/` ทำให้ SlipOK ได้ 404 ทั้งที่สลิปถูกต้อง
+
+**แก้**:
+1. ดึงไฟล์จาก Supabase Storage (service role) แล้วส่ง **multipart `files`** ตรงให้ SlipOK
+2. URL เป็น fallback เมื่อ download ไม่ได้
+3. `dealSlipPublicUrl` encode path ทีละ segment
+
+**ไฟล์**: `src/lib/slipok.ts`, `src/app/api/admin/finance/route.ts`
+
+---
+
 ## 2026-08-10 (14:05)
 
 ### แปลรหัส SlipOK เป็นภาษาไทย + ยกเลิกคำสั่งซื้อตลาด (ไม่ลบโพสต์)

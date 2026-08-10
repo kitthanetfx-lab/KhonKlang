@@ -48,8 +48,72 @@ function norm(d: RawSlip): SlipInfo {
 }
 
 export function dealSlipPublicUrl(fileId: string): string {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  return `${base}/storage/v1/object/public/deal-files/${fileId}`;
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  if (!base || !fileId) return '';
+  // object key อาจมี `/` — encode ทีละ segment ให้ตรงกับ getPublicUrl
+  const path = fileId.split('/').map(encodeURIComponent).join('/');
+  return `${base}/storage/v1/object/public/deal-files/${path}`;
+}
+
+function slipImageMime(fileId: string): string {
+  const ext = fileId.split('.').pop()?.toLowerCase() || '';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  return 'image/jpeg';
+}
+
+function parseSlipokApiResponse(res: Response, j: Record<string, unknown>): SlipResult {
+  if (res.ok && j.success && j.data) {
+    return {
+      ok: true,
+      code: 'ok',
+      message: String((j.data as Record<string, unknown>).message || '✅'),
+      slip: norm(j.data as RawSlip),
+    };
+  }
+  const code = String(j.code ?? res.status);
+  return {
+    ok: false,
+    code,
+    message: String(j.message || 'ตรวจสลิปไม่สำเร็จ'),
+    slip: j.data ? norm(j.data as RawSlip) : undefined,
+    duplicate: code === '1012',
+    wrongReceiver: code === '1014',
+  };
+}
+
+async function postSlipok(body: BodyInit, headers: Record<string, string>): Promise<SlipResult> {
+  const branchId = process.env.SLIPOK_BRANCH_ID?.trim();
+  const apiKey = process.env.SLIPOK_API_KEY?.trim();
+  if (!branchId || !apiKey) {
+    return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
+  }
+  try {
+    const res = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}`, {
+      method: 'POST',
+      headers: { ...headers, 'x-authorization': apiKey },
+      body,
+    });
+    const j = await res.json().catch(() => ({} as Record<string, unknown>));
+    return parseSlipokApiResponse(res, j);
+  } catch {
+    return { ok: false, code: 'network', message: 'เชื่อมต่อ SlipOK ไม่ได้' };
+  }
+}
+
+async function downloadDealSlipFile(fileId: string): Promise<{ bytes: Buffer; filename: string } | null> {
+  try {
+    const { getAdminClient } = await import('@/lib/supabaseServer');
+    const db = getAdminClient();
+    const { data, error } = await db.storage.from('deal-files').download(fileId);
+    if (error || !data) return null;
+    const bytes = Buffer.from(await data.arrayBuffer());
+    if (!bytes.length) return null;
+    const filename = fileId.split('/').pop() || 'slip.jpg';
+    return { bytes, filename };
+  } catch {
+    return null;
+  }
 }
 
 export function isSlipImageFile(fileId: string): boolean {
@@ -88,7 +152,7 @@ const SLIPOK_MESSAGE_ALIASES: Array<{ pattern: RegExp; text: string }> = [
   { pattern: /slip.?not.?found/i, text: SLIPOK_CODE_TH['1011'] },
   { pattern: /qrcode.?not.?found/i, text: SLIPOK_CODE_TH['1007'] },
   { pattern: /duplicate/i, text: SLIPOK_CODE_TH['1012'] },
-  { pattern: /wrong.?receiver|receiver/i, text: SLIPOK_CODE_TH['1014'] },
+  { pattern: /wrong.?receiver/i, text: SLIPOK_CODE_TH['1014'] },
 ];
 
 /** แปลรหัส/ข้อความจาก SlipOK เป็นภาษาไทยที่อ่านเข้าใจ */
@@ -107,45 +171,40 @@ export function formatSlipokError(code: string, message?: string): string {
   return raw || 'สลิปไม่ผ่านการตรวจสอบ';
 }
 
-/** ตรวจสลิปจาก URL รูป public (ตามเอกสาร SlipOK ใช้ field url) */
+/** ตรวจสลิปจาก URL รูป public (fallback เมื่อโหลดจาก storage ไม่ได้) */
 export async function verifySlipByUrl(imageUrl: string, expectedAmount?: number): Promise<SlipResult> {
-  const branchId = process.env.SLIPOK_BRANCH_ID?.trim();
-  const apiKey = process.env.SLIPOK_API_KEY?.trim();
-  if (!branchId || !apiKey) {
+  if (!isSlipokConfigured()) {
     return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
+  const body: Record<string, unknown> = { url: imageUrl, log: true };
+  if (expectedAmount != null && expectedAmount > 0) body.amount = expectedAmount;
+  return postSlipok(JSON.stringify(body), { 'Content-Type': 'application/json' });
+}
 
-  try {
-    const body: Record<string, unknown> = { url: imageUrl, log: true };
-    if (expectedAmount != null && expectedAmount > 0) body.amount = expectedAmount;
-
-    const res = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}`, {
-      method: 'POST',
-      headers: { 'x-authorization': apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const j = await res.json().catch(() => ({} as Record<string, unknown>));
-
-    if (res.ok && j.success && j.data) {
-      return { ok: true, code: 'ok', message: String((j.data as Record<string, unknown>).message || '✅'), slip: norm(j.data as RawSlip) };
-    }
-    const code = String(j.code ?? res.status);
-    return {
-      ok: false,
-      code,
-      message: String(j.message || 'ตรวจสลิปไม่สำเร็จ'),
-      slip: j.data ? norm(j.data as RawSlip) : undefined,
-      duplicate: code === '1012',
-      wrongReceiver: code === '1014',
-    };
-  } catch {
-    return { ok: false, code: 'network', message: 'เชื่อมต่อ SlipOK ไม่ได้' };
+/** ตรวจสลิปจาก bytes — ส่งไฟล์ตรงให้ SlipOK (ไม่พึ่ง public URL) */
+export async function verifySlipByImageBytes(
+  imageBytes: Buffer,
+  filename: string,
+  expectedAmount?: number,
+): Promise<SlipResult> {
+  if (!isSlipokConfigured()) {
+    return { ok: false, code: 'no_config', message: 'ยังไม่ได้ตั้งค่า SlipOK (SLIPOK_BRANCH_ID / SLIPOK_API_KEY)' };
   }
+  const form = new FormData();
+  const mime = slipImageMime(filename);
+  form.append('files', new Blob([new Uint8Array(imageBytes)], { type: mime }), filename);
+  form.append('log', 'true');
+  if (expectedAmount != null && expectedAmount > 0) form.append('amount', String(expectedAmount));
+  return postSlipok(form, {});
 }
 
 export async function verifySlipByFileId(fileId: string, expectedAmount?: number): Promise<SlipResult> {
   if (!isSlipImageFile(fileId)) {
     return { ok: false, code: 'not_image', message: 'ไฟล์ไม่ใช่รูปสลิป (รองรับ JPG/PNG) — รอแอดมินตรวจด้วยตนเอง' };
+  }
+  const local = await downloadDealSlipFile(fileId);
+  if (local) {
+    return verifySlipByImageBytes(local.bytes, local.filename, expectedAmount);
   }
   return verifySlipByUrl(dealSlipPublicUrl(fileId), expectedAmount);
 }

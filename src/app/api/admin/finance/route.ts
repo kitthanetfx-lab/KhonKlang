@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../../_lib/notify';
-import { verifySlipByUrl, dealSlipPublicUrl, formatSlipokError } from '@/lib/slipok';
+import { verifySlipByUrl, verifySlipByFileId, dealSlipPublicUrl, formatSlipokError } from '@/lib/slipok';
 import { getBankInfoMap, type BankInfo } from '@/lib/bankInfo';
 import { readFeesConfig, syncDealLedger, syncFinanceProjection } from '../../_lib/financeLedger';
 
@@ -517,9 +517,11 @@ export async function PATCH(req: NextRequest) {
     if (action === 'verify_slip') {
       if (!fileId) return NextResponse.json({ error: 'ไม่มีไฟล์สลิป' }, { status: 400 });
       const b = bucket === 'kyc_docs' ? 'kyc_docs' : 'deal_files';
-      const result = await verifySlipByUrl(slipUrl(b, String(fileId)));
-      const formatted = { ...result, message: formatSlipokError(result.code, result.message) };
       const exp = Number(expected) || 0;
+      const result = b === 'deal_files'
+        ? await verifySlipByFileId(String(fileId), exp > 0 ? exp : undefined)
+        : await verifySlipByUrl(slipUrl(b, String(fileId)), exp > 0 ? exp : undefined);
+      const formatted = { ...result, message: formatSlipokError(result.code, result.message) };
       const slipAmount = result.slip?.amount;
       const amountMatch = (slipAmount != null && exp > 0) ? Math.abs(slipAmount - exp) < 0.5 : null;
       return NextResponse.json({ result: formatted, expected: exp, amountMatch });
