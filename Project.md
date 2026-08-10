@@ -1,5 +1,11 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-10 (15:05)
+
+### แก้ build error slipok.ts — Uint8Array → Blob ก่อน fetch
+
+---
+
 ## 2026-08-10 (15:00)
 
 ### SlipOK 1000 ทุกช่องทาง — กลับ multipart manual + urlencoded
