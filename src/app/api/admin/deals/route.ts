@@ -19,6 +19,22 @@ import { readFeesConfig, syncDealLedger } from '../../_lib/financeLedger';
 import { isListingCheckoutOrder, isMarketplaceSold } from '@/lib/marketplaceOrder';
 import { notifyUsers } from '../../_lib/notify';
 
+async function attachDealImages<T extends { id: string }>(
+  db: ReturnType<typeof getAdminClient>,
+  deals: T[],
+): Promise<(T & { images: string[] })[]> {
+  const ids = deals.map(d => d.id);
+  if (!ids.length) return deals.map(d => ({ ...d, images: [] }));
+  const { data } = await db.from('deal_images').select('deal_id, file_id, position').in('deal_id', ids).order('position', { ascending: true });
+  const map = new Map<string, string[]>();
+  for (const row of data || []) {
+    const arr = map.get(row.deal_id) || [];
+    arr.push(row.file_id);
+    map.set(row.deal_id, arr);
+  }
+  return deals.map(d => ({ ...d, images: map.get(d.id) || [] }));
+}
+
 async function getBankInfo(db: ReturnType<typeof getAdminClient>, uid?: string | null) {
   if (!uid) return null;
   const { data: u } = await db.from('profiles')
@@ -130,6 +146,8 @@ export async function GET(req: NextRequest) {
       middlemanBank: bankMap.get(d.middleman_id) || null,
       creatorProfile: d.creator_id ? creatorMap.get(d.creator_id) || null : null,
     }));
+
+    documents = await attachDealImages(db, documents);
 
     // กรองเพิ่มฝั่ง JS เพราะต้องเช็คฟิลด์ที่อยู่ใน deal_price_state/deal_meetup (join แล้วถึงรู้)
     if (filter === 'pay_seller') documents = documents.filter(d => !d.priceState?.payout_slip_file_id);

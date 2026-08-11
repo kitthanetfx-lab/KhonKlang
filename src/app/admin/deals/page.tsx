@@ -12,6 +12,7 @@ import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { ADMIN_DEAL_CATEGORIES, type AdminDealCategory, parseAdminDealCategory } from '@/lib/adminDealCategory';
 import { isListingCheckoutOrder, marketplaceBuyerPayAmount, marketplaceShippingCost } from '@/lib/marketplaceOrder';
 import { AdminDealsApp, AdminDealCompactCard } from '@/components/admin/mobile/AdminDealsApp';
+import { DealProductGallery } from '@/components/deal/DealProductGallery';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -50,6 +51,10 @@ interface Deal {
   buyerBank?: BankInfo | null;
   sellerBank?: BankInfo | null;
   middlemanBank?: BankInfo | null;
+  images?: string[];
+  warranty_years?: number;
+  warranty_months?: number;
+  warranty_days?: number;
 }
 
 interface EvidenceItem {
@@ -775,6 +780,19 @@ function AdminDealsInner() {
                   </Link>
                 </div>
               </div>
+
+              {(d.images?.length ?? 0) > 0 && (
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                  <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide mb-2">📷 รูปสินค้าตอนสร้างดีล</p>
+                  <DealProductGallery
+                    compact
+                    images={d.images}
+                    warrantyYears={d.warranty_years}
+                    warrantyMonths={d.warranty_months}
+                    warrantyDays={d.warranty_days}
+                  />
+                </div>
+              )}
 
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                 <p className="text-[11px] font-bold text-orange-700 uppercase tracking-wide mb-2">② ค่าสินค้า + คอมมิชชั่น / บัญชีโอน</p>
