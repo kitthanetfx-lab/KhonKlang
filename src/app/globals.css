@@ -4239,14 +4239,15 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .rv-who span { font-size: 11px; color: var(--muted); }
 .rv-stars {
   grid-area: stars;
-  display: flex;
-  gap: 4px;
-  padding: 4px 6px;
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px 8px;
   border-radius: var(--r-md);
   background: #fffbeb;
   border: 1px solid #fde68a;
-  width: 100%;
-  justify-content: space-between;
+  width: fit-content;
+  max-width: 100%;
+  justify-content: flex-start;
   box-sizing: border-box;
 }
 .rv-star { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #e8c547; background: #fff; color: #c8a000; padding: 0; border-radius: 8px; transition: transform .12s, color .12s, border-color .12s, background .12s; box-shadow: none; }
