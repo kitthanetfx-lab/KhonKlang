@@ -2466,11 +2466,14 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 }
 .deal-product-thumbs {
   display: flex;
+  justify-content: center;
+  align-items: center;
   gap: 8px;
   margin-top: 10px;
   overflow-x: auto;
   padding-bottom: 4px;
   scrollbar-width: thin;
+  width: 100%;
 }
 .deal-product-thumb {
   flex: 0 0 auto;
