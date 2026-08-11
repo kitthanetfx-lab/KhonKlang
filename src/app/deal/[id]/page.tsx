@@ -2420,13 +2420,19 @@ export default function DealRoom() {
   // Wizard ขั้นตอนดีล — เฉพาะ "ซื้อขายผ่านกลางแบบง่าย" (deal_type === 'simple')
   // โฟกัสทีละขั้นตอน (การ์ดเดียว) แทนการแสดงทุกการ์ดพร้อมกันแบบเดิม — ลดความสับสน
   // ═══════════════════════════════════════════════════════════════════════
-  // flow ใหม่ (simple 6 ขั้น): รูปสินค้าตอนสร้างดีล · ไม่มียืนยันเงื่อนไข/อัปหลักฐานก่อนโอน
-  // 1=โอนเงิน, 2=รอทีมงานยืนยัน, 3=แพ็ค+จัดส่ง, 4=รับสินค้า, 5=โอนเงินให้ผู้ขาย, 6=เสร็จสมบูรณ์
+  // flow ใหม่ (simple 5 ขั้น): รูปสินค้าตอนสร้างดีล · ไม่มียืนยันเงื่อนไข/อัปหลักฐานก่อนโอน
+  // 1=โอนเงิน, 2=รอทีมงานยืนยัน, 3=แพ็ค+จัดส่ง, 4=รับสินค้า, 5=จบ (ตัดขั้นรอโอนเงินออก — ไปจบเลยหลังยืนยันรับ)
   const WIZARD_STEP_TITLES = [
     'โอนเงิน', 'รอทีมงานยืนยัน',
-    'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
+    'แพ็ค+จัดส่ง', 'รับสินค้า', 'เสร็จสมบูรณ์',
   ];
   const WZ_TOTAL = WIZARD_STEP_TITLES.length;
+
+  function getSimpleWizardStepTitle(step: number): string {
+    const clamped = Math.max(1, Math.min(WZ_TOTAL, step));
+    if (clamped === WZ_TOTAL && myRole === 'seller') return 'ยืนยัน-รับเงินค่าสินค้า';
+    return WIZARD_STEP_TITLES[clamped - 1];
+  }
 
   // ═══════════════════════════════════════════════════════════════════════
   // Wizard ขั้นตอนดีล — "ซื้อขายผ่านกลางปลอดภัย" (deal_type === '' / regular) — 14 ขั้น
@@ -2457,8 +2463,8 @@ export default function DealRoom() {
     }
     if (s === 'packing') return { step: 3 };
     if (s === 'shipped_to_buyer') return { step: 4 };
-    if (s === 'completed') return { step: pd.payout_slip_file_id ? 6 : 5, outcome: 'success' };
-    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 6 : 5, outcome: 'cancelled' };
+    if (s === 'completed') return { step: 5, outcome: 'success' };
+    if (s === 'cancelled') return { step: 5, outcome: 'cancelled' };
     if (s === 'disputed') return { step: 5, outcome: 'disputed' };
     return { step: 0 };
   }
@@ -2545,16 +2551,20 @@ export default function DealRoom() {
 
   function renderWizardProgress(step: number) {
     const clamped = Math.max(1, Math.min(WZ_TOTAL, step));
+    const title = getSimpleWizardStepTitle(clamped);
     return (
       <div style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-          <b style={{ fontSize: 13, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>ขั้นที่ {clamped} จาก {WZ_TOTAL} · {WIZARD_STEP_TITLES[clamped - 1]}</b>
+          <b style={{ fontSize: 13, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>ขั้นที่ {clamped} จาก {WZ_TOTAL} · {title}</b>
           <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{Math.round((clamped / WZ_TOTAL) * 100)}%</span>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
-          {WIZARD_STEP_TITLES.map((t, i) => (
-            <div key={t} style={{ flex: 1, height: 6, borderRadius: 4, background: i + 1 < clamped ? 'var(--green-500)' : i + 1 === clamped ? 'var(--accent)' : 'var(--line)', transition: 'background .3s' }} />
-          ))}
+          {WIZARD_STEP_TITLES.map((t, i) => {
+            const barTitle = i + 1 === WZ_TOTAL && myRole === 'seller' ? 'ยืนยัน-รับเงินค่าสินค้า' : t;
+            return (
+              <div key={barTitle + i} title={barTitle} style={{ flex: 1, height: 6, borderRadius: 4, background: i + 1 < clamped ? 'var(--green-500)' : i + 1 === clamped ? 'var(--accent)' : 'var(--line)', transition: 'background .3s' }} />
+            );
+          })}
         </div>
       </div>
     );
@@ -3752,7 +3762,138 @@ export default function DealRoom() {
     );
   }
 
-  // ─── ขั้น 7: ส่วนกลางโอน/คืน/อายัด (รอทีมงาน) ────────────────────────────
+  // ─── ขั้นสุดท้าย simple: จบดีล (ตัดขั้นรอโอนเงิน — buyer/seller มาที่นี่เลยหลังยืนยันรับ) ─
+  function renderSimpleWizardFinal(outcome?: 'success' | 'cancelled' | 'disputed') {
+    if (outcome === 'disputed') return renderWizardStep7('disputed');
+    const pd: DealPriceState = priceState || {};
+    const hasPayout = !!pd.payout_slip_file_id;
+    const isCancelled = outcome === 'cancelled';
+
+    let doneTitle: string;
+    let doneSub: string;
+    let doneEmoji: string;
+
+    if (isCancelled) {
+      doneEmoji = '↩️';
+      doneTitle = 'ดีลถูกยกเลิก — คืนเงินผู้ซื้อแล้ว';
+      doneSub = pd.refund_slip_file_id
+        ? 'ศูนย์กลางโอนเงินคืนผู้ซื้อเรียบร้อยแล้ว'
+        : 'ทีมงานกำลังดำเนินการคืนเงินให้ผู้ซื้อ';
+    } else if (myRole === 'seller') {
+      doneEmoji = hasPayout ? '🎉' : '💰';
+      doneTitle = hasPayout ? 'รับเงินค่าสินค้าแล้ว' : 'ยืนยัน-รับเงินค่าสินค้า';
+      doneSub = hasPayout
+        ? 'ศูนย์กลางโอนเงินให้แล้ว — ดูสลิปด้านล่าง'
+        : 'ผู้ซื้อยืนยันรับแล้ว — ทีมงานจะโอนเงินและแนบสลิปให้ที่นี่';
+    } else {
+      doneEmoji = '🎉';
+      doneTitle = 'ดีลเสร็จสมบูรณ์!';
+      doneSub = 'คุณยืนยันรับสินค้าแล้ว — ขอบคุณที่ใช้บริการ';
+    }
+
+    const allSlips: { label: string; fileId: string }[] = [];
+    if (deal!.payment_slip_file_id) allSlips.push({ label: 'สลิปผู้ซื้อ (ค่าสินค้า)', fileId: deal!.payment_slip_file_id });
+    if (pd.seller_fee_slip) allSlips.push({ label: 'สลิปผู้ขาย (ค่าบริการ)', fileId: pd.seller_fee_slip });
+    if (pd.payout_slip_file_id) allSlips.push({ label: 'สลิปโอนเงินให้ผู้ขาย', fileId: pd.payout_slip_file_id });
+    if (pd.refund_slip_file_id) allSlips.push({ label: 'สลิปคืนเงินให้ผู้ซื้อ', fileId: pd.refund_slip_file_id });
+
+    const packingEvid = evidence.filter(e => e.type === 'packing');
+    const receiveEvid = evidence.filter(e => e.type === 'receive');
+    const chatEvid = evidence.filter(e => e.type === 'chat' || e.type === 'call');
+    const inspectionEvid = evidence.filter(e => e.type === 'inspection' || e.type === 'check');
+    const otherEvid = evidence.filter(e => ['other', 'meet', 'chat_text', 'testing'].includes(e.type));
+    const hasAnyEvidence = packingEvid.length > 0 || receiveEvid.length > 0 || chatEvid.length > 0 || inspectionEvid.length > 0 || otherEvid.length > 0;
+
+    const sellerOk = isCancelled ? true : hasPayout;
+    const buyerOk = true;
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="dr-card dr-done-card">
+          <div className="dr-done-emoji">{doneEmoji}</div>
+          <div className="dr-done-title">{doneTitle}</div>
+          <div className="dr-done-sub">{doneSub}</div>
+        </div>
+
+        {renderCompletionReviewBlock(isCancelled)}
+
+        {allSlips.length > 0 && (
+          <div className="dr-card">
+            <div className="dr-card-title">📎 สลิปทั้งหมดในดีล</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(allSlips.length, 2)}, 1fr)`, gap: 10 }}>
+              {allSlips.map(s => (
+                <div key={s.fileId}>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 5, textAlign: 'center' }}>{s.label}</div>
+                  <a href={fileUrl(s.fileId)} target="_blank" rel="noreferrer">
+                    <img src={fileUrl(s.fileId)} alt={s.label} style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="dr-card">
+          {renderParticipantStatusRows([
+            {
+              roleLabel: 'ผู้ขาย',
+              name: deal!.seller_name || '-',
+              ok: sellerOk,
+              doneText: isCancelled ? '✅ ดีลยกเลิกแล้ว' : hasPayout ? '✅ รับเงินแล้ว' : '⏳ รอทีมงานโอนเงิน',
+              waitText: '⏳ รอทีมงานโอนเงิน',
+            },
+            {
+              roleLabel: 'ผู้ซื้อ',
+              name: deal!.buyer_name || '-',
+              ok: buyerOk,
+              doneText: isCancelled ? '✅ ได้รับเงินคืนแล้ว' : '✅ ยืนยันรับสินค้าแล้ว',
+              waitText: '⏳ รอยืนยันรับ',
+            },
+          ], { marginBottom: 0 })}
+        </div>
+
+        {renderSimpleShareBreakdownCard()}
+
+        {hasAnyEvidence && (
+          <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="dr-card-title">📁 หลักฐานทั้งหมดในดีล</div>
+            {packingEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📦 แพ็คสินค้า ({packingEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(packingEvid)}
+              </div>
+            )}
+            {receiveEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📹 แกะกล่อง ({receiveEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(receiveEvid)}
+              </div>
+            )}
+            {inspectionEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>🔍 ตรวจสอบ ({inspectionEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(inspectionEvid)}
+              </div>
+            )}
+            {chatEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>💬 แชท/คอล ({chatEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(chatEvid)}
+              </div>
+            )}
+            {otherEvid.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📎 อื่นๆ ({otherEvid.length} ไฟล์)</div>
+                {renderWizardEvidenceThumbs(otherEvid)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── ขั้น 7: ส่วนกลางโอน/คืน/อายัด (รอทีมงาน) — regular/marketplace ─────
   function renderWizardStep7(outcome?: 'success' | 'cancelled' | 'disputed') {
     if (outcome === 'disputed') {
       return (
@@ -5369,7 +5510,7 @@ export default function DealRoom() {
       setWzViewStep(Math.min(actualStep, nextStep));
     }
     if (step === 0) return renderSimplePreJoinView();
-    const stepFocus = step >= 3;
+    const stepFocus = step >= 3 && step < WZ_TOTAL;
     const showDealMedia = step < 3;
     return (
       <div className={`dr-inner${stepFocus ? ' simple-deal-step-focus' : ''}`}>
@@ -5393,8 +5534,7 @@ export default function DealRoom() {
           {step === 2 && renderWizardStep4()}
           {step === 3 && renderWizardStep5()}
           {step === 4 && renderWizardStep6()}
-          {step === 5 && renderWizardStep7(outcome)}
-          {step === 6 && renderWizardStep8(outcome)}
+          {step === 5 && renderSimpleWizardFinal(outcome)}
         </div>
         {step >= 1 && !stepFocus && (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>
