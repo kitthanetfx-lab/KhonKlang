@@ -27,6 +27,7 @@ import { DealProductGallery } from '@/components/deal/DealProductGallery';
 import { DealPackingEvidenceStrip } from '@/components/deal/DealPackingEvidenceStrip';
 import { DealEvidenceThumbs } from '@/components/deal/DealEvidenceThumbs';
 import { SimpleDealPreJoinScreen } from '@/components/deal/SimpleDealPreJoinScreen';
+import { SimpleDealShell } from '@/components/deal/SimpleDealShell';
 import { DealRoomApp, DealAppFloatBtn } from '@/components/mobile/DealRoomApp';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -2697,31 +2698,25 @@ export default function DealRoom() {
     const { name, phone, address } = buyerShipping;
     const missingContact = !phone && !address;
     return (
-      <div className={`dr-card${compact ? ' pack-shipping-compact' : ''}`}>
+      <div className={`dr-card pack-shipping-card${compact ? ' pack-shipping-compact' : ''}`}>
         <div className="dr-card-title">📦 ที่อยู่ในการจัดส่ง</div>
         {missingContact ? (
-          <p style={{ fontSize: compact ? 12 : 13, color: 'var(--muted)', lineHeight: 1.55, margin: 0 }}>
+          <p className="pack-shipping-empty">
             ผู้ซื้อยังไม่ได้บันทึกที่อยู่หรือเบอร์โทร — แจ้งให้อัปเดตที่หน้าโปรไฟล์ก่อนจัดส่ง
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 6 : 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: compact ? 12.5 : 13.5 }}>
-              <span style={{ color: 'var(--muted)', flexShrink: 0 }}>ชื่อผู้รับ</span>
-              <span style={{ fontWeight: 700, color: 'var(--ink)', textAlign: 'right' }}>{name}</span>
+          <div className="pack-shipping-fields">
+            <div className="pack-shipping-row">
+              <span className="pack-shipping-label">ชื่อผู้รับ</span>
+              <span className="pack-shipping-value">{name}</span>
             </div>
-            {address && !compact && (
-              <div>
-                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 4 }}>ที่อยู่</div>
-                <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{address}</div>
-              </div>
-            )}
-            {address && compact && (
-              <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.45, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{address}</div>
+            {address && (
+              <div className={`pack-shipping-address${compact ? ' is-compact' : ''}`}>{address}</div>
             )}
             {phone && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 35%, var(--line))', borderRadius: 'var(--r-md)', padding: compact ? '6px 10px' : '10px 14px' }}>
-                <span style={{ fontSize: compact ? 12 : 13, color: 'var(--ink-2)' }}>📞 เบอร์โทร</span>
-                <a href={`tel:${phone}`} style={{ fontSize: compact ? 12 : 13, fontWeight: 700, color: 'var(--accent-strong)' }}>{phone}</a>
+              <div className="pack-shipping-phone">
+                <span className="pack-shipping-label">📞 เบอร์โทร</span>
+                <a href={`tel:${phone}`} className="pack-shipping-phone-num">{phone}</a>
               </div>
             )}
           </div>
@@ -3437,6 +3432,7 @@ export default function DealRoom() {
     const wrapClass = simplePackingFocus ? 'simple-deal-packing-focus' : undefined;
     const gapSize = simplePackingFocus ? 8 : 14;
     if (myRole !== 'seller') {
+      const packingStepLabels = ['แพ็ค', 'โลจิสติกส์', 'สลิป'];
       return (
         <div className={wrapClass} style={{ display: 'flex', flexDirection: 'column', gap: gapSize }}>
           {!simplePackingFocus && (
@@ -3463,47 +3459,74 @@ export default function DealRoom() {
             )}
           </div>
           )}
-          <div className="dr-card">
-            <div className="dr-card-title">หลักฐานจากผู้ขาย</div>
-            <div style={{ display: 'grid', gridTemplateColumns: packingUploadColumns, gap: 10 }}>
-              {packingSteps.map(item => {
-                const uploaded = packingEvidenceSlots[item.step - 1];
-                return (
-                  <div key={item.step} style={{ minWidth: 0, border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 10, background: 'var(--surface)' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8, textAlign: 'center' }}>ขั้นตอน {item.step}</div>
-                    <div className="pack-upload-slot-media" style={{ position: 'relative', width: '100%', aspectRatio: simplePackingFocus ? undefined : '16 / 9', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)' }}>
-                      {uploaded ? (
-                        uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
-                          ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
-                          : <img src={fileUrl(uploaded.file_id)} alt={uploaded.file_name || item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      ) : (
-                        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(15, 23, 42, 0.14)', fontSize: 'clamp(34px, 6vw, 54px)', fontWeight: 800, lineHeight: 1 }}>
-                          {item.step}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ marginTop: 8, minHeight: 34, fontSize: 11.5, color: uploaded ? 'var(--green-600)' : 'var(--faint)', textAlign: 'center', lineHeight: 1.45 }}>
-                      {uploaded ? '✅ ผู้ขายอัปโหลดแล้ว' : '⏳ รอผู้ขายอัปโหลด'}
-                    </div>
+          {simplePackingFocus ? (
+            <>
+              <div className="dr-card simple-deal-packing-evidence-card">
+                <div className="dr-card-title">หลักฐานจากผู้ขาย</div>
+                <DealPackingEvidenceStrip slots={packingEvidenceSlots} labels={packingStepLabels} />
+              </div>
+              <div className="dr-card simple-deal-packing-wait-card">
+                <div className="simple-deal-packing-wait-icon" aria-hidden>📦</div>
+                <div className="simple-deal-packing-wait-title">รอผู้ขายแพ็คสินค้าและจัดส่ง</div>
+                <p className="simple-deal-packing-wait-desc">ผู้ขายกำลังถ่ายวิดีโอแพ็คของและจัดส่งตรงถึงคุณ — ระบบจะแจ้งเลขพัสดุทันทีที่ส่งแล้ว</p>
+                <div className="simple-deal-packing-wait-status">
+                  {renderParticipantStatusRows([
+                    { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPacked, doneText: '✅ แพ็คและส่งแล้ว', waitText: '⏳ กำลังแพ็ค' },
+                    { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
+                  ], { marginBottom: 0, gap: 4, fontSize: 12 })}
+                </div>
+                {deal!.tracking_to_buyer && (
+                  <div className="simple-deal-packing-wait-tracking">
+                    {renderTrackingInfoInline(deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
                   </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="dr-card" style={{ textAlign: 'center', padding: '24px 20px' }}>
-            <div style={{ fontSize: 38, marginBottom: 10 }}>📦</div>
-            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอผู้ขายแพ็คสินค้าและจัดส่ง</div>
-            <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ขายกำลังถ่ายวิดีโอแพ็คของและจัดส่งตรงถึงคุณ — ระบบจะแจ้งเลขพัสดุให้ทันทีที่ส่งแล้ว</p>
-            <div style={{ textAlign: 'left', marginTop: 16 }}>
-              {renderParticipantStatusRows([
-                { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPacked, doneText: '✅ แพ็คและส่งแล้ว', waitText: '⏳ กำลังแพ็ค' },
-                { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
-              ], { marginBottom: 0 })}
-            </div>
-            <div style={{ marginTop: 12 }}>
-              {renderTrackingInfoCard('พัสดุจากผู้ขายถึงผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
-            </div>
-          </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="dr-card">
+                <div className="dr-card-title">หลักฐานจากผู้ขาย</div>
+                <div style={{ display: 'grid', gridTemplateColumns: packingUploadColumns, gap: 10 }}>
+                  {packingSteps.map(item => {
+                    const uploaded = packingEvidenceSlots[item.step - 1];
+                    return (
+                      <div key={item.step} style={{ minWidth: 0, border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 10, background: 'var(--surface)' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8, textAlign: 'center' }}>ขั้นตอน {item.step}</div>
+                        <div className="pack-upload-slot-media" style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)' }}>
+                          {uploaded ? (
+                            uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
+                              ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
+                              : <img src={fileUrl(uploaded.file_id)} alt={uploaded.file_name || item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          ) : (
+                            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(15, 23, 42, 0.14)', fontSize: 'clamp(34px, 6vw, 54px)', fontWeight: 800, lineHeight: 1 }}>
+                              {item.step}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 8, minHeight: 34, fontSize: 11.5, color: uploaded ? 'var(--green-600)' : 'var(--faint)', textAlign: 'center', lineHeight: 1.45 }}>
+                          {uploaded ? '✅ ผู้ขายอัปโหลดแล้ว' : '⏳ รอผู้ขายอัปโหลด'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="dr-card" style={{ textAlign: 'center', padding: '24px 20px' }}>
+                <div style={{ fontSize: 38, marginBottom: 10 }}>📦</div>
+                <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอผู้ขายแพ็คสินค้าและจัดส่ง</div>
+                <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7 }}>ผู้ขายกำลังถ่ายวิดีโอแพ็คของและจัดส่งตรงถึงคุณ — ระบบจะแจ้งเลขพัสดุให้ทันทีที่ส่งแล้ว</p>
+                <div style={{ textAlign: 'left', marginTop: 16 }}>
+                  {renderParticipantStatusRows([
+                    { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPacked, doneText: '✅ แพ็คและส่งแล้ว', waitText: '⏳ กำลังแพ็ค' },
+                    { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ได้เลขพัสดุแล้ว', waitText: '⏳ รอเลขพัสดุ' },
+                  ], { marginBottom: 0 })}
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  {renderTrackingInfoCard('พัสดุจากผู้ขายถึงผู้ซื้อ', deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       );
     }
@@ -3542,15 +3565,15 @@ export default function DealRoom() {
           {simplePackingFocus
             ? <p className="pack-upload-hint">อัปโหลด 1→2→3 แล้วกรอกเลขพัสดุ · วิดีโอไม่เกิน 5 นาที</p>
             : renderVideoUploadHint({ marginBottom: 12 })}
-          <div style={{ display: 'grid', gridTemplateColumns: packingUploadColumns, gap: simplePackingFocus ? 6 : 10 }}>
+          <div className={`pack-upload-grid${simplePackingFocus ? ' pack-upload-grid--simple' : ''}`}>
             {packingSteps.map(item => {
               const uploaded = packingEvidenceSlots[item.step - 1];
               const previewVisible = packingUploadStep === item.step && uploadPreview?.url;
               const locked = !canUploadPackingStep(item.step);
               return (
-                <div key={item.step} className={simplePackingFocus ? 'pack-upload-slot' : undefined} style={{ minWidth: 0, border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: simplePackingFocus ? 6 : 10, background: locked ? 'var(--surface-2)' : 'var(--surface)' }}>
-                  <div style={{ fontSize: simplePackingFocus ? 11 : 12, fontWeight: 700, color: 'var(--ink)', marginBottom: simplePackingFocus ? 4 : 8, textAlign: 'center' }}>ขั้นตอน {item.step}</div>
-                  <div className="pack-upload-slot-media" style={{ position: 'relative', width: '100%', aspectRatio: simplePackingFocus ? undefined : '16 / 9', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)' }}>
+                <div key={item.step} className={`pack-upload-slot${simplePackingFocus ? ' pack-upload-slot--simple' : ''}${locked ? ' is-locked' : ''}`}>
+                  <div className="pack-upload-slot-step">ขั้นตอน {item.step}</div>
+                  <div className="pack-upload-slot-media">
                     {uploaded ? (
                       uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
                         ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
@@ -3558,12 +3581,12 @@ export default function DealRoom() {
                     ) : previewVisible ? (
                       <img src={uploadPreview!.url} alt={uploadPreview!.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     ) : (
-                      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(15, 23, 42, 0.14)', fontSize: simplePackingFocus ? 28 : 'clamp(34px, 6vw, 54px)', fontWeight: 800, lineHeight: 1 }}>
+                      <div className="pack-upload-slot-placeholder">
                         {item.step}
                       </div>
                     )}
                   </div>
-                  <div style={{ marginTop: simplePackingFocus ? 4 : 8, minHeight: simplePackingFocus ? 0 : 34, fontSize: 11, color: uploaded ? 'var(--green-600)' : locked ? 'var(--faint)' : 'var(--muted)', textAlign: 'center', lineHeight: 1.35 }}>
+                  <div className="pack-upload-slot-status">
                     {uploaded
                       ? '✅ แล้ว'
                       : locked
@@ -5568,8 +5591,35 @@ export default function DealRoom() {
     const stepPayFocus = step === 1;
     const stepFocus = (step >= 3 && step < WZ_TOTAL) || stepPayFocus;
     const showDealMedia = step < 3 && !stepPayFocus;
+
+    const reviewBanner = isReviewing ? (
+      <div className="simple-deal-shell__review">
+        👀 กำลังดูขั้นตอนที่ผ่านมาแล้ว (ดูอย่างเดียว) — กด &quot;ถัดไป&quot; เพื่อกลับไปขั้นตอนปัจจุบัน
+      </div>
+    ) : undefined;
+
+    const nav = step >= 1 && !stepFocus ? (
+      <div className="simple-deal-shell__nav">
+        {step > 1
+          ? <button type="button" className="btn btn-ghost" onClick={() => setWzViewStep(Math.max(1, step - 1))}>← ย้อนกลับ</button>
+          : <span />}
+        {step < actualStep && (
+          <button type="button" className="btn btn-primary" onClick={() => goToSimpleStep(step + 1)}>ถัดไป →</button>
+        )}
+      </div>
+    ) : stepFocus && isReviewing ? (
+      <div className="simple-deal-step-nav">
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => setWzViewStep(actualStep)}>กลับขั้นปัจจุบัน →</button>
+      </div>
+    ) : undefined;
+
     return (
-      <div className={`dr-inner${stepFocus ? ' simple-deal-step-focus' : ''}`}>
+      <SimpleDealShell
+        focus={stepFocus}
+        progress={step > 0 ? renderWizardProgress(step) : undefined}
+        reviewBanner={reviewBanner}
+        nav={nav}
+      >
         {showDealMedia && <DealFlowBrand className="dr-brand-slot" />}
         {showDealMedia && (
           <DealProductGallery
@@ -5577,37 +5627,17 @@ export default function DealRoom() {
             warrantyYears={deal!.warranty_years}
             warrantyMonths={deal!.warranty_months}
             warrantyDays={deal!.warranty_days}
+            compact
           />
         )}
-        {step > 0 && renderWizardProgress(step)}
-        {isReviewing && (
-          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '8px 12px', marginBottom: 12, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>
-            👀 กำลังดูขั้นตอนที่ผ่านมาแล้ว (ดูอย่างเดียว) — กด &quot;ถัดไป&quot; เพื่อกลับไปขั้นตอนปัจจุบัน
-          </div>
-        )}
-        <div className={stepFocus ? 'simple-deal-step-body' : undefined} style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
+        <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
           {step === 1 && renderPaymentSection({ compact: true })}
           {step === 2 && renderWizardStep4()}
           {step === 3 && renderWizardStep5()}
           {step === 4 && renderWizardStep6()}
           {step === 5 && renderSimpleWizardFinal(outcome)}
         </div>
-        {step >= 1 && !stepFocus && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>
-            {step > 1
-              ? <button type="button" className="btn btn-ghost" onClick={() => setWzViewStep(Math.max(1, step - 1))}>← ย้อนกลับ</button>
-              : <span />}
-            {step < actualStep && (
-              <button type="button" className="btn btn-primary" onClick={() => goToSimpleStep(step + 1)}>ถัดไป →</button>
-            )}
-          </div>
-        )}
-        {stepFocus && isReviewing && (
-          <div className="simple-deal-step-nav">
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => setWzViewStep(actualStep)}>กลับขั้นปัจจุบัน →</button>
-          </div>
-        )}
-      </div>
+      </SimpleDealShell>
     );
   }
 
@@ -5778,7 +5808,7 @@ export default function DealRoom() {
               </nav>
               )}
 
-              <main className="dr-body">
+              <main className={`dr-body${isSimple ? ' dr-body--simple-deal' : ''}`}>
                 {dealWizardBody}
               </main>
             </>

@@ -2873,6 +2873,81 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .simple-deal-join-seller-btn:hover { filter: brightness(1.05); }
 .simple-deal-join-full { text-align: center; color: var(--muted); font-size: 14px; margin: 0; }
 
+/* ── Simple deal shell — โครงกลาง มือถือ+คอม stage เดียวกัน ── */
+.simple-deal-shell {
+  width: 100%;
+  box-sizing: border-box;
+}
+.simple-deal-shell__stage {
+  width: 100%;
+  max-width: min(100%, 520px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+.simple-deal-shell--focus .simple-deal-shell__stage {
+  gap: 8px;
+}
+.simple-deal-shell__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.simple-deal-shell__body.is-focus {
+  gap: 8px;
+}
+.simple-deal-shell__body > .dr-card {
+  width: 100%;
+}
+.simple-deal-shell__review {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.45;
+}
+.simple-deal-shell__nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.deal-app-inner .simple-deal-shell {
+  padding: 0;
+}
+.dr-body--simple-deal {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.dr-body--simple-deal .simple-deal-shell {
+  flex: 0 1 auto;
+  width: 100%;
+}
+@media (min-width: 768px) {
+  .simple-deal-shell__stage {
+    max-width: 560px;
+    padding-top: 4px;
+  }
+  .dr-body--simple-deal {
+    padding-top: 8px;
+    padding-bottom: 48px;
+  }
+}
+@media (min-width: 1024px) {
+  .simple-deal-shell__stage {
+    max-width: 580px;
+  }
+}
+
 /* ── Simple deal step 3+ — โฟกัสขั้นตอน กระชับ ไม่เว้นช่องว่าง ── */
 .simple-deal-step-focus {
   gap: 10px;
@@ -2897,9 +2972,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   padding: 12px 14px 14px;
   background: linear-gradient(135deg, #eef4ff, #e9faf2);
   border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
-  max-width: 520px;
   width: 100%;
-  margin: 0 auto;
 }
 .simple-deal-pay-head {
   display: flex;
@@ -3223,13 +3296,19 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .simple-deal-receive-card .pack-receive-dispute { color: #b22441 !important; font-size: 13px !important; }
 
 /* ขั้น 3+ ไม่ยืดเต็มจอ — เนื้อหาสั้นไม่ทิ้งช่องว่างล่าง */
-.deal-app:has(.simple-deal-step-focus) {
+.deal-app:has(.simple-deal-step-focus),
+.deal-app:has(.simple-deal-shell) {
   min-height: auto;
 }
-.deal-app-feed:has(.simple-deal-step-focus) {
+.deal-app-feed:has(.simple-deal-step-focus),
+.deal-app-feed:has(.simple-deal-shell) {
   flex: 0 1 auto;
 }
-.deal-app-inner:has(.simple-deal-step-focus) {
+.deal-app-inner:has(.simple-deal-step-focus),
+.deal-app-inner:has(.simple-deal-shell) {
+  flex: 0 1 auto;
+}
+.dr-body:has(.simple-deal-shell) {
   flex: 0 1 auto;
 }
 
@@ -3256,10 +3335,10 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   flex-shrink: 0;
   padding-top: 8px;
 }
-.simple-deal-packing-focus .pack-shipping-compact {
+.simple-deal-packing-focus .pack-shipping-card.pack-shipping-compact {
   padding: 8px 12px;
 }
-.simple-deal-packing-focus .pack-shipping-compact .dr-card-title {
+.simple-deal-packing-focus .pack-shipping-card.pack-shipping-compact .dr-card-title {
   margin-bottom: 6px;
 }
 .pack-upload-hint {
@@ -3269,8 +3348,204 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   line-height: 1.45;
 }
 .simple-deal-packing-focus .pack-upload-slot-media {
-  height: clamp(52px, 10vh, 72px);
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  height: auto;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
 }
+.pack-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.pack-upload-grid--simple {
+  gap: 6px;
+}
+.pack-upload-slot {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 10px;
+  background: var(--surface);
+}
+.pack-upload-slot--simple {
+  padding: 6px;
+}
+.pack-upload-slot.is-locked {
+  background: var(--surface-2);
+}
+.pack-upload-slot-step {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+  text-align: center;
+}
+.pack-upload-slot--simple .pack-upload-slot-step {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.pack-upload-slot-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.pack-upload-slot-media img,
+.pack-upload-slot-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pack-upload-slot-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(15, 23, 42, 0.14);
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 800;
+  line-height: 1;
+}
+.pack-upload-slot--simple .pack-upload-slot-placeholder {
+  font-size: 28px;
+}
+.pack-upload-slot-status {
+  margin-top: 8px;
+  min-height: 0;
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.pack-upload-slot--simple .pack-upload-slot-status {
+  margin-top: 4px;
+}
+.pack-upload-slot:not(.is-locked) .pack-upload-slot-status {
+  color: var(--muted);
+}
+
+/* ที่อยู่จัดส่ง — grid แทน space-between ไม่ยืดบนคอม */
+.pack-shipping-card .dr-card-title {
+  margin-bottom: 8px;
+}
+.pack-shipping-empty {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0;
+}
+.pack-shipping-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pack-shipping-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+.pack-shipping-label {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.pack-shipping-value {
+  font-weight: 700;
+  color: var(--ink);
+  text-align: right;
+  word-break: break-word;
+}
+.pack-shipping-address {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+.pack-shipping-address.is-compact {
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pack-shipping-phone {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+}
+.pack-shipping-compact .pack-shipping-phone {
+  padding: 6px 10px;
+}
+.pack-shipping-compact .pack-shipping-row,
+.pack-shipping-compact .pack-shipping-phone {
+  font-size: 12px;
+}
+.pack-shipping-phone-num {
+  font-weight: 700;
+  color: var(--accent-strong);
+  text-align: right;
+  word-break: break-all;
+}
+
+/* ผู้ซื้อรอแพ็ค — simple */
+.simple-deal-packing-evidence-card {
+  padding: 12px 14px;
+}
+.simple-deal-packing-evidence-card .dr-card-title {
+  margin-bottom: 8px;
+}
+.simple-deal-packing-wait-card {
+  text-align: center;
+  padding: 16px 14px;
+}
+.simple-deal-packing-wait-icon {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.simple-deal-packing-wait-title {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  color: var(--ink);
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+.simple-deal-packing-wait-desc {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+.simple-deal-packing-wait-status {
+  text-align: left;
+  margin-bottom: 8px;
+}
+.simple-deal-packing-wait-tracking {
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
 .simple-deal-packing-focus .pack-upload-slot .btn-sm {
   min-height: 32px;
   padding: 4px 8px;
