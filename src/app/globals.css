@@ -2873,6 +2873,121 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .simple-deal-join-seller-btn:hover { filter: brightness(1.05); }
 .simple-deal-join-full { text-align: center; color: var(--muted); font-size: 14px; margin: 0; }
 
+/* ── Simple deal step 3+ — โฟกัสขั้นตอน ไม่เลื่อน ── */
+.dr-body:has(.simple-deal-step-focus),
+.deal-app-feed:has(.simple-deal-step-focus) {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.deal-app-inner:has(.simple-deal-step-focus) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.simple-deal-step-focus {
+  flex: 1;
+  min-height: 0;
+  gap: 8px;
+  padding: 8px 12px 12px;
+  max-height: calc(100dvh - 72px);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.deal-app .simple-deal-step-focus {
+  max-height: calc(100dvh - 112px - env(safe-area-inset-bottom, 0px));
+  padding: 0;
+}
+.simple-deal-step-focus > div:first-child { margin-bottom: 6px !important; }
+.simple-deal-step-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.simple-deal-step-nav {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.simple-deal-packing-focus {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.simple-deal-packing-focus .dr-card {
+  padding: 12px 14px;
+  flex-shrink: 0;
+}
+.simple-deal-packing-focus .pack-logistics-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.simple-deal-packing-focus .pack-submit-bar {
+  margin-top: auto;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+.simple-deal-packing-focus .pack-shipping-compact {
+  padding: 8px 12px;
+}
+.simple-deal-packing-focus .pack-shipping-compact .dr-card-title {
+  margin-bottom: 6px;
+}
+.pack-upload-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: 0 0 6px;
+  line-height: 1.45;
+}
+.simple-deal-packing-focus .pack-upload-slot-media {
+  height: clamp(52px, 10vh, 72px);
+}
+.simple-deal-packing-focus .pack-upload-slot .btn-sm {
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.pack-logistics-title {
+  font-size: 15px;
+  font-weight: 800;
+  font-family: var(--font-display);
+  color: #cf2038;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.pack-tracking-title {
+  font-size: 17px;
+  font-weight: 800;
+  font-family: var(--font-display);
+  color: #cf2038;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.pack-tracking-hint {
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+.simple-deal-packing-focus .pack-logistics-field {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.simple-deal-packing-focus .pack-submit-bar .btn-lg {
+  min-height: 44px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
 .field-row { display: grid; gap: 16px; grid-template-columns: 1fr; }
 @media (min-width: 560px){ .field-row { grid-template-columns: 1fr 1fr; } }
 .field-row-3 { grid-template-columns: 1fr; }
