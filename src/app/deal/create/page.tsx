@@ -10,6 +10,8 @@ import { DealFlowBrand } from '@/components/DealFlowBrand';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { SimpleDealMediaUpload, type UploadedMedia } from '@/components/deal/SimpleDealMediaUpload';
+import { clampWarrantyInput, formatWarranty } from '@/lib/warranty';
 
 const CATS = ['สินค้าทั่วไป', 'อิเล็กทรอนิกส์', 'เสื้อผ้า', 'ยานพาหนะ', 'อสังหาริมทรัพย์', 'บริการ', 'อื่นๆ'];
 const ROLE_OPTIONS = {
@@ -38,6 +40,11 @@ function CreateDealForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fees, setFees] = useState<FeeConfig>(FEE_DEFAULTS);
+  const [media, setMedia] = useState<UploadedMedia[]>([]);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [warrantyYears, setWarrantyYears] = useState('');
+  const [warrantyMonths, setWarrantyMonths] = useState('');
+  const [warrantyDays, setWarrantyDays] = useState('');
 
   useEffect(() => {
     const r = document.documentElement;
@@ -83,6 +90,12 @@ function CreateDealForm() {
           wantedId: searchParams.get('wantedId') || '',
           dealType: isSimple ? 'simple' : '',
           serviceIntent: isSafeZone ? 'safezone' : '',
+          ...(isSimple ? {
+            imageFileIds: media.map(m => m.fileId),
+            warrantyYears: clampWarrantyInput('years', warrantyYears),
+            warrantyMonths: clampWarrantyInput('months', warrantyMonths),
+            warrantyDays: clampWarrantyInput('days', warrantyDays),
+          } : {}),
         }),
       });
       const d = await res.json();
@@ -139,6 +152,50 @@ function CreateDealForm() {
             <textarea value={description} onChange={e => setDesc(e.target.value)} rows={3} placeholder="สภาพ อุปกรณ์ที่แถม เงื่อนไขต่างๆ..." />
           </div>
 
+          {isSimple && (
+            <>
+              <SimpleDealMediaUpload
+                items={media}
+                onChange={setMedia}
+                uploading={mediaUploading}
+                onUploading={setMediaUploading}
+                onError={setError}
+              />
+
+              <div className="deal-field">
+                <label>เงื่อนไขการประกัน</label>
+                <p className="simple-deal-warranty-hint">กำหนดระยะเวลาประกัน (เว้นว่างทั้งหมด = ไม่มีประกัน)</p>
+                <div className="simple-deal-warranty-row">
+                  <label className="simple-deal-warranty-cell">
+                    <span>ปี</span>
+                    <input type="number" min={0} max={99} value={warrantyYears} onChange={e => setWarrantyYears(e.target.value)} placeholder="0" inputMode="numeric" />
+                  </label>
+                  <label className="simple-deal-warranty-cell">
+                    <span>เดือน</span>
+                    <input type="number" min={0} max={11} value={warrantyMonths} onChange={e => setWarrantyMonths(e.target.value)} placeholder="0" inputMode="numeric" />
+                  </label>
+                  <label className="simple-deal-warranty-cell">
+                    <span>วัน</span>
+                    <input type="number" min={0} max={30} value={warrantyDays} onChange={e => setWarrantyDays(e.target.value)} placeholder="0" inputMode="numeric" />
+                  </label>
+                </div>
+                {formatWarranty(
+                  clampWarrantyInput('years', warrantyYears),
+                  clampWarrantyInput('months', warrantyMonths),
+                  clampWarrantyInput('days', warrantyDays),
+                ) && (
+                  <p className="simple-deal-warranty-preview">
+                    🛡️ ประกัน {formatWarranty(
+                      clampWarrantyInput('years', warrantyYears),
+                      clampWarrantyInput('months', warrantyMonths),
+                      clampWarrantyInput('days', warrantyDays),
+                    )}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
           <div className="field-row">
             <div className="deal-field">
               <label>ราคา (บาท) *</label>
@@ -170,7 +227,7 @@ function CreateDealForm() {
 
           {error && <p style={{ color: '#b22441', fontSize: 14, marginTop: 4 }}>⚠️ {error}</p>}
 
-          <button onClick={handleCreate} disabled={loading || !serviceEnabled} className="btn btn-primary btn-block btn-lg" style={{ marginTop: 18 }}>
+          <button onClick={handleCreate} disabled={loading || mediaUploading || !serviceEnabled} className="btn btn-primary btn-block btn-lg" style={{ marginTop: 18 }}>
             {loading ? 'กำลังสร้าง...' : 'สร้างดีล & รับลิงก์แชร์'}
           </button>
           <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', marginTop: 12 }}>หลังสร้าง คัดลอกลิงก์จากหน้าดีลและส่งให้อีกฝ่าย</p>

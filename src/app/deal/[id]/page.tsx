@@ -23,6 +23,7 @@ import { MarketplacePaymentSection } from '@/components/marketplace/MarketplaceP
 import { isDirectShipOrder, isMarketplaceOrder, isListingCheckoutOrder, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
+import { DealProductGallery } from '@/components/deal/DealProductGallery';
 import { DealRoomApp, DealAppFloatBtn } from '@/components/mobile/DealRoomApp';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -239,6 +240,10 @@ interface Deal {
   buyer_id: string; buyer_name: string; creator_id?: string; created_at?: string;
   title: string; description: string; price: number; category: string;
   status: string; reject_reason: string;
+  images?: string[];
+  warranty_years?: number;
+  warranty_months?: number;
+  warranty_days?: number;
   seller_accepted_terms: boolean; middleman_accepted_terms: boolean; buyer_accepted_terms: boolean;
   middleman_confirmed_payment: boolean; buyer_confirmed_check: boolean;
   payment_slip_file_id: string; tracking_to_middleman: string; tracking_to_middleman_provider?: string; tracking_to_buyer: string; tracking_to_buyer_provider?: string;
@@ -1503,6 +1508,16 @@ export default function DealRoom() {
           <div className="dr-card">
             <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--ink)' }}>{deal.title}</div>
             {deal.description && <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>{deal.description}</p>}
+            {deal.deal_type === 'simple' && (
+              <div style={{ marginTop: 12 }}>
+                <DealProductGallery
+                  images={deal.images}
+                  warrantyYears={deal.warranty_years}
+                  warrantyMonths={deal.warranty_months}
+                  warrantyDays={deal.warranty_days}
+                />
+              </div>
+            )}
             <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--green-600)', fontFamily: 'var(--font-display)', marginTop: 10 }}>฿{deal.price.toLocaleString()}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 13, color: 'var(--muted)', marginTop: 8 }}>
               {deal.seller_name && <span>ผู้ขาย: {deal.seller_name}</span>}
@@ -5270,6 +5285,14 @@ export default function DealRoom() {
     return (
       <div className="dr-inner">
         <DealFlowBrand className="dr-brand-slot" />
+        {deal!.deal_type === 'simple' && (
+          <DealProductGallery
+            images={deal!.images}
+            warrantyYears={deal!.warranty_years}
+            warrantyMonths={deal!.warranty_months}
+            warrantyDays={deal!.warranty_days}
+          />
+        )}
         {step > 0 && renderWizardProgress(step)}
         {isReviewing && (
           <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '8px 12px', marginBottom: 12, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>

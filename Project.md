@@ -1,5 +1,24 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-11 (11:30)
+
+### ดีลซื้อขายแบบง่าย — อัปโหลดรูป/วิดีโอ + เงื่อนไขประกัน
+
+**หน้า:** `/deal/create?type=simple` และแสดงผลใน `/deal/[id]`
+
+**ฟีเจอร์:**
+- **สื่อสินค้า:** อัปโหลดรูป/วิดีโอได้ไม่จำกัด (ผ่าน `/api/upload-deal`) · แสดง grid preview · ลบทีละไฟล์ก่อนสร้างดีล
+- **ประกัน:** กำหนด ปี / เดือน / วัน แยกช่อง · preview ข้อความ · เว้นว่าง = ไม่มีประกัน
+
+**ไฟล์หลัก:**
+- `SimpleDealMediaUpload.tsx`, `DealProductGallery.tsx`, `lib/warranty.ts`
+- `POST /api/deals` รับ `imageFileIds` + `warrantyYears/Months/Days` (simple เท่านั้น)
+- Migration `0034_simple_deal_warranty.sql` — คอลัมน์ `warranty_years/months/days` บน `deals`
+
+**Migration:** ต้องรัน `0034_simple_deal_warranty.sql` บน Supabase
+
+---
+
 ## 2026-08-11 (09:40)
 
 ### Mobile Shell REDesign — ครบทุกหน้าใน scope (ตลาด/ประมูล pattern)

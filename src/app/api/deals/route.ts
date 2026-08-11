@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   try {
     const me = await verifyUser(req);
     const body = await req.json();
-    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent, listGrossPrice, auctionData, shippingCost, shippingProviders } = body;
+    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent, listGrossPrice, auctionData, shippingCost, shippingProviders, warrantyYears, warrantyMonths, warrantyDays } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isAuction = dealType === 'auction';
     const isBuyer = creatorRole === 'buyer';
@@ -131,6 +131,10 @@ export async function POST(req: NextRequest) {
 
     const resolvedDealType = dealType === 'meetup' ? 'meetup' : dealType === 'simple' ? 'simple' : dealType === 'auction' ? 'auction' : 'normal';
 
+    const wYears = Math.max(0, Math.min(99, Math.round(Number(warrantyYears) || 0)));
+    const wMonths = Math.max(0, Math.min(11, Math.round(Number(warrantyMonths) || 0)));
+    const wDays = Math.max(0, Math.min(30, Math.round(Number(warrantyDays) || 0)));
+
     const { data: doc, error } = await db.from('deals').insert({
       id: dealNumberSeed,
       deal_number: `KKL-${dealNumberSeed.replace(/-/g, '').slice(-8).toUpperCase()}`,
@@ -148,6 +152,9 @@ export async function POST(req: NextRequest) {
       creator_id: me.id,
       shipping_cost: source === 'listing' ? listingShippingCost : 0,
       shipping_providers: source === 'listing' ? listingShippingProviders : [],
+      warranty_years: resolvedDealType === 'simple' ? wYears : 0,
+      warranty_months: resolvedDealType === 'simple' ? wMonths : 0,
+      warranty_days: resolvedDealType === 'simple' ? wDays : 0,
     }).select().single();
     if (error || !doc) throw new Error(error?.message || 'create deal failed');
 

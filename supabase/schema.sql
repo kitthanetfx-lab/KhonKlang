@@ -199,6 +199,10 @@ create table deals (
   shipping_providers        text[] not null default '{}',
   buyer_shipping_provider   text,
 
+  warranty_years            integer not null default 0 check (warranty_years >= 0),
+  warranty_months           integer not null default 0 check (warranty_months >= 0 and warranty_months <= 11),
+  warranty_days             integer not null default 0 check (warranty_days >= 0 and warranty_days <= 30),
+
   wanted_post_id            uuid references wanted_posts(id),
 
   created_at                timestamptz not null default now(),
