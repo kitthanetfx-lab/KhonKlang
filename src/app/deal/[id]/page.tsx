@@ -2245,52 +2245,45 @@ export default function DealRoom() {
     }
   }
 
-  function renderCompletionReviewBlock(isCancelled: boolean) {
+  function renderCompletionReviewBlock(isCancelled: boolean, opts?: { simple?: boolean }) {
+    const simple = opts?.simple ?? false;
     const completionBtnLabel = myRole === 'seller' ? 'ยืนยัน-รับเงินค่าสินค้า' : 'บันทึกหลักฐาน-จบดีล';
+    const isNotParty = myRole === 'guest' || myRole === '';
+    const alreadyDone = completionReviewed || isCancelled || isNotParty;
+
     return (
-      <>
+      <div className={`simple-deal-final-review${simple ? ' simple-deal-final-review--simple' : ''}`}>
         {!isCancelled && (
           <ReviewPanel
             deal={deal!}
             myRole={myRole as 'buyer' | 'seller' | 'middleman'}
             headers={authHdrs}
+            variant={simple ? 'simple' : 'default'}
             onReviewed={() => { setCompletionReviewed(true); setCompletionSending(false); }}
             onRatedChange={setCompletionAllRated}
             onSubmitError={() => setCompletionSending(false)}
             externalSubmitTrigger={completionSubmitTrigger}
           />
         )}
-        {(() => {
-          const isNotParty = myRole === 'guest' || myRole === '';
-          const alreadyDone = completionReviewed || isCancelled || isNotParty;
-          if (alreadyDone) return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => router.push('/')}>
-                🏠 เสร็จสิ้น-กลับหน้าหลัก
-              </button>
-            </div>
-          );
-          if (completionAllRated) return (
-            <div style={{ marginTop: 8 }}>
-              <button
-                type="button"
-                className="btn btn-primary btn-block btn-lg"
-                disabled={completionSending}
-                onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
-              >
-                {completionSending ? '⏳ กำลังบันทึก...' : `💾 ${completionBtnLabel}`}
-              </button>
-            </div>
-          );
-          return (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>
-                🔒 {completionBtnLabel}
-              </button>
-            </div>
-          );
-        })()}
-      </>
+        {alreadyDone ? (
+          <button type="button" className="btn btn-primary btn-block btn-lg simple-deal-final-cta" onClick={() => router.push('/')}>
+            🏠 เสร็จสิ้น-กลับหน้าหลัก
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`btn btn-block btn-lg simple-deal-final-cta${completionAllRated ? ' btn-green' : ' simple-deal-final-cta--wait'}`}
+            disabled={!completionAllRated || completionSending}
+            onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
+          >
+            {completionSending
+              ? '⏳ กำลังบันทึก...'
+              : completionAllRated
+                ? `✅ ${completionBtnLabel}`
+                : `⭐ ให้คะแนนครบก่อนกดบันทึก`}
+          </button>
+        )}
+      </div>
     );
   }
 
@@ -3859,15 +3852,18 @@ export default function DealRoom() {
     const buyerOk = true;
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="dr-card dr-done-card">
-          <div className="dr-done-emoji">{doneEmoji}</div>
-          <div className="dr-done-title">{doneTitle}</div>
-          <div className="dr-done-sub">{doneSub}</div>
+      <div className="simple-deal-final">
+        <div className="dr-card dr-done-card dr-done-card--compact">
+          <div className="dr-done-emoji" aria-hidden>{doneEmoji}</div>
+          <div className="dr-done-text">
+            <div className="dr-done-title">{doneTitle}</div>
+            <div className="dr-done-sub">{doneSub}</div>
+          </div>
         </div>
 
-        {renderCompletionReviewBlock(isCancelled)}
+        {renderCompletionReviewBlock(isCancelled, { simple: true })}
 
+        <div className="simple-deal-final-extra">
         {allSlips.length > 0 && (
           <div className="dr-card">
             <div className="dr-card-title">📎 สลิปทั้งหมดในดีล</div>
@@ -3940,6 +3936,7 @@ export default function DealRoom() {
             )}
           </div>
         )}
+        </div>
       </div>
     );
   }

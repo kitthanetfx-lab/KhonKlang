@@ -3775,6 +3775,17 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 
 /* Done */
 .dr-done-card { text-align:center;padding:36px 24px;background:linear-gradient(135deg,var(--green-50),#e9f5ef);border-color:var(--green-200); }
+.dr-done-card--compact {
+  display: flex;
+  align-items: center;
+  gap: 10px 12px;
+  text-align: left;
+  padding: 10px 14px;
+}
+.dr-done-card--compact .dr-done-emoji { font-size: 26px; line-height: 1; margin: 0; flex-shrink: 0; }
+.dr-done-card--compact .dr-done-text { flex: 1; min-width: 0; }
+.dr-done-card--compact .dr-done-title { font-size: 15px; font-weight: 800; margin: 0 0 2px; line-height: 1.3; }
+.dr-done-card--compact .dr-done-sub { font-size: 12px; line-height: 1.4; }
 .dr-done-emoji { font-size:52px;line-height:1;margin-bottom:12px; }
 .dr-done-title { font-size:24px;font-family:var(--font-display);font-weight:800;color:var(--green-700);margin-bottom:6px; }
 .dr-done-sub { font-size:14px;color:var(--green-600); }
@@ -4665,6 +4676,68 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .rv-thanks-ic { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--green-50); color: var(--green-600); border: 1px solid var(--green-100); }
 .rv-thanks b { display: block; font-family: var(--font-display); font-size: 14.5px; color: var(--ink); }
 .rv-thanks span { font-size: 12.5px; color: var(--muted); }
+
+/* Simple deal — ขั้น 5 จบดีล */
+.simple-deal-final {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.simple-deal-final-review {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.simple-deal-final-review--simple .rv-card--simple {
+  padding: 12px 14px;
+  gap: 8px;
+}
+.simple-deal-final-review--simple .rv-grid--simple {
+  gap: 8px;
+}
+.simple-deal-final-review--simple .rv-row--simple {
+  padding: 8px;
+  gap: 6px;
+}
+.rv-row-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rv-row-comment-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.rv-comment--inline {
+  min-height: 44px;
+  font-size: 12.5px;
+  padding: 6px 8px;
+}
+.simple-deal-final-cta {
+  min-height: 48px;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.28);
+}
+.simple-deal-final-cta.btn-green:not(:disabled) {
+  background: var(--green-600);
+  border-color: var(--green-600);
+  color: #fff;
+}
+.simple-deal-final-cta--wait {
+  background: #fef3c7;
+  border: 2px solid #f59e0b;
+  color: #92400e;
+  font-weight: 700;
+  opacity: 1;
+  cursor: not-allowed;
+}
+.simple-deal-final-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
 @media (max-width: 559px) {
   .rv-grid { grid-template-columns: 1fr; }

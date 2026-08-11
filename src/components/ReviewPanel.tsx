@@ -30,7 +30,7 @@ interface DealParties {
   seller_id: string; seller_name: string;
   middleman_id: string; middleman_name: string;
 }
-interface RowState { rating: number; tags: string[] }
+interface RowState { rating: number; tags: string[]; comment?: string }
 interface AllReviewItem {
   reviewer_name: string;
   reviewer_role: string;
@@ -105,6 +105,7 @@ export function ReviewPanel({
   deal, myRole, headers,
   onReviewed, onRatedChange, onSubmitError,
   externalSubmitTrigger,
+  variant = 'default',
 }: {
   deal: DealParties;
   myRole: Role | 'guest' | '';
@@ -113,8 +114,11 @@ export function ReviewPanel({
   onRatedChange?: (allRated: boolean) => void;
   onSubmitError?: () => void;
   externalSubmitTrigger?: number;
+  /** simple = ดีลแบบง่าย: ไม่มีแท็กเหตุผล มีกล่องติชมต่อการ์ด */
+  variant?: 'default' | 'simple';
 }) {
   const isParty = myRole === 'buyer' || myRole === 'seller' || myRole === 'middleman';
+  const isSimple = variant === 'simple';
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [reviewed, setReviewed] = useState<boolean | null>(null);
@@ -145,8 +149,10 @@ export function ReviewPanel({
       const items = targets.map(t => ({
         targetRole: t.role,
         rating: getRow(t.role).rating,
-        tags: getRow(t.role).tags,
-        comment: t.role === 'platform' ? comment : '',
+        tags: isSimple ? [] : getRow(t.role).tags,
+        comment: isSimple
+          ? String(getRow(t.role).comment || '').slice(0, 1000)
+          : (t.role === 'platform' ? comment : ''),
       }));
       const r = await fetch('/api/reviews', {
         method: 'POST',
@@ -232,6 +238,7 @@ export function ReviewPanel({
 
   // ── ฟอร์มให้คะแนน (ไม่มีปุ่มส่ง — พ่อเป็นคนกดแทน) ───────────────────────
   const setRating = (role: string, rating: number) => setRows(r => ({ ...r, [role]: { ...getRow(role), rating } }));
+  const setRowComment = (role: string, value: string) => setRows(r => ({ ...r, [role]: { ...getRow(role), comment: value } }));
   const toggleTag = (role: string, tag: string) => setRows(r => {
     const cur = getRow(role);
     const tags = cur.tags.includes(tag) ? cur.tags.filter(t => t !== tag) : [...cur.tags, tag];
@@ -241,17 +248,19 @@ export function ReviewPanel({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {hasAnyReview && <AllReviewsSummary byReviewer={byReviewer} />}
-      <div className="dr-card rv-card">
+      <div className={`dr-card rv-card${isSimple ? ' rv-card--simple' : ''}`}>
         <div className="rv-card-head">
           <div className="dr-card-title">⭐ ให้คะแนนดีลนี้</div>
-          <p className="rv-lead">แตะดาวแต่ละการ์ด → เลือกแท็ก (ถ้ามี) → กดบันทึกด้านล่าง</p>
+          <p className="rv-lead">
+            {isSimple ? 'แตะดาวให้คะแนน แล้วกดปุ่มสีเขียวด้านล่าง' : 'แตะดาวแต่ละการ์ด → เลือกแท็ก (ถ้ามี) → กดบันทึกด้านล่าง'}
+          </p>
         </div>
 
-        <div className="rv-grid">
+        <div className={`rv-grid${isSimple ? ' rv-grid--simple' : ''}`}>
           {targets.map(t => {
             const st = getRow(t.role);
             return (
-              <div key={t.role} className="rv-row">
+              <div key={t.role} className={`rv-row${isSimple ? ' rv-row--simple' : ''}`}>
                 <div className="rv-row-head">
                   <span className={`rv-av ${t.role}`}>{t.role === 'platform' ? <Icon name="shieldCheck" size={14} /> : (t.name || '?').slice(0, 1)}</span>
                   <div className="rv-who">
@@ -277,16 +286,30 @@ export function ReviewPanel({
                       <span className="rv-rating-pill">{st.rating}/5</span>
                       <span className="rv-rating-text">{RATING_LABEL[st.rating]}</span>
                     </div>
-                    <div className="rv-tag-wrap">
-                      <div className="rv-tag-title">แตะเลือกเหตุผล</div>
-                      <div className="rv-tags">
-                        {QUICK_TAGS[t.role].map(tag => (
-                          <button key={tag} type="button" className={`rv-tag ${st.tags.includes(tag) ? 'on' : ''}`} onClick={() => toggleTag(t.role, tag)}>
-                            {tag}
-                          </button>
-                        ))}
+                    {isSimple ? (
+                      <label className="rv-row-comment">
+                        <span className="rv-row-comment-label">💬 ข้อความถึง{t.name} <span className="rv-optional">ไม่บังคับ</span></span>
+                        <textarea
+                          className="rv-comment rv-comment--inline"
+                          value={st.comment || ''}
+                          onChange={e => setRowComment(t.role, e.target.value)}
+                          placeholder="เขียนติชมสั้นๆ..."
+                          rows={2}
+                          maxLength={1000}
+                        />
+                      </label>
+                    ) : (
+                      <div className="rv-tag-wrap">
+                        <div className="rv-tag-title">แตะเลือกเหตุผล</div>
+                        <div className="rv-tags">
+                          {QUICK_TAGS[t.role].map(tag => (
+                            <button key={tag} type="button" className={`rv-tag ${st.tags.includes(tag) ? 'on' : ''}`} onClick={() => toggleTag(t.role, tag)}>
+                              {tag}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </>
                 )}
               </div>
@@ -294,17 +317,19 @@ export function ReviewPanel({
           })}
         </div>
 
-        <label className="rv-comment-wrap">
-          <span className="rv-comment-title">💬 ข้อเสนอแนะถึงทีมงาน <span className="rv-optional">ไม่บังคับ</span></span>
-          <textarea
-            className="rv-comment"
-            value={comment}
-            onChange={e => setComment(e.target.value)}
-            placeholder="เช่น อยากให้ปรับขั้นตอน / ความเร็ว / การใช้งาน..."
-            rows={2}
-            maxLength={1000}
-          />
-        </label>
+        {!isSimple && (
+          <label className="rv-comment-wrap">
+            <span className="rv-comment-title">💬 ข้อเสนอแนะถึงทีมงาน <span className="rv-optional">ไม่บังคับ</span></span>
+            <textarea
+              className="rv-comment"
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              placeholder="เช่น อยากให้ปรับขั้นตอน / ความเร็ว / การใช้งาน..."
+              rows={2}
+              maxLength={1000}
+            />
+          </label>
+        )}
 
         {error && <p className="rv-error">{error}</p>}
       </div>
