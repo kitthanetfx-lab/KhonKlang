@@ -2911,7 +2911,9 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .pack-seller-evidence-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
+  width: 60%;
+  max-width: 240px;
 }
 .pack-seller-evidence-open {
   display: block;
@@ -2944,7 +2946,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .pack-seller-evidence-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   background: #0d1117;
 }
@@ -4794,18 +4796,19 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
   flex-direction: column;
   gap: 4px;
   padding: 6px;
-  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  background: #fff;
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--line); border-radius: var(--r-pill);
-  box-shadow: var(--sh-md);
+  border: 1.5px solid rgba(37, 99, 235, .28);
+  border-radius: var(--r-pill);
+  box-shadow: 0 6px 24px rgba(15, 23, 42, .14), 0 0 0 1px rgba(15, 23, 42, .05);
 }
 /* แถบนี้ต้องแสดงทั้งตอนคอลและไม่คอล — ไม่ซ่อนตาม body.in-call เหมือน FAB อื่น */
 body.in-call .dr-floatbar { display: flex; }
 .dr-floatbar-btn {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  min-width: 64px; padding: 8px 14px; border: none; background: transparent;
+  min-width: 64px; padding: 8px 14px; border: 1px solid rgba(15, 23, 42, .1); background: #f8fafc;
   color: var(--ink-2); font-family: var(--font-display); font-weight: 600; font-size: 11.5px;
-  cursor: pointer; border-radius: var(--r-pill); transition: background .15s, color .15s; white-space: nowrap;
+  cursor: pointer; border-radius: var(--r-pill); transition: background .15s, color .15s, border-color .15s; white-space: nowrap;
 }
 .dr-floatbar-btn .ic { font-size: 18px; line-height: 1; }
 .dr-floatbar-btn:hover { background: var(--surface-2); color: var(--ink); }
@@ -7396,18 +7399,18 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   flex-direction: column;
   gap: 6px;
   padding: 6px;
-  background: rgba(255,255,255,.96);
+  background: #fff;
   border-radius: 18px;
-  box-shadow: 0 8px 32px rgba(15,23,42,.12);
-  border: 1px solid rgba(15,23,42,.06);
+  box-shadow: 0 6px 24px rgba(15, 23, 42, .14), 0 0 0 1px rgba(15, 23, 42, .05);
+  border: 1.5px solid rgba(37, 99, 235, .28);
 }
 .deal-app-fbtn {
   flex: 0 0 auto;
   width: 52px;
   min-height: 52px;
-  border: none;
+  border: 1px solid rgba(15, 23, 42, .12);
   border-radius: 14px;
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #334155;
   font-size: 11px;
   font-weight: 700;
@@ -7419,6 +7422,7 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   cursor: pointer;
   position: relative;
   padding: 4px 2px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
 }
 .deal-app-fbtn.is-on { background: var(--app-accent-soft); color: var(--app-accent); }
 .deal-app-fbtn.ringing { animation: deal-ring 1s ease-in-out infinite; background: #dcfce7; color: #15803d; }
