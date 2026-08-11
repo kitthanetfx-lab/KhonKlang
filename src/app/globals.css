@@ -4783,9 +4783,17 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
    แถบปุ่มลอยด้านล่าง (แชท / โทรเสียง / วิดีโอคอล) — แสดงตลอดทุกขั้นตอนของดีล
    ============================================================ */
 .dr-floatbar {
-  position: fixed; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  left: 50%; transform: translateX(-50%); z-index: 135;
-  display: flex; gap: 4px; padding: 6px;
+  position: fixed;
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  top: 50%;
+  transform: translateY(-50%);
+  left: auto;
+  bottom: auto;
+  z-index: 135;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--line); border-radius: var(--r-pill);
@@ -5006,8 +5014,8 @@ body.in-call .dr-floatbar { display: flex; }
 
 /* ─── media query: ลดขนาดปุ่ม floatbar 20% เฉพาะมือถือ ─── */
 @media (max-width: 720px) {
-  .dr-floatbar { gap: 2px; padding: 4px; }
-  .dr-floatbar-btn { min-width: 52px; padding: 6px 10px; font-size: 10px; }
+  .dr-floatbar { right: calc(8px + env(safe-area-inset-right, 0px)); gap: 2px; padding: 4px; }
+  .dr-floatbar-btn { min-width: 48px; padding: 6px 8px; font-size: 10px; }
   .dr-floatbar-btn .ic { font-size: 15px; }
   .dr-floatbar-btn.voice-active .dur { font-size: 12px; }
 }
@@ -7360,7 +7368,7 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 }
 
 /* Deal app */
-.deal-app { min-height: 100dvh; padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+.deal-app { min-height: 100dvh; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 .deal-app--call { padding-bottom: 0; background: #0d1117; }
 .deal-app-tabs {
   display: flex; gap: 0; padding: 0 var(--app-pad);
@@ -7377,16 +7385,40 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .deal-app-inner .dr-inner { padding: 0; gap: 12px; }
 .deal-app-inner .dr-card { border-radius: 16px; padding: 16px; }
 .deal-app-floatbar {
-  position: fixed; left: var(--app-pad); right: var(--app-pad); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  z-index: 50; display: flex; gap: 8px; padding: 8px;
-  background: rgba(255,255,255,.96); border-radius: 18px;
-  box-shadow: 0 8px 32px rgba(15,23,42,.12); border: 1px solid rgba(15,23,42,.06);
+  position: fixed;
+  right: max(8px, env(safe-area-inset-right, 0px));
+  top: 50%;
+  transform: translateY(-50%);
+  left: auto;
+  bottom: auto;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(255,255,255,.96);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(15,23,42,.12);
+  border: 1px solid rgba(15,23,42,.06);
 }
 .deal-app-fbtn {
-  flex: 1; min-height: 48px; border: none; border-radius: 14px;
-  background: #f1f5f9; color: #334155; font-size: 12px; font-weight: 700;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  cursor: pointer; position: relative;
+  flex: 0 0 auto;
+  width: 52px;
+  min-height: 52px;
+  border: none;
+  border-radius: 14px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  position: relative;
+  padding: 4px 2px;
 }
 .deal-app-fbtn.is-on { background: var(--app-accent-soft); color: var(--app-accent); }
 .deal-app-fbtn.ringing { animation: deal-ring 1s ease-in-out infinite; background: #dcfce7; color: #15803d; }
@@ -7394,7 +7426,7 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .deal-app-fbtn:disabled { opacity: .45; cursor: not-allowed; }
 .deal-app-fbtn-ic { font-size: 18px; line-height: 1; }
 .deal-app-fbtn-badge {
-  position: absolute; top: 4px; right: 8px; min-width: 18px; height: 18px; padding: 0 4px;
+  position: absolute; top: 2px; right: 2px; min-width: 18px; height: 18px; padding: 0 4px;
   border-radius: 999px; background: #ef4444; color: #fff; font-size: 10px; font-weight: 800;
   display: grid; place-items: center;
 }
