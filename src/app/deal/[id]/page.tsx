@@ -3640,22 +3640,35 @@ export default function DealRoom() {
     }
     const hasUnboxEvidence = unboxEvidence.length > 0;
     if (simpleReceiveFocus && myRole === 'buyer') {
+      const trackingNumber = deal!.tracking_to_buyer;
+      const trackingProvider = deal!.tracking_to_buyer_provider;
+      const trackingUrl = trackingNumber ? buildTrackingUrl(trackingProvider, String(trackingNumber).trim()) : null;
       return (
         <div className="dr-card simple-deal-receive-card">
+          <div className="simple-deal-receive-head">
+            <span className="simple-deal-receive-head-title">📦 หลักฐานจากผู้ขาย</span>
+            {trackingNumber && (
+              <div className="simple-deal-receive-tracking">
+                <span className="pack-tracking-inline-provider">{getLogisticsProviderLabel(trackingProvider)}</span>
+                <span className="pack-tracking-inline-code">{String(trackingNumber).trim()}</span>
+                {trackingUrl && (
+                  <a href={trackingUrl} target="_blank" rel="noreferrer" className="pack-tracking-inline-link">
+                    เช็คพัสดุ ↗
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+
           {packingEvidence.length > 0 && (
-            <>
-              <div className="dr-card-title">📦 หลักฐานจากผู้ขาย</div>
-              <p className="pack-seller-evidence-hint">แตะรูปเพื่อขยายดูชัดเจน</p>
-              <DealPackingEvidenceStrip slots={packingSlots} labels={packingStepLabels} />
-            </>
+            <DealPackingEvidenceStrip slots={packingSlots} labels={packingStepLabels} />
           )}
-          {renderTrackingInfoInline(deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
 
-          <div className="simple-deal-receive-divider" aria-hidden />
+          <p className="simple-deal-receive-note">
+            📹 ถ่ายวิดีโอก่อนแกะกล่อง · <span className="simple-deal-receive-note-warn">ไม่มีวิดีโอเรียกร้องผู้ขายไม่ได้</span>
+          </p>
 
-          <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
-          <p className="pack-receive-warn">⚠️ ต้องถ่ายวิดีโอตอนแกะกล่อง — ไม่มีวิดีโอจะเรียกร้องผู้ขายไม่ได้</p>
-          <button type="button" onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block">
+          <button type="button" onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block btn-sm simple-deal-receive-upload">
             <Icon name="upload" size={16} /> อัปโหลดวิดีโอ/รูปก่อนแกะ
           </button>
           <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
