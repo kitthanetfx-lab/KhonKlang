@@ -2180,6 +2180,7 @@ export default function DealRoom() {
   }
 
   function renderCompletionReviewBlock(isCancelled: boolean) {
+    const completionBtnLabel = myRole === 'seller' ? 'ยืนยัน-รับเงินค่าสินค้า' : 'บันทึกหลักฐาน-จบดีล';
     return (
       <>
         {!isCancelled && (
@@ -2211,14 +2212,14 @@ export default function DealRoom() {
                 disabled={completionSending}
                 onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
               >
-                {completionSending ? '⏳ กำลังบันทึก...' : '💾 บันทึกหลักฐาน-จบดีล'}
+                {completionSending ? '⏳ กำลังบันทึก...' : `💾 ${completionBtnLabel}`}
               </button>
             </div>
           );
           return (
             <div style={{ marginTop: 8 }}>
               <button type="button" className="btn btn-ghost btn-block btn-lg" disabled style={{ opacity: 0.45 }}>
-                🔒 บันทึกหลักฐาน-จบดีล
+                🔒 {completionBtnLabel}
               </button>
             </div>
           );
@@ -2430,7 +2431,6 @@ export default function DealRoom() {
 
   function getSimpleWizardStepTitle(step: number): string {
     const clamped = Math.max(1, Math.min(WZ_TOTAL, step));
-    if (clamped === WZ_TOTAL && myRole === 'seller') return 'ยืนยัน-รับเงินค่าสินค้า';
     return WIZARD_STEP_TITLES[clamped - 1];
   }
 
@@ -2559,12 +2559,9 @@ export default function DealRoom() {
           <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{Math.round((clamped / WZ_TOTAL) * 100)}%</span>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
-          {WIZARD_STEP_TITLES.map((t, i) => {
-            const barTitle = i + 1 === WZ_TOTAL && myRole === 'seller' ? 'ยืนยัน-รับเงินค่าสินค้า' : t;
-            return (
-              <div key={barTitle + i} title={barTitle} style={{ flex: 1, height: 6, borderRadius: 4, background: i + 1 < clamped ? 'var(--green-500)' : i + 1 === clamped ? 'var(--accent)' : 'var(--line)', transition: 'background .3s' }} />
-            );
-          })}
+          {WIZARD_STEP_TITLES.map((t, i) => (
+            <div key={t + i} title={t} style={{ flex: 1, height: 6, borderRadius: 4, background: i + 1 < clamped ? 'var(--green-500)' : i + 1 === clamped ? 'var(--accent)' : 'var(--line)', transition: 'background .3s' }} />
+          ))}
         </div>
       </div>
     );
@@ -3779,12 +3776,6 @@ export default function DealRoom() {
       doneSub = pd.refund_slip_file_id
         ? 'ศูนย์กลางโอนเงินคืนผู้ซื้อเรียบร้อยแล้ว'
         : 'ทีมงานกำลังดำเนินการคืนเงินให้ผู้ซื้อ';
-    } else if (myRole === 'seller') {
-      doneEmoji = hasPayout ? '🎉' : '💰';
-      doneTitle = hasPayout ? 'รับเงินค่าสินค้าแล้ว' : 'ยืนยัน-รับเงินค่าสินค้า';
-      doneSub = hasPayout
-        ? 'ศูนย์กลางโอนเงินให้แล้ว — ดูสลิปด้านล่าง'
-        : 'ผู้ซื้อยืนยันรับแล้ว — ทีมงานจะโอนเงินและแนบสลิปให้ที่นี่';
     } else {
       doneEmoji = '🎉';
       doneTitle = 'ดีลเสร็จสมบูรณ์!';
