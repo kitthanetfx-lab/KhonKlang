@@ -24,8 +24,7 @@ import { isDirectShipOrder, isMarketplaceOrder, isListingCheckoutOrder, isMarket
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
 import { DealProductGallery } from '@/components/deal/DealProductGallery';
-import { SimpleDealSummaryCard } from '@/components/deal/SimpleDealSummaryCard';
-import { SimpleDealJoinPanel, simpleDealParticipants } from '@/components/deal/SimpleDealJoinPanel';
+import { SimpleDealPreJoinScreen } from '@/components/deal/SimpleDealPreJoinScreen';
 import { DealRoomApp, DealAppFloatBtn } from '@/components/mobile/DealRoomApp';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -5243,44 +5242,42 @@ export default function DealRoom() {
     else doAction(role === 'buyer' ? 'join_as_buyer' : 'join_as_seller');
   }
 
-  /** ขั้น 0 ดีลแบบง่าย — layout เดียวกันทั้งผู้สร้างและผู้เข้าร่วม */
+  /** ขั้น 0 ดีลแบบง่าย — layout เดียวกันทั้งผู้สร้างและผู้เข้าร่วม จบในหน้าเดียว */
   function renderSimplePreJoinView() {
-    const waitingFor = !deal!.buyer_id ? 'ผู้ซื้อ' : 'ผู้ขาย';
-    const participants = simpleDealParticipants(deal!);
     const isGuestViewer = myRole === 'guest' || myRole === '';
-    return (
-      <div className="dr-inner simple-deal-prejoin">
-        <DealFlowBrand className="dr-brand-slot" />
-        <SimpleDealSummaryCard
-          title={deal!.title}
-          description={deal!.description}
-          price={deal!.price}
-          images={deal!.images}
-          warrantyYears={deal!.warranty_years}
-          warrantyMonths={deal!.warranty_months}
-          warrantyDays={deal!.warranty_days}
-          feePayer={deal!.fee_payer}
+    const dealSlice = {
+      title: deal!.title,
+      description: deal!.description,
+      price: deal!.price,
+      images: deal!.images,
+      warranty_years: deal!.warranty_years,
+      warranty_months: deal!.warranty_months,
+      warranty_days: deal!.warranty_days,
+      fee_payer: deal!.fee_payer,
+      seller_id: deal!.seller_id,
+      buyer_id: deal!.buyer_id,
+      seller_name: deal!.seller_name,
+      buyer_name: deal!.buyer_name,
+    };
+    if (isGuestViewer) {
+      return (
+        <SimpleDealPreJoinScreen
+          deal={dealSlice}
+          mode="guest"
+          notLoggedIn={!myId}
+          canBeBuyer={!deal!.buyer_id}
+          canBeSeller={!deal!.seller_id}
+          onJoin={handleSimpleJoin}
         />
-        {isGuestViewer ? (
-          <SimpleDealJoinPanel
-            mode="guest"
-            waitingFor={waitingFor}
-            participants={participants}
-            notLoggedIn={!myId}
-            canBeBuyer={!deal!.buyer_id}
-            canBeSeller={!deal!.seller_id}
-            onJoin={handleSimpleJoin}
-          />
-        ) : (
-          <SimpleDealJoinPanel
-            mode="wait"
-            waitingFor={waitingFor}
-            participants={participants}
-            copied={copied}
-            onCopyLink={copyLink}
-          />
-        )}
-      </div>
+      );
+    }
+    return (
+      <SimpleDealPreJoinScreen
+        deal={dealSlice}
+        mode="wait"
+        copied={copied}
+        onCopyLink={copyLink}
+      />
     );
   }
 

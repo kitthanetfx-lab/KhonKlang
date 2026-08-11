@@ -18,9 +18,11 @@ type Props = {
   warrantyYears?: number | null;
   warrantyMonths?: number | null;
   warrantyDays?: number | null;
+  /** ขนาดเล็กสำหรับหน้ารอ join — ให้จบในหน้าเดียวไม่ต้องเลื่อน */
+  compact?: boolean;
 };
 
-export function DealProductGallery({ images = [], warrantyYears, warrantyMonths, warrantyDays }: Props) {
+export function DealProductGallery({ images = [], warrantyYears, warrantyMonths, warrantyDays, compact = false }: Props) {
   const warranty = formatWarranty(warrantyYears, warrantyMonths, warrantyDays);
   const items = useMemo<MediaItem[]>(() => images.map(fileId => ({
     fileId,
@@ -48,7 +50,7 @@ export function DealProductGallery({ images = [], warrantyYears, warrantyMonths,
   }
 
   return (
-    <div className="deal-product-gallery">
+    <div className={`deal-product-gallery${compact ? ' deal-product-gallery--compact' : ''}`}>
       {warranty && (
         <div className="deal-product-warranty">
           <span className="deal-product-warranty-ic" aria-hidden>🛡️</span>

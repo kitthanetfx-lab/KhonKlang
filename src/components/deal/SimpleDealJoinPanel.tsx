@@ -16,6 +16,7 @@ type WaitProps = {
   participants: ParticipantRow[];
   copied: boolean;
   onCopyLink: () => void;
+  compact?: boolean;
 };
 
 type GuestProps = {
@@ -26,19 +27,28 @@ type GuestProps = {
   canBeBuyer: boolean;
   canBeSeller: boolean;
   onJoin: (role: 'buyer' | 'seller') => void;
+  compact?: boolean;
 };
 
 type Props = WaitProps | GuestProps;
 
 export function SimpleDealJoinPanel(props: Props) {
-  const { waitingFor, participants } = props;
+  const { waitingFor, participants, compact = false } = props;
+  const rootClass = compact ? 'simple-deal-join-panel simple-deal-join-panel--compact' : 'dr-card simple-deal-join-panel';
 
   return (
-    <div className="dr-card simple-deal-join-panel">
-      <div className="simple-deal-join-icon" aria-hidden>⏳</div>
-      <div className="simple-deal-join-title">รอ{waitingFor}เข้าร่วมดีล</div>
+    <div className={rootClass}>
+      <div className="simple-deal-join-heading">
+        {!compact && <div className="simple-deal-join-icon" aria-hidden>⏳</div>}
+        <div className="simple-deal-join-title">
+          {compact && <span className="simple-deal-join-title-ic" aria-hidden>⏳ </span>}
+          รอ{waitingFor}เข้าร่วมดีล
+        </div>
+      </div>
       <p className="simple-deal-join-hint">
-        ส่งลิงก์นี้ให้{waitingFor}เพื่อเข้าร่วม — เมื่อครบทั้งสองฝ่ายจะเข้าหน้าโอนเงินได้ทันที
+        {compact
+          ? `ส่งลิงก์ให้${waitingFor} — ครบสองฝ่ายแล้วโอนเงินได้ทันที`
+          : `ส่งลิงก์นี้ให้${waitingFor}เพื่อเข้าร่วม — เมื่อครบทั้งสองฝ่ายจะเข้าหน้าโอนเงินได้ทันที`}
       </p>
 
       <div className="simple-deal-join-participants">
