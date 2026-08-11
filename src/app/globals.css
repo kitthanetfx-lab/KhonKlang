@@ -2902,34 +2902,156 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   background: var(--line);
   margin: 2px 0;
 }
+.pack-seller-evidence-hint {
+  margin: -4px 0 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
 .pack-seller-evidence-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
+}
+.pack-seller-evidence-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: inherit;
+}
+.pack-seller-evidence-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-md);
 }
 .pack-seller-evidence-media {
-  height: clamp(48px, 9vh, 64px);
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
   border-radius: var(--r-md);
   overflow: hidden;
   border: 1px solid var(--line);
   background: var(--surface-2);
-  position: relative;
 }
-.pack-seller-evidence-placeholder {
+.pack-seller-evidence-media--empty {
+  display: grid;
+  place-items: center;
+}
+.pack-seller-evidence-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #0d1117;
+}
+.pack-seller-evidence-play {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  color: rgba(15, 23, 42, .12);
   font-size: 22px;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .55);
+  pointer-events: none;
+}
+.pack-seller-evidence-zoom {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .62);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.2;
+  pointer-events: none;
+}
+.pack-seller-evidence-placeholder {
+  color: rgba(15, 23, 42, .12);
+  font-size: 28px;
   font-weight: 800;
+  line-height: 1;
 }
 .pack-seller-evidence-label {
-  margin-top: 4px;
-  font-size: 10.5px;
+  margin-top: 5px;
+  font-size: 11px;
   text-align: center;
   color: var(--muted);
-  line-height: 1.3;
+  line-height: 1.35;
+  font-weight: 600;
+}
+.deal-evidence-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.deal-evidence-thumb-wrap {
+  position: relative;
+}
+.deal-evidence-thumb-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.deal-evidence-thumb-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.deal-evidence-thumb-media {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: #0d1117;
+}
+.deal-evidence-thumb-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .55);
+  pointer-events: none;
+}
+.deal-evidence-thumb-zoom {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .62);
+  color: #fff;
+  font-size: 9px;
+  pointer-events: none;
+}
+.deal-evidence-thumb-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(178, 36, 65, .92);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
 }
 .pack-tracking-inline {
   display: flex;
@@ -2967,13 +3089,16 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 }
 .simple-deal-receive-card .btn-lg { min-height: 44px; }
 .simple-deal-receive-card .pack-receive-dispute { color: #b22441 !important; font-size: 13px !important; }
-.simple-deal-receive-card [style*="grid-template-columns"] {
-  margin-top: 0 !important;
-  gap: 6px !important;
+
+/* ขั้น 3+ ไม่ยืดเต็มจอ — เนื้อหาสั้นไม่ทิ้งช่องว่างล่าง */
+.deal-app:has(.simple-deal-step-focus) {
+  min-height: auto;
 }
-.simple-deal-receive-card [style*="grid-template-columns"] img,
-.simple-deal-receive-card [style*="grid-template-columns"] video {
-  height: 64px !important;
+.deal-app-feed:has(.simple-deal-step-focus) {
+  flex: 0 1 auto;
+}
+.deal-app-inner:has(.simple-deal-step-focus) {
+  flex: 0 1 auto;
 }
 
 .simple-deal-step-nav {

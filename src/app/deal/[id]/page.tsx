@@ -24,6 +24,8 @@ import { isDirectShipOrder, isMarketplaceOrder, isListingCheckoutOrder, isMarket
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
 import { DealProductGallery } from '@/components/deal/DealProductGallery';
+import { DealPackingEvidenceStrip } from '@/components/deal/DealPackingEvidenceStrip';
+import { DealEvidenceThumbs } from '@/components/deal/DealEvidenceThumbs';
 import { SimpleDealPreJoinScreen } from '@/components/deal/SimpleDealPreJoinScreen';
 import { DealRoomApp, DealAppFloatBtn } from '@/components/mobile/DealRoomApp';
 
@@ -3335,31 +3337,13 @@ export default function DealRoom() {
   // ─── ขั้น 5: ผู้ขายแพ็ค + วิดีโอ + เลขพัสดุ ───────────────────────────────
   /** แกลเลอรีย่อรูป/วิดีโอหลักฐาน — ใช้ซ้ำให้ทั้งสองฝ่ายเห็นหลักฐานแพ็ค/แกะกล่องชุดเดียวกัน */
   function renderWizardEvidenceThumbs(items: EvidenceItem[], deletable = false) {
-    if (items.length === 0) return null;
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8, marginTop: 10 }}>
-        {items.map((item, i) => {
-          const url = item.file_id ? fileUrl(item.file_id) : '';
-          const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
-          const showDelete = deletable && canDeleteEvidenceItem(item);
-          return (
-            <div key={item.id || i} style={{ position: 'relative' }}>
-              <a href={url} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
-                {isVid
-                  ? <video src={url} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
-                  : <img src={url} alt={item.file_name} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8 }} />}
-                {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 20, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)', pointerEvents: 'none' }}>▶</span>}
-              </a>
-              {showDelete && (
-                <button type="button" onClick={() => deleteEvidenceItem(item)} title="ลบและอัปใหม่"
-                  style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 999, border: 'none', background: 'rgba(178,36,65,.92)', color: '#fff', fontSize: 12, cursor: 'pointer', lineHeight: 1 }}>
-                  ✕
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <DealEvidenceThumbs
+        items={items}
+        deletable={deletable}
+        onDelete={item => deleteEvidenceItem(item as EvidenceItem)}
+        canDelete={item => canDeleteEvidenceItem(item as EvidenceItem)}
+      />
     );
   }
 
@@ -3661,22 +3645,8 @@ export default function DealRoom() {
           {packingEvidence.length > 0 && (
             <>
               <div className="dr-card-title">📦 หลักฐานจากผู้ขาย</div>
-              <div className="pack-seller-evidence-grid">
-                {packingSlots.map((uploaded, idx) => (
-                  <div key={idx} className="pack-seller-evidence-slot">
-                    <div className="pack-seller-evidence-media">
-                      {uploaded ? (
-                        uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
-                          ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
-                          : <img src={fileUrl(uploaded.file_id)} alt={packingStepLabels[idx]} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      ) : (
-                        <span className="pack-seller-evidence-placeholder">{idx + 1}</span>
-                      )}
-                    </div>
-                    <div className="pack-seller-evidence-label">{uploaded ? `✅ ${packingStepLabels[idx]}` : packingStepLabels[idx]}</div>
-                  </div>
-                ))}
-              </div>
+              <p className="pack-seller-evidence-hint">แตะรูปเพื่อขยายดูชัดเจน</p>
+              <DealPackingEvidenceStrip slots={packingSlots} labels={packingStepLabels} />
             </>
           )}
           {renderTrackingInfoInline(deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
