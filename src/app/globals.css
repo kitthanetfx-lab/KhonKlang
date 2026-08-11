@@ -5749,12 +5749,12 @@ html, body { overflow-x: hidden; max-width: 100%; }
 .home-fab { position: fixed; left: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 140; width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: #fff; border: none; display: grid; place-items: center; box-shadow: var(--sh-lg); transition: transform .2s, background .2s; }
 .home-fab:hover { background: var(--accent-strong); transform: translateY(-3px); }
 .home-fab:focus-visible { outline: none; box-shadow: var(--ring), var(--sh-lg); }
-/* ห้องดีล: ลดขนาด 30% + เลื่อนขึ้นจากขอบล่าง */
+/* ห้องดีล: ลดขนาด 30% + ห่างขอบล่าง 25px */
 body:has(.deal-app) .home-fab,
 body:has(.dr-root) .home-fab {
   width: 45px;
   height: 45px;
-  bottom: calc(18px + 76px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(25px + env(safe-area-inset-bottom, 0px));
 }
 body:has(.deal-app) .home-fab svg,
 body:has(.dr-root) .home-fab svg {
@@ -5768,7 +5768,7 @@ body:has(.dr-root) .home-fab svg {
     width: 42px;
     height: 42px;
     left: 14px;
-    bottom: calc(14px + 72px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(25px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -5787,7 +5787,7 @@ button.is-loading { cursor: progress; }
 .sw-wrap { position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 150; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
 body:has(.deal-app) .sw-wrap,
 body:has(.dr-root) .sw-wrap {
-  bottom: calc(18px + 76px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(25px + env(safe-area-inset-bottom, 0px));
 }
 body:has(.deal-app) .sw-fab,
 body:has(.dr-root) .sw-fab {
@@ -5812,7 +5812,7 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   body:has(.deal-app) .sw-wrap,
   body:has(.dr-root) .sw-wrap {
     right: 14px;
-    bottom: calc(14px + 72px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(25px + env(safe-area-inset-bottom, 0px));
   }
   .sw-fab { width: 60px; height: 60px; }
   body:has(.deal-app) .sw-fab,
@@ -8015,88 +8015,94 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .deal-app-inner .dr-inner { padding: 0; gap: 12px; }
 .deal-app-inner .dr-card { border-radius: 16px; padding: 16px; }
 
-/* แถบแชท/โทร/วิดีโอ — ซ่อนที่ขอบ ดึงออกได้ */
-.deal-comm-floatbar-backdrop {
+/* แถบแชท/โทร/วิดีโอ — FAB กดเปิด-ปิด (แบบปุ่มสลับโหมด) */
+.deal-comm-dial {
   position: fixed;
-  inset: 0;
-  z-index: 49;
-  border: none;
-  background: transparent;
-  cursor: default;
-}
-.deal-comm-floatbar {
-  position: fixed;
-  right: 0;
+  right: max(16px, env(safe-area-inset-right, 0px));
   top: 50%;
   transform: translateY(-50%);
-  z-index: 50;
-  display: flex;
-  flex-direction: row-reverse;
-  align-items: stretch;
-  pointer-events: none;
-}
-.deal-comm-floatbar-tab {
-  pointer-events: auto;
-  flex-shrink: 0;
-  width: 26px;
-  min-height: 72px;
-  padding: 8px 4px;
-  border: 1.5px solid rgba(37, 99, 235, .35);
-  border-right: none;
-  border-radius: 12px 0 0 12px;
-  background: #fff;
-  color: var(--app-accent, #2f6bf0);
-  box-shadow: -4px 0 16px rgba(15, 23, 42, .1);
-  cursor: pointer;
+  z-index: 135;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  position: relative;
+  gap: 10px;
 }
-.deal-comm-floatbar-tab-ic {
-  font-size: 16px;
+body.in-call .deal-comm-dial { display: flex; }
+.deal-comm-dial-toggle {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent, #2f6bf0);
+  color: #fff;
+  box-shadow: var(--sh-lg, 0 8px 28px rgba(15, 23, 42, .18));
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  position: relative;
+  transition: transform .2s, background .2s, box-shadow .2s;
+}
+.deal-comm-dial-toggle:hover {
+  background: var(--accent-strong, #1d4ed8);
+  transform: scale(1.04);
+}
+.deal-comm-dial-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--ring, 0 0 0 3px rgba(47, 107, 240, .35)), var(--sh-lg, 0 8px 28px rgba(15, 23, 42, .18));
+}
+.deal-comm-dial.is-open .deal-comm-dial-toggle {
+  background: var(--ink-2, #475569);
+}
+.deal-comm-dial-toggle-ic {
+  font-size: 22px;
   line-height: 1;
   font-weight: 800;
 }
-.deal-comm-floatbar-tab-badge {
+.deal-comm-dial-badge {
   position: absolute;
-  top: 4px;
-  left: 2px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 3px;
+  top: -2px;
+  right: -2px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
   border-radius: 999px;
-  background: #ef4444;
+  background: var(--rose-500, #ef4444);
   color: #fff;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   display: grid;
   place-items: center;
+  border: 2px solid #fff;
 }
-.deal-comm-floatbar-panel {
-  pointer-events: auto;
+.deal-comm-dial-menu {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 6px;
-  background: #fff;
-  border: 1.5px solid rgba(37, 99, 235, .28);
-  border-right: none;
-  border-radius: 18px 0 0 18px;
-  box-shadow: -6px 0 24px rgba(15, 23, 42, .14);
-  transform: translateX(100%);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-  max-height: min(70vh, 320px);
-  overflow-y: auto;
+  gap: 8px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(10px) scale(0.94);
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.22s;
 }
-.deal-comm-floatbar.is-open .deal-comm-floatbar-panel {
-  transform: translateX(0);
+.deal-comm-dial.is-open .deal-comm-dial-menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
 }
-.deal-comm-floatbar-panel .deal-app-fbtn,
-.deal-comm-floatbar-panel .dr-floatbar-btn {
+.deal-comm-dial-menu .deal-app-fbtn,
+.deal-comm-dial-menu .dr-floatbar-btn {
   flex-shrink: 0;
+  min-width: 56px;
+  min-height: 56px;
+}
+@media (max-width: 480px) {
+  .deal-comm-dial { right: max(12px, env(safe-area-inset-right, 0px)); }
+  .deal-comm-dial-toggle { width: 52px; height: 52px; }
+  .deal-comm-dial-toggle-ic { font-size: 20px; }
+  .deal-comm-dial-menu .deal-app-fbtn,
+  .deal-comm-dial-menu .dr-floatbar-btn { min-width: 52px; min-height: 52px; }
 }
 
 .deal-app-floatbar {
