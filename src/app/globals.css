@@ -2512,6 +2512,148 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   color: var(--muted);
 }
 
+/* รูป/วิดีโอในดีล — คลิกเปิด popup เท่านั้น */
+.deal-clickable-media {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  text-align: left;
+}
+.deal-clickable-media:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.deal-clickable-media-el {
+  width: 100%;
+  display: block;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.deal-clickable-media-play,
+.deal-clickable-media-zoom {
+  position: absolute;
+  pointer-events: none;
+}
+.deal-clickable-media-play {
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .55);
+}
+.deal-clickable-media-zoom {
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .62);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.2;
+}
+.deal-clickable-media--fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+.deal-clickable-media--fill .deal-clickable-media-el {
+  border: none;
+  border-radius: inherit;
+}
+.deal-media-open-link {
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent-strong);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.deal-media-open-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.deal-media-thumb-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+.deal-media-thumb-cell {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.deal-media-thumb-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.deal-media-thumb-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.deal-media-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.deal-media-thumb-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+  pointer-events: none;
+}
+.deal-media-thumb-zoom {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .62);
+  color: #fff;
+  font-size: 9px;
+  line-height: 1.2;
+  pointer-events: none;
+}
+.deal-media-thumb-label {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.35;
+}
+
 /* compact gallery — หน้ารอ join ให้พอดี viewport */
 .deal-product-gallery--compact {
   margin-bottom: 8px;
@@ -3193,13 +3335,18 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   font-weight: 600;
 }
 .deal-evidence-thumbs {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 8px;
+  width: 100%;
 }
 .deal-evidence-thumb-wrap {
   position: relative;
+  flex: 0 0 auto;
+  width: 96px;
 }
 .deal-evidence-thumb-btn {
   display: block;

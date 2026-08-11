@@ -27,6 +27,7 @@ import { DealProductGallery } from '@/components/deal/DealProductGallery';
 import { DealPackingEvidenceStrip } from '@/components/deal/DealPackingEvidenceStrip';
 import { DealPackingUploadGrid } from '@/components/deal/DealPackingUploadGrid';
 import { DealEvidenceThumbs } from '@/components/deal/DealEvidenceThumbs';
+import { DealClickableMedia, DealMediaOpenLink, DealMediaThumbGallery, isDealImageFile, isDealVideoFile } from '@/components/deal/DealClickableMedia';
 import { SimpleDealPreJoinScreen } from '@/components/deal/SimpleDealPreJoinScreen';
 import { DealCommFloatbar, DealCommOrb } from '@/components/deal/DealCommFloatbar';
 import { DealOthersReviewsSummary } from '@/components/deal/DealOthersReviewsSummary';
@@ -218,7 +219,7 @@ function FloatingChatBox({ msgs, myId, chatInput, setChatInput, sending, acting,
             <div key={m.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
               {!isMe && <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2 }}>{m.sender_name}</div>}
               <div style={{ background: isMe ? 'var(--accent)' : 'var(--surface-2)', color: isMe ? '#fff' : 'var(--ink)', padding: '6px 10px', borderRadius: 10, fontSize: 13, wordBreak: 'break-word' }}>
-                {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 160, borderRadius: 8 }} /></a>
+                {m.type === 'image' ? <DealClickableMedia url={fileUrl(m.file_id)} alt={m.file_name} label={m.file_name} maxHeight={160} style={{ maxWidth: 160 }} />
                   : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>📎 {m.file_name}</a>
                   : m.content}
               </div>
@@ -1442,7 +1443,7 @@ export default function DealRoom() {
                     <div className="dr-bubble-col">
                       <span className="dr-bubble-sender">{m.sender_name}</span>
                       <div className={bubbleClass(m, false)}>
-                        {m.type === 'image' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(m.file_id)} alt={m.file_name} style={{ maxWidth: 180, borderRadius: 8 }} /></a>
+                        {m.type === 'image' ? <DealClickableMedia url={fileUrl(m.file_id)} alt={m.file_name} label={m.file_name} maxHeight={180} />
                           : m.type === 'file' ? <a href={fileUrl(m.file_id)} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>📎 {m.file_name}</a>
                           : m.content}
                       </div>
@@ -1466,8 +1467,8 @@ export default function DealRoom() {
                       <div key={item.id || i} style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>
                         <div style={{ marginBottom: 4 }}>{item.type}{item.uploader_name ? ` · ${item.uploader_name}` : ''}</div>
                         {!item.file_id ? <div style={{ fontSize: 13, color: 'var(--ink)' }}>{item.content}</div>
-                          : isVid ? <video src={url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 8 }} />
-                          : isImg ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.file_name} style={{ maxWidth: '100%', maxHeight: 180, borderRadius: 8, objectFit: 'contain' }} /></a>
+                          : isDealVideoFile(item.file_name) ? <DealClickableMedia url={url} alt={item.file_name} label={item.file_name} isVideo maxHeight={200} />
+                          : isDealImageFile(item.file_name) ? <DealClickableMedia url={url} alt={item.file_name} label={item.file_name} maxHeight={180} />
                           : <a href={url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>📎 {item.file_name}</a>}
                       </div>
                     );
@@ -1761,7 +1762,9 @@ export default function DealRoom() {
                     </button>
                   </>
                 )}
-                {r.slip && <a href={fileUrl(r.slip)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--accent-strong)', textDecoration: 'underline' }}>ดูสลิป</a>}
+                {r.slip && (
+                  <DealMediaOpenLink url={fileUrl(r.slip)} label="สลิปเงินประกัน">ดูสลิป</DealMediaOpenLink>
+                )}
               </div>
               {/* สถานะการเดินทาง: เวลาออกเดินทาง + ตำแหน่งล่าสุด (เปิดดูแผนที่ได้) */}
               {(meetStage || s === 'completed') && r.departedAt && (
@@ -2194,9 +2197,7 @@ export default function DealRoom() {
           {slips.map(s => (
             <div key={s.label}>
               <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 4 }}>{s.label}</div>
-              <a href={fileUrl(s.fileId)} target="_blank" rel="noreferrer">
-                <img src={fileUrl(s.fileId)} alt={s.label} style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} />
-              </a>
+              <DealClickableMedia url={fileUrl(s.fileId)} alt={s.label} label={s.label} maxHeight={200} />
             </div>
           ))}
         </div>
@@ -2466,8 +2467,8 @@ export default function DealRoom() {
                 </div>
                 {!item.file_id
                   ? <div style={{ fontSize: 14, color: 'var(--ink)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.content || '(ไม่มีข้อความ)'}</div>
-                  : isVid ? <video src={url} controls style={{ width: '100%', maxHeight: 220, borderRadius: 'var(--r-md)', background: '#000' }} />
-                  : isImg ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.file_name} style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 'var(--r-md)' }} /></a>
+                  : isDealVideoFile(item.file_name) ? <DealClickableMedia url={url} alt={item.file_name} label={typeLabel[item.type] || item.type} isVideo maxHeight={220} />
+                  : isDealImageFile(item.file_name) ? <DealClickableMedia url={url} alt={item.file_name} label={typeLabel[item.type] || item.type} maxHeight={220} />
                   : <a href={url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', fontSize: 14 }}>📎 {item.file_name || 'เปิดไฟล์'}</a>}
                 {item.file_id && item.content ? <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>{item.content}</div> : null}
               </div>
@@ -3167,8 +3168,8 @@ export default function DealRoom() {
                     </div>
                     {!item.file_id
                       ? <div style={{ fontSize: 14, color: 'var(--ink)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.content || '(ไม่มีข้อความ)'}</div>
-                      : isVid ? <video src={url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 'var(--r-md)', background: '#000' }} />
-                      : isImg ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={item.file_name} style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 'var(--r-md)' }} /></a>
+                      : isDealVideoFile(item.file_name) ? <DealClickableMedia url={url} alt={item.file_name} label={item.type} isVideo maxHeight={200} />
+                      : isDealImageFile(item.file_name) ? <DealClickableMedia url={url} alt={item.file_name} label={item.file_name} maxHeight={200} />
                       : <a href={url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', fontSize: 14 }}>📎 {item.file_name || 'เปิดไฟล์'}</a>}
                   </div>
                 );
@@ -3380,10 +3381,10 @@ export default function DealRoom() {
         <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 16 }}>ศูนย์กลางกำลังตรวจสลิปที่อัปโหลดไว้ — เมื่อยืนยันรับเงินแล้ว ผู้ขายจะเริ่มแพ็คสินค้าได้ทันที</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {deal!.payment_slip_file_id && (
-            <a href={fileUrl(deal!.payment_slip_file_id)} target="_blank" rel="noreferrer"><img src={fileUrl(deal!.payment_slip_file_id)} alt="สลิปผู้ซื้อ" style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+            <DealClickableMedia url={fileUrl(deal!.payment_slip_file_id)} alt="สลิปผู้ซื้อ" label="สลิปผู้ซื้อ" maxHeight={180} />
           )}
           {pd.seller_fee_slip && (
-            <a href={fileUrl(pd.seller_fee_slip)} target="_blank" rel="noreferrer"><img src={fileUrl(pd.seller_fee_slip)} alt="สลิปผู้ขาย" style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+            <DealClickableMedia url={fileUrl(pd.seller_fee_slip)} alt="สลิปผู้ขาย" label="สลิปผู้ขาย" maxHeight={180} />
           )}
         </div>
         <div style={{ textAlign: 'left', marginTop: 16 }}>
@@ -3437,8 +3438,8 @@ export default function DealRoom() {
               {packingHeaderSteps.map(item => (
                 <div key={item.step} style={{ minWidth: 0 }}>
                   <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
-                    <img src={item.imageSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    <div style={{ position: 'absolute', top: 8, left: 8, minWidth: 26, height: 26, borderRadius: 999, background: 'rgba(15, 23, 42, .72)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>
+                    <DealClickableMedia url={item.imageSrc} alt={item.title} label={item.title} fill objectFit="cover" />
+                    <div style={{ position: 'absolute', top: 8, left: 8, minWidth: 26, height: 26, borderRadius: 999, background: 'rgba(15, 23, 42, .72)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, pointerEvents: 'none' }}>
                       {item.step}
                     </div>
                   </div>
@@ -3490,9 +3491,14 @@ export default function DealRoom() {
                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8, textAlign: 'center' }}>ขั้นตอน {item.step}</div>
                         <div className="pack-upload-slot-media" style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)' }}>
                           {uploaded ? (
-                            uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
-                              ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
-                              : <img src={fileUrl(uploaded.file_id)} alt={uploaded.file_name || item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            <DealClickableMedia
+                              url={fileUrl(uploaded.file_id)}
+                              alt={uploaded.file_name || item.title}
+                              label={uploaded.file_name || item.title}
+                              isVideo={isDealVideoFile(uploaded.file_name)}
+                              fill
+                              objectFit="cover"
+                            />
                           ) : (
                             <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(15, 23, 42, 0.14)', fontSize: 'clamp(34px, 6vw, 54px)', fontWeight: 800, lineHeight: 1 }}>
                               {item.step}
@@ -3535,8 +3541,8 @@ export default function DealRoom() {
             {packingHeaderSteps.map(item => (
               <div key={item.step} style={{ minWidth: 0 }}>
                 <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
-                  <img src={item.imageSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  <div style={{ position: 'absolute', top: 8, left: 8, minWidth: 26, height: 26, borderRadius: 999, background: 'rgba(15, 23, 42, .72)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>
+                  <DealClickableMedia url={item.imageSrc} alt={item.title} label={item.title} fill objectFit="cover" />
+                  <div style={{ position: 'absolute', top: 8, left: 8, minWidth: 26, height: 26, borderRadius: 999, background: 'rgba(15, 23, 42, .72)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, pointerEvents: 'none' }}>
                     {item.step}
                   </div>
                 </div>
@@ -3775,9 +3781,14 @@ export default function DealRoom() {
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8, textAlign: 'center' }}>ขั้นตอน {idx + 1}</div>
                   <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
                     {uploaded ? (
-                      uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
-                        ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} controls />
-                        : <img src={fileUrl(uploaded.file_id)} alt={packingStepLabels[idx]} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      <DealClickableMedia
+                        url={fileUrl(uploaded.file_id)}
+                        alt={packingStepLabels[idx]}
+                        label={packingStepLabels[idx]}
+                        isVideo={isDealVideoFile(uploaded.file_name)}
+                        fill
+                        objectFit="cover"
+                      />
                     ) : (
                       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(15,23,42,0.14)', fontSize: 'clamp(34px,6vw,54px)', fontWeight: 800, lineHeight: 1 }}>
                         {idx + 1}
@@ -3869,15 +3880,13 @@ export default function DealRoom() {
         {allSlips.length > 0 && (
           <div className="dr-card">
             <div className="dr-card-title">📎 สลิปทั้งหมดในดีล</div>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(allSlips.length, 2)}, 1fr)`, gap: 10 }}>
-              {allSlips.map(s => (
-                <div key={s.fileId}>
-                  <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 5, textAlign: 'center' }}>{s.label}</div>
-                  <a href={fileUrl(s.fileId)} target="_blank" rel="noreferrer">
-                    <img src={fileUrl(s.fileId)} alt={s.label} style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
-                  </a>
-                </div>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <DealMediaThumbGallery
+                items={allSlips.map(s => ({ fileId: s.fileId, label: s.label }))}
+                resolveUrl={fileUrl}
+                thumbHeight={180}
+                thumbWidth="min(160px, 42vw)"
+              />
             </div>
           </div>
         )}
@@ -4026,15 +4035,13 @@ export default function DealRoom() {
         {allSlips.length > 0 && (
           <div className="dr-card">
             <div className="dr-card-title">📎 สลิปทั้งหมดในดีล</div>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(allSlips.length, 2)}, 1fr)`, gap: 10 }}>
-              {allSlips.map(s => (
-                <div key={s.fileId}>
-                  <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 5, textAlign: 'center' }}>{s.label}</div>
-                  <a href={fileUrl(s.fileId)} target="_blank" rel="noreferrer">
-                    <img src={fileUrl(s.fileId)} alt={s.label} style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
-                  </a>
-                </div>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <DealMediaThumbGallery
+                items={allSlips.map(s => ({ fileId: s.fileId, label: s.label }))}
+                resolveUrl={fileUrl}
+                thumbHeight={180}
+                thumbWidth="min(160px, 42vw)"
+              />
             </div>
           </div>
         )}
@@ -4424,9 +4431,16 @@ export default function DealRoom() {
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink)', marginBottom: 6, textAlign: 'center' }}>ขั้น {item.step}</div>
                     <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
                       {uploaded
-                        ? (uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
-                          ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
-                          : <img src={fileUrl(uploaded.file_id)} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />)
+                        ? (
+                          <DealClickableMedia
+                            url={fileUrl(uploaded.file_id)}
+                            alt={item.title}
+                            label={item.title}
+                            isVideo={isDealVideoFile(uploaded.file_name)}
+                            fill
+                            objectFit="cover"
+                          />
+                        )
                         : <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 28, fontWeight: 800, color: 'rgba(15,23,42,.12)' }}>{item.step}</div>}
                     </div>
                     <button type="button" className="btn btn-soft btn-block btn-sm" style={{ marginTop: 6, fontSize: 11 }}
@@ -4680,15 +4694,13 @@ export default function DealRoom() {
           {allSlips14.length > 0 && (
             <div className="dr-card">
               <div className="dr-card-title">📎 สลิปทั้งหมดในดีล</div>
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(allSlips14.length, 2)}, 1fr)`, gap: 10 }}>
-                {allSlips14.map(s => (
-                  <div key={s.fileId}>
-                    <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 5, textAlign: 'center' }}>{s.label}</div>
-                    <a href={fileUrl(s.fileId)} target="_blank" rel="noreferrer">
-                      <img src={fileUrl(s.fileId)} alt={s.label} style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)', background: 'var(--surface-2)' }} />
-                    </a>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <DealMediaThumbGallery
+                  items={allSlips14.map(s => ({ fileId: s.fileId, label: s.label }))}
+                  resolveUrl={fileUrl}
+                  thumbHeight={180}
+                  thumbWidth="min(160px, 42vw)"
+                />
               </div>
             </div>
           )}
@@ -5141,7 +5153,7 @@ export default function DealRoom() {
               <span style={{ fontSize: 12.5, color: r.slip ? 'var(--green-600)' : 'var(--faint)' }}>{r.slip ? '✅ ส่งสลิปแล้ว' : '⏳ รอ'}</span>
             </div>
             {r.slip
-              ? <a href={fileUrl(r.slip)} target="_blank" rel="noreferrer"><img src={fileUrl(r.slip)} alt="สลิปเงินประกัน" style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} /></a>
+              ? <DealClickableMedia url={fileUrl(r.slip)} alt="สลิปเงินประกัน" label="สลิปเงินประกัน" maxHeight={160} />
               : isParty && r.side === myRole && (
                 <button onClick={() => meetupSlipInputRef.current?.click()} className="btn btn-green btn-block"><Icon name="upload" size={16} /> อัปโหลดสลิปเงินประกัน</button>
               )}
@@ -5175,7 +5187,7 @@ export default function DealRoom() {
               <div key={r.side} style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: 10 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{r.label}</div>
                 {r.slip
-                  ? <a href={fileUrl(r.slip)} target="_blank" rel="noreferrer"><img src={fileUrl(r.slip)} alt={r.label} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 'var(--r-sm)', border: '1px solid var(--line)' }} /></a>
+                  ? <DealClickableMedia url={fileUrl(r.slip)} alt={r.label} label={r.label} maxHeight={120} objectFit="cover" />
                   : <div style={{ height: 120, display: 'grid', placeItems: 'center', fontSize: 12, color: 'var(--faint)', border: '1px dashed var(--line)', borderRadius: 'var(--r-sm)' }}>ยังไม่อัปสลิป</div>}
                 <div style={{ fontSize: 12, marginTop: 6, fontWeight: 600, color: r.verified ? 'var(--green-600)' : 'var(--muted)' }}>
                   {r.verified ? '✅ ตรวจแล้ว — ถูกต้อง' : r.slip ? '⏳ รอศูนย์กลางตรวจ' : '⏳ รอวางเงินประกัน'}
@@ -5273,20 +5285,13 @@ export default function DealRoom() {
               <div className="dr-card-title">📷 หลักฐานการเจอกัน (บังคับ)</div>
               <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>ถ่ายรูปหรือวิดีโอขณะเจอกัน — ต้องอัปโหลดอย่างน้อย 1 ชิ้นก่อนกดยืนยัน</p>
               {meetEvidence.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 8, marginBottom: 10 }}>
-                  {meetEvidence.map((item, i) => {
-                    const url = item.file_id ? fileUrl(item.file_id) : '';
-                    const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
-                    return (
-                      <a key={item.id || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', position: 'relative' }}>
-                        {isVid
-                          ? <video src={url} style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
-                          : <img src={url} alt={item.file_name} style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8 }} />}
-                        {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 18, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>▶</span>}
-                      </a>
-                    );
-                  })}
-                </div>
+                <DealMediaThumbGallery
+                  items={meetEvidence.filter(e => e.file_id).map(item => ({ id: item.id, fileId: item.file_id!, fileName: item.file_name }))}
+                  resolveUrl={fileUrl}
+                  thumbHeight={80}
+                  thumbWidth="min(90px, 22vw)"
+                  showLabels={false}
+                />
               )}
               <button type="button" className="btn btn-soft btn-block btn-sm" onClick={() => meetupMeetEvidInputRef.current?.click()}>
                 <Icon name="upload" size={15} /> {meetEvidence.length > 0 ? 'เพิ่มหลักฐาน' : 'อัปโหลดรูป/วิดีโอหลักฐาน'}
@@ -5348,36 +5353,22 @@ export default function DealRoom() {
         {depositSlips.length > 0 && (
           <div className="dr-card">
             <div className="dr-card-title">🧾 สลิปเงินประกัน</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
-              {depositSlips.map(s => (
-                <div key={s.id}>
-                  <a href={fileUrl(s.id)} target="_blank" rel="noreferrer">
-                    <img src={fileUrl(s.id)} alt={s.label} style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} />
-                  </a>
-                  <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{s.label}</p>
-                </div>
-              ))}
-            </div>
+            <DealMediaThumbGallery
+              items={depositSlips.map(s => ({ fileId: s.id, label: s.label }))}
+              resolveUrl={fileUrl}
+              thumbHeight={110}
+            />
           </div>
         )}
-        {/* gallery หลักฐานการเจอกัน */}
         {meetEvidItems.length > 0 && (
           <div className="dr-card">
             <div className="dr-card-title">📷 หลักฐานการเจอกัน</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
-              {meetEvidItems.map((item, i) => {
-                const url = item.file_id ? fileUrl(item.file_id) : '';
-                const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
-                return (
-                  <a key={item.id || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', position: 'relative' }}>
-                    {isVid
-                      ? <video src={url} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
-                      : <img src={url} alt={item.file_name} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8 }} />}
-                    {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 18, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>▶</span>}
-                  </a>
-                );
-              })}
-            </div>
+            <DealMediaThumbGallery
+              items={meetEvidItems.filter(e => e.file_id).map(item => ({ id: item.id, fileId: item.file_id!, fileName: item.file_name }))}
+              resolveUrl={fileUrl}
+              thumbHeight={90}
+              showLabels={false}
+            />
           </div>
         )}
       </div>
@@ -5416,36 +5407,22 @@ export default function DealRoom() {
         {allSlips.length > 0 && (
           <div className="dr-card">
             <div className="dr-card-title">🧾 สลิปทั้งหมดในดีล</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
-              {allSlips.map(s => (
-                <div key={s.id}>
-                  <a href={fileUrl(s.id)} target="_blank" rel="noreferrer">
-                    <img src={fileUrl(s.id)} alt={s.label} style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }} />
-                  </a>
-                  <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{s.label}</p>
-                </div>
-              ))}
-            </div>
+            <DealMediaThumbGallery
+              items={allSlips.map(s => ({ fileId: s.id, label: s.label }))}
+              resolveUrl={fileUrl}
+              thumbHeight={110}
+            />
           </div>
         )}
-        {/* gallery หลักฐานการเจอกัน */}
         {meetEvidItems.length > 0 && (
           <div className="dr-card">
             <div className="dr-card-title">📷 หลักฐานการเจอกัน</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
-              {meetEvidItems.map((item, i) => {
-                const url = item.file_id ? fileUrl(item.file_id) : '';
-                const isVid = item.file_name?.match(/\.(mp4|mov|avi|webm)$/i);
-                return (
-                  <a key={item.id || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', position: 'relative' }}>
-                    {isVid
-                      ? <video src={url} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
-                      : <img src={url} alt={item.file_name} style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8 }} />}
-                    {isVid && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 18, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>▶</span>}
-                  </a>
-                );
-              })}
-            </div>
+            <DealMediaThumbGallery
+              items={meetEvidItems.filter(e => e.file_id).map(item => ({ id: item.id, fileId: item.file_id!, fileName: item.file_name }))}
+              resolveUrl={fileUrl}
+              thumbHeight={90}
+              showLabels={false}
+            />
           </div>
         )}
       </div>
