@@ -24,6 +24,8 @@ import { isDirectShipOrder, isMarketplaceOrder, isListingCheckoutOrder, isMarket
 import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
 import { DealProductGallery } from '@/components/deal/DealProductGallery';
+import { SimpleDealSummaryCard } from '@/components/deal/SimpleDealSummaryCard';
+import { SimpleDealJoinPanel, simpleDealParticipants } from '@/components/deal/SimpleDealJoinPanel';
 import { DealRoomApp, DealAppFloatBtn } from '@/components/mobile/DealRoomApp';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -1472,8 +1474,8 @@ export default function DealRoom() {
     );
   }
 
-  // ─── Guest / not-logged-in join panel ───────────────────────────────────
-  if (myRole === 'guest' || myRole === '') {
+  // ─── Guest / not-logged-in join panel (regular/meetup — simple ใช้ shell ร่วมกับผู้สร้าง) ───
+  if ((myRole === 'guest' || myRole === '') && !isSimple) {
     const canBeBuyer = !deal.buyer_id, canBeSeller = !deal.seller_id, notLoggedIn = !myId;
     const dealUrl = typeof window !== 'undefined' ? window.location.href : '';
     function handleJoin(role: 'buyer' | 'seller') {
@@ -5234,6 +5236,54 @@ export default function DealRoom() {
     );
   }
 
+  function handleSimpleJoin(role: 'buyer' | 'seller') {
+    const notLoggedIn = !myId;
+    const dealUrl = typeof window !== 'undefined' ? window.location.href : '';
+    if (notLoggedIn) router.push(`/login?returnTo=${encodeURIComponent(dealUrl || `/deal/${dealId}`)}`);
+    else doAction(role === 'buyer' ? 'join_as_buyer' : 'join_as_seller');
+  }
+
+  /** ขั้น 0 ดีลแบบง่าย — layout เดียวกันทั้งผู้สร้างและผู้เข้าร่วม */
+  function renderSimplePreJoinView() {
+    const waitingFor = !deal!.buyer_id ? 'ผู้ซื้อ' : 'ผู้ขาย';
+    const participants = simpleDealParticipants(deal!);
+    const isGuestViewer = myRole === 'guest' || myRole === '';
+    return (
+      <div className="dr-inner simple-deal-prejoin">
+        <DealFlowBrand className="dr-brand-slot" />
+        <SimpleDealSummaryCard
+          title={deal!.title}
+          description={deal!.description}
+          price={deal!.price}
+          images={deal!.images}
+          warrantyYears={deal!.warranty_years}
+          warrantyMonths={deal!.warranty_months}
+          warrantyDays={deal!.warranty_days}
+          feePayer={deal!.fee_payer}
+        />
+        {isGuestViewer ? (
+          <SimpleDealJoinPanel
+            mode="guest"
+            waitingFor={waitingFor}
+            participants={participants}
+            notLoggedIn={!myId}
+            canBeBuyer={!deal!.buyer_id}
+            canBeSeller={!deal!.seller_id}
+            onJoin={handleSimpleJoin}
+          />
+        ) : (
+          <SimpleDealJoinPanel
+            mode="wait"
+            waitingFor={waitingFor}
+            participants={participants}
+            copied={copied}
+            onCopyLink={copyLink}
+          />
+        )}
+      </div>
+    );
+  }
+
   function renderSimpleWizard() {
     const { step: actualStep, outcome } = getSimpleStep();
     const step = Math.min(wzViewStep ?? actualStep, actualStep);
@@ -5241,17 +5291,16 @@ export default function DealRoom() {
     function goToSimpleStep(nextStep: number) {
       setWzViewStep(Math.min(actualStep, nextStep));
     }
+    if (step === 0) return renderSimplePreJoinView();
     return (
       <div className="dr-inner">
         <DealFlowBrand className="dr-brand-slot" />
-        {deal!.deal_type === 'simple' && (
-          <DealProductGallery
-            images={deal!.images}
-            warrantyYears={deal!.warranty_years}
-            warrantyMonths={deal!.warranty_months}
-            warrantyDays={deal!.warranty_days}
-          />
-        )}
+        <DealProductGallery
+          images={deal!.images}
+          warrantyYears={deal!.warranty_years}
+          warrantyMonths={deal!.warranty_months}
+          warrantyDays={deal!.warranty_days}
+        />
         {step > 0 && renderWizardProgress(step)}
         {isReviewing && (
           <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '8px 12px', marginBottom: 12, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>
@@ -5259,7 +5308,6 @@ export default function DealRoom() {
           </div>
         )}
         <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
-          {step === 0 && renderWizardStep0()}
           {step === 1 && renderPaymentSection()}
           {step === 2 && renderWizardStep4()}
           {step === 3 && renderWizardStep5()}
