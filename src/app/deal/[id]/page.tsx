@@ -28,7 +28,7 @@ import { DealPackingEvidenceStrip } from '@/components/deal/DealPackingEvidenceS
 import { DealPackingUploadGrid } from '@/components/deal/DealPackingUploadGrid';
 import { DealEvidenceThumbs } from '@/components/deal/DealEvidenceThumbs';
 import { SimpleDealPreJoinScreen } from '@/components/deal/SimpleDealPreJoinScreen';
-import { DealCommFloatbar, DealCommChip } from '@/components/deal/DealCommFloatbar';
+import { DealCommFloatbar, DealCommOrb } from '@/components/deal/DealCommFloatbar';
 import { DealOthersReviewsSummary } from '@/components/deal/DealOthersReviewsSummary';
 import { SimpleDealShell } from '@/components/deal/SimpleDealShell';
 import { DealRoomApp } from '@/components/mobile/DealRoomApp';
@@ -5716,16 +5716,16 @@ export default function DealRoom() {
 
   const mobileFloatBar = canCall ? (
     <>
-      <DealCommChip active={floatChatOpen} onClick={() => setFloatChatOpen(v => !v)} label="แชท" value="💬" badge={chatBadge} />
+      <DealCommOrb active={floatChatOpen} onClick={() => setFloatChatOpen(v => !v)} icon="💬" label="แชท" badge={chatBadge} />
       {voiceBgActive ? (
-        <DealCommChip className="voice-active" onClick={endCall} label="โทร" value={fmtVoiceDur(callSeconds)} />
+        <DealCommOrb className="voice-active" onClick={endCall} icon="📞" label={fmtVoiceDur(callSeconds)} />
       ) : incomingCall ? (
-        <DealCommChip className="ringing" onClick={acceptIncomingCall} label="โทร" value="รับสาย" />
+        <DealCommOrb className="ringing" onClick={acceptIncomingCall} icon="📞" label="รับสาย" />
       ) : callStatus === 'idle' ? (
-        <DealCommChip className="voice" onClick={() => startCall('voice')} label="โทร" value="📞" />
+        <DealCommOrb className="voice" onClick={() => startCall('voice')} icon="📞" label="โทร" />
       ) : null}
       {callStatus === 'idle' && !incomingCall && (
-        <DealCommChip className="video" disabled label="วิดีโอ" value="📹" />
+        <DealCommOrb className="video" disabled icon="📹" label="วิดีโอ" />
       )}
     </>
   ) : undefined;
@@ -5789,16 +5789,16 @@ export default function DealRoom() {
 
           {canCall && (
             <DealCommFloatbar badge={chatBadge}>
-              <DealCommChip active={floatChatOpen} onClick={() => setFloatChatOpen(v => !v)} label="แชท" value="💬" badge={chatBadge} />
+              <DealCommOrb active={floatChatOpen} onClick={() => setFloatChatOpen(v => !v)} icon="💬" label="แชท" badge={chatBadge} />
               {voiceBgActive ? (
-                <DealCommChip className="voice-active" onClick={endCall} label="โทร" value={fmtVoiceDur(callSeconds)} />
+                <DealCommOrb className="voice-active" onClick={endCall} icon="📞" label={fmtVoiceDur(callSeconds)} />
               ) : incomingCall ? (
-                <DealCommChip className="ringing" onClick={acceptIncomingCall} label="โทร" value="รับสาย" />
+                <DealCommOrb className="ringing" onClick={acceptIncomingCall} icon="📞" label="รับสาย" />
               ) : callStatus === 'idle' ? (
-                <DealCommChip className="voice" onClick={() => startCall('voice')} label="โทร" value="📞" />
+                <DealCommOrb className="voice" onClick={() => startCall('voice')} icon="📞" label="โทร" />
               ) : null}
               {callStatus === 'idle' && !incomingCall && (
-                <DealCommChip className="video" disabled label="วิดีโอ" value="📹" />
+                <DealCommOrb className="video" disabled icon="📹" label="วิดีโอ" />
               )}
             </DealCommFloatbar>
           )}

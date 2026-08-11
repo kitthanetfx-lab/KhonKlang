@@ -7,7 +7,7 @@ type Props = {
   badge?: number | string;
 };
 
-/** แชท/โทร/วิดีโอ — ซ่อนที่ขอบ + ดึงออกแบบ Lang/Theme (pref-dock) */
+/** แชท/โทร/วิดีโอ — แท็บซ่อนขอบ (ไม่โผล่ขอบ) กดแล้วปุ่มกลมเด้งออก */
 export function DealCommFloatbar({ children, badge }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -26,16 +26,16 @@ export function DealCommFloatbar({ children, badge }: Props) {
           <span className="deal-comm-dock-toggle-badge">{badge}</span>
         )}
       </button>
-      <div className="deal-comm-dock" role="toolbar" aria-label="การสื่อสารในดีล">
+      <div className="deal-comm-orbs" role="toolbar" aria-label="การสื่อสารในดีล" aria-hidden={!open}>
         {children}
       </div>
     </div>
   );
 }
 
-type ChipProps = {
-  label: string;
-  value: string;
+type OrbProps = {
+  icon: string;
+  label?: string;
   active?: boolean;
   onClick?: () => void;
   disabled?: boolean;
@@ -43,18 +43,18 @@ type ChipProps = {
   className?: string;
 };
 
-/** ปุ่ม chip แบบ Lang / Theme */
-export function DealCommChip({ label, value, active, onClick, disabled, badge, className }: ChipProps) {
+/** ปุ่มกลมแชท/โทร/วิดีโอ */
+export function DealCommOrb({ icon, label, active, onClick, disabled, badge, className }: OrbProps) {
   return (
     <button
       type="button"
-      className={`pref-chip deal-comm-chip${active ? ' is-on' : ''}${className ? ` ${className}` : ''}`}
+      className={`deal-comm-orb${active ? ' is-on' : ''}${className ? ` ${className}` : ''}`}
       onClick={onClick}
       disabled={disabled}
     >
-      <span className="pref-chip-label">{label}</span>
-      <span className="pref-chip-value">{value}</span>
-      {badge != null && badge !== 0 && <span className="deal-comm-chip-badge">{badge}</span>}
+      <span className="deal-comm-orb-ic" aria-hidden>{icon}</span>
+      {label && <span className="deal-comm-orb-lb">{label}</span>}
+      {badge != null && badge !== 0 && <span className="deal-comm-orb-badge">{badge}</span>}
     </button>
   );
 }
