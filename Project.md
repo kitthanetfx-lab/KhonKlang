@@ -1,5 +1,24 @@
 # Project.md — สรุปงานที่ทำแล้ว
 
+## 2026-08-11 (15:30)
+
+### ดีลแบบง่าย — ย่อ flow + ค่ากลางตอนสร้าง + รูปสินค้าตอนสร้าง
+
+**Flow ใหม่ (6 ขั้น):** รอ join → โอนเงิน → รอทีมงานยืนยัน → แพ็ค → รับของ → จบ  
+**ตัดออก:** ยืนยันเงื่อนไข/เลือกค่ากลางร่วมกัน · อัปหลักฐานก่อนโอน  
+**คงไว้:** หลักฐานแพ็ค/แกะกล่อง + แท็บหลักฐาน
+
+**หน้าสร้างดีล (`/deal/create?type=simple`):**
+- เลือกผู้จ่ายค่าบริการ (ผู้ซื้อ/ผู้ขาย/หารครึ่ง) ตั้งแต่สร้าง → บันทึก `deals.fee_payer`
+- อัปรูป/วิดีโอสินค้า ผ่าน `uploadDealFile` (logic เดียวกับห้องดีล) → `deal_images`
+- เงื่อนไขประกัน ปี/เดือน/วัน
+
+**Join:** อีกฝ่ายเข้าร่วมครบ → `payment_pending` ทันที (ข้าม step ยืนยัน)
+
+**ไฟล์หลัก:** `lib/uploadDealFile.ts`, `DealCreateMediaField.tsx`, `getSimpleStep()` ใน deal room
+
+---
+
 ## 2026-08-11 (11:30)
 
 ### ดีลซื้อขายแบบง่าย — อัปโหลดรูป/วิดีโอ + เงื่อนไขประกัน
@@ -11,7 +30,7 @@
 - **ประกัน:** กำหนด ปี / เดือน / วัน แยกช่อง · preview ข้อความ · เว้นว่าง = ไม่มีประกัน
 
 **ไฟล์หลัก:**
-- `SimpleDealMediaUpload.tsx`, `DealProductGallery.tsx`, `lib/warranty.ts`
+- `DealCreateMediaField.tsx`, `DealProductGallery.tsx`, `lib/warranty.ts`, `lib/uploadDealFile.ts`
 - `POST /api/deals` รับ `imageFileIds` + `warrantyYears/Months/Days` (simple เท่านั้น)
 - Migration `0034_simple_deal_warranty.sql` — คอลัมน์ `warranty_years/months/days` บน `deals`
 

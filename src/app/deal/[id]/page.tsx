@@ -734,16 +734,7 @@ export default function DealRoom() {
     }
     const nextStep = getSimpleStep().step;
     const prevStep = simpleActualStepRef.current;
-    // popup เตือนเฉพาะตอนเข้า step 2 (พูดคุย) จากขั้นก่อนหน้า
-    // step 2→3 (ตรวจหลักฐาน) ไม่ต้องมี popup
-    const enteringChat = prevStep !== null && prevStep < 2 && nextStep >= 2;
-    if (enteringChat && !showStep3Warning) {
-      step3PendingRef.current = 2;
-      setShowStep3Warning(true);
-    }
-    // ถ้าสถานะจริงของดีลเดินหน้าแล้ว ให้ยกเลิกโหมด "ดูขั้นเก่า" อัตโนมัติ
-    // เพื่อไม่ให้ค้างที่หน้าขั้นเดิมหลังยืนยันหลักฐาน/ขยับสเต็ปสำเร็จ
-    if (prevStep !== null && nextStep > prevStep && !enteringChat) {
+    if (prevStep !== null && nextStep > prevStep) {
       setWzViewStep(null);
     }
     simpleActualStepRef.current = nextStep;
@@ -756,15 +747,10 @@ export default function DealRoom() {
     deal?.price,
     deal?.fee_payer,
     priceState?.agreed,
-    priceState?.evidence_done_buyer,
-    priceState?.evidence_done_seller,
-    priceState?.evidence_done_middleman,
     priceState?.seller_fee_slip,
     priceState?.payout_slip_file_id,
     priceState?.refund_slip_file_id,
-    chatReviewReady,
     feeConfig,
-    showStep3Warning,
   ]);
 
   useEffect(() => {
@@ -848,9 +834,8 @@ export default function DealRoom() {
   useEffect(() => {
     if (!dealId) return;
     const simpleStep = deal?.deal_type === 'simple' ? getSimpleStep().step : null;
-    const waitSyncFast = deal?.deal_type === 'simple' && (simpleStep === 2 || simpleStep === 3);
-    // poll เร็วตอนเลือกผู้จ่ายค่ากลาง (terms_pending) — กัน "เห็นว่าอีกฝ่ายยังไม่เลือก" ทั้งที่เลือกแล้ว
-    const inTermsStep = deal?.status === 'terms_pending' || deal?.status === 'buyer_joined';
+    const waitSyncFast = deal?.deal_type === 'simple' && (simpleStep === 1 || simpleStep === 2);
+    const inTermsStep = deal?.deal_type !== 'simple' && (deal?.status === 'terms_pending' || deal?.status === 'buyer_joined');
     const intervalMs = isFinishedStatus(deal?.status) ? 45000 : (waitSyncFast || inTermsStep) ? 4000 : 15000;
     const timer = window.setInterval(() => { void fetchDeal(headersRef.current); }, intervalMs);
     return () => window.clearInterval(timer);
@@ -882,7 +867,7 @@ export default function DealRoom() {
     const isSimpleDeal = deal?.deal_type === 'simple' && !isFinishedStatus(deal?.status);
     const simpleActualStep = isSimpleDeal ? getSimpleStep().step : 0;
     const simpleViewStep = isSimpleDeal ? Math.min(wzViewStep ?? simpleActualStep, simpleActualStep) : 0;
-    const isSimpleChatStage = isSimpleDeal && (simpleViewStep === 2 || simpleViewStep === 3);
+    const isSimpleChatStage = false;
     // canCall = เป็นคู่ดีล มี buyer เข้าแล้ว และดีลยังไม่จบ → poll เพื่อรอสายเรียกเข้า
     const canCallCheck = isDealParty(deal, myId) && !!deal?.buyer_id && !['completed', 'cancelled'].includes(deal?.status || '');
     if (!isDealParty(deal, myId)) return;
@@ -2361,7 +2346,7 @@ export default function DealRoom() {
   function renderEvidencePanel() {
     // flow ใหม่: ในขั้น payment_pending ทั้งผู้ซื้อและผู้ขายอัปโหลดหลักฐานได้ (แยกอิสระ)
     // ขั้นอื่น (packing/receive/check) → ตาม role เดิม (regular เท่านั้น)
-    const canUp = ((myRole === 'seller' || myRole === 'buyer') && ['packing', 'shipped_to_middleman', 'payment_pending', 'payment_uploaded'].includes(deal!.status)) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
+    const canUp = ((myRole === 'seller' || myRole === 'buyer') && ['packing', 'shipped_to_middleman', 'payment_pending', 'payment_uploaded'].includes(deal!.status) && !(isSimple && ['payment_pending', 'payment_uploaded'].includes(deal!.status))) || (myRole === 'middleman' && ['middleman_received', 'middleman_checking'].includes(deal!.status));
     // โหมดง่าย: ผู้ซื้อต้องถ่ายวิดีโอก่อนแกะกล่องเมื่อของมาถึง
     const canBuyerUnbox = isSimple && myRole === 'buyer' && deal!.status === 'shipped_to_buyer';
     const typeLabel: Record<string, string> = { packing: '📦 แพ็คของ', testing: '🔧 ทดสอบ', receive: isDirectShipFlow ? '📬 วิดีโอก่อนแกะกล่อง (ผู้ซื้อ)' : '📬 รับสินค้า (คนกลาง)', check: '🔍 ตรวจสินค้า (คนกลาง)', chat: '💬 หลักฐานจากแชท', chat_text: '💬 ข้อความแชท', call: '📹 วิดีโอคอลที่บันทึก', other: '📎 หลักฐาน' };
@@ -2432,10 +2417,10 @@ export default function DealRoom() {
   // Wizard ขั้นตอนดีล — เฉพาะ "ซื้อขายผ่านกลางแบบง่าย" (deal_type === 'simple')
   // โฟกัสทีละขั้นตอน (การ์ดเดียว) แทนการแสดงทุกการ์ดพร้อมกันแบบเดิม — ลดความสับสน
   // ═══════════════════════════════════════════════════════════════════════
-  // flow ใหม่ (simple 9→8 ขั้น): ตัด 'พูดคุย' + 'ตรวจหลักฐาน' เพิ่ม 'อัปหลักฐาน'
-  // 1=ยอมรับเงื่อนไข, 2=โอนเงิน, 3=อัปหลักฐาน, 4=รอทีมงานยืนยัน, 5=แพ็ค+จัดส่ง, 6=รับสินค้า, 7=โอนเงิน/เสร็จสมบูรณ์, 8=outcome
+  // flow ใหม่ (simple 6 ขั้น): รูปสินค้าตอนสร้างดีล · ไม่มียืนยันเงื่อนไข/อัปหลักฐานก่อนโอน
+  // 1=โอนเงิน, 2=รอทีมงานยืนยัน, 3=แพ็ค+จัดส่ง, 4=รับสินค้า, 5=โอนเงินให้ผู้ขาย, 6=เสร็จสมบูรณ์
   const WIZARD_STEP_TITLES = [
-    'ยอมรับเงื่อนไข', 'โอนเงิน', 'อัปหลักฐาน', 'รอทีมงานยืนยัน',
+    'โอนเงิน', 'รอทีมงานยืนยัน',
     'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
   ];
   const WZ_TOTAL = WIZARD_STEP_TITLES.length;
@@ -2456,33 +2441,23 @@ export default function DealRoom() {
   function getSimpleStep(): { step: number; outcome?: 'success' | 'cancelled' | 'disputed' } {
     const s = deal!.status;
     const pd: DealPriceState = priceState || {};
-    if (['posted', 'waiting_seller', 'waiting_buyer'].includes(s)) return { step: 0 };
-    const bothAcceptedTerms = !!deal!.seller_accepted_terms && !!deal!.buyer_accepted_terms;
-    if (['buyer_joined', 'terms_pending'].includes(s)) return { step: bothAcceptedTerms ? 2 : 1 };
-    // flow ใหม่ (simple): แยกอิสระ — เช็คเฉพาะฝั่งตัวเอง ฝั่งตัวเองเสร็จก็ไปขั้นถัดไปได้เลย
-    //   step 2 = โอนเงิน, step 3 = อัปหลักฐาน, step 4 = รอทีมงานยืนยัน
-    //   ฝั่งตัวเองต้อง "อัป + กดยืนยันหลักฐาน" ถึงจะไป step 4 (ไม่ต้องรออีกฝ่าย)
+    if (['posted', 'waiting_seller', 'waiting_buyer', 'buyer_joined', 'terms_pending'].includes(s)) return { step: 0 };
     if (['payment_pending', 'payment_uploaded'].includes(s)) {
       const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
       const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
       const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
-      // สถานะฝั่งตัวเอง
       const myHasSlip = myRole === 'buyer' ? !!deal!.payment_slip_file_id
                       : myRole === 'seller' ? (sellerShare <= 0 || !!pd.seller_fee_slip)
                       : true;
-      const myEvidenceDone = myRole === 'buyer' ? !!pd.evidence_done_buyer
-                           : myRole === 'seller' ? !!pd.evidence_done_seller
-                           : true;
-      if (myHasSlip && myEvidenceDone) return { step: 4 }; // ฝั่งเราทำครบ → รอทีมงานยืนยัน
-      if (myHasSlip) return { step: 3 };                    // โอนเสร็จ → อัปหลักฐาน
-      return { step: 2 };                                    // ยังไม่โอน
+      if (myHasSlip) return { step: 2 };
+      return { step: 1 };
     }
-    if (s === 'packing') return { step: 5 };
-    if (s === 'shipped_to_buyer') return { step: 6 };
-    if (s === 'completed') return { step: pd.payout_slip_file_id ? 8 : 7, outcome: 'success' };
-    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 8 : 7, outcome: 'cancelled' };
-    if (s === 'disputed') return { step: 7, outcome: 'disputed' };
-    return { step: 1 };
+    if (s === 'packing') return { step: 3 };
+    if (s === 'shipped_to_buyer') return { step: 4 };
+    if (s === 'completed') return { step: pd.payout_slip_file_id ? 6 : 5, outcome: 'success' };
+    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 6 : 5, outcome: 'cancelled' };
+    if (s === 'disputed') return { step: 5, outcome: 'disputed' };
+    return { step: 0 };
   }
 
   const MARKETPLACE_WZ_STEPS = [2, 4, 5, 6, 7, 8] as const;
@@ -2724,7 +2699,14 @@ export default function DealRoom() {
       <div className="dr-card" style={{ textAlign: 'center', padding: '34px 20px' }}>
         <div style={{ fontSize: 40, marginBottom: 10 }}>⏳</div>
         <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>รอ{waitingFor}เข้าร่วมดีล</div>
-        <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 18 }}>ส่งลิงก์นี้ให้{waitingFor}เพื่อเข้าร่วม — wizard จะเริ่มขั้นที่ 1 ทันทีที่ทั้งสองฝ่ายอยู่ในดีลครบ</p>
+        <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 18 }}>
+          ส่งลิงก์นี้ให้{waitingFor}เพื่อเข้าร่วม — {isSimple ? 'เมื่อครบทั้งสองฝ่ายจะเข้าหน้าโอนเงินได้ทันที' : 'wizard จะเริ่มขั้นที่ 1 ทันทีที่ทั้งสองฝ่ายอยู่ในดีลครบ'}
+        </p>
+        {isSimple && deal!.fee_payer && (
+          <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '10px 12px', marginBottom: 14, fontSize: 13, textAlign: 'left' }}>
+            💸 ผู้จ่ายค่าบริการ: <strong>{deal!.fee_payer === 'buyer' ? 'ผู้ซื้อ' : deal!.fee_payer === 'seller' ? 'ผู้ขาย' : 'หารครึ่ง'}</strong> (กำหนดตอนสร้างดีล)
+          </div>
+        )}
         <div style={{ textAlign: 'left', marginBottom: 18 }}>
           {renderParticipantStatusRows([
             { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerJoined, doneText: '✅ เข้าร่วมแล้ว', waitText: '⏳ รอเข้าร่วม' },
@@ -5253,34 +5235,11 @@ export default function DealRoom() {
   }
 
   function renderSimpleWizard() {
-    const pd0: DealPriceState = priceState || {};
-    // กัน flash: ถ้า msgs ยังไม่โหลดถึง และยังไม่มีสัญญาณชัดว่าอยู่ขั้นไหน
-    // (status=payment_pending + ไม่มี evidence + ยังไม่ตกลงราคา) → รอ msgs มาก่อนค่อย render
-    const msgsAmbiguous = !msgsLoaded
-      && deal!.status === 'payment_pending'
-      && !pd0.agreed
-      && !pd0.evidence_done_seller
-      && !pd0.evidence_done_buyer;
-    if (msgsAmbiguous) {
-      return (
-        <div className="dr-inner" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--muted)' }}>
-          <div style={{ fontSize: 22, marginBottom: 10 }}>⏳</div>
-          <div style={{ fontSize: 13.5 }}>กำลังโหลดข้อมูลขั้นตอน...</div>
-        </div>
-      );
-    }
     const { step: actualStep, outcome } = getSimpleStep();
-    const step = Math.min(wzViewStep ?? actualStep, actualStep); // กันดูล้ำหน้ากว่าความเป็นจริง
-    const isReviewing = step < actualStep; // กำลังย้อนดูขั้นที่ผ่านมาแล้ว — ปิดปฏิสัมพันธ์ กันกดซ้ำย้อนสถานะดีล
+    const step = Math.min(wzViewStep ?? actualStep, actualStep);
+    const isReviewing = step < actualStep;
     function goToSimpleStep(nextStep: number) {
-      const safeNextStep = Math.min(actualStep, nextStep);
-      if (step === 1 && safeNextStep === 2) {
-        simpleStep2WarnShownRef.current = true;
-        step3PendingRef.current = safeNextStep;
-        setShowStep3Warning(true);
-        return;
-      }
-      setWzViewStep(safeNextStep);
+      setWzViewStep(Math.min(actualStep, nextStep));
     }
     return (
       <div className="dr-inner">
@@ -5301,15 +5260,12 @@ export default function DealRoom() {
         )}
         <div style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
           {step === 0 && renderWizardStep0()}
-          {step === 1 && renderWizardStep1()}
-          {/* flow ใหม่ (simple): ตัดขั้นคุย + ตัดขั้นตรวจหลักฐาน + ตัดขั้นตกลงราคา */}
-          {step === 2 && renderPaymentSection()}
-          {step === 3 && renderWizardStepEvidenceUpload()}
-          {step === 4 && renderWizardStep4()}
-          {step === 5 && renderWizardStep5()}
-          {step === 6 && renderWizardStep6()}
-          {step === 7 && renderWizardStep7(outcome)}
-          {step === 8 && renderWizardStep8(outcome)}
+          {step === 1 && renderPaymentSection()}
+          {step === 2 && renderWizardStep4()}
+          {step === 3 && renderWizardStep5()}
+          {step === 4 && renderWizardStep6()}
+          {step === 5 && renderWizardStep7(outcome)}
+          {step === 6 && renderWizardStep8(outcome)}
         </div>
         {step >= 1 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>

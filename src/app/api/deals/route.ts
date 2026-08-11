@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   try {
     const me = await verifyUser(req);
     const body = await req.json();
-    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent, listGrossPrice, auctionData, shippingCost, shippingProviders, warrantyYears, warrantyMonths, warrantyDays } = body;
+    const { title, description, price, category, creatorRole, condition, location, sellingMode, imageFileIds, source, dealType, meetupData, serviceIntent, listGrossPrice, auctionData, shippingCost, shippingProviders, warrantyYears, warrantyMonths, warrantyDays, feePayer } = body;
     if (!title || price == null) return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     const isAuction = dealType === 'auction';
     const isBuyer = creatorRole === 'buyer';
@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
     const wYears = Math.max(0, Math.min(99, Math.round(Number(warrantyYears) || 0)));
     const wMonths = Math.max(0, Math.min(11, Math.round(Number(warrantyMonths) || 0)));
     const wDays = Math.max(0, Math.min(30, Math.round(Number(warrantyDays) || 0)));
+    const resolvedFeePayer = ['buyer', 'seller', 'split'].includes(String(feePayer)) ? String(feePayer) : 'buyer';
 
     const { data: doc, error } = await db.from('deals').insert({
       id: dealNumberSeed,
@@ -155,8 +156,20 @@ export async function POST(req: NextRequest) {
       warranty_years: resolvedDealType === 'simple' ? wYears : 0,
       warranty_months: resolvedDealType === 'simple' ? wMonths : 0,
       warranty_days: resolvedDealType === 'simple' ? wDays : 0,
+      fee_payer: resolvedDealType === 'simple' ? resolvedFeePayer : null,
     }).select().single();
     if (error || !doc) throw new Error(error?.message || 'create deal failed');
+
+    if (resolvedDealType === 'simple') {
+      await db.from('deal_price_state').upsert({
+        deal_id: doc.id,
+        agreed: true,
+        proposed_price: dealPrice,
+        proposed_fee_payer: resolvedFeePayer,
+        fee_payer_selection_buyer: resolvedFeePayer,
+        fee_payer_selection_seller: resolvedFeePayer,
+      }, { onConflict: 'deal_id' });
+    }
 
     if (isAuction && source === 'listing') {
       const ad = (auctionData || {}) as AuctionDurationInput & { bidIncrement?: number };

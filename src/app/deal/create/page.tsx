@@ -11,10 +11,15 @@ import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { useUser } from '@/lib/useUser';
-import { SimpleDealMediaUpload, type UploadedMedia } from '@/components/deal/SimpleDealMediaUpload';
+import { DealCreateMediaField, type CreateDealMedia } from '@/components/deal/DealCreateMediaField';
 import { clampWarrantyInput, formatWarranty } from '@/lib/warranty';
 
 const CATS = ['สินค้าทั่วไป', 'อิเล็กทรอนิกส์', 'เสื้อผ้า', 'ยานพาหนะ', 'อสังหาริมทรัพย์', 'บริการ', 'อื่นๆ'];
+const FEE_PAYER_OPTIONS = [
+  { key: 'buyer' as const, label: 'ผู้ซื้อจ่าย' },
+  { key: 'seller' as const, label: 'ผู้ขายจ่าย' },
+  { key: 'split' as const, label: 'หารครึ่ง' },
+];
 const ROLE_OPTIONS = {
   simple: [
     { key: 'seller', image: '/Seller.webp', imageAlt: 'Seller', desc: 'สร้างดีลแล้วส่งลิงก์ให้ผู้ซื้อเข้าร่วม' },
@@ -29,7 +34,6 @@ const ROLE_OPTIONS = {
 function CreateDealForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // prefill จากหน้าอื่น เช่น /wanted ("เสนอขายผ่านคนกลาง")
   const isSimple = searchParams.get('type') === 'simple';
   const isSafeZone = searchParams.get('safezone') === '1';
   const controls = useServiceControls();
@@ -43,10 +47,11 @@ function CreateDealForm() {
   const [description, setDesc] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
+  const [feePayer, setFeePayer] = useState<'buyer' | 'seller' | 'split'>('buyer');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fees, setFees] = useState<FeeConfig>(FEE_DEFAULTS);
-  const [media, setMedia] = useState<UploadedMedia[]>([]);
+  const [media, setMedia] = useState<CreateDealMedia[]>([]);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [warrantyYears, setWarrantyYears] = useState('');
   const [warrantyMonths, setWarrantyMonths] = useState('');
@@ -101,6 +106,7 @@ function CreateDealForm() {
             warrantyYears: clampWarrantyInput('years', warrantyYears),
             warrantyMonths: clampWarrantyInput('months', warrantyMonths),
             warrantyDays: clampWarrantyInput('days', warrantyDays),
+            feePayer,
           } : {}),
         }),
       });
@@ -123,7 +129,6 @@ function CreateDealForm() {
         <div className="deal-form create-deal-form">
           <DealFlowBrand docked />
 
-          {/* Role */}
           <div className="deal-field">
             <label>คุณเป็น...</label>
             <div className="svc-pick-grid">
@@ -165,13 +170,13 @@ function CreateDealForm() {
                   🔐 ต้อง <Link href={loginHref} style={{ fontWeight: 700, textDecoration: 'underline' }}>เข้าสู่ระบบ</Link> ก่อนจึงจะอัปโหลดรูป/วิดีโอและสร้างดีลได้
                 </div>
               )}
-              <SimpleDealMediaUpload
+              <DealCreateMediaField
                 items={media}
                 onChange={setMedia}
                 uploading={mediaUploading}
                 onUploading={setMediaUploading}
                 onError={setError}
-                loginHref={loginHref}
+                userId={user?.$id}
               />
 
               <div className="deal-field">
@@ -205,6 +210,33 @@ function CreateDealForm() {
                   </p>
                 )}
               </div>
+
+              <div className="deal-field">
+                <label>ผู้จ่ายค่าบริการ (ค่ากลาง) *</label>
+                <p className="simple-deal-warranty-hint">กำหนดตอนสร้างดีล — อีกฝ่ายเห็นค่านี้ทันที ไม่ต้องเลือกซ้ำ</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {FEE_PAYER_OPTIONS.map(opt => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setFeePayer(opt.key)}
+                      style={{
+                        flex: 1,
+                        padding: '10px 8px',
+                        borderRadius: 'var(--r-md)',
+                        border: `2px solid ${feePayer === opt.key ? 'var(--accent)' : 'var(--line)'}`,
+                        background: feePayer === opt.key ? 'var(--accent-soft)' : 'var(--surface)',
+                        color: feePayer === opt.key ? 'var(--accent-strong)' : 'var(--ink-2)',
+                        fontWeight: feePayer === opt.key ? 700 : 500,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </>
           )}
 
@@ -233,6 +265,11 @@ function CreateDealForm() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid #d7e3ff', marginTop: 6, paddingTop: 6 }}>
                 <span>รวมค่าบริการ</span><span>฿{feeBreakdown.total.toLocaleString()}</span>
               </div>
+              {isSimple && (
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                  ผู้จ่าย: {FEE_PAYER_OPTIONS.find(o => o.key === feePayer)?.label}
+                </div>
+              )}
               <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>* {feeBreakdown.note} · อัตราตามที่ระบบกำหนด แสดงให้ทราบก่อนเริ่มดีล</div>
             </div>
           )}

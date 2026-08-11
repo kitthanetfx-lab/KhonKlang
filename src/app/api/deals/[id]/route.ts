@@ -115,6 +115,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }).eq('id', id).select().single();
       if (fixed) current = fixed;
     }
+    // simple deal: ครบทั้งสองฝ่ายแล้ว → ข้ามยืนยันเงื่อนไข ไปโอนเงินเลย (รองรับดีลเก่าที่ค้าง buyer_joined)
+    if (
+      current.deal_type === 'simple'
+      && ['buyer_joined', 'terms_pending'].includes(String(current.status))
+      && current.seller_id && current.buyer_id
+    ) {
+      const { data: fixed } = await db.from('deals').update({
+        status: 'payment_pending',
+        seller_accepted_terms: true,
+        buyer_accepted_terms: true,
+        fee_payer: current.fee_payer || 'buyer',
+      }).eq('id', id).select().single();
+      if (fixed) current = fixed;
+    }
     // Self-heal: ทั้งสองฝ่าย (และคนกลางถ้ามี) ยอมรับครบแล้วแต่สถานะค้างที่ขั้นยอมรับ
     // (เกิดได้จาก race ตอนสองฝ่ายกดยอมรับพร้อมกัน) → ดันไปขั้นคุย/เก็บหลักฐานก่อนโอนเงิน
     // ข้าม listing checkout (ตลาด/ประมูล) — ไม่ดันเข้า payment_pending แบบคนกลาง
@@ -388,9 +402,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         {
           const newStatus = deal.seller_id ? 'buyer_joined' : 'waiting_seller';
           updates = { ...updates, buyer_id: me.id, buyer_name: myName, status: newStatus };
-          systemMsg = shipLabel
-            ? `${myName} เข้าร่วมเป็นผู้ซื้อ · ขนส่ง: ${shipLabel}`
-            : `${myName} เข้าร่วมเป็นผู้ซื้อ`;
+          if (deal.deal_type === 'simple' && deal.seller_id) {
+            updates.status = 'payment_pending';
+            updates.seller_accepted_terms = true;
+            updates.buyer_accepted_terms = true;
+            updates.fee_payer = deal.fee_payer || 'buyer';
+            priceUpdates = {
+              agreed: true,
+              proposed_price: deal.price,
+              proposed_fee_payer: deal.fee_payer || 'buyer',
+              fee_payer_selection_buyer: deal.fee_payer || 'buyer',
+              fee_payer_selection_seller: deal.fee_payer || 'buyer',
+            };
+            systemMsg = shipLabel
+              ? `${myName} เข้าร่วมเป็นผู้ซื้อ · ขนส่ง: ${shipLabel} — พร้อมโอนเงินได้เลย`
+              : `${myName} เข้าร่วมเป็นผู้ซื้อ — พร้อมโอนเงินได้เลย`;
+          } else {
+            systemMsg = shipLabel
+              ? `${myName} เข้าร่วมเป็นผู้ซื้อ · ขนส่ง: ${shipLabel}`
+              : `${myName} เข้าร่วมเป็นผู้ซื้อ`;
+          }
         }
         break;
       }
@@ -403,7 +434,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'มีผู้ขายแล้ว' }, { status: 400 });
         const newSt = deal.buyer_id ? 'buyer_joined' : 'waiting_buyer';
         updates = { seller_id: me.id, seller_name: myName, status: newSt };
-        systemMsg = `${myName} เข้าร่วมเป็นผู้ขาย`;
+        if (deal.deal_type === 'simple' && deal.buyer_id) {
+          updates.status = 'payment_pending';
+          updates.seller_accepted_terms = true;
+          updates.buyer_accepted_terms = true;
+          updates.fee_payer = deal.fee_payer || 'buyer';
+          priceUpdates = {
+            agreed: true,
+            proposed_price: deal.price,
+            proposed_fee_payer: deal.fee_payer || 'buyer',
+            fee_payer_selection_buyer: deal.fee_payer || 'buyer',
+            fee_payer_selection_seller: deal.fee_payer || 'buyer',
+          };
+          systemMsg = `${myName} เข้าร่วมเป็นผู้ขาย — พร้อมโอนเงินได้เลย`;
+        } else {
+          systemMsg = `${myName} เข้าร่วมเป็นผู้ขาย`;
+        }
         break;
       }
       case 'select_middleman': {
@@ -507,12 +553,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (sellerShare > 0 && !pd.seller_fee_slip) {
           return NextResponse.json({ error: 'ยังรอผู้ขายอัปสลิปค่าบริการ' }, { status: 400 });
         }
-        // 3) หลักฐาน — ทั้งผู้ซื้อและผู้ขายต้องอัปอย่างน้อย 1 ชิ้น
-        const evidenceList = (await db.from('deal_evidence').select('uploaded_by').eq('deal_id', id).then(r => r.data)) || [];
-        const hasBuyerEvidence = evidenceList.some((e: { uploaded_by?: string }) => e.uploaded_by === deal.buyer_id);
-        const hasSellerEvidence = evidenceList.some((e: { uploaded_by?: string }) => e.uploaded_by === deal.seller_id);
-        if (!hasBuyerEvidence || !hasSellerEvidence) {
-          return NextResponse.json({ error: 'ยังรอทั้งสองฝ่ายอัปหลักฐาน (แชท/รูป/วิดีโอ)' }, { status: 400 });
+        // 3) หลักฐาน — regular ต้องครบทั้งสองฝ่าย · simple ใช้รูปสินค้าตอนสร้างดีล (deal_images)
+        if (deal.deal_type === 'simple') {
+          const { data: productImages } = await db.from('deal_images').select('file_id').eq('deal_id', id).limit(1);
+          if (!productImages?.length) {
+            return NextResponse.json({ error: 'ยังไม่มีรูป/วิดีโอสินค้าในดีล (อัปตอนสร้างดีล)' }, { status: 400 });
+          }
+        } else {
+          const evidenceList = (await db.from('deal_evidence').select('uploaded_by').eq('deal_id', id).then(r => r.data)) || [];
+          const hasBuyerEvidence = evidenceList.some((e: { uploaded_by?: string }) => e.uploaded_by === deal.buyer_id);
+          const hasSellerEvidence = evidenceList.some((e: { uploaded_by?: string }) => e.uploaded_by === deal.seller_id);
+          if (!hasBuyerEvidence || !hasSellerEvidence) {
+            return NextResponse.json({ error: 'ยังรอทั้งสองฝ่ายอัปหลักฐาน (แชท/รูป/วิดีโอ)' }, { status: 400 });
+          }
         }
         updates = { status: 'packing', middleman_confirmed_payment: true };
         systemMsg = 'คนกลางยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้า';
@@ -1071,10 +1124,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    // กัน race ตอนยอมรับเงื่อนไข: ถ้าหลังอัปเดตแล้วทุกฝ่ายยอมรับครบแต่สถานะยังค้าง → ดันไปขั้นคุย/เก็บหลักฐานก่อน
-    if (['buyer_joined', 'terms_pending'].includes(String(updated.status))
-      && updated.seller_accepted_terms && updated.buyer_accepted_terms
-      && (!updated.middleman_id || updated.middleman_accepted_terms)) {
+    // กัน race / ดีลเก่า: simple ครบสองฝ่าย → payment_pending · regular/meetup ต้องยอมรับเงื่อนไขครบ
+    if (
+      !isListingCheckoutOrder(updated)
+      && ['buyer_joined', 'terms_pending'].includes(String(updated.status))
+      && (
+        (updated.deal_type === 'simple' && updated.seller_id && updated.buyer_id)
+        || (updated.seller_accepted_terms && updated.buyer_accepted_terms
+          && (!updated.middleman_id || updated.middleman_accepted_terms))
+      )
+    ) {
       // อ่าน fee_payer_selection อีกครั้งเพื่อเซ็ต fee_payer บน deal (default 'buyer' ถ้า null)
       const finalPd = (await db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data)) || {};
       const finalBuyerSel = finalPd.fee_payer_selection_buyer || 'buyer';
