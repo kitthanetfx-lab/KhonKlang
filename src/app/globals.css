@@ -3399,11 +3399,35 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   border: 1px solid var(--line);
 }
 .pack-upload-slot-media img,
-.pack-upload-slot-media video {
+.pack-upload-slot-media video,
+.pack-upload-slot-media-el {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.pack-upload-slot-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: inherit;
+}
+.pack-upload-slot-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-md);
+}
+.pack-upload-slot-open .pack-upload-slot-media {
+  position: relative;
+}
+.pack-upload-slot-delete {
+  margin-top: 6px;
+  color: var(--rose-500) !important;
+  font-size: 11px;
 }
 .pack-upload-slot-placeholder {
   position: absolute;

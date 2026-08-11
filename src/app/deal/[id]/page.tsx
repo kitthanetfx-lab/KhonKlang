@@ -25,6 +25,7 @@ import { useUser } from '@/lib/useUser';
 import DealVideoCall from '@/components/DealVideoCall';
 import { DealProductGallery } from '@/components/deal/DealProductGallery';
 import { DealPackingEvidenceStrip } from '@/components/deal/DealPackingEvidenceStrip';
+import { DealPackingUploadGrid } from '@/components/deal/DealPackingUploadGrid';
 import { DealEvidenceThumbs } from '@/components/deal/DealEvidenceThumbs';
 import { SimpleDealPreJoinScreen } from '@/components/deal/SimpleDealPreJoinScreen';
 import { SimpleDealShell } from '@/components/deal/SimpleDealShell';
@@ -3565,56 +3566,28 @@ export default function DealRoom() {
           {simplePackingFocus
             ? <p className="pack-upload-hint">อัปโหลด 1→2→3 แล้วกรอกเลขพัสดุ · วิดีโอไม่เกิน 5 นาที</p>
             : renderVideoUploadHint({ marginBottom: 12 })}
-          <div className={`pack-upload-grid${simplePackingFocus ? ' pack-upload-grid--simple' : ''}`}>
-            {packingSteps.map(item => {
-              const uploaded = packingEvidenceSlots[item.step - 1];
-              const previewVisible = packingUploadStep === item.step && uploadPreview?.url;
-              const locked = !canUploadPackingStep(item.step);
-              return (
-                <div key={item.step} className={`pack-upload-slot${simplePackingFocus ? ' pack-upload-slot--simple' : ''}${locked ? ' is-locked' : ''}`}>
-                  <div className="pack-upload-slot-step">ขั้นตอน {item.step}</div>
-                  <div className="pack-upload-slot-media">
-                    {uploaded ? (
-                      uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
-                        ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
-                        : <img src={fileUrl(uploaded.file_id)} alt={uploaded.file_name || item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    ) : previewVisible ? (
-                      <img src={uploadPreview!.url} alt={uploadPreview!.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    ) : (
-                      <div className="pack-upload-slot-placeholder">
-                        {item.step}
-                      </div>
-                    )}
-                  </div>
-                  <div className="pack-upload-slot-status">
-                    {uploaded
-                      ? '✅ แล้ว'
-                      : locked
-                        ? `รอ ${item.step - 1}`
-                        : item.title}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-soft btn-block btn-sm"
-                    disabled={locked || !!uploaded}
-                    onClick={() => {
-                      if (packingEvidence.length >= 3) return;
-                      setPackingUploadStep(item.step);
-                      evidInputRef.current?.click();
-                    }}
-                  >
-                    <Icon name="upload" size={14} /> {uploaded ? 'แล้ว' : `ไฟล์ ${item.step}`}
-                  </button>
-                  {uploaded && canDeleteEvidenceItem(uploaded) && (
-                    <button type="button" className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 6, color: 'var(--rose-500)', fontSize: 11 }}
-                      onClick={() => deleteEvidenceItem(uploaded)}>
-                      ลบ / อัปใหม่
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <DealPackingUploadGrid
+            steps={packingSteps}
+            slots={packingEvidenceSlots}
+            compact={simplePackingFocus}
+            fileUrl={fileUrl}
+            canUploadStep={canUploadPackingStep}
+            uploadPreview={uploadPreview}
+            activeUploadStep={packingUploadStep}
+            evidenceFull={packingEvidence.length >= 3}
+            onPickFile={step => {
+              setPackingUploadStep(step);
+              evidInputRef.current?.click();
+            }}
+            onDelete={item => {
+              const full = packingEvidence.find(e => e.file_id === item.file_id);
+              if (full) deleteEvidenceItem(full);
+            }}
+            canDelete={item => {
+              const full = packingEvidence.find(e => e.file_id === item.file_id);
+              return full ? canDeleteEvidenceItem(full) : false;
+            }}
+          />
           <input ref={evidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={async e => {
             const f = e.target.files?.[0];
             const activeStep = packingUploadStep;
