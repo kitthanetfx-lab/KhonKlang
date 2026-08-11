@@ -239,70 +239,72 @@ export function ReviewPanel({
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {hasAnyReview && <AllReviewsSummary byReviewer={byReviewer} />}
       <div className="dr-card rv-card">
-        <div className="dr-card-title">⭐ ให้คะแนนดีลนี้</div>
-        <p className="rv-lead">แตะดาวเพื่อให้คะแนนทุกรายการ — จากนั้นกดปุ่มบันทึกด้านล่าง</p>
+        <div className="rv-card-head">
+          <div className="dr-card-title">⭐ ให้คะแนนดีลนี้</div>
+          <p className="rv-lead">แตะดาวแต่ละการ์ด → เลือกแท็ก (ถ้ามี) → กดบันทึกด้านล่าง</p>
+        </div>
 
-        {targets.map(t => {
-          const st = getRow(t.role);
-          return (
-            <div key={t.role} className="rv-row">
-              <div className="rv-row-head">
-                <span className={`rv-av ${t.role}`}>{t.role === 'platform' ? <Icon name="shieldCheck" size={16} /> : (t.name || '?').slice(0, 1)}</span>
-                <div className="rv-who">
-                  <b>{t.name}</b>
-                  <span>{ROLE_LABEL[t.role]}</span>
-                </div>
-                <div className="rv-stars" role="radiogroup" aria-label={`ให้คะแนน ${t.name}`}>
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <button
-                      key={n} type="button"
-                      className={`rv-star ${st.rating >= n ? 'on' : ''}`}
-                      role="radio" aria-checked={st.rating === n} aria-label={`${n} ดาว`}
-                      onClick={() => setRating(t.role, n)}
-                    >
-                      <Icon name="star" size={22} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {st.rating > 0 && (
-                <>
-
-                  <div className="rv-rating-meta">
-                    <span className="rv-rating-pill">{st.rating} / 5 ดาว</span>
-                    <span className="rv-rating-text">{RATING_LABEL[st.rating]}</span>
+        <div className="rv-grid">
+          {targets.map(t => {
+            const st = getRow(t.role);
+            return (
+              <div key={t.role} className="rv-row">
+                <div className="rv-row-head">
+                  <span className={`rv-av ${t.role}`}>{t.role === 'platform' ? <Icon name="shieldCheck" size={14} /> : (t.name || '?').slice(0, 1)}</span>
+                  <div className="rv-who">
+                    <b>{t.name}</b>
+                    <span>{ROLE_LABEL[t.role]}</span>
                   </div>
-                  <div className="rv-tag-wrap">
-                    <div className="rv-tag-title">เหตุผลที่อยากแนะนำ</div>
-                    <div className="rv-tags">
-                      {QUICK_TAGS[t.role].map(tag => (
-                        <button key={tag} type="button" className={`rv-tag ${st.tags.includes(tag) ? 'on' : ''}`} onClick={() => toggleTag(t.role, tag)}>
-                          {tag}
-                        </button>
-                      ))}
+                  <div className="rv-stars" role="radiogroup" aria-label={`ให้คะแนน ${t.name}`}>
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button
+                        key={n} type="button"
+                        className={`rv-star ${st.rating >= n ? 'on' : ''}`}
+                        role="radio" aria-checked={st.rating === n} aria-label={`${n} ดาว`}
+                        onClick={() => setRating(t.role, n)}
+                      >
+                        <Icon name="star" size={18} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {st.rating > 0 && (
+                  <>
+                    <div className="rv-rating-meta">
+                      <span className="rv-rating-pill">{st.rating}/5</span>
+                      <span className="rv-rating-text">{RATING_LABEL[st.rating]}</span>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        })}
+                    <div className="rv-tag-wrap">
+                      <div className="rv-tag-title">แตะเลือกเหตุผล</div>
+                      <div className="rv-tags">
+                        {QUICK_TAGS[t.role].map(tag => (
+                          <button key={tag} type="button" className={`rv-tag ${st.tags.includes(tag) ? 'on' : ''}`} onClick={() => toggleTag(t.role, tag)}>
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
-        <div className="rv-comment-wrap">
-          <div className="rv-comment-title">ข้อเสนอแนะเพิ่มเติม</div>
-          <div className="rv-comment-sub">เขียนถึงทีมงานหรือประสบการณ์ใช้งานเพิ่มเติมได้</div>
+        <label className="rv-comment-wrap">
+          <span className="rv-comment-title">💬 ข้อเสนอแนะถึงทีมงาน <span className="rv-optional">ไม่บังคับ</span></span>
           <textarea
             className="rv-comment"
             value={comment}
             onChange={e => setComment(e.target.value)}
-            placeholder="พิมพ์ข้อเสนอแนะถึงทีมงานหรือสิ่งที่อยากให้ปรับปรุง (ไม่บังคับ)"
-            rows={5}
+            placeholder="เช่น อยากให้ปรับขั้นตอน / ความเร็ว / การใช้งาน..."
+            rows={2}
             maxLength={1000}
           />
-        </div>
+        </label>
 
         {error && <p className="rv-error">{error}</p>}
       </div>
