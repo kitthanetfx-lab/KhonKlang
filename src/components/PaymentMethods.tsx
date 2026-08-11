@@ -16,7 +16,7 @@ interface PayCfg { promptPay: string; bankName: string; bankAcct: string; bankHo
  * กล่องช่องทางชำระเงินของบริษัท — ดึงบัญชีรับเงินจากที่แอดมินตั้งไว้ (/admin/settings)
  * ถ้ามีรูป QR ที่อัปโหลดไว้ → ใช้รูปนั้น ; ถ้าไม่มี → สร้าง QR พร้อมเพย์พร้อมยอดอัตโนมัติ
  */
-export function PaymentMethods({ amount, note }: { amount: number; note?: string }) {
+export function PaymentMethods({ amount, note, compact }: { amount: number; note?: string; compact?: boolean }) {
   const [copied, setCopied] = useState('');
   const [cfg, setCfg] = useState<PayCfg>({ promptPay: ENV_PP, bankName: ENV_BANK, bankAcct: ENV_ACCT, bankHolder: ENV_HOLDER, qrFileId: '' });
 
@@ -62,7 +62,7 @@ export function PaymentMethods({ amount, note }: { amount: number; note?: string
 
   if (notSet) {
     return (
-      <div className="pm-box">
+      <div className={`pm-box${compact ? ' pm-box--compact' : ''}`}>
         <div className="pm-head">💳 ช่องทางชำระเงิน</div>
         <p className="pm-note">⚠️ ยังไม่ได้ตั้งบัญชีรับเงินของบริษัท — กรุณาแจ้งทีมงาน/แอดมินตั้งค่าบัญชีในระบบก่อนทำการโอน</p>
       </div>
@@ -70,9 +70,9 @@ export function PaymentMethods({ amount, note }: { amount: number; note?: string
   }
 
   return (
-    <div className="pm-box">
-      <div className="pm-head">💳 ช่องทางชำระเงิน — {cfg.bankHolder || 'บริษัท กลางฮับ จำกัด'}</div>
-      <div className="pm-amount">ยอดที่ต้องโอน <b>฿{amount.toLocaleString()}</b></div>
+    <div className={`pm-box${compact ? ' pm-box--compact' : ''}`}>
+      <div className="pm-head">{compact ? '💳 ช่องทางชำระเงิน' : `💳 ช่องทางชำระเงิน — ${cfg.bankHolder || 'บริษัท กลางฮับ จำกัด'}`}</div>
+      {!compact && <div className="pm-amount">ยอดที่ต้องโอน <b>฿{amount.toLocaleString()}</b></div>}
 
       {qrSrc && (
         <div className="pm-qr-wrap">
@@ -87,7 +87,7 @@ export function PaymentMethods({ amount, note }: { amount: number; note?: string
                 </button>
               </div>
             )}
-            <button type="button" className="btn btn-soft btn-sm" onClick={saveQr}>💾 บันทึกรูป QR ลงเครื่อง</button>
+            {!compact && <button type="button" className="btn btn-soft btn-sm" onClick={saveQr}>💾 บันทึกรูป QR ลงเครื่อง</button>}
           </div>
         </div>
       )}
@@ -107,7 +107,7 @@ export function PaymentMethods({ amount, note }: { amount: number; note?: string
       )}
 
       {note && <p className="pm-note">{note}</p>}
-      <p className="pm-note">⚠️ โอนตามยอดที่ระบุเท่านั้น แล้วกดอัปโหลดสลิปด้านล่าง — อย่าโอนเข้าบัญชีบุคคลอื่นเด็ดขาด</p>
+      {!compact && <p className="pm-note">⚠️ โอนตามยอดที่ระบุเท่านั้น แล้วกดอัปโหลดสลิปด้านล่าง — อย่าโอนเข้าบัญชีบุคคลอื่นเด็ดขาด</p>}
     </div>
   );
 }

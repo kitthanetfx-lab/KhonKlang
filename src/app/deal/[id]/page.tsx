@@ -1998,12 +1998,13 @@ export default function DealRoom() {
   }
 
   // ─── Payment section (ดีลผ่านกลาง / simple — ไม่รวมตลาด) ─────────────────
-  function renderPaymentSection() {
+  function renderPaymentSection(opts?: { compact?: boolean }) {
     if (deal!.deal_type === 'meetup' || isMarketplaceOrder(deal!)) return null;
     if (!['payment_pending', 'payment_uploaded'].includes(deal!.status)) return null;
+    const compact = opts?.compact ?? false;
     const awaitingBuyerSlip = !deal!.payment_slip_file_id && deal!.status === 'payment_pending';
     return (
-        <div className="dr-card dr-pay-card">
+        <div className={`dr-card${compact ? ' simple-deal-pay-card' : ' dr-pay-card'}`}>
         {(() => {
           const pd: DealPriceState = priceState || {};
           const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
@@ -2020,18 +2021,81 @@ export default function DealRoom() {
           const sellerShouldPay = sellerShare;
           
           const payTitle = myRole === 'buyer'
-            ? '💳 ยอดที่คุณต้องโอน'
+            ? 'ยอดที่คุณต้องโอน'
             : myRole === 'seller'
-              ? '💳 ค่าบริการฝั่งผู้ขาย'
-              : '💳 สรุปการชำระเงิน';
+              ? 'ค่าบริการฝั่งผู้ขาย'
+              : 'สรุปการชำระเงิน';
           const payAmount = myRole === 'buyer'
             ? buyerShouldPay
             : myRole === 'seller'
               ? sellerShouldPay
               : buyerShouldPay;
+          const feeHint = myRole === 'buyer'
+            ? `ราคา ฿${deal!.price.toLocaleString()}${buyerShare > 0 ? ` + ค่าบริการ ฿${buyerShare.toLocaleString()}` : ''} · ${fpName}`
+            : myRole === 'seller' && sellerShouldPay > 0
+              ? `ค่าบริการ ${fpName} · แยกจากยอดสินค้า`
+              : `ค่าบริการ: ${fpName}`;
+          const statusItems = isBuyerPaysAll
+            ? [
+                { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: true, doneText: '✅ ไม่ต้องชำระ', waitText: '⏳ รอ' },
+                { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.payment_slip_file_id, doneText: '✅ ส่งสลิปแล้ว', waitText: '⏳ รอส่งสลิป' },
+              ]
+            : [
+                { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: sellerPaymentDone, doneText: sellerShouldPay > 0 ? '✅ ส่งสลิปแล้ว' : '✅ ไม่ต้องชำระ', waitText: sellerShouldPay > 0 ? '⏳ รอส่งสลิป' : '⏳ รอ' },
+                { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: !!deal!.payment_slip_file_id, doneText: '✅ ส่งสลิปแล้ว', waitText: '⏳ รอส่งสลิป' },
+              ];
+
+          if (compact) {
+            return (
+              <>
+                <div className="simple-deal-pay-head">
+                  <div className="simple-deal-pay-head-text">
+                    <div className="simple-deal-pay-deal">{deal!.title}</div>
+                    <div className="simple-deal-pay-title">💳 {payTitle}</div>
+                    <div className="simple-deal-pay-fee">{feeHint}</div>
+                  </div>
+                  <div className="simple-deal-pay-amount">฿{payAmount.toLocaleString()}</div>
+                </div>
+                <div className="simple-deal-pay-status" aria-label="สถานะการชำระเงิน">
+                  {statusItems.map(({ roleLabel, ok, doneText, waitText = '⏳ รอ' }) => (
+                    <span key={roleLabel} className={`simple-deal-pay-chip${ok ? ' is-done' : ''}`}>
+                      {roleLabel}: {ok ? doneText.replace(/^✅\s*/, '') : waitText.replace(/^⏳\s*/, '')}
+                    </span>
+                  ))}
+                </div>
+                {awaitingBuyerSlip && myRole === 'buyer' && (
+                  <>
+                    <PaymentMethods compact amount={buyerShouldPay} note={
+                      isSellerPaysAll
+                        ? `โอนค่าสินค้า ฿${deal!.price.toLocaleString()} เข้าบัญชีกลาง`
+                        : isSplit
+                          ? `โอน ฿${buyerShouldPay.toLocaleString()} เข้าบัญชีกลาง`
+                          : 'เงินพักกับศูนย์กลางจนกว่าจะยืนยันรับสินค้า'
+                    } />
+                    <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block simple-deal-pay-upload">📎 โอนแล้ว — อัปโหลดสลิป</button>
+                  </>
+                )}
+                {awaitingBuyerSlip && myRole !== 'buyer' && myRole !== 'seller' && (
+                  <p className="simple-deal-pay-wait">รอผู้ซื้อโอนเงินเข้าระบบพักเงิน</p>
+                )}
+                {myRole === 'seller' && sellerShouldPay > 0 && ['payment_pending', 'payment_uploaded'].includes(deal!.status) && (
+                  pd.seller_fee_slip
+                    ? <div className="dr-slip-status">✅ โอนค่าบริการ ฿{sellerShouldPay.toLocaleString()} แล้ว — รอตรวจสอบ</div>
+                    : <>
+                        <PaymentMethods compact amount={sellerShouldPay} note="โอนค่าบริการส่วนผู้ขายเข้าศูนย์กลาง" />
+                        <button onClick={() => sellerFeeInputRef.current?.click()} className="btn btn-green btn-block simple-deal-pay-upload">📎 โอนค่าบริการแล้ว — อัปโหลดสลิป</button>
+                      </>
+                )}
+                {deal!.status === 'payment_uploaded' && myRole === 'buyer' && (
+                  <div className="dr-slip-status">✅ ส่งสลิปแล้ว — {isDirectShipFlow ? 'รอศูนย์กลางยืนยันรับเงิน' : 'รอคนกลางยืนยัน'}</div>
+                )}
+              </>
+            );
+          }
+
           return (
             <>
-              <div className="dr-card-title">{payTitle}</div>
+              <div className="dr-card-title">💳 {payTitle}</div>
               <div className="dr-pay-amount">฿{payAmount.toLocaleString()}</div>
               <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', margin: '4px 0 12px', fontSize: 13 }}>
                 <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 สรุปยอด · ค่าบริการ: {fpName}</div>
@@ -5501,8 +5565,9 @@ export default function DealRoom() {
       setWzViewStep(Math.min(actualStep, nextStep));
     }
     if (step === 0) return renderSimplePreJoinView();
-    const stepFocus = step >= 3 && step < WZ_TOTAL;
-    const showDealMedia = step < 3;
+    const stepPayFocus = step === 1;
+    const stepFocus = (step >= 3 && step < WZ_TOTAL) || stepPayFocus;
+    const showDealMedia = step < 3 && !stepPayFocus;
     return (
       <div className={`dr-inner${stepFocus ? ' simple-deal-step-focus' : ''}`}>
         {showDealMedia && <DealFlowBrand className="dr-brand-slot" />}
@@ -5521,7 +5586,7 @@ export default function DealRoom() {
           </div>
         )}
         <div className={stepFocus ? 'simple-deal-step-body' : undefined} style={isReviewing ? { pointerEvents: 'none', opacity: .55 } : undefined}>
-          {step === 1 && renderPaymentSection()}
+          {step === 1 && renderPaymentSection({ compact: true })}
           {step === 2 && renderWizardStep4()}
           {step === 3 && renderWizardStep5()}
           {step === 4 && renderWizardStep6()}
