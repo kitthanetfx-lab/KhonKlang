@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -10,6 +10,7 @@ import { DealFlowBrand } from '@/components/DealFlowBrand';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { useServiceControls } from '@/lib/useServiceControls';
+import { useUser } from '@/lib/useUser';
 import { SimpleDealMediaUpload, type UploadedMedia } from '@/components/deal/SimpleDealMediaUpload';
 import { clampWarrantyInput, formatWarranty } from '@/lib/warranty';
 
@@ -32,6 +33,11 @@ function CreateDealForm() {
   const isSimple = searchParams.get('type') === 'simple';
   const isSafeZone = searchParams.get('safezone') === '1';
   const controls = useServiceControls();
+  const { user, loading: authLoading } = useUser();
+  const loginHref = useMemo(() => {
+    const q = searchParams.toString();
+    return `/login?returnTo=${encodeURIComponent(q ? `/deal/create?${q}` : '/deal/create?type=simple')}`;
+  }, [searchParams]);
   const [role, setRole] = useState<'seller' | 'buyer'>(searchParams.get('role') === 'buyer' ? 'buyer' : 'seller');
   const [title, setTitle] = useState(searchParams.get('title') || '');
   const [description, setDesc] = useState('');
@@ -154,12 +160,18 @@ function CreateDealForm() {
 
           {isSimple && (
             <>
+              {!authLoading && !user && (
+                <div style={{ background: '#fff8e6', border: '1px solid #f0d080', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 14, fontSize: 13.5, color: '#7a5a00' }}>
+                  🔐 ต้อง <Link href={loginHref} style={{ fontWeight: 700, textDecoration: 'underline' }}>เข้าสู่ระบบ</Link> ก่อนจึงจะอัปโหลดรูป/วิดีโอและสร้างดีลได้
+                </div>
+              )}
               <SimpleDealMediaUpload
                 items={media}
                 onChange={setMedia}
                 uploading={mediaUploading}
                 onUploading={setMediaUploading}
                 onError={setError}
+                loginHref={loginHref}
               />
 
               <div className="deal-field">
@@ -227,7 +239,7 @@ function CreateDealForm() {
 
           {error && <p style={{ color: '#b22441', fontSize: 14, marginTop: 4 }}>⚠️ {error}</p>}
 
-          <button onClick={handleCreate} disabled={loading || mediaUploading || !serviceEnabled} className="btn btn-primary btn-block btn-lg" style={{ marginTop: 18 }}>
+          <button onClick={handleCreate} disabled={loading || mediaUploading || !serviceEnabled || authLoading || !user} className="btn btn-primary btn-block btn-lg" style={{ marginTop: 18 }}>
             {loading ? 'กำลังสร้าง...' : 'สร้างดีล & รับลิงก์แชร์'}
           </button>
           <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', marginTop: 12 }}>หลังสร้าง คัดลอกลิงก์จากหน้าดีลและส่งให้อีกฝ่าย</p>

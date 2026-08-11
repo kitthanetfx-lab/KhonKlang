@@ -1,10 +1,18 @@
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp|avif)$/i;
+
+/** รองรับมือถือที่ file.type ว่าง หรือ HEIC ที่ไม่มี mime image/ */
+export function isImageFile(file: File): boolean {
+  if (file.type.startsWith('image/')) return true;
+  return IMAGE_EXT.test(file.name);
+}
+
 /**
  * บีบอัดรูปฝั่ง client ก่อนอัปโหลด — ลดขนาดรูปจากกล้องมือถือ (หลาย MB)
  * ให้เล็กพอผ่านลิมิต request ของโฮสติ้ง และอัปโหลดเร็วขึ้นมาก
  * ไฟล์ที่ไม่ใช่รูป (เช่น PDF) หรือบีบแล้วไม่เล็กลง จะคืนไฟล์เดิม
  */
 export async function compressImage(file: File, maxDim = 1600, quality = 0.82): Promise<File> {
-  if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml') return file;
+  if (!isImageFile(file) || file.type === 'image/gif' || file.type === 'image/svg+xml') return file;
   // รูปเล็กอยู่แล้ว ไม่ต้องแตะ
   if (file.size < 600 * 1024) return file;
   try {
