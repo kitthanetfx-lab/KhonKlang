@@ -8032,6 +8032,7 @@ body.in-call .deal-comm-dock-wrap { display: block; }
   transform: translateY(-50%);
   z-index: 136;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
