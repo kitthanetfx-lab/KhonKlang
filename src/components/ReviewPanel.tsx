@@ -31,13 +31,6 @@ interface DealParties {
   middleman_id: string; middleman_name: string;
 }
 interface RowState { rating: number; tags: string[]; comment?: string }
-interface AllReviewItem {
-  reviewer_name: string;
-  reviewer_role: string;
-  target_role: string;
-  rating: number;
-  tags: string[];
-}
 
 // ── StarDisplay: แสดงดาวแบบอ่านอย่างเดียว ─────────────────────────────────
 function StarDisplay({ rating, size = 18 }: { rating: number; size?: number }) {
@@ -56,34 +49,42 @@ function StarDisplay({ rating, size = 18 }: { rating: number; size?: number }) {
 }
 
 // ── AllReviewsSummary: สรุปคะแนนจากทุกฝ่าย ────────────────────────────────
-function AllReviewsSummary({ byReviewer }: { byReviewer: Record<string, AllReviewItem[]> }) {
+export type AllReviewItem = {
+  reviewer_name: string;
+  reviewer_role: string;
+  target_role: string;
+  rating: number;
+  tags: string[];
+};
+
+export function AllReviewsSummary({ byReviewer, compact = false }: { byReviewer: Record<string, AllReviewItem[]>; compact?: boolean }) {
   const reviewerRoles = Object.keys(byReviewer);
   if (reviewerRoles.length === 0) return null;
   return (
-    <div className="dr-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="dr-card-title">⭐ คะแนนที่ได้รับจากทุกฝ่าย</div>
+    <div className={`dr-card${compact ? ' rv-others-summary--compact' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: compact ? 8 : 12 }}>
+      <div className="dr-card-title">{compact ? '⭐ คะแนนจากอีกฝั่ง' : '⭐ คะแนนที่ได้รับจากทุกฝ่าย'}</div>
       {reviewerRoles.map(reviewerRole => {
         const items = byReviewer[reviewerRole];
         const bg = ROLE_AVATAR_BG[reviewerRole] || 'var(--muted)';
         const reviewerName = items[0]?.reviewer_name || ROLE_LABEL_SHORT[reviewerRole] || reviewerRole;
         return (
-          <div key={reviewerRole} style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: '12px 14px', background: 'var(--surface)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: bg, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+          <div key={reviewerRole} className={compact ? 'rv-others-row--compact' : undefined} style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: compact ? '8px 10px' : '12px 14px', background: 'var(--surface)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 8 : 10, marginBottom: compact ? 6 : 10 }}>
+              <div style={{ width: compact ? 30 : 36, height: compact ? 30 : 36, borderRadius: '50%', background: bg, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: compact ? 12 : 14, flexShrink: 0 }}>
                 {reviewerName.slice(0, 1)}
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--ink)' }}>{reviewerName}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{ROLE_LABEL_SHORT[reviewerRole] || reviewerRole}</div>
+                <div style={{ fontWeight: 700, fontSize: compact ? 12.5 : 13.5, color: 'var(--ink)' }}>{reviewerName}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{ROLE_LABEL_SHORT[reviewerRole] || reviewerRole}</div>
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 4 : 8 }}>
               {items.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', minWidth: 80 }}>→ {ROLE_LABEL_SHORT[item.target_role] || item.target_role}</div>
-                  <StarDisplay rating={item.rating} size={16} />
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', minWidth: compact ? 0 : 80 }}>→ {ROLE_LABEL_SHORT[item.target_role] || item.target_role}</div>
+                  <StarDisplay rating={item.rating} size={compact ? 14 : 16} />
                   <span style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 600 }}>{item.rating}/5</span>
-                  {item.tags && item.tags.length > 0 && (
+                  {!compact && item.tags && item.tags.length > 0 && (
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {item.tags.map(tag => (
                         <span key={tag} style={{ fontSize: 11, background: '#f0f5ff', color: 'var(--accent)', border: '1px solid #c7d9ff', borderRadius: 999, padding: '2px 8px' }}>{tag}</span>
@@ -247,7 +248,7 @@ export function ReviewPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {hasAnyReview && <AllReviewsSummary byReviewer={byReviewer} />}
+      {!isSimple && hasAnyReview && <AllReviewsSummary byReviewer={byReviewer} />}
       <div className={`dr-card rv-card${isSimple ? ' rv-card--simple' : ''}`}>
         <div className="rv-card-head">
           <div className="dr-card-title">⭐ ให้คะแนนดีลนี้</div>

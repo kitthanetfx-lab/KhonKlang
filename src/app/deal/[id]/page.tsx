@@ -28,6 +28,8 @@ import { DealPackingEvidenceStrip } from '@/components/deal/DealPackingEvidenceS
 import { DealPackingUploadGrid } from '@/components/deal/DealPackingUploadGrid';
 import { DealEvidenceThumbs } from '@/components/deal/DealEvidenceThumbs';
 import { SimpleDealPreJoinScreen } from '@/components/deal/SimpleDealPreJoinScreen';
+import { DealCommFloatbar } from '@/components/deal/DealCommFloatbar';
+import { DealOthersReviewsSummary } from '@/components/deal/DealOthersReviewsSummary';
 import { SimpleDealShell } from '@/components/deal/SimpleDealShell';
 import { DealRoomApp, DealAppFloatBtn } from '@/components/mobile/DealRoomApp';
 
@@ -2272,16 +2274,15 @@ export default function DealRoom() {
         ) : (
           <button
             type="button"
-            className={`btn btn-block btn-lg simple-deal-final-cta${completionAllRated ? ' btn-green' : ' simple-deal-final-cta--wait'}`}
+            className="btn btn-green btn-block btn-lg simple-deal-final-cta"
             disabled={!completionAllRated || completionSending}
             onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
           >
-            {completionSending
-              ? '⏳ กำลังบันทึก...'
-              : completionAllRated
-                ? `✅ ${completionBtnLabel}`
-                : `⭐ ให้คะแนนครบก่อนกดบันทึก`}
+            {completionSending ? '⏳ กำลังบันทึก...' : `💾 ${completionBtnLabel}`}
           </button>
+        )}
+        {simple && !isCancelled && (
+          <DealOthersReviewsSummary dealId={deal!.id} headers={authHdrs} />
         )}
       </div>
     );
@@ -5741,6 +5742,7 @@ export default function DealRoom() {
           inVideoCall={isInCall && callMode === 'video'}
           videoCallOverlay={videoCallOverlay}
           floatBar={mobileFloatBar}
+          floatBarBadge={chatBadge}
         >
           {dealWizardBody}
         </DealRoomApp>
@@ -5785,7 +5787,7 @@ export default function DealRoom() {
           )}
 
           {canCall && (
-            <div className="dr-floatbar" role="toolbar" aria-label="การสื่อสารในดีล">
+            <DealCommFloatbar badge={chatBadge}>
               <button type="button" className={`dr-floatbar-btn ${floatChatOpen ? 'active' : ''}`} onClick={() => setFloatChatOpen(v => !v)} title="แชท">
                 <span className="ic">💬</span><span>แชท</span>
                 {chatBadge != null && <span className="dr-floatbar-badge">{chatBadge}</span>}
@@ -5808,7 +5810,7 @@ export default function DealRoom() {
                   <span className="ic">📹</span><span>วิดีโอ</span>
                 </button>
               )}
-            </div>
+            </DealCommFloatbar>
           )}
         </div>
       </div>

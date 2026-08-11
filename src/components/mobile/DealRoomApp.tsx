@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { DealCommFloatbar } from '@/components/deal/DealCommFloatbar';
 import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { Icon } from '@/components/Icon';
 import { AppFeed, AppTop } from './shells';
@@ -16,13 +17,14 @@ type Props = {
   onTab: (k: TabKey) => void;
   children: ReactNode;
   floatBar?: ReactNode;
+  floatBarBadge?: number | string;
   inVideoCall?: boolean;
   videoCallOverlay?: ReactNode;
 };
 
 /** Mobile shell ห้องดีล — โครงแยกจาก dr-root desktop */
 export function DealRoomApp({
-  title, subtitle, onBack, showTabs, tab, onTab, children, floatBar, inVideoCall, videoCallOverlay,
+  title, subtitle, onBack, showTabs, tab, onTab, children, floatBar, floatBarBadge, inVideoCall, videoCallOverlay,
 }: Props) {
   if (inVideoCall && videoCallOverlay) {
     return <div className="deal-app deal-app--call">{videoCallOverlay}</div>;
@@ -60,9 +62,9 @@ export function DealRoomApp({
       </AppFeed>
 
       {floatBar && (
-        <div className="deal-app-floatbar" role="toolbar" aria-label="การสื่อสารในดีล">
+        <DealCommFloatbar badge={floatBarBadge}>
           {floatBar}
-        </div>
+        </DealCommFloatbar>
       )}
     </div>
   );
