@@ -2911,9 +2911,8 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .pack-seller-evidence-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  width: 60%;
-  max-width: 240px;
+  gap: 8px;
+  width: 100%;
 }
 .pack-seller-evidence-open {
   display: block;
@@ -2946,9 +2945,9 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .pack-seller-evidence-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
-  background: #0d1117;
+  background: var(--surface-2);
 }
 .pack-seller-evidence-play {
   position: absolute;
