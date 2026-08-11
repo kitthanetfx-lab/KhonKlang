@@ -64,7 +64,7 @@ export function SimpleDealJoinPanel(props: Props) {
       </div>
 
       {props.mode === 'wait' ? (
-        <button type="button" onClick={props.onCopyLink} className="btn btn-primary btn-block">
+        <button type="button" onClick={props.onCopyLink} className="btn btn-soft btn-block">
           {props.copied ? '✅ คัดลอกลิงก์แล้ว' : '🔗 คัดลอกลิงก์แชร์'}
         </button>
       ) : (
@@ -75,7 +75,7 @@ export function SimpleDealJoinPanel(props: Props) {
             </div>
           )}
           {props.canBeBuyer && (
-            <AsyncButton onClick={() => props.onJoin('buyer')} className="btn btn-primary btn-block btn-lg">
+            <AsyncButton onClick={() => props.onJoin('buyer')} className="btn btn-green btn-block btn-lg">
               {props.notLoggedIn ? '🔑 เข้าสู่ระบบเพื่อเป็นผู้ซื้อ' : '🛍️ เข้าร่วมเป็นผู้ซื้อ'}
             </AsyncButton>
           )}
