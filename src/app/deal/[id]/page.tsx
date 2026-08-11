@@ -3657,64 +3657,63 @@ export default function DealRoom() {
     const hasUnboxEvidence = unboxEvidence.length > 0;
     if (simpleReceiveFocus && myRole === 'buyer') {
       return (
-        <div className="simple-deal-receive-focus">
-          <div className="simple-deal-step-scroll">
-            {packingEvidence.length > 0 && (
-              <div className="dr-card pack-seller-evidence-compact">
-                <div className="dr-card-title">📦 หลักฐานจากผู้ขาย</div>
-                <div className="pack-seller-evidence-grid">
-                  {packingSlots.map((uploaded, idx) => (
-                    <div key={idx} className="pack-seller-evidence-slot">
-                      <div className="pack-seller-evidence-media">
-                        {uploaded ? (
-                          uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
-                            ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
-                            : <img src={fileUrl(uploaded.file_id)} alt={packingStepLabels[idx]} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                        ) : (
-                          <span className="pack-seller-evidence-placeholder">{idx + 1}</span>
-                        )}
-                      </div>
-                      <div className="pack-seller-evidence-label">{uploaded ? `✅ ${packingStepLabels[idx]}` : packingStepLabels[idx]}</div>
+        <div className="dr-card simple-deal-receive-card">
+          {packingEvidence.length > 0 && (
+            <>
+              <div className="dr-card-title">📦 หลักฐานจากผู้ขาย</div>
+              <div className="pack-seller-evidence-grid">
+                {packingSlots.map((uploaded, idx) => (
+                  <div key={idx} className="pack-seller-evidence-slot">
+                    <div className="pack-seller-evidence-media">
+                      {uploaded ? (
+                        uploaded.file_name?.match(/\.(mp4|mov|avi|webm)$/i)
+                          ? <video src={fileUrl(uploaded.file_id)} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
+                          : <img src={fileUrl(uploaded.file_id)} alt={packingStepLabels[idx]} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      ) : (
+                        <span className="pack-seller-evidence-placeholder">{idx + 1}</span>
+                      )}
                     </div>
-                  ))}
-                </div>
+                    <div className="pack-seller-evidence-label">{uploaded ? `✅ ${packingStepLabels[idx]}` : packingStepLabels[idx]}</div>
+                  </div>
+                ))}
               </div>
-            )}
-            {renderTrackingInfoInline(deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
-          </div>
-          <div className="dr-card simple-deal-step-actions pack-receive-actions">
-            <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
-            <p className="pack-receive-warn">⚠️ ต้องถ่ายวิดีโอตอนแกะกล่อง — ไม่มีวิดีโอจะเรียกร้องผู้ขายไม่ได้</p>
-            <button type="button" onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block">
-              <Icon name="upload" size={16} /> อัปโหลดวิดีโอ/รูปก่อนแกะ
-            </button>
-            <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
-            {hasUnboxEvidence && (
-              <p className="pack-receive-uploaded">✅ อัปโหลดแล้ว {unboxEvidence.length} ไฟล์</p>
-            )}
-            {renderWizardEvidenceThumbs(unboxEvidence, true)}
-            <AsyncButton
-              className="btn btn-green btn-block btn-lg"
-              disabled={acting}
-              onClick={() => {
-                if (!hasUnboxEvidence && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return;
-                return doAction('buyer_received');
-              }}
-            >
-              🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์
-            </AsyncButton>
-            <AsyncButton
-              className="btn btn-ghost btn-block btn-sm pack-receive-dispute"
-              disabled={acting}
-              onClick={() => {
-                const r = prompt('อธิบายปัญหาที่พบ (เช่น สินค้าไม่ตรงปก/ชำรุด/ไม่ได้รับสินค้า):');
-                if (r === null || !r.trim()) return;
-                return doAction('dispute', { reason: r.trim() });
-              }}
-            >
-              ⚠️ แจ้งปัญหากับสินค้า
-            </AsyncButton>
-          </div>
+            </>
+          )}
+          {renderTrackingInfoInline(deal!.tracking_to_buyer, deal!.tracking_to_buyer_provider)}
+
+          <div className="simple-deal-receive-divider" aria-hidden />
+
+          <div className="dr-card-title">📹 ถ่ายวิดีโอก่อนแกะกล่อง</div>
+          <p className="pack-receive-warn">⚠️ ต้องถ่ายวิดีโอตอนแกะกล่อง — ไม่มีวิดีโอจะเรียกร้องผู้ขายไม่ได้</p>
+          <button type="button" onClick={() => buyerEvidInputRef.current?.click()} className="btn btn-soft btn-block">
+            <Icon name="upload" size={16} /> อัปโหลดวิดีโอ/รูปก่อนแกะ
+          </button>
+          <input ref={buyerEvidInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, true, 'receive'); e.target.value = ''; }} />
+          {hasUnboxEvidence && (
+            <p className="pack-receive-uploaded">✅ อัปโหลดแล้ว {unboxEvidence.length} ไฟล์</p>
+          )}
+          {renderWizardEvidenceThumbs(unboxEvidence, true)}
+          <AsyncButton
+            className="btn btn-green btn-block btn-lg"
+            disabled={acting}
+            onClick={() => {
+              if (!hasUnboxEvidence && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return;
+              return doAction('buyer_received');
+            }}
+          >
+            🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์
+          </AsyncButton>
+          <AsyncButton
+            className="btn btn-ghost btn-block btn-sm pack-receive-dispute"
+            disabled={acting}
+            onClick={() => {
+              const r = prompt('อธิบายปัญหาที่พบ (เช่น สินค้าไม่ตรงปก/ชำรุด/ไม่ได้รับสินค้า):');
+              if (r === null || !r.trim()) return;
+              return doAction('dispute', { reason: r.trim() });
+            }}
+          >
+            ⚠️ แจ้งปัญหากับสินค้า
+          </AsyncButton>
         </div>
       );
     }
