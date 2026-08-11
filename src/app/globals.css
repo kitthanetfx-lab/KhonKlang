@@ -8095,9 +8095,11 @@ body.in-call .deal-comm-dock-wrap { display: block; }
   gap: 12px;
   transform: translateY(-50%);
   pointer-events: none;
+  visibility: hidden;
 }
 .deal-comm-dock-wrap.is-open .deal-comm-orbs {
   pointer-events: auto;
+  visibility: visible;
 }
 
 .deal-comm-orb {
@@ -8155,7 +8157,11 @@ body.in-call .deal-comm-dock-wrap { display: block; }
 .deal-comm-orb.voice-active .deal-comm-orb-ic,
 .deal-comm-orb.voice-active .deal-comm-orb-lb { color: var(--rose-500); }
 .deal-comm-orb.ringing { animation: dealCommRing 1s ease-in-out infinite; }
-.deal-comm-orb:disabled { opacity: .4; cursor: not-allowed; transform: translateX(-16px) scale(1); }
+.deal-comm-orb:disabled { cursor: not-allowed; }
+.deal-comm-dock-wrap.is-open .deal-comm-orb:disabled {
+  opacity: .45;
+  transform: translateX(-16px) scale(1);
+}
 .deal-comm-orb-badge {
   position: absolute;
   top: -2px;
