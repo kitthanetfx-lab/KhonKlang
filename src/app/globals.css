@@ -8015,94 +8015,145 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .deal-app-inner .dr-inner { padding: 0; gap: 12px; }
 .deal-app-inner .dr-card { border-radius: 16px; padding: 16px; }
 
-/* แถบแชท/โทร/วิดีโอ — FAB กดเปิด-ปิด (แบบปุ่มสลับโหมด) */
-.deal-comm-dial {
+/* แชท/โทร/วิดีโอ — ซ่อนที่ขอบ + ดึงออกแบบ Lang/Theme (pref-dock) */
+.deal-comm-dock-wrap {
   position: fixed;
-  right: max(16px, env(safe-area-inset-right, 0px));
   top: 50%;
+  right: 0;
   transform: translateY(-50%);
+  z-index: 134;
+}
+body.in-call .deal-comm-dock-wrap { display: block; }
+
+.deal-comm-dock-toggle {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 136;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-right: none;
+  border-radius: 12px 0 0 12px;
+  width: 28px;
+  min-width: 28px;
+  padding: 10px 4px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--ink);
+  box-shadow: var(--sh-md);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  cursor: pointer;
+}
+.deal-comm-dock-toggle-pill {
+  width: 16px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+.deal-comm-dock-toggle-text {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  line-height: 1;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+.deal-comm-dock-toggle-badge {
+  position: absolute;
+  top: 4px;
+  left: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--rose-500);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--surface);
+}
+
+.deal-comm-dock {
+  position: fixed;
+  top: 50%;
+  right: 0;
   z-index: 135;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
+  align-items: stretch;
+  gap: 5px;
+  padding: 6px 8px 6px 10px;
+  border-radius: 16px 0 0 16px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-right: none;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: var(--sh-md);
+  transform: translateY(-50%) translateX(calc(100% - 36px));
+  transition: transform .24s ease;
 }
-body.in-call .deal-comm-dial { display: flex; }
-.deal-comm-dial-toggle {
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  border: none;
-  border-radius: 50%;
-  background: var(--accent, #2f6bf0);
-  color: #fff;
-  box-shadow: var(--sh-lg, 0 8px 28px rgba(15, 23, 42, .18));
-  cursor: pointer;
-  display: grid;
-  place-items: center;
+.deal-comm-dock-wrap.is-open .deal-comm-dock {
+  transform: translateY(-50%) translateX(0);
+}
+
+.deal-comm-chip {
   position: relative;
-  transition: transform .2s, background .2s, box-shadow .2s;
-}
-.deal-comm-dial-toggle:hover {
-  background: var(--accent-strong, #1d4ed8);
-  transform: scale(1.04);
-}
-.deal-comm-dial-toggle:focus-visible {
-  outline: none;
-  box-shadow: var(--ring, 0 0 0 3px rgba(47, 107, 240, .35)), var(--sh-lg, 0 8px 28px rgba(15, 23, 42, .18));
-}
-.deal-comm-dial.is-open .deal-comm-dial-toggle {
-  background: var(--ink-2, #475569);
-}
-.deal-comm-dial-toggle-ic {
-  font-size: 22px;
-  line-height: 1;
-  font-weight: 800;
-}
-.deal-comm-dial-badge {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--rose-500, #ef4444);
-  color: #fff;
+  justify-content: space-between;
+  min-width: 108px;
+  padding: 8px 12px;
   font-size: 11px;
+  gap: 8px;
+}
+.deal-comm-chip.is-on {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)), var(--surface-2));
+}
+.deal-comm-chip.voice { color: var(--green-600); }
+.deal-comm-chip.voice .pref-chip-value { color: var(--green-600); }
+.deal-comm-chip.video .pref-chip-value { color: var(--accent); }
+.deal-comm-chip.voice-active {
+  border-color: color-mix(in srgb, var(--rose-500) 40%, var(--line));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rose-500) 12%, var(--surface)), var(--surface-2));
+}
+.deal-comm-chip.voice-active .pref-chip-value { color: var(--rose-500); font-variant-numeric: tabular-nums; }
+.deal-comm-chip.ringing {
+  animation: dealCommRing 1s ease-in-out infinite;
+}
+.deal-comm-chip:disabled { opacity: .45; cursor: not-allowed; }
+.deal-comm-chip-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--rose-500);
+  color: #fff;
+  font-size: 9px;
   font-weight: 800;
   display: grid;
   place-items: center;
-  border: 2px solid #fff;
+  border: 1.5px solid var(--surface);
 }
-.deal-comm-dial-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(10px) scale(0.94);
-  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.22s;
+@keyframes dealCommRing {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
 }
-.deal-comm-dial.is-open .deal-comm-dial-menu {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateY(0) scale(1);
-}
-.deal-comm-dial-menu .deal-app-fbtn,
-.deal-comm-dial-menu .dr-floatbar-btn {
-  flex-shrink: 0;
-  min-width: 56px;
-  min-height: 56px;
-}
-@media (max-width: 480px) {
-  .deal-comm-dial { right: max(12px, env(safe-area-inset-right, 0px)); }
-  .deal-comm-dial-toggle { width: 52px; height: 52px; }
-  .deal-comm-dial-toggle-ic { font-size: 20px; }
-  .deal-comm-dial-menu .deal-app-fbtn,
-  .deal-comm-dial-menu .dr-floatbar-btn { min-width: 52px; min-height: 52px; }
+
+@media (max-width: 979px) {
+  .deal-comm-chip { min-width: 100px; padding: 7px 10px; font-size: 10.5px; }
 }
 
 .deal-app-floatbar {

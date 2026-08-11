@@ -28,10 +28,10 @@ import { DealPackingEvidenceStrip } from '@/components/deal/DealPackingEvidenceS
 import { DealPackingUploadGrid } from '@/components/deal/DealPackingUploadGrid';
 import { DealEvidenceThumbs } from '@/components/deal/DealEvidenceThumbs';
 import { SimpleDealPreJoinScreen } from '@/components/deal/SimpleDealPreJoinScreen';
-import { DealCommFloatbar } from '@/components/deal/DealCommFloatbar';
+import { DealCommFloatbar, DealCommChip } from '@/components/deal/DealCommFloatbar';
 import { DealOthersReviewsSummary } from '@/components/deal/DealOthersReviewsSummary';
 import { SimpleDealShell } from '@/components/deal/SimpleDealShell';
-import { DealRoomApp, DealAppFloatBtn } from '@/components/mobile/DealRoomApp';
+import { DealRoomApp } from '@/components/mobile/DealRoomApp';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -5716,16 +5716,16 @@ export default function DealRoom() {
 
   const mobileFloatBar = canCall ? (
     <>
-      <DealAppFloatBtn active={floatChatOpen} onClick={() => setFloatChatOpen(v => !v)} icon="💬" label="แชท" badge={chatBadge} />
+      <DealCommChip active={floatChatOpen} onClick={() => setFloatChatOpen(v => !v)} label="แชท" value="💬" badge={chatBadge} />
       {voiceBgActive ? (
-        <DealAppFloatBtn className="voice-active" onClick={endCall} icon="📞" label={fmtVoiceDur(callSeconds)} />
+        <DealCommChip className="voice-active" onClick={endCall} label="โทร" value={fmtVoiceDur(callSeconds)} />
       ) : incomingCall ? (
-        <DealAppFloatBtn className="ringing" onClick={acceptIncomingCall} icon="📞" label="รับสาย" />
+        <DealCommChip className="ringing" onClick={acceptIncomingCall} label="โทร" value="รับสาย" />
       ) : callStatus === 'idle' ? (
-        <DealAppFloatBtn onClick={() => startCall('voice')} icon="📞" label="โทร" />
+        <DealCommChip className="voice" onClick={() => startCall('voice')} label="โทร" value="📞" />
       ) : null}
       {callStatus === 'idle' && !incomingCall && (
-        <DealAppFloatBtn disabled icon="📹" label="วิดีโอ" />
+        <DealCommChip className="video" disabled label="วิดีโอ" value="📹" />
       )}
     </>
   ) : undefined;
@@ -5789,27 +5789,16 @@ export default function DealRoom() {
 
           {canCall && (
             <DealCommFloatbar badge={chatBadge}>
-              <button type="button" className={`dr-floatbar-btn ${floatChatOpen ? 'active' : ''}`} onClick={() => setFloatChatOpen(v => !v)} title="แชท">
-                <span className="ic">💬</span><span>แชท</span>
-                {chatBadge != null && <span className="dr-floatbar-badge">{chatBadge}</span>}
-              </button>
+              <DealCommChip active={floatChatOpen} onClick={() => setFloatChatOpen(v => !v)} label="แชท" value="💬" badge={chatBadge} />
               {voiceBgActive ? (
-                <button type="button" className="dr-floatbar-btn voice-active" onClick={endCall} title="วางสาย">
-                  <span className="ic">📞</span><span className="dur">{fmtVoiceDur(callSeconds)}</span>
-                </button>
+                <DealCommChip className="voice-active" onClick={endCall} label="โทร" value={fmtVoiceDur(callSeconds)} />
               ) : incomingCall ? (
-                <button type="button" className="dr-floatbar-btn ringing" onClick={acceptIncomingCall} title="รับสายเรียกเข้า">
-                  <span className="ic">📞</span><span>รับสาย</span>
-                </button>
+                <DealCommChip className="ringing" onClick={acceptIncomingCall} label="โทร" value="รับสาย" />
               ) : callStatus === 'idle' ? (
-                <button type="button" className="dr-floatbar-btn voice" onClick={() => startCall('voice')} title="โทรเสียง">
-                  <span className="ic">📞</span><span>โทร</span>
-                </button>
+                <DealCommChip className="voice" onClick={() => startCall('voice')} label="โทร" value="📞" />
               ) : null}
               {callStatus === 'idle' && !incomingCall && (
-                <button type="button" className="dr-floatbar-btn video" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="วิดีโอคอล (ยังไม่พร้อมใช้งาน)">
-                  <span className="ic">📹</span><span>วิดีโอ</span>
-                </button>
+                <DealCommChip className="video" disabled label="วิดีโอ" value="📹" />
               )}
             </DealCommFloatbar>
           )}
