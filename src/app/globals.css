@@ -644,7 +644,7 @@ button.nav-link { background: none; border: none; }
 /* ---- Hero ---- */
 .hero {
   position: relative;
-  --hero-logo-top: 100px; /* ระยะจากขอบบน viewport ถึงโลโก้ hero */
+  --hero-logo-top: 100px; /* desktop: ระยะจากขอบบนถึงโลโก้ hero */
   padding: 0 0 clamp(18px, 2.5vh, 22px);
   overflow: hidden;
 }
@@ -941,15 +941,10 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 @media (max-width: 760px){ .foot-grid { grid-template-columns: 1fr 1fr; } .foot-grid > :first-child { grid-column: 1 / -1; } }
 @media (max-width: 460px){ .foot-grid { grid-template-columns: 1fr; } }
 
-/* Mobile hero — โลโก้ ~100px จากขอบบน + ปุ่ม Deal เห็นเต็มในจอแรก */
+/* Mobile hero — บีบ spacing หน้าแรกให้ปุ่ม Deal เห็นเต็ม (ไม่ซ่อนเมนู) */
 @media (max-width: 899px) {
-  /* หน้าแรก: ซ่อนแถบไอคอนเมนู ให้โลโก้ hero เริ่มใต้แถบบน ~100px */
-  body:has(.hero--home) .app-hdr-services-row {
-    display: none;
-  }
   .hero--home {
-    /* header แถวบน ~72px + padding = 100px */
-    padding-top: calc(var(--hero-logo-top) - 72px);
+    padding-top: clamp(4px, 0.8vh, 8px);
   }
   .hero--home .hero-inner {
     gap: clamp(10px, 1.6vh, 16px);
