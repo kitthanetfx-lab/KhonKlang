@@ -33,19 +33,23 @@ export default function ServiceTradePage() {
             return enabled ? (
             <Link key={m.title} href={m.href} className="svc-mode">
               <div className="svc-mode-media">
-                <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 100vw, 50vw" />
+                <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 50vw, 25vw" />
               </div>
-              <div className="svc-mode-title">{m.title}</div>
-              <div className="svc-mode-cta">เริ่มต้น <span>→</span></div>
+              <div className="svc-mode-foot">
+                <div className="svc-mode-title">{m.title}</div>
+                <div className="svc-mode-cta">เริ่มต้น <span>→</span></div>
+              </div>
             </Link>
             ) : (
             <div key={m.title} className="svc-mode" style={{ opacity: 0.7, cursor: 'not-allowed' }}>
               <div className="svc-mode-media">
-                <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 100vw, 50vw" />
+                <Image src={m.image} alt={m.title} fill className="svc-mode-image" sizes="(max-width: 519px) 50vw, 25vw" />
               </div>
-              <div className="svc-mode-title">{m.title}</div>
-              <div className="svc-mode-cta" style={{ color: '#b7791f' }}>ปิดชั่วคราว</div>
-              <div style={{ marginTop: 10, fontSize: 13, color: '#9a6700', lineHeight: 1.6 }}>{note}</div>
+              <div className="svc-mode-foot">
+                <div className="svc-mode-title">{m.title}</div>
+                <div className="svc-mode-cta" style={{ color: '#b7791f' }}>ปิดชั่วคราว</div>
+                <div className="svc-mode-note">{note}</div>
+              </div>
             </div>
             );
           })}

@@ -4891,6 +4891,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .service-meetup-page .svc-mode {
   padding: 10px;
   gap: 8px;
+  height: 100%;
 }
 @media (min-width: 980px) {
   .service-trade-page .svc-mode,
@@ -4901,8 +4902,41 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 }
 .service-trade-page .svc-mode-media,
 .service-meetup-page .svc-mode-media {
-  width: 50%;
-  margin-inline: auto;
+  width: 100%;
+  margin-inline: 0;
+}
+@media (min-width: 980px) {
+  .service-trade-page .svc-mode-media,
+  .service-meetup-page .svc-mode-media {
+    width: 50%;
+    margin-inline: auto;
+  }
+}
+.service-trade-page .svc-mode-foot,
+.service-meetup-page .svc-mode-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+.service-trade-page .svc-mode-note,
+.service-meetup-page .svc-mode-note {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #9a6700;
+  line-height: 1.6;
+  text-align: center;
+}
+@media (max-width: 979px) {
+  .service-trade-page .svc-mode-note,
+  .service-meetup-page .svc-mode-note {
+    display: none;
+  }
+  .service-trade-page .svc-mode-cta,
+  .service-meetup-page .svc-mode-cta {
+    margin-top: 0;
+  }
 }
 .service-trade-page .svc-mode-title,
 .service-meetup-page .svc-mode-title {
