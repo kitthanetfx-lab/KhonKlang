@@ -46,9 +46,6 @@ export default function ServiceSimplePage() {
 
           <div className="svc-simple-hero">
             <h1 className="svc-simple-title">ซื้อขายผ่านกลางแบบง่าย</h1>
-            <p className="svc-simple-sub">ซื้อขายง่าย ปลอดภัยขึ้น70% </p>
-            <p className="svc-simple-sub">คลอบคลุมกรณีไม่ได้รับสินค้า ไม่ตรงปก</p>
-            <p className="svc-simple-sub"> ความเสียหายที่เห็นได้ชัด </p>
           </div>
 
           <div className="svc-simple-kicker svc-simple-fade">ขั้นตอนการดำเนินงาน</div>
