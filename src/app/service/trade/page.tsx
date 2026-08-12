@@ -1,7 +1,7 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 
@@ -20,14 +20,7 @@ export default function ServiceTradePage() {
 
   return (
     <div className="sub-page service-sub-page service-trade-page">
-      <header className="sub-header">
-        <Link href="/" className="sub-back" aria-label="ย้อนกลับ">
-          <span className="sub-back-arrow">←</span>
-          <span className="sub-back-text">ย้อนกลับ</span>
-        </Link>
-        <span className="sub-htitle">บริการผ่านคนกลาง</span>
-        <HeaderAccountActions />
-      </header>
+      <SubPageHeader backHref="/" title="บริการผ่านคนกลาง" />
       <div className="svc-inner">
         <div className="svc-hero">
           <div className="svc-hero-icon">🤝</div>

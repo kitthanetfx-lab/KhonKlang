@@ -2,7 +2,7 @@
 
 import { ReactNode } from 'react';
 import { Icon } from '@/components/Icon';
-import { AppFeed, AppTop } from '@/components/mobile/shells';
+import { AppFeed, AppTop, AppHeaderActions } from '@/components/mobile/shells';
 
 type Props = {
   title: string;
@@ -23,11 +23,16 @@ export function AdminAppFrame({ title, subtitle, onRefresh, refreshing, search, 
         title={title}
         subtitle={subtitle}
         classPrefix="admin-app"
-        right={onRefresh ? (
-          <button type="button" className="admin-app-refresh" onClick={onRefresh} disabled={refreshing} aria-label="รีเฟรช">
-            <Icon name="refresh" size={18} />
-          </button>
-        ) : undefined}
+        actions={(
+          <>
+            {onRefresh && (
+              <button type="button" className="hdr-icon-btn" onClick={onRefresh} disabled={refreshing} aria-label="รีเฟรช">
+                <Icon name="refresh" size={18} />
+              </button>
+            )}
+            <AppHeaderActions />
+          </>
+        )}
       />
       {(search || filters) && (
         <div className="admin-app-toolbar">

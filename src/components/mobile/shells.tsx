@@ -1,6 +1,8 @@
 'use client';
 
-import { Icon } from '@/components/Icon';
+import { ReactNode } from 'react';
+import { AppHeaderBar } from './AppHeaderBar';
+import { AppHeaderActions } from './AppHeaderActions';
 
 /** มือถือ ≤767px — ซ่อนบน desktop */
 export function MobileShell({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -17,32 +19,28 @@ type AppTopProps = {
   subtitle?: string;
   titleIcon?: string;
   onBack?: () => void;
-  right?: React.ReactNode;
+  backHref?: string;
+  extraActions?: ReactNode;
+  actions?: ReactNode;
   classPrefix?: string;
+  hideTitle?: boolean;
 };
 
-export function AppTop({ title, subtitle, titleIcon, onBack, right, classPrefix = 'app' }: AppTopProps) {
-  const p = classPrefix;
+export function AppTop({
+  title, subtitle, titleIcon, onBack, backHref, extraActions, actions, classPrefix = 'app', hideTitle,
+}: AppTopProps) {
   return (
-    <header className={`${p}-top`}>
-      {onBack && (
-        <button type="button" className={`${p}-back`} onClick={onBack} aria-label="ย้อนกลับ">
-          <Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} />
-        </button>
-      )}
-      <div className={`${p}-top-info${titleIcon ? ` ${p}-top-info--icon` : ''}`}>
-        <div className={`${p}-top-title`} title={title}>
-          {titleIcon && (
-            <span className={`${p}-top-title-ic`} aria-hidden>
-              <Icon name={titleIcon} size={17} />
-            </span>
-          )}
-          <span className={`${p}-top-title-tx`}>{title}</span>
-        </div>
-        {subtitle && <div className={`${p}-top-sub`}>{subtitle}</div>}
-      </div>
-      {right && <div className={`${p}-top-right`}>{right}</div>}
-    </header>
+    <AppHeaderBar
+      className={`${classPrefix}-top app-header-bar`}
+      title={title}
+      subtitle={subtitle}
+      titleIcon={titleIcon}
+      onBack={onBack}
+      backHref={backHref}
+      extraActions={extraActions}
+      hideTitle={hideTitle}
+      actions={actions}
+    />
   );
 }
 
@@ -65,3 +63,5 @@ export function AppLoading() {
     </div>
   );
 }
+
+export { AppHeaderActions, AppHeaderBar };

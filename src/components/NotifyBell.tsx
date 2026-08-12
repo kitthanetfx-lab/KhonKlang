@@ -14,8 +14,8 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 86400)} วัน`;
 }
 
-/** กระดิ่งแจ้งเตือนใน Nav — โพลทุก 25 วิ + ตอนกลับมาโฟกัสแท็บ */
-export function NotifyBell() {
+/** กระดิ่งแจ้งเตือน — โพลทุก 25 วิ + ตอนกลับมาโฟกัสแท็บ */
+export function NotifyBell({ buttonClassName = 'nb-btn' }: { buttonClassName?: string }) {
   const router = useRouter();
   const [items, setItems] = useState<Noti[]>([]);
   const [unread, setUnread] = useState(0);
@@ -79,7 +79,7 @@ export function NotifyBell() {
   return (
     <div className="nb-wrap" ref={wrapRef}>
       <button
-        type="button" className="nb-btn"
+        type="button" className={`${buttonClassName}${open ? ' nb-btn-active' : ''}`}
         aria-label={unread > 0 ? `การแจ้งเตือน ${unread} รายการใหม่` : 'การแจ้งเตือน'}
         aria-expanded={open}
         onClick={() => setOpen(v => !v)}

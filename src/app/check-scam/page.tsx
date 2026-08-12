@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { Icon } from '@/components/Icon';
 import { ScamDbSearch } from '@/components/ScamDbSearch';
 import { ScamReportForm } from '@/components/ScamReportForm';
@@ -29,11 +29,7 @@ export default function CheckScamPage() {
 
   return (
     <div className="sub-page">
-      <header className="sub-header">
-        <Link href="/" className="sub-back">←</Link>
-        <span className="sub-htitle">เช็คคนโกง</span>
-        <HeaderAccountActions />
-      </header>
+      <SubPageHeader backHref="/" title="เช็คคนโกง" titleIcon="shieldCheck" />
       <div className="cs-inner">
         <div className="cs-hero">
           <div className="cs-hero-icon">🛡️</div>

@@ -7,7 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 
@@ -35,14 +35,7 @@ export default function ServiceSimplePage() {
 
   return (
     <div className="sub-page service-sub-page svc-simple-page">
-      <header className="sub-header">
-        <Link href="/service/trade" className="sub-back" aria-label="ย้อนกลับ">
-          <span className="sub-back-arrow">←</span>
-          <span className="sub-back-text">ย้อนกลับ</span>
-        </Link>
-        <span className="sub-htitle">ซื้อขายผ่านกลางแบบง่าย</span>
-        <HeaderAccountActions />
-      </header>
+      <SubPageHeader backHref="/service/trade" title="ซื้อขายผ่านกลางแบบง่าย" titleIcon="zap" />
       <div className="svc-inner svc-simple-stage">
         <div className="svc-simple-panel svc-simple-fade">
           <div className="svc-simple-brand-wrap">

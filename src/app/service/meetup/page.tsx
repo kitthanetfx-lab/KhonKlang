@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authHeaders } from '@/lib/supabase';
 import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { RATE_PER_KM } from '@/lib/provinceGeo';
 import { useServiceControls } from '@/lib/useServiceControls';
@@ -86,14 +86,7 @@ function MeetupInner() {
 
   return (
     <div className="sub-page service-sub-page service-trade-page service-meetup-page">
-      <header className="sub-header">
-        <Link href="/" className="sub-back" aria-label="ย้อนกลับ">
-          <span className="sub-back-arrow">←</span>
-          <span className="sub-back-text">ย้อนกลับ</span>
-        </Link>
-        <span className="sub-htitle">นัดรับผ่านกลาง</span>
-        <HeaderAccountActions />
-      </header>
+      <SubPageHeader backHref="/" title="นัดรับผ่านกลาง" titleIcon="mapPin" />
       <div className="svc-inner">
 
         {step === 1 && (

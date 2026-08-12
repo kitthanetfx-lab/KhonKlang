@@ -2,7 +2,6 @@
 
 import { ReactNode } from 'react';
 import { DealCommFloatbar } from '@/components/deal/DealCommFloatbar';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
 import { Icon } from '@/components/Icon';
 import { AppFeed, AppTop } from './shells';
 
@@ -38,7 +37,6 @@ export function DealRoomApp({
         titleIcon="package"
         onBack={onBack}
         classPrefix="deal-app"
-        right={<HeaderAccountActions showNotify showMarket />}
       />
 
       {showTabs && (

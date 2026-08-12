@@ -4481,57 +4481,102 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 
 /* ---------- GENERIC SUBPAGE HEADER (svc/cs/pf/pay) ---------- */
 .sub-page { min-height:100vh; background:var(--bg); }
-.sub-header { position:sticky; top:0; z-index:40; background:color-mix(in srgb,var(--surface) 94%,transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-bottom:1px solid var(--line); box-shadow:var(--sh-xs); padding:0 20px; height:64px; display:flex; align-items:center; gap:12px; }
-.sub-back { min-width: auto; height: 40px; border-radius: 999px; display:inline-flex; align-items:center; gap:8px; padding:0 14px 0 10px; border:1px solid color-mix(in srgb,var(--line) 88%, transparent); background:linear-gradient(180deg, color-mix(in srgb,var(--surface) 95%, transparent), var(--surface-2)); color:var(--ink); box-shadow:var(--sh-xs); transition:all .2s; flex-shrink:0; text-decoration:none; font-family:var(--font-display); font-weight:700; font-size:13px; }
-.sub-back:hover { background:var(--surface-2); color:var(--ink); transform: translateY(-1px); }
-.sub-back-arrow { display:grid; place-items:center; width:22px; height:22px; border-radius:999px; background:color-mix(in srgb,var(--accent) 12%, white); color:var(--accent-strong); font-size:15px; line-height:1; }
-.sub-back-text { white-space:nowrap; line-height:1; }
-.sub-htitle { font-family:var(--font-display); font-weight:700; font-size:17px; color:var(--ink); flex:1; min-width:0; }
-.service-sub-page .sub-htitle { display:none; }
-.sub-header-actions, .header-account-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-.header-account-actions { margin-left:auto; }
-.header-account-actions .btn { white-space:nowrap; }
 
-/* ปุ่มไอคอนใน header — ตลาด / โปรไฟล์ (มือถือ-แท็บเล็ต) */
+/* ============================================================
+   Unified app header bar (มือถือ/แท็บเล็ต — ทุกหน้า)
+   [←] [ไอคอน+ชื่อ] ··· [ตลาด][ข้อความ][ตะกร้า][แจ้ง][โปรไฟล์]
+   ============================================================ */
+.app-header-bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 12px;
+  background: rgba(244, 246, 251, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  box-sizing: border-box;
+}
+.app-hdr-left { display: flex; align-items: center; flex-shrink: 0; }
+.app-hdr-center { min-width: 0; overflow: hidden; }
+.app-hdr-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex-shrink: 0; min-width: 0; }
+.app-hdr-actions-inner { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.app-hdr-back {
+  width: 40px; height: 40px; border: none; border-radius: 12px;
+  display: grid; place-items: center; background: #fff; color: var(--app-muted, var(--muted));
+  box-shadow: 0 1px 2px rgba(15,23,42,.06); cursor: pointer; flex-shrink: 0;
+  text-decoration: none;
+}
+.app-hdr-back:hover { color: var(--ink); }
+.app-hdr-title {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  font-size: 15px; font-weight: 800; line-height: 1.25; color: var(--ink);
+}
+.app-hdr-title-tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.app-hdr-title-ic {
+  flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: 8px; background: #fff; color: var(--app-accent, var(--accent));
+  box-shadow: 0 1px 2px rgba(15,23,42,.06);
+}
+.app-hdr-sub {
+  font-size: 12px; color: var(--app-muted, var(--muted)); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.app-hdr-loading { font-size: 12px; color: var(--muted); padding: 0 6px; }
+
+/* ปุ่มไอคอน header — ขนาดเท่ากันทุกปุ่ม */
 .hdr-icon-btn {
-  display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0;
-  border-radius: 12px; border: none; background: #fff; color: var(--app-muted, var(--ink-2));
+  position: relative;
+  display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 11px; border: none; background: #fff; color: var(--app-muted, var(--ink-2));
   box-shadow: 0 1px 2px rgba(15,23,42,.06); text-decoration: none; cursor: pointer;
   transition: color .15s, box-shadow .15s, background .15s;
+  padding: 0;
 }
 .hdr-icon-btn:hover { color: var(--accent-strong, var(--accent)); box-shadow: 0 2px 6px rgba(15,23,42,.08); }
-.hdr-profile-av { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-.hdr-profile-name, .hdr-profile-chevron { flex-shrink: 0; }
+.hdr-icon-btn.nb-btn-active { color: var(--accent-strong, var(--accent)); background: var(--accent-soft, #eff6ff); }
+.hdr-profile-dd { flex-shrink: 0; }
+.hdr-profile-av { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+
+/* legacy class names — ใช้ layout เดียวกับ app-header-bar */
+.sub-header, .dr-header.app-header-bar {
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--sh-xs);
+  padding: 0 12px;
+  min-height: 56px;
+}
+.sub-back { display: none; }
+.sub-htitle { display: none; }
+.sub-header-actions { display: contents; }
+.sub-header .header-account-actions { display: contents; }
 
 @media (min-width: 980px) {
   .hdr-icon-btn--market { display: none; }
+  .app-hdr-sub { display: block; }
+  .dr-header.app-header-bar .app-hdr-sub { display: block; font-size: 12px; color: var(--muted); }
 }
 
 @media (max-width: 979px) {
-  .header-account-logout,
-  .header-account-register { display:none; }
-  .sub-header { padding: 0 14px; gap: 10px; }
-  .sub-back { height: 36px; padding: 0 12px 0 9px; gap: 7px; font-size: 12px; }
-  .sub-back-arrow { width: 20px; height: 20px; font-size: 14px; }
-
-  /* header แบบไอคอน — ซ่อนชื่อยาว ใช้ avatar/icon อย่างเดียว */
-  .header-account-actions { gap: 6px; }
-  .header-account-actions .hdr-profile-name,
-  .header-account-actions .hdr-profile-chevron { display: none; }
-  .header-account-actions .hdr-profile-btn.profile-trigger {
-    width: 40px; height: 40px; min-width: 40px; padding: 0; justify-content: center;
-    border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.06);
-    border: none;
-  }
-  .header-account-actions .hdr-profile-av { width: 26px; height: 26px; }
-  .header-account-actions .nb-btn {
-    width: 40px; height: 40px; border-radius: 12px; border: none;
-    box-shadow: 0 1px 2px rgba(15,23,42,.06);
-  }
-
-  /* ห้องดีล desktop shell บนแท็บเล็ต — ซ่อน subtitle ยาว */
-  .dr-hsub { display: none; }
+  .app-hdr-sub { display: none; }
+  .sub-header, .dr-header.app-header-bar { padding: 0 10px; gap: 6px; min-height: 52px; }
+  .app-hdr-actions-inner { gap: 3px; }
 }
+
+@media (max-width: 520px) {
+  .app-hdr-title-tx { display: none; }
+  .app-hdr-title-ic { width: 34px; height: 34px; border-radius: 10px; }
+  .hdr-icon-btn { width: 34px; height: 34px; border-radius: 10px; }
+  .app-hdr-back { width: 34px; height: 34px; }
+  .hdr-profile-av { width: 24px; height: 24px; }
+}
+
+.service-sub-page .app-hdr-center { display: none; }
 
 /* ---------- CHECK-SCAM ---------- */
 .cs-inner { max-width:none; width:100%; margin:0 auto; padding:32px 20px; box-sizing:border-box; }
@@ -8060,52 +8105,8 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 }
 
 .app-top, .reg-app-top, .onsite-app-top, .deal-app-top, .admin-app-top {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 52px;
-  padding: 8px var(--app-pad);
-  background: rgba(244, 246, 251, 0.94);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-}
-.app-back, .reg-app-back, .onsite-app-back, .deal-app-back, .admin-app-back {
-  width: 40px; height: 40px; border: none; border-radius: 12px;
-  display: grid; place-items: center; background: #fff; color: var(--app-muted);
-  box-shadow: 0 1px 2px rgba(15,23,42,.06); cursor: pointer; flex-shrink: 0;
-}
-.app-top-info, .reg-app-top-info, .onsite-app-top-info, .deal-app-top-info, .admin-app-top-info { flex: 1; min-width: 0; }
-.app-top-title, .reg-app-top-title, .onsite-app-top-title, .deal-app-top-title, .admin-app-top-title {
-  display: flex; align-items: center; gap: 6px; min-width: 0;
-  font-size: 16px; font-weight: 800; line-height: 1.25;
-}
-.app-top-title-tx, .reg-app-top-title-tx, .onsite-app-top-title-tx, .deal-app-top-title-tx, .admin-app-top-title-tx {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
-}
-.app-top-title-ic, .reg-app-top-title-ic, .onsite-app-top-title-ic, .deal-app-top-title-ic, .admin-app-top-title-ic {
-  flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 28px;
-  border-radius: 8px; background: #fff; color: var(--app-accent, var(--accent));
-  box-shadow: 0 1px 2px rgba(15,23,42,.06);
-}
-.app-top-sub, .reg-app-top-sub, .onsite-app-top-sub, .deal-app-top-sub, .admin-app-top-sub {
-  font-size: 12px; color: var(--app-muted); margin-top: 2px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.app-top-right, .reg-app-top-right, .onsite-app-top-right, .deal-app-top-right, .admin-app-top-right { flex-shrink: 0; }
-
-@media (max-width: 979px) {
-  .deal-app-top-sub, .app-top-sub, .reg-app-top-sub, .onsite-app-top-sub { display: none; }
-}
-
-@media (max-width: 520px) {
-  /* จอแคบมาก — แสดงแค่ไอคอนดีล ไม่โชว์ชื่อสินค้ายาว */
-  .deal-app-top-title-tx { display: none; }
-  .deal-app-top-title-ic { width: 36px; height: 36px; border-radius: 10px; }
-  .deal-app-top-info--icon { flex: 0 0 auto; }
+  padding-left: var(--app-pad, 12px);
+  padding-right: var(--app-pad, 12px);
 }
 
 .app-feed, .reg-app-feed, .onsite-app-feed, .deal-app-feed, .admin-app-feed {

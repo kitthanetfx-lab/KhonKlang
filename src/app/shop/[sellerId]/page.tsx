@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 
 const imgUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -81,11 +81,7 @@ export default function PublicShopPage() {
   if (error || !shop || !stats) {
     return (
       <div className="sub-page">
-        <header className="sub-header">
-          <Link href="/marketplace" className="sub-back"><span className="sub-back-arrow">←</span><span className="sub-back-text">ตลาด</span></Link>
-          <span className="sub-htitle">หน้าร้าน</span>
-          <HeaderAccountActions />
-        </header>
+        <SubPageHeader backHref="/marketplace" title="หน้าร้าน" titleIcon="store" />
         <div className="dash-empty" style={{ marginTop: 48 }}><p>{error || 'ไม่พบร้าน'}</p></div>
       </div>
     );
@@ -96,11 +92,7 @@ export default function PublicShopPage() {
 
   return (
     <div className="sub-page shop-public-page">
-      <header className="sub-header">
-        <Link href="/marketplace" className="sub-back"><span className="sub-back-arrow">←</span><span className="sub-back-text">ตลาด</span></Link>
-        <span className="sub-htitle">หน้าร้าน</span>
-        <HeaderAccountActions />
-      </header>
+      <SubPageHeader backHref="/marketplace" title="หน้าร้าน" titleIcon="store" />
 
       <div className="shop-sign-card shop-sign-card--public">
         <div className="shop-sign-banner" style={bannerSrc ? { backgroundImage: `url(${bannerSrc})` } : undefined}>

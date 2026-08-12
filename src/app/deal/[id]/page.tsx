@@ -6,7 +6,8 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { DealFlowBrand } from '@/components/DealFlowBrand';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { AppHeaderBar } from '@/components/mobile/AppHeaderBar';
+import { AppHeaderActions } from '@/components/mobile/AppHeaderActions';
 import { ReviewPanel } from '@/components/ReviewPanel';
 import { AsyncButton } from '@/components/AsyncButton';
 import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
@@ -1408,14 +1409,13 @@ export default function DealRoom() {
     return (
       <div className="dr-root">
         <InAppBanner />
-        <header className="dr-header">
-          <Link href="/admin/deals" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
-          <div className="dr-header-info">
-            <div className="dr-htitle">{deal.title}</div>
-            <span style={{ fontSize: 11, background: '#fee2e2', color: '#991b1b', borderRadius: 4, padding: '2px 7px', fontWeight: 700 }}>🔍 Admin Observer</span>
-          </div>
-          <HeaderAccountActions />
-        </header>
+        <AppHeaderBar
+          className="dr-header app-header-bar"
+          title={deal.title}
+          titleIcon="package"
+          backHref="/admin/deals"
+          extraActions={<span style={{ fontSize: 11, background: '#fee2e2', color: '#991b1b', borderRadius: 4, padding: '2px 7px', fontWeight: 700, whiteSpace: 'nowrap' }}>Admin</span>}
+        />
         <main style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 60px', display: 'flex', flexDirection: 'column', gap: 14, width: '100%' }}>
           {/* Deal summary */}
           <div className="dr-card">
@@ -1491,11 +1491,7 @@ export default function DealRoom() {
     return (
       <div className="dr-root">
         <InAppBanner />
-        <header className="dr-header">
-          <Link href="/" className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
-          <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div></div>
-          <HeaderAccountActions />
-        </header>
+        <AppHeaderBar className="dr-header app-header-bar" title={deal.title} titleIcon="package" backHref="/" />
         <div style={{ maxWidth: 440, margin: '0 auto', padding: '40px 16px', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <DealFlowBrand className="dr-brand-slot" />
           <div className="dr-card">
@@ -5729,13 +5725,13 @@ export default function DealRoom() {
       <div className="deal-desktop-shell">
         <div className="dr-root">
           <InAppBanner />
-          <header className="dr-header">
-            <button onClick={() => router.back()} className="dr-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
-            <div className="dr-header-info"><div className="dr-htitle">{deal.title}</div><div className="dr-hsub">{dealSubtitle}</div></div>
-            <div className="dr-hctas">
-              <HeaderAccountActions showNotify />
-            </div>
-          </header>
+          <AppHeaderBar
+            className="dr-header app-header-bar"
+            title={deal.title}
+            subtitle={dealSubtitle}
+            titleIcon="package"
+            onBack={() => router.back()}
+          />
 
           {isInCall && callMode === 'video' ? videoCallOverlay : (
             <>

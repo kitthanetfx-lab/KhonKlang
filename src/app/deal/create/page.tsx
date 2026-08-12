@@ -5,7 +5,7 @@ import { authHeaders } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { DealFlowBrand } from '@/components/DealFlowBrand';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
@@ -119,11 +119,7 @@ function CreateDealForm() {
 
   return (
     <div className="sub-page">
-      <header className="sub-header">
-        <Link href="/" className="sub-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>
-        <span className="sub-htitle">{isSimple ? 'สร้างดีลแบบง่าย' : 'สร้างดีลใหม่'}</span>
-        <HeaderAccountActions />
-      </header>
+      <SubPageHeader backHref="/" title={isSimple ? 'สร้างดีลแบบง่าย' : 'สร้างดีลใหม่'} titleIcon="package" />
 
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px 80px' }}>
         <div className="deal-form create-deal-form">

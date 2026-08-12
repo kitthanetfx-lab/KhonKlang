@@ -5,7 +5,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { ProfileConsentModal } from '@/components/ProfileConsentModal';
 import { Icon } from '@/components/Icon';
 import { THAI_BANKS } from '@/lib/banks';
@@ -277,21 +277,27 @@ function ProfilePage() {
       {locked && !consentOk && (
         <ProfileConsentModal onAccept={acceptConsent} onDecline={() => router.replace('/')} />
       )}
-      <header className="sub-header">
-        {locked
-          ? <span style={{ width: 18, display: 'inline-block' }} />
-          : <Link href="/" className="sub-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></Link>}
-        <span className="sub-htitle">{locked ? 'กรอกข้อมูลให้ครบเพื่อใช้งานเว็บไซต์' : 'โปรไฟล์ของฉัน'}</span>
-        <div className="sub-header-actions">
-          {!editing
-            ? <button className="btn btn-ghost btn-sm" onClick={openEdit}><Icon name="user" size={14} /> แก้ไข</button>
-            : <div style={{ display: 'flex', gap: 8 }}>
-                {!locked && <button className="btn btn-ghost btn-sm" onClick={cancelEdit}>ยกเลิก</button>}
-                <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
-              </div>}
-          <HeaderAccountActions />
-        </div>
-      </header>
+      <SubPageHeader
+        backHref={locked ? undefined : '/'}
+        title={locked ? 'กรอกข้อมูลให้ครบเพื่อใช้งานเว็บไซต์' : 'โปรไฟล์ของฉัน'}
+        titleIcon="user"
+        extraActions={!editing ? (
+          <button type="button" className="hdr-icon-btn" onClick={openEdit} aria-label="แก้ไขโปรไฟล์" title="แก้ไข">
+            <Icon name="settings" size={17} />
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: 4 }}>
+            {!locked && (
+              <button type="button" className="hdr-icon-btn" onClick={cancelEdit} aria-label="ยกเลิก" title="ยกเลิก">
+                <Icon name="x" size={17} />
+              </button>
+            )}
+            <button type="button" className="hdr-icon-btn" onClick={handleSave} disabled={saving} aria-label="บันทึก" title={saving ? 'กำลังบันทึก...' : 'บันทึก'}>
+              <Icon name="check" size={17} />
+            </button>
+          </div>
+        )}
+      />
 
       <div className="pf-inner">
         <div className="pf-hero">

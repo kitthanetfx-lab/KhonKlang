@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { HeaderAccountActions } from '@/components/HeaderAccountActions';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
 
@@ -28,14 +28,7 @@ export default function ServiceOnsitePage() {
 
   return (
     <div className="sub-page service-sub-page">
-      <header className="sub-header">
-        <Link href="/" className="sub-back" aria-label="ย้อนกลับ">
-          <span className="sub-back-arrow">←</span>
-          <span className="sub-back-text">ย้อนกลับ</span>
-        </Link>
-        <span className="sub-htitle">บริการออนไซต์</span>
-        <HeaderAccountActions />
-      </header>
+      <SubPageHeader backHref="/" title="บริการออนไซต์" titleIcon="car" />
       <div className="svc-inner">
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: 52, lineHeight: 1, marginBottom: 14 }}>🔍</div>

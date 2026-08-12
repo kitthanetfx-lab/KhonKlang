@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { authHeaders } from '@/lib/supabase';
 import { Icon } from './Icon';
 
-/** ไอคอนกล่องข้อความ (ข้างกระดิ่ง) — badge แสดงจำนวนข้อความที่ยังไม่อ่าน */
-export function MessengerIcon() {
+/** ไอคอนกล่องข้อความ — badge แสดงจำนวนข้อความที่ยังไม่อ่าน */
+export function MessengerIcon({ className = 'nb-btn' }: { className?: string }) {
   const [unread, setUnread] = useState(0);
 
   const load = useCallback(async () => {
@@ -31,7 +31,7 @@ export function MessengerIcon() {
   return (
     <Link
       href="/messages"
-      className="nb-btn"
+      className={className}
       style={{ position: 'relative', flex: '0 0 auto' }}
       aria-label={unread > 0 ? `กล่องข้อความ ${unread} ข้อความใหม่` : 'กล่องข้อความ'}
     >
