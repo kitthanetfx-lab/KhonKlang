@@ -2418,8 +2418,8 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 }
 
 /* service picker */
-.svc-pick-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
-@media (min-width: 560px){ .svc-pick-grid { grid-template-columns: repeat(2, 1fr); } }
+.svc-pick-grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 560px){ .svc-pick-grid { gap: 14px; } }
 .svc-pick-card {
   display: flex; gap: 15px; align-items: flex-start;
   padding: 18px 18px; border-radius: var(--r-lg); border: 2px solid var(--line);
@@ -2471,6 +2471,12 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   .create-deal-form {
     padding-top: 0;
   }
+  .create-deal-form .svc-pick-grid {
+    gap: 8px;
+  }
+  .create-deal-form .svc-pick-card-role {
+    min-width: 0;
+  }
   .deal-flow-brand {
     min-height: 70px;
     border-radius: 0 0 20px 20px;
@@ -2483,7 +2489,8 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
     margin-bottom: 2px;
   }
   .svc-pick-role-media {
-    border-radius: 14px;
+    border-radius: 12px;
+    aspect-ratio: 1 / 1;
   }
 }
 

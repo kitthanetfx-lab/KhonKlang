@@ -141,7 +141,7 @@ function CreateDealForm() {
                       alt={option.imageAlt}
                       fill
                       className="svc-pick-role-image"
-                      sizes="(max-width: 559px) 100vw, 240px"
+                      sizes="(max-width: 559px) 46vw, 240px"
                     />
                   </span>
                 </button>
