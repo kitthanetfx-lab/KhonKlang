@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Icon } from './Icon';
 import { useAppPreferences } from './AppPreferences';
 
@@ -8,7 +8,6 @@ import { useAppPreferences } from './AppPreferences';
 export function HomeButton() {
   const { locale } = useAppPreferences();
   const pathname = usePathname();
-  const router = useRouter();
   if (!pathname || pathname === '/' || pathname.startsWith('/admin')) return null;
 
   return (
@@ -17,10 +16,6 @@ export function HomeButton() {
       className="home-fab"
       aria-label={locale === 'th' ? 'กลับหน้าหลัก' : 'Back to home'}
       title={locale === 'th' ? 'กลับหน้าหลัก' : 'Back to home'}
-      onClick={(e) => {
-        e.preventDefault();
-        router.push('/');
-      }}
     >
       <Icon name="home" size={24} />
     </Link>

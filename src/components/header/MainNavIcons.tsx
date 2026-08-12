@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { useAppPreferences } from '@/components/AppPreferences';
@@ -13,16 +13,11 @@ function blurActive() {
 }
 
 function DropItem({ it, onSelect }: { it: NavItem; onSelect: () => void }) {
-  const router = useRouter();
   return (
     <Link
       className="dropdown-item"
       href={it.href}
-      onClick={(e) => {
-        e.preventDefault();
-        onSelect();
-        router.push(it.href);
-      }}
+      onClick={() => onSelect()}
     >
       <span className={`icon-tile ${it.tint}`}><Icon name={it.icon} /></span>
       <span>

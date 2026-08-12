@@ -4487,9 +4487,8 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
    [←] [ไอคอน+ชื่อ] ··· [ตลาด][ข้อความ][ตะกร้า][แจ้ง][โปรไฟล์]
    ============================================================ */
 .app-header-bar {
-  position: sticky;
-  top: 0;
-  z-index: 60;
+  position: relative;
+  z-index: 1;
   overflow: visible;
   background: rgba(244, 246, 251, 0.94);
   backdrop-filter: blur(12px);
@@ -4543,14 +4542,22 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .app-header-bar .dropdown-menu {
   transition: opacity .15s ease, transform .15s var(--ease-out), visibility 0s linear 0s;
 }
+/* ปิด global hover/focus-within ใน header — กันเมนูค้างดักคลิกทั้งหน้า */
+.app-header-bar .dropdown:not(.open):hover .dropdown-menu,
+.app-header-bar .dropdown:not(.open):focus-within .dropdown-menu {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 .app-header-bar .dropdown:not(.open) .dropdown-menu,
 .app-header-bar .dropdown:not(.open):hover .dropdown-menu,
 .app-header-bar .dropdown:not(.open):focus-within .dropdown-menu {
-  display: none;
-  opacity: 0;
-  visibility: hidden;
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
   transform: translateY(6px) scale(.98);
-  pointer-events: none;
+  pointer-events: none !important;
   transition-delay: 0s, 0s, 0s;
 }
 .app-header-bar .dropdown.open {
@@ -4558,11 +4565,11 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   z-index: 170;
 }
 .app-header-bar .dropdown.open .dropdown-menu {
-  display: block;
-  opacity: 1;
-  visibility: visible;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
   transform: none;
-  pointer-events: auto;
+  pointer-events: auto !important;
   transition-delay: 0s, 0s, 0s;
 }
 .app-hdr-dd-menu {
@@ -4657,7 +4664,19 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 }
 .hdr-main-dd.open { z-index: 170; }
 
-.site-header-wrap { position: sticky; top: 0; z-index: 60; }
+.site-header-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  /* กัน sticky header ดักคลิกเนื้อหาด้านล่าง (มือถือ/WebKit) */
+  pointer-events: none;
+}
+.site-header-wrap > * {
+  pointer-events: auto;
+}
+.site-header-wrap:has(.dropdown.open) {
+  z-index: 160;
+}
 
 .app-hdr-back {
   width: 40px; height: 40px; border: none; border-radius: 12px;

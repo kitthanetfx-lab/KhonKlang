@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { ReactNode } from 'react';
+import { ReactNode, Suspense } from 'react';
 import { Icon } from '@/components/Icon';
 import { AppHeaderActions } from './AppHeaderActions';
 import { MainNavIcons } from '@/components/header/MainNavIcons';
@@ -68,12 +68,14 @@ export function AppHeaderBar({
   const defaultActions = (
     <>
       {extraActions}
-      <AppHeaderActions />
+      <Suspense fallback={<span className="app-hdr-loading" aria-busy="true">…</span>}>
+        <AppHeaderActions />
+      </Suspense>
     </>
   );
 
   const hasPageMeta = !hideTitle && (title || titleIcon || subtitle);
-  const showBack = !showMainNav && backEl;
+  const showBack = !!backEl;
 
   return (
     <header className={`app-header-bar${showBrand ? ' app-header-bar--unified' : ''} ${className}`.trim()}>

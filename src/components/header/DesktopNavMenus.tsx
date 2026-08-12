@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/Icon';
 import { useAppPreferences } from '@/components/AppPreferences';
@@ -13,16 +13,11 @@ function blurActive() {
 }
 
 function DropItem({ it, onNavigate }: { it: NavItem; onNavigate: () => void }) {
-  const router = useRouter();
   return (
     <Link
       className="dropdown-item"
       href={it.href}
-      onClick={(e) => {
-        e.preventDefault();
-        onNavigate();
-        router.push(it.href);
-      }}
+      onClick={() => onNavigate()}
     >
       <span className={`icon-tile ${it.tint}`}><Icon name={it.icon} /></span>
       <span>
@@ -81,8 +76,6 @@ export function DesktopNavMenus() {
     return (
       <div
         className={`dropdown app-hdr-dd${open ? ' open' : ''}${active ? ' is-active' : ''}`}
-        onMouseEnter={() => setOpenKey(key)}
-        onMouseLeave={() => setOpenKey(prev => (prev === key ? null : prev))}
       >
         <button
           type="button"
