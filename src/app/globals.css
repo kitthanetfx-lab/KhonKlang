@@ -304,6 +304,131 @@ button.nav-link { background: none; border: none; }
 .hero-stage .hero-title { margin-top: 0; }
 /* ตรึงตัวหนังสือใต้การ์ดไว้บน layer ของมันเอง กันการ re-rasterize ตาม animation (โดยเฉพาะ gradient-text ที่ไวต่อการกระพริบ) */
 .hero-stage .eyebrow, .hero-stage .hero-title { transform: translateZ(0); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+
+/* ---- Hero above-fold (ปุ่มเริ่มดีลเห็นทันที) ---- */
+.hero-fit {
+  padding: 6px 0 14px;
+}
+.hero-fit .hero-inner {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.6vh, 18px);
+  min-height: calc(100dvh - 132px);
+  min-height: calc(100svh - 132px);
+}
+@media (min-width: 980px) {
+  .hero-fit .hero-inner {
+    min-height: calc(100dvh - 88px);
+    min-height: calc(100svh - 88px);
+    gap: clamp(12px, 2vh, 22px);
+  }
+}
+.hero-head {
+  text-align: center;
+  flex-shrink: 0;
+}
+.hero-head .eyebrow {
+  justify-content: center;
+  margin-bottom: clamp(6px, 1vh, 10px);
+  font-size: clamp(12px, 2.6vw, 14px);
+}
+.hero-head .hero-title {
+  margin: 0 0 clamp(12px, 2vh, 16px);
+  font-size: clamp(22px, 5vw, 40px);
+}
+.hero-start-deal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 auto;
+  padding: clamp(15px, 2.4vh, 18px) clamp(28px, 8vw, 44px);
+  font-family: var(--font-display);
+  font-size: clamp(17px, 4.2vw, 20px);
+  font-weight: 800;
+  line-height: 1.1;
+  border-radius: var(--r-pill);
+  background: linear-gradient(180deg, #3d7af5 0%, var(--accent) 55%, var(--accent-strong) 100%);
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 10px 32px -8px color-mix(in srgb, var(--accent) 62%, transparent);
+  min-width: min(100%, 300px);
+  transition: transform .2s var(--ease-out), box-shadow .2s;
+}
+.hero-start-deal-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 36px -8px color-mix(in srgb, var(--accent) 70%, transparent);
+  color: #fff;
+}
+@media (min-width: 980px) {
+  .hero-start-deal-btn {
+    min-width: 340px;
+    padding: 18px 48px;
+    font-size: 20px;
+  }
+}
+.hero-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: clamp(10px, 1.8vh, 20px);
+  grid-template-columns: 1fr;
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .hero-body {
+    grid-template-columns: 1.04fr .96fr;
+    gap: clamp(18px, 2.5vw, 36px);
+  }
+}
+.hero-fit .hero-brand {
+  margin-bottom: 8px;
+}
+.hero-fit .hero-brand-image {
+  width: min(100%, 168px);
+}
+@media (min-width: 900px) {
+  .hero-fit .hero-brand-image {
+    width: min(100%, 240px);
+  }
+}
+.hero-fit .hero-promo-mini {
+  margin-top: 8px;
+}
+.hero-fit .hero-promo-mini .promo-video-wrap {
+  padding-top: 0;
+  height: clamp(88px, 14vh, 132px);
+}
+.hero-fit .hero-promo-mini .promo-image {
+  max-height: clamp(88px, 14vh, 132px);
+}
+.hero-fit .hero-promo-mini .promo-placeholder {
+  min-height: clamp(72px, 12vh, 108px);
+  padding: 10px;
+}
+.hero-fit .hero-promo-mini .promo-placeholder p {
+  font-size: 11px;
+}
+.hero-fit .hero-stage {
+  padding-top: 0;
+  max-width: 100%;
+}
+.hero-fit .ef-wrap {
+  gap: clamp(6px, 1vh, 10px);
+}
+.hero-fit .ef-stage {
+  aspect-ratio: 1 / 0.72;
+  max-height: clamp(140px, 22vh, 220px);
+}
+.hero-fit .ef-step-line {
+  padding: 8px 10px;
+}
+.hero-fit .ef-step-tx b {
+  font-size: clamp(12px, 2.8vw, 14px);
+}
+.hero-fit .ef-step-tx span {
+  font-size: 11px;
+}
 .section-title { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; letter-spacing: -0.03em; }
 .section-lead {
   color: var(--ink-2);

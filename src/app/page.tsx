@@ -7,7 +7,6 @@ import { Nav, Footer, CountUp, useReveal, useTilt } from '@/components/Site';
 import { EscrowStage } from '@/components/EscrowStage';
 import { ServiceSlider } from '@/components/ServiceSlider';
 import { useAppPreferences } from '@/components/AppPreferences';
-import { useServiceControls } from '@/lib/useServiceControls';
 
 interface SiteStats {
   completedDeals: number; protectedValue: number; middlemen: number; satisfaction: number; reviewCount: number;
@@ -31,11 +30,9 @@ function useSiteStats() {
 }
 
 function buildStatItems(s: SiteStats | null) {
-  // default labels in Thai; locale mapping happens in page
   const value = s?.protectedValue ?? 0;
   const inMillions = value >= 1_000_000;
   return [
-    // เรียงจากภาพรวมระบบไปสู่ผลลัพธ์จริง: สมาชิก → ผู้ขาย → คนกลาง → ดีลสำเร็จ → มูลค่าคุ้มครอง → ความพึงพอใจ
     { v: s?.totalMembers ?? 0, suf: '', pre: '', label: 'สมาชิกทั้งหมด' },
     { v: s?.sellers ?? 0, suf: '', pre: '', label: 'ผู้ขายในระบบ' },
     { v: s?.middlemen ?? 0, suf: '', pre: '', label: 'คนกลางผ่านการรับรอง' },
@@ -43,12 +40,10 @@ function buildStatItems(s: SiteStats | null) {
     { v: inMillions ? Math.round(value / 100_000) / 10 : value, suf: inMillions ? 'ล้าน' : '', pre: '฿', label: 'มูลค่าที่คุ้มครอง' },
     s && s.reviewCount > 0
       ? { v: s.satisfaction, suf: '%', pre: '', label: 'ความพึงพอใจผู้ใช้' }
-      : { v: -1, suf: '', pre: '', label: 'ความพึงพอใจผู้ใช้' }, // -1 = ยังไม่มีรีวิว แสดง "—"
+      : { v: -1, suf: '', pre: '', label: 'ความพึงพอใจผู้ใช้' },
   ];
 }
 
-// ลิงก์วิดีโอตั้งได้จากหน้าแอดมิน admin/service-controls (เก็บใน fee_config.promo_video_url)
-// ส่วนรูปภาพยังไม่มี UI ตั้งค่า ถ้าต้องใช้ให้แก้ค่าคงที่นี้ตรง ๆ ได้
 const PROMO_IMAGE = '';
 
 function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: string; lead?: string; center?: boolean }) {
@@ -61,61 +56,60 @@ function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: 
   );
 }
 
-function Hero({ stats, controls, locale }: { stats: SiteStats | null; controls: ReturnType<typeof useServiceControls>; locale: 'th' | 'en' }) {
+function Hero({ stats, locale }: { stats: SiteStats | null; locale: 'th' | 'en' }) {
   const { ref: stageTiltRef, onMouseLeave, onMouseMove } = useTilt(7);
-  const hasReviews = !!stats && stats.reviewCount > 0;
-  const avgStars = hasReviews ? Math.round((stats!.satisfaction / 20) * 10) / 10 : 0;
   return (
-    <header className="hero">
+    <header className="hero hero-fit">
       <div className="hero-bg" aria-hidden="true">
         <span className="blob blob-a" /><span className="blob blob-b" /><span className="hero-grid" />
       </div>
       <div className="container hero-inner">
-        <div className="hero-copy">
-          <div className="hero-brand reveal">
-            {/* โลโก้สลับตามธีม — CSS ใน globals.css ซ่อน/แสดงตาม html[data-theme='dark'] */}
-            <Image
-              src="/logo.png"
-              alt="โลโก้กลางฮับ"
-              width={520}
-              height={520}
-              priority
-              className="hero-brand-image hero-logo-light"
-            />
-            <Image
-              src="/logo-dark.png"
-              alt="โลโก้กลางฮับ (dark)"
-              width={520}
-              height={520}
-              className="hero-brand-image hero-logo-dark"
-            />
-          </div>
-          <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '140ms' }}>
-            {stats?.promoVideoUrl ? (
-              <div className="promo-video-wrap">
-                <iframe src={stats.promoVideoUrl} title={locale === 'th' ? 'วีดีโอแนะนำการใช้งาน' : 'How it works video'} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
-              </div>
-            ) : PROMO_IMAGE ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={PROMO_IMAGE} alt={locale === 'th' ? 'แนะนำการใช้งาน' : 'How it works'} className="promo-image" />
-            ) : (
-              <div className="promo-placeholder">
-                <Icon name="film" size={20} />
-                <p>{locale === 'th' ? 'เร็ว ๆ นี้ — วีดีโอ/ภาพแนะนำการใช้งาน' : 'Coming soon — product walkthrough video/image'}</p>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
-          <EscrowStage speed={1} />
-          <div className="eyebrow reveal"><Icon name="shieldCheck" size={19} /> {locale === 'th' ? 'ซื้อขายปลอดภัยผ่านคนกลางรับรอง' : 'Safer trading with trusted escrow support'}</div>
-          <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
+        <div className="hero-head reveal">
+          <div className="eyebrow"><Icon name="shieldCheck" size={19} /> {locale === 'th' ? 'ซื้อขายปลอดภัยผ่านคนกลางรับรอง' : 'Safer trading with trusted escrow support'}</div>
+          <h1 className="hero-title">
             {locale === 'th' ? <>จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span></> : <>Pay with confidence<br /><span className="gradient-text">Get the real item, avoid scams</span></>}
           </h1>
-          <div className="reveal" style={{ ['--d' as string]: '120ms', marginTop: 24 }}>
-            <Link className="btn btn-lg" href="/deal-all" style={{ background: 'var(--accent)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              {locale === 'th' ? 'เริ่ม Deal' : 'Start a Deal'} <Icon name="arrowRight" size={18} />
-            </Link>
+          <Link className="btn hero-start-deal-btn" href="/deal-all">
+            {locale === 'th' ? 'เริ่มดีล' : 'Start a Deal'} <Icon name="arrowRight" size={20} />
+          </Link>
+        </div>
+        <div className="hero-body">
+          <div className="hero-copy">
+            <div className="hero-brand reveal">
+              <Image
+                src="/logo.png"
+                alt="โloโก้กลางฮับ"
+                width={520}
+                height={520}
+                priority
+                className="hero-brand-image hero-logo-light"
+              />
+              <Image
+                src="/logo-dark.png"
+                alt="โloโก้กลางฮับ (dark)"
+                width={520}
+                height={520}
+                className="hero-brand-image hero-logo-dark"
+              />
+            </div>
+            <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '140ms' }}>
+              {stats?.promoVideoUrl ? (
+                <div className="promo-video-wrap">
+                  <iframe src={stats.promoVideoUrl} title={locale === 'th' ? 'วีดีโอแนะนำการใช้งาน' : 'How it works video'} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                </div>
+              ) : PROMO_IMAGE ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={PROMO_IMAGE} alt={locale === 'th' ? 'แนะนำการใช้งาน' : 'How it works'} className="promo-image" />
+              ) : (
+                <div className="promo-placeholder">
+                  <Icon name="film" size={20} />
+                  <p>{locale === 'th' ? 'เร็ว ๆ นี้ — วีดีโอ/ภาพแนะนำการใช้งาน' : 'Coming soon — product walkthrough video/image'}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
+            <EscrowStage speed={1} />
           </div>
         </div>
       </div>
@@ -140,7 +134,6 @@ export default function HomePage() {
           'ความพึงพอใจผู้ใช้': 'User Satisfaction',
         }[item.label] || item.label),
   }));
-  const controls = useServiceControls();
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0');
@@ -151,7 +144,7 @@ export default function HomePage() {
   return (
     <>
       <Nav active="home" />
-      <Hero stats={stats} controls={controls} locale={locale} />
+      <Hero stats={stats} locale={locale} />
 
       <section className="stats-band">
         <div className="container stats-grid">
