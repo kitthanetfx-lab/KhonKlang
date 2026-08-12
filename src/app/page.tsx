@@ -93,7 +93,19 @@ function Hero({ stats, locale }: { stats: SiteStats | null; locale: 'th' | 'en' 
               <h1 className="hero-title">
                 <span className="hero-title-primary-row">
                   <span className="hero-title-main">{locale === 'th' ? 'จ่ายเงินอย่างมั่นใจ' : 'Pay with confidence'}</span>
-                  <span className="hero-title-tagline">{locale === 'th' ? 'ระบบ Escrow ที่เข้าถึงง่ายที่สุด' : 'The most accessible Escrow system'}</span>
+                  <span className="hero-title-tagline">
+                    {locale === 'th' ? (
+                      <>
+                        <span className="hero-title-tagline-line">ระบบ Escrow</span>
+                        <span className="hero-title-tagline-line gradient-text">ที่เข้าถึงง่ายที่สุด</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="hero-title-tagline-line">Escrow system</span>
+                        <span className="hero-title-tagline-line gradient-text">The most accessible</span>
+                      </>
+                    )}
+                  </span>
                 </span>
                 <span className="gradient-text">{locale === 'th' ? 'ได้ของชัวร์ ไม่โดนโกง' : 'Get the real item, avoid scams'}</span>
               </h1>
@@ -174,17 +186,6 @@ export default function HomePage() {
         <div className="container">
           <SectionHead kicker={locale === 'th' ? 'บริการผ่านคนกลาง' : 'Escrow Services'} title={locale === 'th' ? 'ทุกปัญหาการซื้อขาย เรามีทางแก้ให้' : 'We design services for real trading problems'} lead={locale === 'th' ? 'เลื่อนดูบริการที่ออกแบบมาแก้ปัญหาที่คนซื้อ–ขายเจอบ่อยที่สุด พร้อมข้อดีที่คุณจะได้รับ' : 'Browse services built to solve the most common buyer-seller risks, with clear benefits for both sides.'} center />
           <div className="reveal"><ServiceSlider stats={stats} /></div>
-        </div>
-      </section>
-
-      <section className="scam-band">
-        <div className="container scam-inner reveal">
-          <div className="scam-ic"><Icon name="search" size={30} /></div>
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <h2 style={{ fontSize: 'clamp(22px,3vw,30px)', color: '#fff' }}>{locale === 'th' ? 'สงสัยว่าจะโดนโกง? เช็คก่อนโอน' : 'Think it might be a scam? Check before you pay'}</h2>
-            <p style={{ color: 'rgba(255,255,255,.78)', marginTop: 8, maxWidth: '52ch' }}>{locale === 'th' ? 'ค้นหาชื่อ เลขบัญชี หรือเบอร์โทรศัพท์จากฐานข้อมูลคนโกง เพื่อความปลอดภัยก่อนทำธุรกรรมทุกครั้ง' : 'Search names, bank accounts, or phone numbers against scam reports before every transaction.'}</p>
-          </div>
-          <Link className="btn btn-lg" href="/check-scam" style={{ background: '#fff', color: '#10224d' }}>{locale === 'th' ? 'ตรวจสอบเลย' : 'Check Now'} <Icon name="arrowRight" size={18} /></Link>
         </div>
       </section>
 

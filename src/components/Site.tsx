@@ -106,26 +106,6 @@ function getFooterCols(locale: 'th' | 'en') {
   if (locale === 'en') {
     return [
       {
-        h: 'Services',
-        links: [
-          { t: 'Escrow Trade', href: '/service/trade' },
-          { t: 'Meetup Escrow', href: '/service/meetup' },
-          { t: 'Consign with Escrow', href: '/service/consign' },
-          { t: 'On-site Service', href: '/service/onsite' },
-        ],
-      },
-      {
-        h: 'Marketplace',
-        links: [
-          { t: 'Wanted Board', href: '/wanted' },
-          { t: 'Pre-owned Items', href: '/marketplace' },
-          { t: 'Luxury Goods', href: '/marketplace' },
-          { t: 'Game Accounts', href: '/marketplace' },
-          { t: 'Collectibles', href: '/marketplace' },
-          { t: 'Wholesale / Farm', href: '/marketplace' },
-        ],
-      },
-      {
         h: 'Help',
         links: [
           { t: 'How It Works', href: '/how-it-works' },
@@ -138,26 +118,6 @@ function getFooterCols(locale: 'th' | 'en') {
     ];
   }
   return [
-    {
-      h: 'บริการ',
-      links: [
-        { t: 'ซื้อขายผ่านกลาง', href: '/service/trade' },
-        { t: 'นัดรับผ่านกลาง', href: '/service/meetup' },
-        { t: 'ฝากขายผ่านกลาง', href: '/service/consign' },
-        { t: 'บริการนัดออนไซต์', href: '/service/onsite' },
-      ],
-    },
-    {
-      h: 'ตลาด',
-      links: [
-        { t: 'ประกาศหาสินค้า', href: '/wanted' },
-        { t: 'สินค้ามือสอง', href: '/marketplace' },
-        { t: 'แบรนด์เนม', href: '/marketplace' },
-        { t: 'ไอดีเกม', href: '/marketplace' },
-        { t: 'ของสะสม', href: '/marketplace' },
-        { t: 'ค้าส่ง/เหมาสวน', href: '/marketplace' },
-      ],
-    },
     {
       h: 'ช่วยเหลือ',
       links: [
@@ -176,13 +136,10 @@ export function Footer() {
   const footCols = getFooterCols(locale);
   return (
     <footer className="footer">
-      <div className="container" style={{ padding: '56px 22px 26px' }}>
-        <div
-          className="foot-grid"
-          style={{ display: 'grid', gap: 38, gridTemplateColumns: '1.4fr repeat(3, 1fr)' }}
-        >
+      <div className="container footer-inner">
+        <div className="foot-grid">
           <div>
-            <div className="logo" style={{ marginBottom: 14 }}>
+            <div className="logo footer-logo">
               <span className="logo-mark" style={{ background: 'transparent', overflow: 'hidden', padding: 0 }}>
                 <Image src="/logo.png" alt="กลางฮับ" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </span>
@@ -191,12 +148,12 @@ export function Footer() {
                 <small style={{ color: 'rgba(255,255,255,.45)' }}>GLANGHUB</small>
               </span>
             </div>
-            <p style={{ color: '#9aa6c4', fontSize: 14, maxWidth: '34ch' }}>
+            <p className="footer-desc">
               {locale === 'th'
                 ? 'แพลตฟอร์มซื้อขายปลอดภัยด้วยระบบตัวกลาง ช่วยลดความเสี่ยงในการโอนเงิน ตรวจรับสินค้า และติดตามดีลได้ในที่เดียว'
                 : 'A secure escrow marketplace that reduces transfer risk, supports item verification, and keeps every deal trackable in one place.'}
             </p>
-            <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+            <div className="footer-badges">
               <span
                 className="badge badge-green"
                 style={{
@@ -213,7 +170,7 @@ export function Footer() {
           {footCols.map((c) => (
             <div key={c.h}>
               <h4>{c.h}</h4>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 11, fontSize: 14 }}>
+              <ul className="footer-links">
                 {c.links.map((l) => (
                   <li key={l.t}>
                     <Link href={l.href}>{l.t}</Link>
@@ -224,21 +181,11 @@ export function Footer() {
           ))}
         </div>
 
-        <hr style={{ border: 0, borderTop: '1px solid rgba(255,255,255,.1)', margin: '34px 0 18px' }} />
+        <hr className="footer-divider" />
 
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 12,
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: 13,
-            color: '#8694b5',
-          }}
-        >
+        <div className="footer-bottom">
           <span>{locale === 'th' ? `© ${new Date().getFullYear() + 543} GLANGHUB - ซื้อขายมั่นใจด้วยระบบตัวกลาง` : `© ${new Date().getFullYear()} GLANGHUB - Secure trading with escrow protection`}</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
+          <div className="footer-legal">
             <Link href="/privacy">{locale === 'th' ? 'นโยบายความเป็นส่วนตัว' : 'Privacy Policy'}</Link>
             <Link href="/terms">{locale === 'th' ? 'เงื่อนไขการใช้งาน' : 'Terms of Use'}</Link>
             <Link href="/cookies">{locale === 'th' ? 'นโยบายคุกกี้' : 'Cookie Policy'}</Link>
