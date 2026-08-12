@@ -63,7 +63,7 @@ function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: 
 function Hero({ stats, locale }: { stats: SiteStats | null; locale: 'th' | 'en' }) {
   const { ref: stageTiltRef, onMouseLeave, onMouseMove } = useTilt(7);
   return (
-    <header className="hero">
+    <header className="hero hero--home">
       <div className="hero-bg" aria-hidden="true">
         <span className="blob blob-a" /><span className="blob blob-b" /><span className="hero-grid" />
       </div>

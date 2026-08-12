@@ -644,10 +644,14 @@ button.nav-link { background: none; border: none; }
 /* ---- Hero ---- */
 .hero {
   position: relative;
-  padding: clamp(6px, 1.2vh, 12px) 0 clamp(18px, 2.5vh, 22px);
+  --hero-logo-top: 100px; /* ระยะจากขอบบน viewport ถึงโลโก้ hero */
+  padding: 0 0 clamp(18px, 2.5vh, 22px);
   overflow: hidden;
 }
-@media (min-width: 900px){ .hero { padding: 8px 0 38px; } }
+@media (min-width: 900px){
+  /* header ~76px + padding-top = 100px */
+  .hero { padding: calc(var(--hero-logo-top) - 76px) 0 38px; }
+}
 .hero-bg { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 .hero-bg .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; }
 .blob-a { width: 460px; height: 460px; top: -160px; right: -120px; background: color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -937,40 +941,56 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 @media (max-width: 760px){ .foot-grid { grid-template-columns: 1fr 1fr; } .foot-grid > :first-child { grid-column: 1 / -1; } }
 @media (max-width: 460px){ .foot-grid { grid-template-columns: 1fr; } }
 
-/* Mobile hero — ย่อโลโก้ + headline 20% ให้ปุ่ม "เริ่ม Deal" อยู่ในจอ */
+/* Mobile hero — โลโก้ ~100px จากขอบบน + ปุ่ม Deal เห็นเต็มในจอแรก */
 @media (max-width: 899px) {
-  .hero-brand-image {
-    width: min(100%, 320px);
+  /* หน้าแรก: ซ่อนแถบไอคอนเมนู ให้โลโก้ hero เริ่มใต้แถบบน ~100px */
+  body:has(.hero--home) .app-hdr-services-row {
+    display: none;
   }
-  .hero-head .eyebrow {
-    font-size: 10.4px;
-    padding: 5.6px 12px;
-    gap: 6.4px;
-    margin-bottom: clamp(8px, 1.2vh, 11px);
+  .hero--home {
+    /* header แถวบน ~72px + padding = 100px */
+    padding-top: calc(var(--hero-logo-top) - 72px);
   }
-  .hero-head .eyebrow svg {
-    width: 15px;
-    height: 15px;
+  .hero--home .hero-inner {
+    gap: clamp(10px, 1.6vh, 16px);
   }
-  .hero-title {
-    font-size: clamp(20.8px, 3.84vw, 35.2px);
+  .hero--home .hero-top {
+    gap: clamp(8px, 1.2vh, 12px);
+    padding-bottom: 14px; /* ขอบหลังปุ่ม Deal เล็กน้อย */
   }
-  .hero-title-primary-row {
-    gap: clamp(6.4px, 0.96vh, 9.6px);
+  .hero--home .hero-brand-image {
+    width: min(100%, 240px);
   }
-  .hero-top {
-    gap: clamp(12.8px, 2vh, 19.2px);
+  .hero--home .hero-head .eyebrow {
+    font-size: 10px;
+    padding: 5px 11px;
+    gap: 6px;
+    margin-bottom: clamp(6px, 1vh, 9px);
   }
-  .hero-title-row {
-    gap: clamp(9.6px, 1.6vh, 12.8px);
+  .hero--home .hero-head .eyebrow svg {
+    width: 14px;
+    height: 14px;
   }
-  .hero-cta-btn {
-    padding: 17.6px 31.2px;
-    font-size: 17.2px;
+  .hero--home .hero-title {
+    font-size: clamp(19px, 3.5vw, 32px);
+    gap: clamp(3px, 0.6vh, 6px);
   }
-  .hero-cta-btn svg {
-    width: 18.4px;
-    height: 18.4px;
+  .hero--home .hero-title-primary-row {
+    gap: clamp(5px, 0.8vh, 8px);
+  }
+  .hero--home .hero-title-row {
+    gap: clamp(8px, 1.2vh, 11px);
+  }
+  .hero--home .hero-cta-btn {
+    padding: 15px 27px;
+    font-size: 16px;
+  }
+  .hero--home .hero-cta-btn svg {
+    width: 17px;
+    height: 17px;
+  }
+  .hero--home .hero-head .hero-cta .btn {
+    min-width: min(100%, 300px);
   }
 }
 
