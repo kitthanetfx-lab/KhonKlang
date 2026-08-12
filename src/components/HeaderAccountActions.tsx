@@ -11,6 +11,8 @@ import { useUser } from '@/lib/useUser';
 type HeaderAccountActionsProps = {
   className?: string;
   showNotify?: boolean;
+  /** แสดงปุ่มไอคอนตลาด (มือถือ/แท็บเล็ต) */
+  showMarket?: boolean;
 };
 
 const profileItems = [
@@ -20,7 +22,7 @@ const profileItems = [
   { icon: 'handCoins', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' },
 ] as const;
 
-export function HeaderAccountActions({ className = '', showNotify = true }: HeaderAccountActionsProps) {
+export function HeaderAccountActions({ className = '', showNotify = true, showMarket = true }: HeaderAccountActionsProps) {
   const { locale } = useAppPreferences();
   const { user, loading, logout } = useUser();
   const pathname = usePathname() || '/';
@@ -59,8 +61,16 @@ export function HeaderAccountActions({ className = '', showNotify = true }: Head
   const qs = searchParams?.toString() || '';
   const loginHref = `/login?returnTo=${encodeURIComponent(qs ? `${pathname}?${qs}` : pathname)}`;
 
+  const marketLabel = locale === 'th' ? 'ตลาด' : 'Marketplace';
+  const accountLabel = locale === 'th' ? `เมนูบัญชี ${displayName}` : `Account menu ${displayName}`;
+
   return (
     <div className={`header-account-actions ${className}`.trim()}>
+      {showMarket && (
+        <Link href="/marketplace" className="hdr-icon-btn hdr-icon-btn--market" aria-label={marketLabel} title={marketLabel}>
+          <Icon name="store" size={18} />
+        </Link>
+      )}
       {user && showNotify && <NotifyBell />}
       {loading ? (
         <span className="btn btn-ghost btn-sm" aria-busy="true">{locale === 'th' ? 'กำลังโหลด...' : 'Loading...'}</span>
@@ -73,15 +83,18 @@ export function HeaderAccountActions({ className = '', showNotify = true }: Head
           >
             <button
               type="button"
-              className="btn btn-ghost btn-sm profile-trigger"
+              className="btn btn-ghost btn-sm profile-trigger hdr-profile-btn"
               aria-haspopup="true"
               aria-expanded={profileOpen}
+              aria-label={accountLabel}
               onClick={() => setProfileOpen(v => !v)}
             >
               {user.prefs?.avatarUrl
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={user.prefs.avatarUrl} alt="" referrerPolicy="no-referrer" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                : <Icon name="user" size={16} />} {shortName} <Icon name="chevronDown" size={16} />
+                ? <img src={user.prefs.avatarUrl} alt="" referrerPolicy="no-referrer" className="hdr-profile-av" />
+                : <Icon name="user" size={18} />}
+              <span className="hdr-profile-name">{shortName}</span>
+              <Icon name="chevronDown" size={16} className="hdr-profile-chevron" />
             </button>
             <div className="dropdown-menu dropdown-menu-right">
               {profileItems.map(it => (

@@ -15,12 +15,13 @@ export function DesktopShell({ children, className = '' }: { children: React.Rea
 type AppTopProps = {
   title: string;
   subtitle?: string;
+  titleIcon?: string;
   onBack?: () => void;
   right?: React.ReactNode;
   classPrefix?: string;
 };
 
-export function AppTop({ title, subtitle, onBack, right, classPrefix = 'app' }: AppTopProps) {
+export function AppTop({ title, subtitle, titleIcon, onBack, right, classPrefix = 'app' }: AppTopProps) {
   const p = classPrefix;
   return (
     <header className={`${p}-top`}>
@@ -29,8 +30,15 @@ export function AppTop({ title, subtitle, onBack, right, classPrefix = 'app' }: 
           <Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} />
         </button>
       )}
-      <div className={`${p}-top-info`}>
-        <div className={`${p}-top-title`}>{title}</div>
+      <div className={`${p}-top-info${titleIcon ? ` ${p}-top-info--icon` : ''}`}>
+        <div className={`${p}-top-title`} title={title}>
+          {titleIcon && (
+            <span className={`${p}-top-title-ic`} aria-hidden>
+              <Icon name={titleIcon} size={17} />
+            </span>
+          )}
+          <span className={`${p}-top-title-tx`}>{title}</span>
+        </div>
         {subtitle && <div className={`${p}-top-sub`}>{subtitle}</div>}
       </div>
       {right && <div className={`${p}-top-right`}>{right}</div>}

@@ -35,9 +35,10 @@ export function DealRoomApp({
       <AppTop
         title={title}
         subtitle={subtitle}
+        titleIcon="package"
         onBack={onBack}
         classPrefix="deal-app"
-        right={<HeaderAccountActions showNotify />}
+        right={<HeaderAccountActions showNotify showMarket />}
       />
 
       {showTabs && (
