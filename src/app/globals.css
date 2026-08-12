@@ -300,10 +300,10 @@ button.nav-link { background: none; border: none; }
   padding: 7px 15px; border-radius: var(--r-pill); line-height: 1;
 }
 .eyebrow svg { flex: 0 0 auto; }
-.hero-stage .eyebrow { margin-bottom: 20px; }
-.hero-stage .hero-title { margin-top: 0; }
-/* ตรึงตัวหนังสือใต้การ์ดไว้บน layer ของมันเอง กันการ re-rasterize ตาม animation (โดยเฉพาะ gradient-text ที่ไวต่อการกระพริบ) */
-.hero-stage .eyebrow, .hero-stage .hero-title { transform: translateZ(0); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.hero-head .eyebrow { margin-bottom: clamp(12px, 2vh, 18px); }
+.hero-head .hero-title { margin-top: 0; }
+/* ตรึงตัวหนังสือ hero-head ไว้บน layer ของมันเอง กันการ re-rasterize ตาม animation (โดยเฉพาะ gradient-text ที่ไวต่อการกระพริบ) */
+.hero-head .eyebrow, .hero-head .hero-title { transform: translateZ(0); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .section-title { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; letter-spacing: -0.03em; }
 .section-lead {
   color: var(--ink-2);
@@ -638,10 +638,41 @@ button.nav-link { background: none; border: none; }
 .blob-b { width: 420px; height: 420px; bottom: -180px; left: -140px; background: var(--green-100); }
 .hero-grid { position: absolute; inset: 0; background-image: linear-gradient(var(--line-2) 1px, transparent 1px), linear-gradient(90deg, var(--line-2) 1px, transparent 1px); background-size: 46px 46px; -webkit-mask-image: radial-gradient(120% 80% at 50% 0, #000, transparent 75%); mask-image: radial-gradient(120% 80% at 50% 0, #000, transparent 75%); opacity: .6; }
 
-.hero-inner { position: relative; z-index: 1; display: grid; gap: 38px; align-items: center; }
-@media (min-width: 900px){ .hero-inner { grid-template-columns: 1.04fr .96fr; gap: 54px; } }
-.hero-stage { padding-top: 24px; text-align: center; display: flex; flex-direction: column; align-items: center; }
-.hero-copy { text-align: center; }
+.hero-inner {
+  position: relative; z-index: 1;
+  display: grid; gap: clamp(20px, 3vh, 34px); align-items: center;
+  grid-template-areas:
+    "head"
+    "copy"
+    "visual";
+}
+@media (min-width: 900px){
+  .hero-inner {
+    grid-template-areas:
+      "head head"
+      "copy visual";
+    grid-template-columns: 1.04fr .96fr;
+    column-gap: 54px;
+    row-gap: clamp(22px, 3vh, 36px);
+  }
+}
+.hero-head {
+  grid-area: head;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 52rem;
+  margin-inline: auto;
+}
+.hero-copy { grid-area: copy; text-align: center; }
+.hero-visual {
+  grid-area: visual;
+  max-width: 540px;
+  width: 100%;
+  margin: 0 auto;
+  transition: transform .4s var(--ease-out);
+}
 .hero-brand { margin: 0 auto 16px; }
 .hero-brand-image { width: min(100%, 520px); height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 18px 38px rgba(20, 44, 94, 0.12)); }
 /* โลโก้หน้าแรกสลับตามธีม: light แสดง logo.png, dark แสดง logo-dark.png */
@@ -650,10 +681,9 @@ html[data-theme='dark'] .hero-logo-light { display: none; }
 html[data-theme='dark'] .hero-logo-dark { display: block; }
 .hero-title { font-size: clamp(26px, 4.8vw, 44px); line-height: 1.06; letter-spacing: -0.02em; }
 .hero-lead { color: var(--ink-2); font-size: clamp(15.5px, 1.9vw, 19px); margin-top: 20px; max-width: 50ch; margin-left: auto; margin-right: auto; }
-.hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.hero-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: clamp(16px, 2.5vh, 24px); }
 .hero-trust { display: flex; align-items: center; gap: 14px; margin-top: 28px; }
 .hero-avatars { display: flex; }
-.hero-stage { max-width: 540px; width: 100%; margin: 0 auto; transition: transform .4s var(--ease-out); }
 
 /* ช่องวีดีโอ/ภาพขนาดเล็กใต้การ์ด escrow — ใช้พื้นที่ที่ว่างขึ้นจากการเลื่อนการ์ดขึ้นไปด้านบน */
 .hero-promo-mini { margin-top: 14px; }

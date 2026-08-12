@@ -71,8 +71,19 @@ function Hero({ stats, controls, locale }: { stats: SiteStats | null; controls: 
         <span className="blob blob-a" /><span className="blob blob-b" /><span className="hero-grid" />
       </div>
       <div className="container hero-inner">
+        <div className="hero-head">
+          <div className="eyebrow reveal"><Icon name="shieldCheck" size={19} /> {locale === 'th' ? 'ซื้อขายปลอดภัยผ่านคนกลางรับรอง' : 'Safer trading with trusted escrow support'}</div>
+          <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
+            {locale === 'th' ? <>จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span></> : <>Pay with confidence<br /><span className="gradient-text">Get the real item, avoid scams</span></>}
+          </h1>
+          <div className="hero-cta reveal" style={{ ['--d' as string]: '120ms' }}>
+            <Link className="btn btn-lg" href="/deal-all" style={{ background: 'var(--accent)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              {locale === 'th' ? 'เริ่ม Deal' : 'Start a Deal'} <Icon name="arrowRight" size={18} />
+            </Link>
+          </div>
+        </div>
         <div className="hero-copy">
-          <div className="hero-brand reveal">
+          <div className="hero-brand reveal" style={{ ['--d' as string]: '100ms' }}>
             {/* โลโก้สลับตามธีม — CSS ใน globals.css ซ่อน/แสดงตาม html[data-theme='dark'] */}
             <Image
               src="/logo.png"
@@ -106,17 +117,8 @@ function Hero({ stats, controls, locale }: { stats: SiteStats | null; controls: 
             )}
           </div>
         </div>
-        <div className="hero-stage reveal" style={{ ['--d' as string]: '140ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
+        <div className="hero-visual reveal" style={{ ['--d' as string]: '180ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
           <EscrowStage speed={1} />
-          <div className="eyebrow reveal"><Icon name="shieldCheck" size={19} /> {locale === 'th' ? 'ซื้อขายปลอดภัยผ่านคนกลางรับรอง' : 'Safer trading with trusted escrow support'}</div>
-          <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
-            {locale === 'th' ? <>จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span></> : <>Pay with confidence<br /><span className="gradient-text">Get the real item, avoid scams</span></>}
-          </h1>
-          <div className="reveal" style={{ ['--d' as string]: '120ms', marginTop: 24 }}>
-            <Link className="btn btn-lg" href="/deal-all" style={{ background: 'var(--accent)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              {locale === 'th' ? 'เริ่ม Deal' : 'Start a Deal'} <Icon name="arrowRight" size={18} />
-            </Link>
-          </div>
         </div>
       </div>
     </header>
