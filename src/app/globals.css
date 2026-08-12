@@ -4876,6 +4876,11 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   border: 1px solid var(--line-2);
 }
 .svc-mode-image { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.service-trade-page .svc-mode-media,
+.service-meetup-page .svc-mode-media {
+  width: 50%;
+  margin-inline: auto;
+}
 .svc-mode-title { font-family:var(--font-display); font-weight:700; font-size:18px; color:var(--ink); text-align:center; }
 .svc-mode-cta { display:flex; align-items:center; gap:5px; font-family:var(--font-display); font-weight:600; font-size:13px; color:var(--accent); margin-top:4px; transition:gap .2s; }
 .svc-mode-cta { justify-content:center; }
