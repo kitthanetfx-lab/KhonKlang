@@ -43,6 +43,10 @@ export function DesktopNavMenus() {
   const serviceLabel = locale === 'th' ? 'บริการผ่านคนกลาง' : 'Escrow Services';
 
   useEffect(() => {
+    setOpenKey(null);
+  }, [pathname]);
+
+  useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (!navRef.current?.contains(e.target as Node)) setOpenKey(null);
     };

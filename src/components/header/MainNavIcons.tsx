@@ -7,9 +7,9 @@ import { Icon } from '@/components/Icon';
 import { useAppPreferences } from '@/components/AppPreferences';
 import { getMainNavMenus, type NavItem } from '@/lib/navData';
 
-function DropItem({ it }: { it: NavItem }) {
+function DropItem({ it, onSelect }: { it: NavItem; onSelect: () => void }) {
   return (
-    <Link className="dropdown-item" href={it.href} onClick={e => e.stopPropagation()}>
+    <Link className="dropdown-item" href={it.href} onClick={() => onSelect()}>
       <span className={`icon-tile ${it.tint}`}><Icon name={it.icon} /></span>
       <span>
         <span className="t" style={{ display: 'block' }}>{it.t}</span>
@@ -30,6 +30,10 @@ export function MainNavIcons() {
   const isActive = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
   useEffect(() => {
+    setOpenKey(null);
+  }, [pathname]);
+
+  useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpenKey(null);
     };
@@ -47,7 +51,8 @@ export function MainNavIcons() {
       {menus.map(menu => {
         const active = isActive(menu.hrefPrefix);
         const open = openKey === menu.key;
-        const alignCenter = menu.key === 'market' || menu.key === 'scam';
+        const alignEnd = menu.key === 'scam';
+        const alignCenter = menu.key === 'market';
         return (
           <div
             key={menu.key}
@@ -67,10 +72,9 @@ export function MainNavIcons() {
               <span className="hdr-main-icon-label">{menu.label}</span>
             </button>
             <div
-              className={`dropdown-menu hdr-main-dropdown${alignCenter ? ' hdr-main-dropdown--center' : ''}`}
-              onMouseDown={e => e.stopPropagation()}
+              className={`dropdown-menu hdr-main-dropdown${alignEnd ? ' hdr-main-dropdown--end' : ''}${alignCenter ? ' hdr-main-dropdown--center' : ''}`}
             >
-              {menu.items.map(it => <DropItem key={it.href} it={it} />)}
+              {menu.items.map(it => <DropItem key={it.href} it={it} onSelect={() => setOpenKey(null)} />)}
             </div>
           </div>
         );

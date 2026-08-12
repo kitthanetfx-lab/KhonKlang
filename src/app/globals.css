@@ -4512,6 +4512,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 }
 .app-hdr-brand { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .app-header-bar--unified .app-hdr-center { display: none; }
+.app-header-bar--unified .app-hdr-actions { margin-left: auto; }
 .app-hdr-center { min-width: 0; overflow: hidden; flex: 1; flex-shrink: 1; }
 .app-hdr-actions { display: flex; align-items: flex-start; justify-content: flex-end; gap: 2px; flex-shrink: 0; min-width: 0; }
 .app-hdr-actions-inner { display: flex; align-items: flex-start; gap: 2px; flex-shrink: 0; }
@@ -4557,7 +4558,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 /* Mobile — แถบบริการ 4 ไอคอน (ชั้น 2) */
 .app-hdr-services-row {
   display: flex; align-items: stretch; justify-content: center;
-  padding: 10px 12px 12px;
+  padding: 10px 16px 12px;
   border-top: 1px solid rgba(15, 23, 42, 0.06);
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   overflow: visible;
@@ -4569,11 +4570,13 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   justify-content: space-evenly;
   align-items: flex-start;
   width: 100%;
-  max-width: 480px;
+  max-width: none;
   margin: 0 auto;
-  gap: 8px;
-  padding: 0 4px;
+  gap: 6px;
+  padding: 0 8px;
+  box-sizing: border-box;
 }
+.hdr-main-dd:last-child { padding-right: 4px; }
 .hdr-main-dd { position: relative; min-width: 0; flex: 0 0 auto; }
 .hdr-main-tile {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -4619,8 +4622,16 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   right: auto;
   transform-origin: top center;
 }
+.hdr-main-dropdown--end {
+  left: auto;
+  right: 0;
+  transform-origin: top right;
+}
 .app-header-bar .hdr-main-dd.open .hdr-main-dropdown--center {
   transform: translateX(-50%);
+}
+.app-header-bar .hdr-main-dd.open .hdr-main-dropdown--end {
+  transform: none;
 }
 .hdr-main-dd.open { z-index: 170; }
 
