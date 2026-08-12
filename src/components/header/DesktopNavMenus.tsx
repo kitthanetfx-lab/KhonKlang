@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/Icon';
 import { useAppPreferences } from '@/components/AppPreferences';
 import {
@@ -9,9 +10,9 @@ import {
   type NavItem,
 } from '@/lib/navData';
 
-function DropItem({ it }: { it: NavItem }) {
+function DropItem({ it, onNavigate }: { it: NavItem; onNavigate: () => void }) {
   return (
-    <Link className="dropdown-item" href={it.href}>
+    <Link className="dropdown-item" href={it.href} onClick={onNavigate}>
       <span className={`icon-tile ${it.tint}`}><Icon name={it.icon} /></span>
       <span>
         <span className="t" style={{ display: 'block' }}>{it.t}</span>
@@ -21,10 +22,13 @@ function DropItem({ it }: { it: NavItem }) {
   );
 }
 
-/** เมนูตัวอักษร + dropdown — ใช้บน desktop (≥980px) */
+/** เมนูตัวอักษร + dropdown — ใช้บน desktop (≥980px), เปิดด้วยคลิก */
 export function DesktopNavMenus() {
   const { locale } = useAppPreferences();
   const pathname = usePathname() || '';
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+
   const isAct = (p: string) => pathname === p || pathname.startsWith(`${p}/`);
   const isMarketBrowse = (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
     && !pathname.startsWith('/marketplace/checkout')
@@ -38,40 +42,52 @@ export function DesktopNavMenus() {
 
   const serviceLabel = locale === 'th' ? 'บริการผ่านคนกลาง' : 'Escrow Services';
 
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!navRef.current?.contains(e.target as Node)) setOpenKey(null);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenKey(null); };
+    document.addEventListener('mousedown', onDoc);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  const toggle = (key: string) => setOpenKey(prev => (prev === key ? null : key));
+  const close = () => setOpenKey(null);
+
+  const dd = (key: string, active: boolean, label: ReactNode, items: NavItem[], minWidth?: number) => {
+    const open = openKey === key;
+    return (
+      <div className={`dropdown app-hdr-dd${open ? ' open' : ''}${active ? ' is-active' : ''}`}>
+        <button
+          type="button"
+          className={`nav-link${active || open ? ' is-active' : ''}`}
+          aria-haspopup="true"
+          aria-expanded={open}
+          onClick={() => toggle(key)}
+        >
+          {label}
+        </button>
+        <div
+          className="dropdown-menu app-hdr-dd-menu"
+          style={minWidth ? { minWidth } : undefined}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {items.map(it => <DropItem key={it.href} it={it} onNavigate={close} />)}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <nav className="app-hdr-desktop-nav" aria-label={locale === 'th' ? 'เมนูหลัก' : 'Main menu'}>
-      <div className="dropdown">
-        <button type="button" className={`nav-link${isAct('/register') ? ' is-active' : ''}`} aria-haspopup="true">
-          {register.label} <Icon name="chevronDown" size={16} />
-        </button>
-        <div className="dropdown-menu">
-          {register.items.map(it => <DropItem key={it.href} it={it} />)}
-        </div>
-      </div>
-      <div className="dropdown">
-        <button type="button" className={`nav-link${isAct('/service') ? ' is-active' : ''}`} aria-haspopup="true">
-          {serviceLabel} <Icon name="chevronDown" size={16} />
-        </button>
-        <div className="dropdown-menu" style={{ minWidth: 290 }}>
-          {service.items.map(it => <DropItem key={it.href} it={it} />)}
-        </div>
-      </div>
-      <div className="dropdown">
-        <button type="button" className={`nav-link${isMarketBrowse ? ' is-active' : ''}`} aria-haspopup="true">
-          <Icon name="store" size={17} /> {market.label} <Icon name="chevronDown" size={16} />
-        </button>
-        <div className="dropdown-menu">
-          {market.items.map(it => <DropItem key={it.href} it={it} />)}
-        </div>
-      </div>
-      <div className="dropdown">
-        <button type="button" className={`nav-link${isAct('/check-scam') ? ' is-active' : ''}`} aria-haspopup="true">
-          <Icon name="search" size={17} /> {scam.label} <Icon name="chevronDown" size={16} />
-        </button>
-        <div className="dropdown-menu">
-          {scam.items.map(it => <DropItem key={it.href} it={it} />)}
-        </div>
-      </div>
+    <nav className="app-hdr-desktop-nav" ref={navRef} aria-label={locale === 'th' ? 'เมนูหลัก' : 'Main menu'}>
+      {dd('register', isAct('/register'), <>{register.label} <Icon name="chevronDown" size={16} /></>, register.items)}
+      {dd('service', isAct('/service'), <>{serviceLabel} <Icon name="chevronDown" size={16} /></>, service.items, 290)}
+      {dd('market', isMarketBrowse, <><Icon name="store" size={17} /> {market.label} <Icon name="chevronDown" size={16} /></>, market.items)}
+      {dd('scam', isAct('/check-scam'), <><Icon name="search" size={17} /> {scam.label} <Icon name="chevronDown" size={16} /></>, scam.items)}
     </nav>
   );
 }

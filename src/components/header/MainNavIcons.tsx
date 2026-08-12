@@ -47,6 +47,7 @@ export function MainNavIcons() {
       {menus.map(menu => {
         const active = isActive(menu.hrefPrefix);
         const open = openKey === menu.key;
+        const alignCenter = menu.key === 'market' || menu.key === 'scam';
         return (
           <div
             key={menu.key}
@@ -54,7 +55,7 @@ export function MainNavIcons() {
           >
             <button
               type="button"
-              className={`hdr-main-tile${active ? ' is-active' : ''}`}
+              className={`hdr-main-tile${active || open ? ' is-active' : ''}`}
               aria-haspopup="true"
               aria-expanded={open}
               aria-label={menu.label}
@@ -65,7 +66,10 @@ export function MainNavIcons() {
               </span>
               <span className="hdr-main-icon-label">{menu.label}</span>
             </button>
-            <div className="dropdown-menu hdr-main-dropdown">
+            <div
+              className={`dropdown-menu hdr-main-dropdown${alignCenter ? ' hdr-main-dropdown--center' : ''}`}
+              onMouseDown={e => e.stopPropagation()}
+            >
               {menu.items.map(it => <DropItem key={it.href} it={it} />)}
             </div>
           </div>

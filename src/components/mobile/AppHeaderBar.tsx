@@ -23,17 +23,15 @@ export type AppHeaderBarProps = {
   showMainNav?: boolean;
 };
 
-function HeaderLogo({ compact = false }: { compact?: boolean }) {
+function HeaderLogo() {
   return (
     <Link href="/" className="app-hdr-logo" aria-label="กลางฮับ หน้าแรก">
       <span className="app-hdr-logo-mark">
-        <Image src="/logo.png" alt="" width={compact ? 40 : 48} height={compact ? 40 : 48} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <Image src="/logo.png" alt="" width={60} height={60} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
       </span>
-      {!compact && (
-        <span className="app-hdr-logo-word">
-          กลางฮับ<small>GLANGHUB</small>
-        </span>
-      )}
+      <span className="app-hdr-logo-word">
+        กลางฮับ<small>GLANGHUB</small>
+      </span>
     </Link>
   );
 }
@@ -75,14 +73,14 @@ export function AppHeaderBar({
   );
 
   const hasPageMeta = !hideTitle && (title || titleIcon || subtitle);
-  const logoCompact = !!(backEl || hasPageMeta);
+  const showBack = !showMainNav && backEl;
 
   return (
     <header className={`app-header-bar${showBrand ? ' app-header-bar--unified' : ''} ${className}`.trim()}>
       <div className="app-hdr-row">
-        <div className={`app-hdr-brand${logoCompact ? ' app-hdr-brand--compact' : ''}`}>
-          {showBrand && <HeaderLogo compact={logoCompact} />}
-          {backEl}
+        <div className="app-hdr-brand">
+          {showBrand && <HeaderLogo />}
+          {showBack}
         </div>
 
         {showMainNav && <DesktopNavMenus />}
