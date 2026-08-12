@@ -300,8 +300,11 @@ button.nav-link { background: none; border: none; }
   padding: 7px 15px; border-radius: var(--r-pill); line-height: 1;
 }
 .eyebrow svg { flex: 0 0 auto; }
-.hero-head .eyebrow { margin-bottom: clamp(12px, 2vh, 18px); }
+.hero-head .eyebrow { margin-bottom: clamp(10px, 1.5vh, 14px); }
 .hero-head .hero-title { margin-top: 0; }
+@media (min-width: 900px){
+  .hero-head .eyebrow { justify-content: flex-start; }
+}
 /* ตรึงตัวหนังสือ hero-head ไว้บน layer ของมันเอง กันการ re-rasterize ตาม animation (โดยเฉพาะ gradient-text ที่ไวต่อการกระพริบ) */
 .hero-head .eyebrow, .hero-head .hero-title { transform: translateZ(0); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .section-title { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; letter-spacing: -0.03em; }
@@ -644,64 +647,182 @@ button.nav-link { background: none; border: none; }
 
 .hero-inner {
   position: relative; z-index: 1;
-  display: grid; gap: clamp(20px, 3vh, 34px); align-items: center;
+  display: grid;
+  gap: clamp(20px, 3vh, 34px);
   grid-template-areas:
-    "head"
-    "copy"
-    "visual";
+    "top"
+    "bottom";
 }
-@media (min-width: 900px){
-  .hero-inner {
-    grid-template-areas:
-      "head head"
-      "copy visual";
-    grid-template-columns: 1.04fr .96fr;
-    column-gap: 54px;
-    row-gap: clamp(22px, 3vh, 36px);
-  }
-}
-.hero-head {
-  grid-area: head;
-  text-align: center;
+.hero-top {
+  grid-area: top;
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex-shrink: 0;
+  gap: clamp(16px, 2.5vh, 24px);
+  text-align: center;
+}
+.hero-bottom {
+  grid-area: bottom;
+  display: grid;
+  gap: clamp(16px, 2.5vh, 24px);
+  align-items: stretch;
+}
+@media (min-width: 900px){
+  .hero-inner {
+    row-gap: clamp(22px, 3vh, 36px);
+  }
+  .hero-top {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: clamp(24px, 3.5vw, 48px);
+    text-align: left;
+  }
+  .hero-bottom {
+    grid-template-columns: 1fr 1fr;
+    column-gap: clamp(24px, 3.5vw, 48px);
+  }
+}
+.hero-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
   max-width: 52rem;
-  margin-inline: auto;
+}
+@media (min-width: 900px){
+  .hero-head {
+    align-items: flex-start;
+    max-width: none;
+  }
+}
+.hero-title-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(12px, 2vh, 16px);
+  width: 100%;
+}
+@media (min-width: 900px){
+  .hero-title-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(16px, 2.5vw, 28px);
+  }
 }
 .hero-head .hero-cta .btn { min-width: min(100%, 280px); }
-.hero-copy { grid-area: copy; text-align: center; }
+@media (min-width: 900px){
+  .hero-head .hero-cta .btn { min-width: auto; white-space: nowrap; }
+}
 .hero-visual {
-  grid-area: visual;
-  max-width: 540px;
   width: 100%;
+  max-width: 540px;
   margin: 0 auto;
   transition: transform .4s var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
-.hero-brand { margin: 0 auto 16px; }
-.hero-brand-image { width: min(100%, 520px); height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 18px 38px rgba(20, 44, 94, 0.12)); }
+@media (min-width: 900px){
+  .hero-visual {
+    max-width: none;
+    margin: 0;
+  }
+  .hero-visual .ef-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+}
+.hero-brand {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.hero-brand-image {
+  width: min(100%, 400px);
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 18px 38px rgba(20, 44, 94, 0.12));
+}
+@media (min-width: 900px){
+  .hero-brand-image {
+    width: clamp(140px, 18vw, 240px);
+    margin: 0;
+  }
+}
 /* โลโก้หน้าแรกสลับตามธีม: light แสดง logo.png, dark แสดง logo-dark.png */
 .hero-logo-dark { display: none; }
 html[data-theme='dark'] .hero-logo-light { display: none; }
 html[data-theme='dark'] .hero-logo-dark { display: block; }
-.hero-title { font-size: clamp(26px, 4.8vw, 44px); line-height: 1.06; letter-spacing: -0.02em; }
+.hero-title {
+  font-size: clamp(26px, 4.8vw, 44px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  text-align: inherit;
+}
 .hero-lead { color: var(--ink-2); font-size: clamp(15.5px, 1.9vw, 19px); margin-top: 20px; max-width: 50ch; margin-left: auto; margin-right: auto; }
-.hero-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: clamp(16px, 2.5vh, 24px); }
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+@media (min-width: 900px){
+  .hero-cta { justify-content: flex-end; }
+}
 .hero-trust { display: flex; align-items: center; gap: 14px; margin-top: 28px; }
 .hero-avatars { display: flex; }
 
-/* ช่องวีดีโอ/ภาพขนาดเล็กใต้การ์ด escrow — ใช้พื้นที่ที่ว่างขึ้นจากการเลื่อนการ์ดขึ้นไปด้านบน */
-.hero-promo-mini { margin-top: 14px; }
-.hero-promo-mini .promo-video-wrap { padding-top: 49.9%; }
-.hero-promo-mini .promo-image { max-height: 220px; object-fit: cover; }
-.hero-promo-mini .promo-placeholder { aspect-ratio: auto; padding: 16px; gap: 6px; min-height: 0; }
+/* ช่องวีดีโอ/ภาพ promo — แถวล่างคู่กับ EscrowStage ความสูงเท่ากัน */
+.hero-promo-mini {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.hero-promo-mini .promo-video-wrap {
+  flex: 1;
+  min-height: 180px;
+  padding-top: 0;
+  height: 100%;
+}
+@media (max-width: 899px){
+  .hero-promo-mini .promo-video-wrap {
+    padding-top: 49.9%;
+    height: auto;
+    flex: none;
+  }
+}
+.hero-promo-mini .promo-image {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  max-height: none;
+  object-fit: cover;
+}
+.hero-promo-mini .promo-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 180px;
+  aspect-ratio: auto;
+  padding: 16px;
+}
 .hero-promo-mini .promo-placeholder svg { width: 20px; height: 20px; }
 .hero-promo-mini .promo-placeholder p { font-size: 12px; margin: 0; }
-@media (max-width: 899px){
-  .hero-brand { margin-bottom: 12px; }
-  .hero-brand-image { width: min(100%, 400px); margin: 0 auto; }
-}
 
 /* ---- Stats ---- */
 .stats-band { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 30px 0; }

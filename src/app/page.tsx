@@ -68,18 +68,7 @@ function Hero({ stats, locale }: { stats: SiteStats | null; locale: 'th' | 'en' 
         <span className="blob blob-a" /><span className="blob blob-b" /><span className="hero-grid" />
       </div>
       <div className="container hero-inner">
-        <div className="hero-head">
-          <div className="eyebrow reveal"><Icon name="shieldCheck" size={19} /> {locale === 'th' ? 'ซื้อขายปลอดภัยผ่านคนกลางรับรอง' : 'Safer trading with trusted escrow support'}</div>
-          <h1 className="hero-title reveal" style={{ ['--d' as string]: '60ms' }}>
-            {locale === 'th' ? <>จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span></> : <>Pay with confidence<br /><span className="gradient-text">Get the real item, avoid scams</span></>}
-          </h1>
-          <div className="hero-cta reveal" style={{ ['--d' as string]: '120ms' }}>
-            <Link className="btn btn-lg" href="/deal-all" style={{ background: 'var(--accent)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              {locale === 'th' ? 'เริ่ม Deal' : 'Start a Deal'} <Icon name="arrowRight" size={18} />
-            </Link>
-          </div>
-        </div>
-        <div className="hero-copy">
+        <div className="hero-top">
           <div className="hero-brand reveal" style={{ ['--d' as string]: '100ms' }}>
             {/* โลโก้สลับตามธีม — CSS ใน globals.css ซ่อน/แสดงตาม html[data-theme='dark'] */}
             <Image
@@ -98,6 +87,24 @@ function Hero({ stats, locale }: { stats: SiteStats | null; locale: 'th' | 'en' 
               className="hero-brand-image hero-logo-dark"
             />
           </div>
+          <div className="hero-head">
+            <div className="eyebrow reveal"><Icon name="shieldCheck" size={19} /> {locale === 'th' ? 'ซื้อขายปลอดภัยผ่านคนกลางรับรอง' : 'Safer trading with trusted escrow support'}</div>
+            <div className="hero-title-row reveal" style={{ ['--d' as string]: '60ms' }}>
+              <h1 className="hero-title">
+                {locale === 'th' ? <>จ่ายเงินอย่างมั่นใจ<br /><span className="gradient-text">ได้ของชัวร์ ไม่โดนโกง</span></> : <>Pay with confidence<br /><span className="gradient-text">Get the real item, avoid scams</span></>}
+              </h1>
+              <div className="hero-cta reveal" style={{ ['--d' as string]: '120ms' }}>
+                <Link className="btn btn-lg" href="/deal-all" style={{ background: 'var(--accent)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  {locale === 'th' ? 'เริ่ม Deal' : 'Start a Deal'} <Icon name="arrowRight" size={18} />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="hero-bottom">
+          <div className="hero-visual reveal" style={{ ['--d' as string]: '180ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
+            <EscrowStage speed={1} />
+          </div>
           <div className="hero-promo-mini reveal" style={{ ['--d' as string]: '140ms' }}>
             {stats?.promoVideoUrl ? (
               <div className="promo-video-wrap">
@@ -113,9 +120,6 @@ function Hero({ stats, locale }: { stats: SiteStats | null; locale: 'th' | 'en' 
               </div>
             )}
           </div>
-        </div>
-        <div className="hero-visual reveal" style={{ ['--d' as string]: '180ms' }} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} ref={stageTiltRef}>
-          <EscrowStage speed={1} />
         </div>
       </div>
     </header>
