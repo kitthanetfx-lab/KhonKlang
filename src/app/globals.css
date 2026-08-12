@@ -4865,8 +4865,17 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 @media (min-width:980px){ .svc-modes { grid-template-columns:1fr 1fr; } }
 .svc-mode { border:2px solid var(--line); border-radius:var(--r-xl); padding:16px; cursor:pointer; transition:all .25s var(--ease-out); background:var(--surface); display:flex; flex-direction:column; gap:14px; text-decoration:none; color:inherit; }
 .svc-mode:hover { border-color:color-mix(in srgb,var(--accent) 45%,var(--line)); transform:translateY(-3px); box-shadow:var(--sh-md); }
-.svc-mode-media { position:relative; width:100%; aspect-ratio:1 / 1; overflow:hidden; border-radius:calc(var(--r-xl) - 6px); background:var(--surface-2); border:1px solid var(--line-2); }
-.svc-mode-image { object-fit:cover; }
+.svc-mode-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: calc(var(--r-xl) - 6px);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+}
+.svc-mode-image { width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .svc-mode-title { font-family:var(--font-display); font-weight:700; font-size:18px; color:var(--ink); text-align:center; }
 .svc-mode-cta { display:flex; align-items:center; gap:5px; font-family:var(--font-display); font-weight:600; font-size:13px; color:var(--accent); margin-top:4px; transition:gap .2s; }
 .svc-mode-cta { justify-content:center; }
@@ -5005,28 +5014,6 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   font-size: clamp(17px, 2.6vh, 22px);
   margin: 0;
 }
-.service-compact-page .svc-compact-modes {
-  flex: 1;
-  min-height: 0;
-  align-content: center;
-  gap: clamp(10px, 1.5vh, 14px);
-}
-.service-compact-page .svc-mode {
-  padding: clamp(8px, 1.2vh, 12px);
-  gap: clamp(6px, 1vh, 10px);
-}
-.service-compact-page .svc-mode-media {
-  aspect-ratio: 4 / 3;
-  max-height: min(26vh, 200px);
-}
-.service-compact-page .svc-mode-title {
-  font-size: clamp(13px, 2vh, 16px);
-}
-.service-compact-page .svc-mode-cta {
-  font-size: 12px;
-  margin-top: 0;
-}
-
 .svc-compact-panel {
   display: flex;
   flex-direction: column;

@@ -85,17 +85,17 @@ function MeetupInner() {
   }
 
   return (
-    <div className="sub-page service-sub-page service-compact-page service-meetup-page">
+    <div className="sub-page service-sub-page service-meetup-page">
       <SubPageHeader backHref="/service" title="นัดรับผ่านกลาง" titleIcon="mapPin" />
-      <div className="svc-inner svc-compact-inner">
+      <div className="svc-inner">
 
         {step === 1 && (
           <>
-            <div className="svc-hero svc-compact-hero">
+            <div className="svc-hero">
               <div className="svc-hero-icon">🚗</div>
               <h1 className="svc-hero-title">เลือกรูปแบบบริการ</h1>
             </div>
-            <div className="svc-modes svc-compact-modes">
+            <div className="svc-modes">
               {MODES.map(m => {
                 const enabled = m.kind === 'guarantee' ? guaranteeEnabled : safeZoneEnabled;
                 const note = m.kind === 'guarantee' ? controls.message('meetupGuarantee') : controls.message('meetupSafeZone');
