@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { NotifyBell } from '@/components/NotifyBell';
@@ -27,6 +27,7 @@ export function AppHeaderActions({ className = '' }: { className?: string }) {
   const { locale } = useAppPreferences();
   const { user, loading, logout } = useUser();
   const pathname = usePathname() || '/';
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,7 +103,16 @@ export function AppHeaderActions({ className = '' }: { className?: string }) {
               </button>
               <div className="dropdown-menu dropdown-menu-right">
                 {profileItems.map(it => (
-                  <Link key={it.href} className="dropdown-item" href={it.href} onClick={closeProfile}>
+                  <Link
+                    key={it.href}
+                    className="dropdown-item"
+                    href={it.href}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      closeProfile();
+                      router.push(it.href);
+                    }}
+                  >
                     <span className={`icon-tile ${it.tint}`}><Icon name={it.icon} /></span>
                     <span>
                       <span className="t" style={{ display: 'block' }}>{it.t}</span>

@@ -4546,6 +4546,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .app-header-bar .dropdown:not(.open) .dropdown-menu,
 .app-header-bar .dropdown:not(.open):hover .dropdown-menu,
 .app-header-bar .dropdown:not(.open):focus-within .dropdown-menu {
+  display: none;
   opacity: 0;
   visibility: hidden;
   transform: translateY(6px) scale(.98);
@@ -4557,6 +4558,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   z-index: 170;
 }
 .app-header-bar .dropdown.open .dropdown-menu {
+  display: block;
   opacity: 1;
   visibility: visible;
   transform: none;
