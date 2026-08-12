@@ -7,7 +7,6 @@ import { Nav, Footer, CountUp, useReveal, useTilt } from '@/components/Site';
 import { EscrowStage } from '@/components/EscrowStage';
 import { ServiceSlider } from '@/components/ServiceSlider';
 import { useAppPreferences } from '@/components/AppPreferences';
-import { useServiceControls } from '@/lib/useServiceControls';
 
 interface SiteStats {
   completedDeals: number; protectedValue: number; middlemen: number; satisfaction: number; reviewCount: number;
@@ -61,10 +60,8 @@ function SectionHead({ kicker, title, lead, center }: { kicker?: string; title: 
   );
 }
 
-function Hero({ stats, controls, locale }: { stats: SiteStats | null; controls: ReturnType<typeof useServiceControls>; locale: 'th' | 'en' }) {
+function Hero({ stats, locale }: { stats: SiteStats | null; locale: 'th' | 'en' }) {
   const { ref: stageTiltRef, onMouseLeave, onMouseMove } = useTilt(7);
-  const hasReviews = !!stats && stats.reviewCount > 0;
-  const avgStars = hasReviews ? Math.round((stats!.satisfaction / 20) * 10) / 10 : 0;
   return (
     <header className="hero">
       <div className="hero-bg" aria-hidden="true">
@@ -142,7 +139,6 @@ export default function HomePage() {
           'ความพึงพอใจผู้ใช้': 'User Satisfaction',
         }[item.label] || item.label),
   }));
-  const controls = useServiceControls();
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0');
@@ -153,7 +149,7 @@ export default function HomePage() {
   return (
     <>
       <Nav active="home" />
-      <Hero stats={stats} controls={controls} locale={locale} />
+      <Hero stats={stats} locale={locale} />
 
       <section className="stats-band">
         <div className="container stats-grid">

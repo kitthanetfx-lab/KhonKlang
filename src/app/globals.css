@@ -630,7 +630,11 @@ button.nav-link { background: none; border: none; }
 /* home.css — landing page sections */
 
 /* ---- Hero ---- */
-.hero { position: relative; padding: 12px 0 22px; overflow: hidden; }
+.hero {
+  position: relative;
+  padding: clamp(6px, 1.2vh, 12px) 0 clamp(18px, 2.5vh, 22px);
+  overflow: hidden;
+}
 @media (min-width: 900px){ .hero { padding: 8px 0 38px; } }
 .hero-bg { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 .hero-bg .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; }
@@ -662,9 +666,11 @@ button.nav-link { background: none; border: none; }
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex-shrink: 0;
   max-width: 52rem;
   margin-inline: auto;
 }
+.hero-head .hero-cta .btn { min-width: min(100%, 280px); }
 .hero-copy { grid-area: copy; text-align: center; }
 .hero-visual {
   grid-area: visual;
