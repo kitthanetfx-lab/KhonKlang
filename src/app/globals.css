@@ -4539,29 +4539,29 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   .app-hdr-dd.open > .nav-link { color: var(--accent-strong, var(--accent)); }
 }
 
-/* Header dropdowns — mobile: คลิกเท่านั้น · desktop: hover + คลิก */
-.app-header-bar .hdr-main-dd.dropdown:hover:not(.open) .dropdown-menu,
-.app-header-bar .hdr-main-dd.dropdown:focus-within:not(.open) .dropdown-menu {
-  opacity: 0; visibility: hidden; transform: translateY(6px) scale(.98);
-  transition-delay: 0s, 0s, 0s; pointer-events: none;
+/* Header dropdowns — เปิด/ปิดด้วย class .open เท่านั้น (React state) */
+.app-header-bar .dropdown-menu {
+  transition: opacity .15s ease, transform .15s var(--ease-out), visibility 0s linear 0s;
 }
-.app-header-bar .dropdown:not(.open) .dropdown-menu {
+.app-header-bar .dropdown:not(.open) .dropdown-menu,
+.app-header-bar .dropdown:not(.open):hover .dropdown-menu,
+.app-header-bar .dropdown:not(.open):focus-within .dropdown-menu {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px) scale(.98);
   pointer-events: none;
+  transition-delay: 0s, 0s, 0s;
 }
-.app-header-bar .dropdown.open { position: relative; z-index: 170; }
+.app-header-bar .dropdown.open {
+  position: relative;
+  z-index: 170;
+}
 .app-header-bar .dropdown.open .dropdown-menu {
-  opacity: 1; visibility: visible; transform: none; transition-delay: 0s, 0s, 0s;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
   pointer-events: auto;
-}
-@media (min-width: 980px) {
-  .app-header-bar .app-hdr-dd.dropdown:hover .dropdown-menu,
-  .app-header-bar .app-hdr-dd.dropdown.open .dropdown-menu,
-  .app-header-bar .app-hdr-dd.dropdown:focus-within .dropdown-menu {
-    opacity: 1; visibility: visible; transform: none; transition-delay: 0s, 0s, 0s;
-    pointer-events: auto;
-  }
-  .app-header-bar .app-hdr-dd.dropdown:hover,
-  .app-header-bar .app-hdr-dd.dropdown.open { z-index: 170; }
+  transition-delay: 0s, 0s, 0s;
 }
 .app-hdr-dd-menu {
   top: calc(100% + 4px);

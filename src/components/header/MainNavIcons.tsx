@@ -1,84 +1,99 @@
-'use client';
-
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { Icon } from '@/components/Icon';
-import { useAppPreferences } from '@/components/AppPreferences';
-import { getMainNavMenus, type NavItem } from '@/lib/navData';
-
-function DropItem({ it, onSelect }: { it: NavItem; onSelect: () => void }) {
-  return (
-    <Link className="dropdown-item" href={it.href} onClick={() => onSelect()}>
-      <span className={`icon-tile ${it.tint}`}><Icon name={it.icon} /></span>
-      <span>
-        <span className="t" style={{ display: 'block' }}>{it.t}</span>
-        <span className="d">{it.d}</span>
-      </span>
-    </Link>
-  );
-}
-
-/** ไอคอนหลัก 4 ตัว + label ใต้ไอคอน — mobile/tablet แถบที่ 2 */
-export function MainNavIcons() {
-  const { locale } = useAppPreferences();
-  const pathname = usePathname() || '';
-  const menus = getMainNavMenus(locale);
-  const [openKey, setOpenKey] = useState<string | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  const isActive = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
-
-  useEffect(() => {
-    setOpenKey(null);
-  }, [pathname]);
-
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpenKey(null);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenKey(null); };
-    document.addEventListener('click', onDoc);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('click', onDoc);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, []);
-
-  return (
-    <nav className="hdr-main-nav" ref={wrapRef} aria-label={locale === 'th' ? 'เมนูหลัก' : 'Main menu'}>
-      {menus.map(menu => {
-        const active = isActive(menu.hrefPrefix);
-        const open = openKey === menu.key;
-        const alignEnd = menu.key === 'scam';
-        const alignCenter = menu.key === 'market';
-        return (
-          <div
-            key={menu.key}
-            className={`dropdown hdr-main-dd${open ? ' open' : ''}${active ? ' is-active' : ''}`}
-          >
-            <button
-              type="button"
-              className={`hdr-main-tile${active || open ? ' is-active' : ''}`}
-              aria-haspopup="true"
-              aria-expanded={open}
-              aria-label={menu.label}
-              onClick={() => setOpenKey(open ? null : menu.key)}
-            >
-              <span className="hdr-main-icon">
-                <Icon name={menu.icon} size={20} />
-              </span>
-              <span className="hdr-main-icon-label">{menu.label}</span>
-            </button>
-            <div
-              className={`dropdown-menu hdr-main-dropdown${alignEnd ? ' hdr-main-dropdown--end' : ''}${alignCenter ? ' hdr-main-dropdown--center' : ''}`}
-            >
-              {menu.items.map(it => <DropItem key={it.href} it={it} onSelect={() => setOpenKey(null)} />)}
-            </div>
-          </div>
-        );
-      })}
-    </nav>
-  );
-}
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { Icon } from '@/components/Icon';
+import { useAppPreferences } from '@/components/AppPreferences';
+import { getMainNavMenus, type NavItem } from '@/lib/navData';
+
+function blurActive() {
+  const el = document.activeElement;
+  if (el instanceof HTMLElement) el.blur();
+}
+
+function DropItem({ it, onSelect }: { it: NavItem; onSelect: () => void }) {
+  return (
+    <Link
+      className="dropdown-item"
+      href={it.href}
+      onClick={() => { onSelect(); blurActive(); }}
+    >
+      <span className={`icon-tile ${it.tint}`}><Icon name={it.icon} /></span>
+      <span>
+        <span className="t" style={{ display: 'block' }}>{it.t}</span>
+        <span className="d">{it.d}</span>
+      </span>
+    </Link>
+  );
+}
+
+/** ไอคอนหลัก 4 ตัว + label ใต้ไอคอน — mobile/tablet แถบที่ 2 */
+export function MainNavIcons() {
+  const { locale } = useAppPreferences();
+  const pathname = usePathname() || '';
+  const menus = getMainNavMenus(locale);
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const isActive = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
+
+  useEffect(() => {
+    setOpenKey(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpenKey(null);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenKey(null); };
+    document.addEventListener('mousedown', onDoc);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  const close = () => {
+    setOpenKey(null);
+    blurActive();
+  };
+
+  return (
+    <nav className="hdr-main-nav" ref={wrapRef} aria-label={locale === 'th' ? 'เมนูหลัก' : 'Main menu'}>
+      {menus.map(menu => {
+        const active = isActive(menu.hrefPrefix);
+        const open = openKey === menu.key;
+        const alignEnd = menu.key === 'scam';
+        const alignCenter = menu.key === 'market';
+        return (
+          <div
+            key={menu.key}
+            className={`dropdown hdr-main-dd${open ? ' open' : ''}${active ? ' is-active' : ''}`}
+          >
+            <button
+              type="button"
+              className={`hdr-main-tile${active || open ? ' is-active' : ''}`}
+              aria-haspopup="true"
+              aria-expanded={open}
+              aria-label={menu.label}
+              onClick={() => setOpenKey(open ? null : menu.key)}
+            >
+              <span className="hdr-main-icon">
+                <Icon name={menu.icon} size={20} />
+              </span>
+              <span className="hdr-main-icon-label">{menu.label}</span>
+            </button>
+            <div
+              className={`dropdown-menu hdr-main-dropdown${alignEnd ? ' hdr-main-dropdown--end' : ''}${alignCenter ? ' hdr-main-dropdown--center' : ''}`}
+            >
+              {menu.items.map(it => <DropItem key={it.href} it={it} onSelect={close} />)}
+            </div>
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+

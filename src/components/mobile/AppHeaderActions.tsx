@@ -40,6 +40,18 @@ export function AppHeaderActions({ className = '' }: { className?: string }) {
     profileCloseTimer.current = setTimeout(() => setProfileOpen(false), 300);
   };
 
+  const closeProfile = () => {
+    if (profileCloseTimer.current) clearTimeout(profileCloseTimer.current);
+    setProfileOpen(false);
+    const el = document.activeElement;
+    if (el instanceof HTMLElement) el.blur();
+  };
+
+  useEffect(() => {
+    closeProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on route change
+  }, [pathname]);
+
   useEffect(() => () => {
     if (profileCloseTimer.current) clearTimeout(profileCloseTimer.current);
   }, []);
@@ -90,7 +102,7 @@ export function AppHeaderActions({ className = '' }: { className?: string }) {
               </button>
               <div className="dropdown-menu dropdown-menu-right">
                 {profileItems.map(it => (
-                  <Link key={it.href} className="dropdown-item" href={it.href}>
+                  <Link key={it.href} className="dropdown-item" href={it.href} onClick={closeProfile}>
                     <span className={`icon-tile ${it.tint}`}><Icon name={it.icon} /></span>
                     <span>
                       <span className="t" style={{ display: 'block' }}>{it.t}</span>
@@ -98,7 +110,7 @@ export function AppHeaderActions({ className = '' }: { className?: string }) {
                     </span>
                   </Link>
                 ))}
-                <button type="button" className="dropdown-item" onClick={logout} style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                <button type="button" className="dropdown-item" onClick={() => { closeProfile(); logout(); }} style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
                   <span className="icon-tile"><Icon name="logout" /></span>
                   <span>
                     <span className="t" style={{ display: 'block' }}>{locale === 'th' ? 'ออกจากระบบ' : 'Log out'}</span>
