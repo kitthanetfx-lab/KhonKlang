@@ -38,10 +38,10 @@ export function MainNavIcons() {
       if (!wrapRef.current?.contains(e.target as Node)) setOpenKey(null);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenKey(null); };
-    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('click', onDoc);
     window.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('click', onDoc);
       window.removeEventListener('keydown', onKey);
     };
   }, []);

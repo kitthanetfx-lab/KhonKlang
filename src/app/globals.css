@@ -4512,7 +4512,13 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 }
 .app-hdr-brand { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .app-header-bar--unified .app-hdr-center { display: none; }
-.app-header-bar--unified .app-hdr-actions { margin-left: auto; }
+.app-header-bar--unified .app-hdr-row {
+  justify-content: flex-start;
+}
+.app-header-bar--unified .app-hdr-actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
 .app-hdr-center { min-width: 0; overflow: hidden; flex: 1; flex-shrink: 1; }
 .app-hdr-actions { display: flex; align-items: flex-start; justify-content: flex-end; gap: 2px; flex-shrink: 0; min-width: 0; }
 .app-hdr-actions-inner { display: flex; align-items: flex-start; gap: 2px; flex-shrink: 0; }
@@ -4533,15 +4539,29 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   .app-hdr-dd.open > .nav-link { color: var(--accent-strong, var(--accent)); }
 }
 
-/* Header dropdowns — เปิดด้วยคลิกเท่านั้น ไม่ใช้ hover */
-.app-header-bar .dropdown:hover:not(.open) .dropdown-menu,
-.app-header-bar .dropdown:focus-within:not(.open) .dropdown-menu {
+/* Header dropdowns — mobile: คลิกเท่านั้น · desktop: hover + คลิก */
+.app-header-bar .hdr-main-dd.dropdown:hover:not(.open) .dropdown-menu,
+.app-header-bar .hdr-main-dd.dropdown:focus-within:not(.open) .dropdown-menu {
   opacity: 0; visibility: hidden; transform: translateY(6px) scale(.98);
-  transition-delay: 0s, 0s, 0s;
+  transition-delay: 0s, 0s, 0s; pointer-events: none;
+}
+.app-header-bar .dropdown:not(.open) .dropdown-menu {
+  pointer-events: none;
 }
 .app-header-bar .dropdown.open { position: relative; z-index: 170; }
 .app-header-bar .dropdown.open .dropdown-menu {
   opacity: 1; visibility: visible; transform: none; transition-delay: 0s, 0s, 0s;
+  pointer-events: auto;
+}
+@media (min-width: 980px) {
+  .app-header-bar .app-hdr-dd.dropdown:hover .dropdown-menu,
+  .app-header-bar .app-hdr-dd.dropdown.open .dropdown-menu,
+  .app-header-bar .app-hdr-dd.dropdown:focus-within .dropdown-menu {
+    opacity: 1; visibility: visible; transform: none; transition-delay: 0s, 0s, 0s;
+    pointer-events: auto;
+  }
+  .app-header-bar .app-hdr-dd.dropdown:hover,
+  .app-header-bar .app-hdr-dd.dropdown.open { z-index: 170; }
 }
 .app-hdr-dd-menu {
   top: calc(100% + 4px);

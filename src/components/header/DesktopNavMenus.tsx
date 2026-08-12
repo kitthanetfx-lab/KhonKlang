@@ -51,10 +51,10 @@ export function DesktopNavMenus() {
       if (!navRef.current?.contains(e.target as Node)) setOpenKey(null);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenKey(null); };
-    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('click', onDoc);
     window.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('click', onDoc);
       window.removeEventListener('keydown', onKey);
     };
   }, []);
@@ -65,7 +65,11 @@ export function DesktopNavMenus() {
   const dd = (key: string, active: boolean, label: ReactNode, items: NavItem[], minWidth?: number) => {
     const open = openKey === key;
     return (
-      <div className={`dropdown app-hdr-dd${open ? ' open' : ''}${active ? ' is-active' : ''}`}>
+      <div
+        className={`dropdown app-hdr-dd${open ? ' open' : ''}${active ? ' is-active' : ''}`}
+        onMouseEnter={() => setOpenKey(key)}
+        onMouseLeave={() => setOpenKey(prev => (prev === key ? null : prev))}
+      >
         <button
           type="button"
           className={`nav-link${active || open ? ' is-active' : ''}`}
