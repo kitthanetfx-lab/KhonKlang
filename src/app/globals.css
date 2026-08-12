@@ -4876,14 +4876,71 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   border: 1px solid var(--line-2);
 }
 .svc-mode-image { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.service-trade-page .svc-modes,
+.service-meetup-page .svc-modes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 980px) {
+  .service-trade-page .svc-modes,
+  .service-meetup-page .svc-modes {
+    gap: 18px;
+  }
+}
+.service-trade-page .svc-mode,
+.service-meetup-page .svc-mode {
+  padding: 10px;
+  gap: 8px;
+}
+@media (min-width: 980px) {
+  .service-trade-page .svc-mode,
+  .service-meetup-page .svc-mode {
+    padding: 16px;
+    gap: 14px;
+  }
+}
 .service-trade-page .svc-mode-media,
 .service-meetup-page .svc-mode-media {
   width: 50%;
   margin-inline: auto;
 }
+.service-trade-page .svc-mode-title,
+.service-meetup-page .svc-mode-title {
+  font-size: clamp(11px, 3.2vw, 18px);
+  line-height: 1.35;
+}
+.service-trade-page .svc-mode-cta,
+.service-meetup-page .svc-mode-cta {
+  font-size: clamp(10px, 2.8vw, 13px);
+}
+.service-trade-page .svc-hero,
+.service-meetup-page .svc-hero {
+  margin-bottom: 16px;
+}
+@media (min-width: 980px) {
+  .service-trade-page .svc-hero,
+  .service-meetup-page .svc-hero {
+    margin-bottom: 32px;
+  }
+}
+.service-trade-page .svc-hero-icon,
+.service-meetup-page .svc-hero-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+@media (min-width: 980px) {
+  .service-trade-page .svc-hero-icon,
+  .service-meetup-page .svc-hero-icon {
+    font-size: 52px;
+    margin-bottom: 14px;
+  }
+}
+.service-trade-page .svc-hero-title,
+.service-meetup-page .svc-hero-title {
+  font-size: clamp(16px, 4.5vw, 32px);
+}
 .svc-mode-title { font-family:var(--font-display); font-weight:700; font-size:18px; color:var(--ink); text-align:center; }
-.svc-mode-cta { display:flex; align-items:center; gap:5px; font-family:var(--font-display); font-weight:600; font-size:13px; color:var(--accent); margin-top:4px; transition:gap .2s; }
-.svc-mode-cta { justify-content:center; }
+.svc-mode-cta { display:flex; align-items:center; gap:5px; font-family:var(--font-display); font-weight:600; font-size:13px; color:var(--accent); margin-top:4px; transition:gap .2s; justify-content:center; }
 .svc-mode:hover .svc-mode-cta { gap:9px; }
 
 /* ---- Service hub + compact sub-pages (พอดีจอ ไม่เลื่อน) ---- */
