@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
+import { notifyUsers } from '../../_lib/notify';
 import { syncOnsiteJobLedger } from '../../_lib/financeLedger';
+
+function onsiteLabel(job: Record<string, unknown>): string {
+  const desc = String(job.item_description || 'งานออนไซต์');
+  return desc.length > 60 ? `${desc.slice(0, 60)}…` : desc;
+}
 
 /** รายการงานนัดออนไซต์สำหรับแอดมิน: ?filter=active | open | completed | cancelled | all */
 export async function GET(req: NextRequest) {
@@ -38,16 +44,45 @@ export async function PATCH(req: NextRequest) {
     if (action === 'cancel') {
       const { data: updated } = await db.from('onsite_jobs').update({ status: 'cancelled', report_notes: appendNote('แอดมินยกเลิก') }).eq('id', id).select().single();
       await syncOnsiteJobLedger(db, updated as Record<string, unknown>);
+      if (updated) {
+        const label = onsiteLabel(updated as Record<string, unknown>);
+        const recipients = [updated.buyer_id, updated.middleman_id].filter((x): x is string => typeof x === 'string' && !!x);
+        if (recipients.length) {
+          await notifyUsers(db, recipients, {
+            title: '❌ แอดมินยกเลิกงานออนไซต์',
+            body: `งาน "${label}" ถูกยกเลิกโดยทีมงาน`,
+            link: `/onsite/${id}`,
+          });
+        }
+      }
       return NextResponse.json({ job: updated });
     }
     if (action === 'mark_refunded') {
       const { data: updated } = await db.from('onsite_jobs').update({ report_notes: appendNote('คืนมัดจำแล้ว') }).eq('id', id).select().single();
       await syncOnsiteJobLedger(db, updated as Record<string, unknown>);
+      if (updated?.buyer_id) {
+        await notifyUsers(db, [updated.buyer_id as string], {
+          title: '💰 คืนมัดจำงานออนไซต์แล้ว',
+          body: `งาน "${onsiteLabel(updated as Record<string, unknown>)}" — ตรวจสอบรายละเอียดในหน้างาน`,
+          link: `/onsite/${id}`,
+        });
+      }
       return NextResponse.json({ job: updated });
     }
     if (action === 'complete') {
       const { data: updated } = await db.from('onsite_jobs').update({ status: 'completed', completed_at: now, report_notes: appendNote('แอดมินปิดงาน') }).eq('id', id).select().single();
       await syncOnsiteJobLedger(db, updated as Record<string, unknown>);
+      if (updated) {
+        const label = onsiteLabel(updated as Record<string, unknown>);
+        const recipients = [updated.buyer_id, updated.middleman_id].filter((x): x is string => typeof x === 'string' && !!x);
+        if (recipients.length) {
+          await notifyUsers(db, recipients, {
+            title: '🎉 แอดมินปิดงานออนไซต์แล้ว',
+            body: `งาน "${label}" เสร็จสมบูรณ์`,
+            link: `/onsite/${id}`,
+          });
+        }
+      }
       return NextResponse.json({ job: updated });
     }
     return NextResponse.json({ error: 'unknown action' }, { status: 400 });

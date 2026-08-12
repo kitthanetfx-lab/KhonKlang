@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { notifyUsers } from '../../../_lib/notify';
 import { verifyAdmin, getAdminClient } from '../../_lib';
 import { newCallId } from '../../../_lib/support';
 
@@ -44,6 +45,13 @@ export async function POST(req: NextRequest) {
         call_staff_id: staffId, call_staff_name: staffName, call_updated_at: now, updated_at: now,
       }).eq('customer_id', customerId);
       await logSystem(db, customerId, `พนักงาน ${staffName} กำลังโทรหาลูกค้า`);
+      await notifyUsers(db, [customerId], {
+        title: '📞 ทีมงานกำลังโทรหาคุณ',
+        body: `${staffName} โทรจากกลางฮับ — กดเพื่อเปิดแชทและรับสาย`,
+        link: '/?support=1',
+        kind: 'call',
+        data: { type: 'support_call', callerName: staffName },
+      });
       return NextResponse.json({ ok: true, callId });
     }
 
@@ -53,6 +61,11 @@ export async function POST(req: NextRequest) {
         call_status: 'connecting', call_staff_id: staffId, call_staff_name: staffName, call_updated_at: now, updated_at: now,
       }).eq('customer_id', customerId);
       await logSystem(db, customerId, `พนักงาน ${staffName} รับคำขอโทรกลับและกำลังเชื่อมต่อเสียง`);
+      await notifyUsers(db, [customerId], {
+        title: '📞 พนักงานรับคำขอโทรกลับแล้ว',
+        body: `${staffName} กำลังเชื่อมต่อ — เปิดแชทเพื่อรับสาย`,
+        link: '/?support=1',
+      });
       return NextResponse.json({ ok: true, callId: thread.call_id, callStatus: 'connecting' });
     }
 

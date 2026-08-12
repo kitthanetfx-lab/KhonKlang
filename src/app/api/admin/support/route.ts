@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { notifyUsers } from '../../_lib/notify';
 import { verifyAdmin, getAdminClient } from '../_lib';
 
 async function getStaffName(db: ReturnType<typeof getAdminClient>, staffId: string) {
@@ -69,6 +70,13 @@ export async function POST(req: NextRequest) {
       last_message: content || 'ส่งรูปภาพ', last_at: now, last_sender: 'staff', unread_customer: true,
       assigned_staff_id: staffId, assigned_staff_name: staffName, updated_at: now,
     }).eq('customer_id', customerId);
+
+    const preview = imageUrl ? '📷 ส่งรูปภาพ' : content.slice(0, 100);
+    await notifyUsers(db, [customerId], {
+      title: `💬 ${staffName} (ทีมงาน)`,
+      body: preview,
+      link: '/?support=1',
+    });
 
     return NextResponse.json({ message: msg });
   } catch (err: unknown) {

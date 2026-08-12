@@ -1,7 +1,7 @@
 'use client';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { supabase, authHeaders } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
 import { Icon } from './Icon';
@@ -25,10 +25,15 @@ function timeShort(iso: string) {
 export function SupportWidget() {
   const pathname = usePathname();
   if (pathname?.startsWith('/admin')) return null;
-  return <SupportWidgetPanel pathname={pathname || '/'} />;
+  return (
+    <Suspense fallback={null}>
+      <SupportWidgetPanel pathname={pathname || '/'} />
+    </Suspense>
+  );
 }
 
 function SupportWidgetPanel({ pathname }: { pathname: string }) {
+  const searchParams = useSearchParams();
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [myId, setMyId] = useState('');
   const [open, setOpen] = useState(false);
@@ -91,6 +96,11 @@ function SupportWidgetPanel({ pathname }: { pathname: string }) {
     }, 0);
     return () => window.clearTimeout(t);
   }, []);
+
+  // เปิดจาก push notification (?support=1) หรือ deep link
+  useEffect(() => {
+    if (searchParams.get('support') === '1') setOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!open) return;

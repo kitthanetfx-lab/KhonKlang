@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAdminClient, verifyUser } from '@/lib/supabaseServer';
+import { notifyUsers } from '../../_lib/notify';
 import { syncOnsiteJobLedger, readFeesConfig } from '../../_lib/financeLedger';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 
@@ -24,6 +25,25 @@ async function getDeposit(db: SupabaseClient, uid: string): Promise<number> {
   ]);
   const tier = profile?.middleman_tier_intent || 'Bronze';
   return getTierCreditLimit(fees, tier);
+}
+
+function onsiteLabel(job: Record<string, unknown>): string {
+  const desc = String(job.item_description || 'งานออนไซต์');
+  return desc.length > 60 ? `${desc.slice(0, 60)}…` : desc;
+}
+
+async function notifyOnsiteParties(
+  db: SupabaseClient,
+  userIds: Array<string | null | undefined>,
+  n: { title: string; body: string; jobId: string },
+) {
+  const recipients = [...new Set(userIds.filter((x): x is string => typeof x === 'string' && !!x))];
+  if (!recipients.length) return;
+  await notifyUsers(db, recipients, {
+    title: n.title,
+    body: n.body,
+    link: `/onsite/${n.jobId}`,
+  });
 }
 
 // PATCH actions:
@@ -94,6 +114,46 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { data: updated, error } = await db.from('onsite_jobs').update(update).eq('id', id).select().single();
     if (error) throw new Error(error.message);
     await syncOnsiteJobLedger(db, updated as Record<string, unknown>);
+
+    const label = onsiteLabel(updated as Record<string, unknown>);
+    if (action === 'submit_quote') {
+      await notifyOnsiteParties(db, [updated.buyer_id], {
+        title: '📩 มีใบเสนอราคาออนไซต์',
+        body: `${updated.middleman_name || 'คนกลาง'} เสนอราคางาน "${label}" — กดเพื่อพิจารณา`,
+        jobId: id,
+      });
+    } else if (action === 'accept_quote') {
+      await notifyOnsiteParties(db, [updated.middleman_id], {
+        title: '✅ ผู้ว่าจ้างยอมรับใบเสนอราคา',
+        body: `งาน "${label}" ได้รับการอนุมัติแล้ว — เริ่มเดินทางได้`,
+        jobId: id,
+      });
+    } else if (action === 'reject_quote') {
+      await notifyOnsiteParties(db, [job.middleman_id], {
+        title: '↩️ ผู้ว่าจ้างปฏิเสธใบเสนอราคา',
+        body: `งาน "${label}" ถูกปฏิเสธ — เปิดรับใบเสนอใหม่แล้ว`,
+        jobId: id,
+      });
+    } else if (action === 'start_work') {
+      await notifyOnsiteParties(db, [updated.buyer_id], {
+        title: '🚗 คนกลางเริ่มเดินทางแล้ว',
+        body: `${updated.middleman_name || 'คนกลาง'} เริ่มงาน "${label}"`,
+        jobId: id,
+      });
+    } else if (action === 'complete') {
+      await notifyOnsiteParties(db, [updated.buyer_id], {
+        title: '🎉 งานออนไซต์เสร็จสมบูรณ์',
+        body: `งาน "${label}" ปิดงานแล้ว — กดดูรายงานผล`,
+        jobId: id,
+      });
+    } else if (action === 'cancel') {
+      await notifyOnsiteParties(db, [job.middleman_id], {
+        title: '❌ ผู้ว่าจ้างยกเลิกงานออนไซต์',
+        body: `งาน "${label}" ถูกยกเลิก`,
+        jobId: id,
+      });
+    }
+
     return NextResponse.json({ job: updated });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
