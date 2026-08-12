@@ -19,14 +19,14 @@ export default function ServiceTradePage() {
   }
 
   return (
-    <div className="sub-page service-sub-page service-trade-page">
-      <SubPageHeader backHref="/" title="บริการผ่านคนกลาง" />
-      <div className="svc-inner">
-        <div className="svc-hero">
+    <div className="sub-page service-sub-page service-compact-page service-trade-page">
+      <SubPageHeader backHref="/service" title="บริการผ่านคนกลาง" />
+      <div className="svc-inner svc-compact-inner">
+        <div className="svc-hero svc-compact-hero">
           <div className="svc-hero-icon">🤝</div>
           <h1 className="svc-hero-title">เลือกรูปแบบบริการ</h1>
         </div>
-        <div className="svc-modes">
+        <div className="svc-modes svc-compact-modes">
           {MODES.map(m => {
             const enabled = m.href === '/service/simple' ? controls.isEnabled('tradeSimple') : controls.isEnabled('tradeOnline');
             const note = m.href === '/service/simple' ? controls.message('tradeSimple') : controls.message('tradeOnline');

@@ -4871,6 +4871,238 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .svc-mode-cta { display:flex; align-items:center; gap:5px; font-family:var(--font-display); font-weight:600; font-size:13px; color:var(--accent); margin-top:4px; transition:gap .2s; }
 .svc-mode-cta { justify-content:center; }
 .svc-mode:hover .svc-mode-cta { gap:9px; }
+
+/* ---- Service hub + compact sub-pages (พอดีจอ ไม่เลื่อน) ---- */
+.service-hub-page,
+.service-compact-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  min-height: 100svh;
+  overflow: hidden;
+}
+.service-hub-inner,
+.svc-compact-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 16px 16px;
+  min-height: calc(100dvh - 132px);
+  min-height: calc(100svh - 132px);
+  overflow: hidden;
+}
+@media (min-width: 980px) {
+  .service-hub-inner,
+  .svc-compact-inner {
+    min-height: calc(100dvh - 96px);
+    min-height: calc(100svh - 96px);
+    padding: 12px 24px 24px;
+  }
+}
+.service-hub-head {
+  text-align: center;
+  margin-bottom: clamp(10px, 2vh, 18px);
+  flex-shrink: 0;
+}
+.service-hub-head h1 {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.8vh, 26px);
+  font-weight: 800;
+  margin: 0 0 4px;
+  color: var(--ink);
+}
+.service-hub-head p {
+  font-size: clamp(12px, 1.8vh, 14px);
+  color: var(--muted);
+  margin: 0;
+}
+.service-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(8px, 1.4vh, 14px);
+  flex: 1;
+  min-height: 0;
+  align-content: center;
+}
+@media (min-width: 900px) {
+  .service-hub-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.service-hub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: clamp(6px, 1vh, 10px);
+  padding: clamp(12px, 2vh, 18px) clamp(10px, 1.5vw, 14px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+  text-decoration: none;
+  color: inherit;
+  transition: transform .2s var(--ease-out), box-shadow .2s, border-color .2s;
+  min-height: 0;
+}
+.service-hub-card:hover:not(.is-disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--sh-md);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.service-hub-card.is-disabled {
+  opacity: .72;
+  cursor: not-allowed;
+}
+.service-hub-card .icon-tile {
+  width: clamp(42px, 7vh, 54px);
+  height: clamp(42px, 7vh, 54px);
+  border-radius: 14px;
+}
+.service-hub-card .icon-tile svg {
+  width: clamp(20px, 3.5vh, 26px);
+  height: clamp(20px, 3.5vh, 26px);
+}
+.service-hub-card-t {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(13px, 2vh, 16px);
+  line-height: 1.3;
+  color: var(--ink);
+}
+.service-hub-card-d {
+  font-size: clamp(11px, 1.5vh, 13px);
+  color: var(--muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.service-hub-card-go {
+  margin-top: auto;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(12px, 1.6vh, 13px);
+  color: var(--accent-strong);
+}
+
+.service-compact-page .svc-compact-hero {
+  text-align: center;
+  margin-bottom: clamp(8px, 1.5vh, 14px);
+  flex-shrink: 0;
+}
+.service-compact-page .svc-compact-hero .svc-hero-icon {
+  font-size: clamp(32px, 5vh, 44px);
+  margin-bottom: 4px;
+  line-height: 1;
+}
+.service-compact-page .svc-compact-hero .svc-hero-title {
+  font-size: clamp(17px, 2.6vh, 22px);
+  margin: 0;
+}
+.service-compact-page .svc-compact-modes {
+  flex: 1;
+  min-height: 0;
+  align-content: center;
+  gap: clamp(10px, 1.5vh, 14px);
+}
+.service-compact-page .svc-mode {
+  padding: clamp(8px, 1.2vh, 12px);
+  gap: clamp(6px, 1vh, 10px);
+}
+.service-compact-page .svc-mode-media {
+  aspect-ratio: 4 / 3;
+  max-height: min(26vh, 200px);
+}
+.service-compact-page .svc-mode-title {
+  font-size: clamp(13px, 2vh, 16px);
+}
+.service-compact-page .svc-mode-cta {
+  font-size: 12px;
+  margin-top: 0;
+}
+
+.svc-compact-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+  gap: clamp(8px, 1.5vh, 14px);
+}
+.svc-compact-panel-icon {
+  font-size: clamp(40px, 6vh, 52px);
+  line-height: 1;
+}
+.svc-compact-panel-title {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.8vh, 24px);
+  font-weight: 800;
+  margin: 0;
+  color: var(--ink);
+}
+.svc-compact-panel-sub {
+  font-size: clamp(13px, 1.8vh, 14.5px);
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 36ch;
+}
+.svc-compact-bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+.svc-compact-bullets li {
+  font-size: clamp(12px, 1.6vh, 13.5px);
+  color: var(--ink-2);
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+}
+.svc-compact-experts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+.svc-compact-expert {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.svc-compact-cta {
+  margin-top: auto;
+  text-decoration: none;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 320px;
+}
+
 .svc-steps { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-xl); padding:24px; margin-top:28px; box-shadow:var(--sh-xs); }
 .svc-steps-title { font-size:16px; font-weight:700; color:var(--ink); margin-bottom:18px; }
 .svc-step-row { display:flex; gap:14px; padding:12px 0; border-bottom:1px solid var(--line-2); }
