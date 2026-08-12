@@ -2,6 +2,7 @@
 // ทำ 2 อย่าง: (1) บันทึก in-app notification ลง DB, (2) ยิง push ไปแอปมือถือ (FCM/APNs)
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendPush } from '@/lib/push';
+import { notifyUsersLine } from '@/lib/lineUserNotify';
 
 export interface NotifyOptions {
   title: string;
@@ -39,5 +40,12 @@ export async function notifyUsers(
       kind: n.kind || 'normal',
       data: n.data,
     });
+    if (n.kind !== 'call') {
+      await notifyUsersLine(db, unique, {
+        title: n.title,
+        body: n.body,
+        link: n.link,
+      });
+    }
   } catch { /* best effort */ }
 }

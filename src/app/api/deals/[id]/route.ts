@@ -193,6 +193,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const me = await verifyUser(req);
       viewerId = me.id;
       buyerShipping = await getBuyerShippingForSeller(db, current, me.id, me.role);
+      const { data: vp } = await db.from('profiles').select('line_user_id').eq('id', me.id).maybeSingle();
+      hasLineNotify = Boolean(String(vp?.line_user_id || '').trim());
     } catch {
       // public view — ไม่ส่งข้อมูลส่วนตัวผู้ซื้อ
     }
@@ -234,8 +236,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         myAutoBidMax = mine?.maxAmount ?? null;
         myAutoBidStep = mine?.stepAmount ? mine.stepAmount : null;
         myAuctionStatus = computeMyAuctionStatus(auction, viewerId, current.buyer_id);
-        const { data: vp } = await db.from('profiles').select('line_user_id').eq('id', viewerId).maybeSingle();
-        hasLineNotify = Boolean(String(vp?.line_user_id || '').trim());
       }
     }
 

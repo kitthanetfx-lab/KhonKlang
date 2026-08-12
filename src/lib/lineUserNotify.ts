@@ -32,6 +32,37 @@ async function lineUserIdOf(db: SupabaseClient, userId: string): Promise<string>
   return String(profile?.line_user_id || '').trim();
 }
 
+function fullAppUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
+}
+
+/** Push แจ้งเตือนขั้นตอนดีลให้ผู้ใช้หลายคนที่ผูก LINE แล้ว — best effort */
+export async function notifyUsersLine(
+  db: SupabaseClient,
+  userIds: string[],
+  params: { title: string; body: string; link: string },
+): Promise<void> {
+  const unique = [...new Set(userIds.filter(Boolean))];
+  if (!unique.length) return;
+  const { data: profiles } = await db
+    .from('profiles')
+    .select('id, line_user_id')
+    .in('id', unique);
+  const appUrl = fullAppUrl();
+  const link = params.link.startsWith('http') ? params.link : `${appUrl}${params.link}`;
+  const text = [
+    `📦 ${params.title}`,
+    params.body,
+    link,
+  ].join('\n');
+  await Promise.all(
+    (profiles || [])
+      .map(p => String(p.line_user_id || '').trim())
+      .filter(Boolean)
+      .map(lineUserId => pushLineText(lineUserId, text)),
+  );
+}
+
 /** Push ถึงลูกค้าที่ถูก overbid ผ่าน LINE OA — ทำงานแม้ปิดเว็บ */
 export async function notifyUserLineOverbid(
   db: SupabaseClient,
@@ -40,7 +71,7 @@ export async function notifyUserLineOverbid(
 ): Promise<void> {
   const lineUserId = await lineUserIdOf(db, userId);
   if (!lineUserId) return;
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
+  const appUrl = fullAppUrl();
   const text = [
     '🔨 มีคน overbid คุณแล้ว',
     `"${params.title}"`,
@@ -58,7 +89,7 @@ export async function notifySellerLineNewBid(
 ): Promise<void> {
   const lineUserId = await lineUserIdOf(db, sellerId);
   if (!lineUserId) return;
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
+  const appUrl = fullAppUrl();
   const text = [
     '🔨 มี bid ใหม่ในประมูลของคุณ',
     `"${params.title}"`,
