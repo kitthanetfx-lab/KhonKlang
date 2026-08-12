@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { ReactNode } from 'react';
 import { Icon } from '@/components/Icon';
 import { AppHeaderActions } from './AppHeaderActions';
+import { MainNavIcons } from '@/components/header/MainNavIcons';
 
 export type AppHeaderBarProps = {
   title?: string;
@@ -12,16 +14,32 @@ export type AppHeaderBarProps = {
   onBack?: () => void;
   backHref?: string;
   backLabel?: string;
-  /** ปุ่ม/ไอคอนเพิ่มก่อนกลุ่มไอคอนมาตรฐาน (เช่น แก้ไขโปรไฟล์) */
   extraActions?: ReactNode;
   actions?: ReactNode;
   className?: string;
   hideTitle?: boolean;
+  showBrand?: boolean;
+  showMainNav?: boolean;
 };
 
+function HeaderLogo({ compact = false }: { compact?: boolean }) {
+  return (
+    <Link href="/" className="app-hdr-logo" aria-label="กลางฮับ หน้าแรก">
+      <span className="app-hdr-logo-mark">
+        <Image src="/logo.png" alt="" width={compact ? 40 : 48} height={compact ? 40 : 48} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+      </span>
+      {!compact && (
+        <span className="app-hdr-logo-word">
+          กลางฮับ<small>GLANGHUB</small>
+        </span>
+      )}
+    </Link>
+  );
+}
+
 /**
- * Top bar มาตรฐานทุกหน้า (มือถือ/แท็บเล็ต)
- * [←] [ไอคอน+ชื่อหน้า] ········· [ตลาด][ข้อความ][ตะกร้า][แจ้งเตือน][โปรไฟล์]
+ * Top bar มาตรฐานทุกหน้า
+ * [โloโก้][←][ชื่อหน้า] · [สมัคร][บริการ][ตลาด][เช็ค] · [ข้อความ][ตะกr้า][แจ้ง][โปroไฟล์]
  */
 export function AppHeaderBar({
   title,
@@ -34,6 +52,8 @@ export function AppHeaderBar({
   actions,
   className = '',
   hideTitle,
+  showBrand = false,
+  showMainNav = false,
 }: AppHeaderBarProps) {
   const backEl = onBack ? (
     <button type="button" className="app-hdr-back" onClick={onBack} aria-label={backLabel}>
@@ -52,24 +72,42 @@ export function AppHeaderBar({
     </>
   );
 
+  const hasPageMeta = !hideTitle && (title || titleIcon || subtitle);
+  const logoCompact = !!(backEl || hasPageMeta);
+
   return (
-    <header className={`app-header-bar ${className}`.trim()}>
-      <div className="app-hdr-left">{backEl}</div>
-      <div className="app-hdr-center">
-        {!hideTitle && (title || titleIcon) && (
-          <div className="app-hdr-title" title={title}>
-            {titleIcon && (
-              <span className="app-hdr-title-ic" aria-hidden>
-                <Icon name={titleIcon} size={17} />
-              </span>
-            )}
-            {title && <span className="app-hdr-title-tx">{title}</span>}
+    <header className={`app-header-bar${showBrand ? ' app-header-bar--unified' : ''} ${className}`.trim()}>
+      <div className="app-hdr-row">
+        <div className={`app-hdr-brand${logoCompact ? ' app-hdr-brand--compact' : ''}`}>
+          {showBrand && <HeaderLogo compact={logoCompact} />}
+          {backEl}
+        </div>
+
+        {showMainNav && (
+          <div className="app-hdr-mainnav">
+            <MainNavIcons />
           </div>
         )}
-        {subtitle && <div className="app-hdr-sub">{subtitle}</div>}
-      </div>
-      <div className="app-hdr-actions">
-        {actions ?? defaultActions}
+
+        <div className="app-hdr-center">
+          {hasPageMeta && (
+            <>
+              <div className="app-hdr-title" title={title}>
+                {titleIcon && (
+                  <span className="app-hdr-title-ic" aria-hidden>
+                    <Icon name={titleIcon} size={17} />
+                  </span>
+                )}
+                {title && <span className="app-hdr-title-tx">{title}</span>}
+              </div>
+              {subtitle && <div className="app-hdr-sub">{subtitle}</div>}
+            </>
+          )}
+        </div>
+
+        <div className="app-hdr-actions">
+          {actions ?? defaultActions}
+        </div>
       </div>
     </header>
   );

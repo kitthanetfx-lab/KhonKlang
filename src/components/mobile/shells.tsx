@@ -1,8 +1,9 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
+import { AppTopConfig } from '@/components/header/useHeaderConfig';
 import { AppHeaderBar } from './AppHeaderBar';
-import { AppHeaderActions } from './AppHeaderActions';
 
 /** มือถือ ≤767px — ซ่อนบน desktop */
 export function MobileShell({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -29,17 +30,33 @@ type AppTopProps = {
 export function AppTop({
   title, subtitle, titleIcon, onBack, backHref, extraActions, actions, classPrefix = 'app', hideTitle,
 }: AppTopProps) {
+  const pathname = usePathname() || '';
+  if (pathname.startsWith('/admin')) {
+    return (
+      <AppHeaderBar
+        className={`${classPrefix}-top app-header-bar`}
+        title={title}
+        subtitle={subtitle}
+        titleIcon={titleIcon}
+        onBack={onBack}
+        backHref={backHref}
+        extraActions={extraActions}
+        actions={actions}
+        hideTitle={hideTitle}
+      />
+    );
+  }
   return (
-    <AppHeaderBar
-      className={`${classPrefix}-top app-header-bar`}
+    <AppTopConfig
       title={title}
       subtitle={subtitle}
       titleIcon={titleIcon}
       onBack={onBack}
       backHref={backHref}
       extraActions={extraActions}
-      hideTitle={hideTitle}
       actions={actions}
+      classPrefix={classPrefix}
+      hideTitle={hideTitle}
     />
   );
 }
@@ -64,4 +81,5 @@ export function AppLoading() {
   );
 }
 
-export { AppHeaderActions, AppHeaderBar };
+export { AppHeaderActions } from './AppHeaderActions';
+export { AppHeaderBar } from './AppHeaderBar';

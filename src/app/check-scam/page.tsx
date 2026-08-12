@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { Icon } from '@/components/Icon';
 import { ScamDbSearch } from '@/components/ScamDbSearch';
@@ -15,8 +16,14 @@ const SITES = [
 type Tab = 'db' | 'web' | 'report';
 
 export default function CheckScamPage() {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>('db');
   const [q, setQ] = useState('');
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'report') setTab('report');
+    else if (t === 'web') setTab('web');
+  }, [searchParams]);
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');

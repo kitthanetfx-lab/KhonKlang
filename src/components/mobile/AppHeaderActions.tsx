@@ -8,6 +8,7 @@ import { NotifyBell } from '@/components/NotifyBell';
 import { MessengerIcon } from '@/components/MessengerIcon';
 import { MarketplaceOrdersIcon } from '@/components/MarketplaceOrdersIcon';
 import { useAppPreferences } from '@/components/AppPreferences';
+import { getProfileItems } from '@/lib/navData';
 import { useUser } from '@/lib/useUser';
 
 const ICON = 'hdr-icon-btn';
@@ -16,7 +17,7 @@ type Props = {
   className?: string;
 };
 
-/** ไอคอนขวาบนมือถือ/แท็บเล็ต — ลำดับคงที่: ตลาด → ข้อความ → ตะกร้า → แจ้งเตือน → โปรไฟล์ (ขวาสุด) */
+/** ไอคอนขวาบน — ลำดับคงที่: ข้อความ → ตะกร้า → แจ้งเตือน → โปรไฟล์ (ขวาสุด) */
 export function AppHeaderActions({ className = '' }: Props) {
   const { locale } = useAppPreferences();
   const { user, loading, logout } = useUser();
@@ -38,44 +39,22 @@ export function AppHeaderActions({ className = '' }: Props) {
     if (profileCloseTimer.current) clearTimeout(profileCloseTimer.current);
   }, []);
 
-  const profileItems = locale === 'th'
-    ? [
-        { icon: 'user', t: 'เข้าสู่โปรไฟล์', d: 'ดูและแก้ไขข้อมูลบัญชี', href: '/profile' },
-        { icon: 'clock', t: 'ดีลของฉัน / ประวัติ', d: 'ประวัติซื้อขายทุกบทบาท + กล่องข้อความ', href: '/orders' },
-        { icon: 'store', t: 'ร้านของฉัน', d: 'ตั้งค่าร้านและลงขายสินค้า', href: '/dashboard/seller' },
-        { icon: 'handCoins', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' },
-      ]
-    : [
-        { icon: 'user', t: 'Profile', d: 'View and edit your account details', href: '/profile' },
-        { icon: 'clock', t: 'My Deals / History', d: 'Transaction history and inbox', href: '/orders' },
-        { icon: 'store', t: 'My Shop', d: 'Manage your shop and listings', href: '/dashboard/seller' },
-        { icon: 'handCoins', t: 'Middleman Board', d: 'Deals currently under your care', href: '/dashboard/middleman' },
-      ];
+  const profileItems = getProfileItems(locale);
 
   const displayName = user?.prefs?.displayName || user?.name || (locale === 'th' ? 'บัญชีของฉัน' : 'My account');
   const qs = searchParams?.toString() || '';
   const loginHref = `/login?returnTo=${encodeURIComponent(qs ? `${pathname}?${qs}` : pathname)}`;
-  const marketLabel = locale === 'th' ? 'ตลาด' : 'Marketplace';
   const accountLabel = locale === 'th' ? `เมนูบัญชี ${displayName}` : `Account menu ${displayName}`;
 
   return (
     <div className={`app-hdr-actions-inner ${className}`.trim()}>
-      <Link
-        href="/marketplace"
-        className={`${ICON} hdr-icon-btn--market`}
-        aria-label={marketLabel}
-        title={marketLabel}
-      >
-        <Icon name="store" size={18} />
-      </Link>
-
       {loading ? (
         <span className="app-hdr-loading" aria-busy="true">{locale === 'th' ? '…' : '…'}</span>
       ) : user ? (
         <>
-          <MessengerIcon className={ICON} />
-          <MarketplaceOrdersIcon className={ICON} />
-          <NotifyBell buttonClassName={ICON} />
+          <MessengerIcon className={`${ICON} hdr-icon-btn--msg`} />
+          <MarketplaceOrdersIcon className={`${ICON} hdr-icon-btn--cart`} />
+          <NotifyBell buttonClassName={`${ICON} hdr-icon-btn--notify`} />
           <div
             className={`dropdown hdr-profile-dd ${profileOpen ? 'open' : ''}`}
             onMouseEnter={openProfile}
@@ -83,7 +62,7 @@ export function AppHeaderActions({ className = '' }: Props) {
           >
             <button
               type="button"
-              className={`${ICON} hdr-profile-btn`}
+              className={`${ICON} hdr-icon-btn--profile hdr-profile-btn`}
               aria-haspopup="true"
               aria-expanded={profileOpen}
               aria-label={accountLabel}
@@ -97,7 +76,7 @@ export function AppHeaderActions({ className = '' }: Props) {
             <div className="dropdown-menu dropdown-menu-right">
               {profileItems.map(it => (
                 <Link key={it.href} className="dropdown-item" href={it.href}>
-                  <span className="icon-tile"><Icon name={it.icon} /></span>
+                  <span className={`icon-tile ${it.tint}`}><Icon name={it.icon} /></span>
                   <span>
                     <span className="t" style={{ display: 'block' }}>{it.t}</span>
                     <span className="d">{it.d}</span>

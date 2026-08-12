@@ -63,7 +63,7 @@ export function AdminSupportApp({
         title={inThread ? (threadName || 'แชท') : 'แชทลูกค้า'}
         subtitle={inThread ? threadSub : `${threads?.length ?? 0} ห้อง`}
         onBack={inThread ? onBack : undefined}
-        right={headerActions}
+        extraActions={headerActions}
       />
 
       {!inThread ? (

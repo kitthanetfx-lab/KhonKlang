@@ -6,6 +6,7 @@ import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase'
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 
 const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -250,15 +251,16 @@ export default function MiddlemanDashboard() {
 
   return (
     <div className="dash-root">
-      <header className="dash-header">
-        <button onClick={() => router.back()} className="dash-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
-        <div className="dash-head-info"><div className="dash-head-title">🤝 บอร์ดคนกลาง</div></div>
-        <div className="dash-head-actions">
-          <button className="btn btn-ghost btn-sm" onClick={refresh} disabled={refreshing}>
+      <SubPageHeader
+        title="บอร์ดคนกlาง"
+        titleIcon="handCoins"
+        onBack={() => router.back()}
+        extraActions={(
+          <button type="button" className="btn btn-ghost btn-sm" onClick={refresh} disabled={refreshing}>
             <span className={refreshing ? 'spin' : ''}>🔄</span> {refreshing ? 'กำลังโหลด...' : 'รีเฟรช'}
           </button>
-        </div>
-      </header>
+        )}
+      />
 
       <main className="dash-body">
         <div className="tier-card" style={{ background: ti.bg }}>

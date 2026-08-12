@@ -8,6 +8,7 @@ import { SupportWidget } from "@/components/SupportWidget";
 import { HomeButton } from "@/components/HomeButton";
 import { AuthGate } from "@/components/AuthGate";
 import { AppPreferencesProvider } from "@/components/AppPreferences";
+import { AppChrome } from "@/components/AppChrome";
 import { GlobalPreferenceDock } from "@/components/GlobalPreferenceDock";
 
 const displayFont = Anuphan({
@@ -79,7 +80,9 @@ export default function RootLayout({
         <AppPreferencesProvider>
           <DialogProvider>
             <AuthGate>
-              {children}
+              <AppChrome>
+                {children}
+              </AppChrome>
               <GlobalPreferenceDock />
               <HomeButton />
               <SupportWidget />

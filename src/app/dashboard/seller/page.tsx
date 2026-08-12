@@ -13,6 +13,7 @@ import { formatDurationPartsLabel } from '@/lib/auction';
 import { ShippingCarrierPicker } from '@/components/ShippingCarrierPicker';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
 import { SellerPackingPanel } from '@/components/seller/SellerPackingPanel';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import {
   isListingStoreOrder,
   sellerListingStatusLabel,
@@ -454,11 +455,12 @@ export default function SellerDashboard() {
 
   return (
     <div className="dash-root">
-      <header className="dash-header">
-        <button onClick={() => router.back()} className="dash-back"><Icon name="chevronRight" size={18} style={{ transform: 'rotate(180deg)' }} /></button>
-        <div className="dash-head-info"><div className="dash-head-title">🏪 ร้านของฉัน</div></div>
-        <div className="dash-head-actions"><button className="btn btn-primary btn-sm" onClick={() => { setPostError(''); setPostDone(false); setPostModal('pick'); }}>+ ลงขาย</button></div>
-      </header>
+      <SubPageHeader
+        title="ร้านของฉัน"
+        titleIcon="store"
+        onBack={() => router.back()}
+        extraActions={<button type="button" className="btn btn-primary btn-sm" onClick={() => { setPostError(''); setPostDone(false); setPostModal('pick'); }}>+ ลงขาย</button>}
+      />
 
       <div className="dash-shell">
         <section className="dash-shop-col">

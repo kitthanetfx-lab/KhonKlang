@@ -6,13 +6,11 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { DealFlowBrand } from '@/components/DealFlowBrand';
-import { AppHeaderBar } from '@/components/mobile/AppHeaderBar';
-import { AppHeaderActions } from '@/components/mobile/AppHeaderActions';
+import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { ReviewPanel } from '@/components/ReviewPanel';
 import { AsyncButton } from '@/components/AsyncButton';
 import { AddressPicker, EMPTY_ADDRESS, ThaiAddress, addressLabel } from '@/components/AddressPicker';
 import { PaymentMethods } from '@/components/PaymentMethods';
-import { InAppBanner } from '@/components/InAppBanner';
 import { withExternalBrowserParam } from '@/lib/inApp';
 import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
@@ -1408,8 +1406,7 @@ export default function DealRoom() {
     };
     return (
       <div className="dr-root">
-        <InAppBanner />
-        <AppHeaderBar
+        <SubPageHeader
           className="dr-header app-header-bar"
           title={deal.title}
           titleIcon="package"
@@ -1490,8 +1487,7 @@ export default function DealRoom() {
     }
     return (
       <div className="dr-root">
-        <InAppBanner />
-        <AppHeaderBar className="dr-header app-header-bar" title={deal.title} titleIcon="package" backHref="/" />
+        <SubPageHeader className="dr-header app-header-bar" title={deal.title} titleIcon="package" backHref="/" />
         <div style={{ maxWidth: 440, margin: '0 auto', padding: '40px 16px', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <DealFlowBrand className="dr-brand-slot" />
           <div className="dr-card">
@@ -5724,8 +5720,7 @@ export default function DealRoom() {
 
       <div className="deal-desktop-shell">
         <div className="dr-root">
-          <InAppBanner />
-          <AppHeaderBar
+          <SubPageHeader
             className="dr-header app-header-bar"
             title={deal.title}
             subtitle={dealSubtitle}
