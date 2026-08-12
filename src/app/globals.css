@@ -787,25 +787,13 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
     flex-direction: row;
     align-items: baseline;
     flex-wrap: wrap;
-    gap: clamp(12px, 2vw, 24px);
+    gap: 50px;
   }
 }
 .hero-title-main { flex: 0 1 auto; }
 .hero-title-tagline {
-  flex: 1 1 12rem;
+  flex: 0 1 auto;
   min-width: 0;
-  font-size: clamp(14px, 2.2vw, 20px);
-  font-weight: 600;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-  color: var(--ink-2);
-}
-@media (min-width: 640px){
-  .hero-title-tagline {
-    max-width: 16ch;
-    border-inline-start: 2px solid var(--line);
-    padding-inline-start: clamp(12px, 2vw, 20px);
-  }
 }
 .hero-lead { color: var(--ink-2); font-size: clamp(15.5px, 1.9vw, 19px); margin-top: 20px; max-width: 50ch; margin-left: auto; margin-right: auto; }
 .hero-cta {
