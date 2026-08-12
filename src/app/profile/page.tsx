@@ -91,6 +91,7 @@ function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
   const [saveOk, setSaveOk] = useState(false);
+  const [lineLinkMsg, setLineLinkMsg] = useState('');
 
   const [editFirst, setEditFirst] = useState('');
   const [editLast, setEditLast] = useState('');
@@ -166,6 +167,30 @@ function ProfilePage() {
       }
     })();
   }, [router]);
+
+  useEffect(() => {
+    const linked = searchParams.get('line_linked');
+    const err = searchParams.get('line_link_error');
+    if (linked === '1') {
+      setLineLinkMsg('✓ ผูก LINE กับบัญชีนี้แล้ว — จะแจ้งเมื่อมีคน overbid แม้ปิดเว็บ');
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        if (profile) setPrefs(profile as Record<string, string>);
+      })();
+    } else if (err) {
+      const messages: Record<string, string> = {
+        already_linked: 'LINE นี้ถูกผูกกับบัญชีอื่นแล้ว',
+        cancelled: 'ยกเลิกการผูก LINE',
+        start_failed: 'ไม่สามารถเริ่มผูก LINE ได้ — ลองเข้าสู่ระบบใหม่',
+        invalid_state: 'ลิงก์หมดอายุ — ลองใหม่อีกครั้ง',
+      };
+      setLineLinkMsg(`⚠️ ${messages[err] || (() => { try { return decodeURIComponent(err); } catch { return err; } })() || 'ผูก LINE ไม่สำเร็จ'}`);
+    } else {
+      setLineLinkMsg('');
+    }
+  }, [searchParams]);
 
   const openEditWith = (p: Record<string, string>) => {
     setEditFirst(p.first_name || ''); setEditLast(p.last_name || '');
@@ -323,6 +348,19 @@ function ProfilePage() {
           </div>
         )}
 
+        {lineLinkMsg && (
+          <div style={{
+            background: lineLinkMsg.startsWith('✓') ? '#ecfdf3' : '#fff1f2',
+            border: `1px solid ${lineLinkMsg.startsWith('✓') ? '#86efac' : '#fecdd3'}`,
+            borderRadius: 'var(--r-md)',
+            padding: '12px 14px',
+            fontSize: 13,
+            color: lineLinkMsg.startsWith('✓') ? '#15803d' : '#be123c',
+          }}>
+            {lineLinkMsg}
+          </div>
+        )}
+
         <div className="pf-card">
           <div className="pf-card-title">แจ้งเตือน LINE OA (ประมูล)</div>
           {prefs.line_user_id ? (
@@ -332,7 +370,7 @@ function ProfilePage() {
           ) : (
             <>
               <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
-                เพิ่มเพื่อน Official Account แล้วเข้าสู่ระบบด้วย LINE หนึ่งครั้ง เพื่อรับแจ้งเมื่อสินค้าถูกประมูลสูงกว่า
+                เพิ่มเพื่อน Official Account แล้วกดปุ่มด้านล่างเพื่อ<strong>ผูก LINE กับบัญชีนี้</strong> — ใช้รับแจ้งเมื่อสินค้าถูกประมูลสูงกว่า (ไม่สลับบัญชี Google/อื่น ๆ)
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {process.env.NEXT_PUBLIC_LINE_OA_ADD_FRIEND_URL ? (
@@ -345,9 +383,9 @@ function ProfilePage() {
                     เพิ่มเพื่อน LINE OA
                   </a>
                 ) : null}
-                <a className="btn btn-soft btn-sm" href={`/api/auth/line?returnTo=${encodeURIComponent('/profile')}`}>
-                  เชื่อมด้วย LINE Login
-                </a>
+                <Link className="btn btn-soft btn-sm" href={`/auth/line/link?returnTo=${encodeURIComponent('/profile')}`}>
+                  ผูก LINE กับบัญชีนี้
+                </Link>
               </div>
             </>
           )}

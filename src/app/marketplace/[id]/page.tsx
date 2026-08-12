@@ -408,19 +408,19 @@ export default function MarketplaceDetailPage() {
                       ) : (
                         <>
                           <p className="pd-line-oa-title">รับแจ้งเตือนเมื่อถูกประมูลสูงกว่า</p>
-                          <p className="pd-bid-hint">เพิ่มเพื่อน LINE OA แล้วเข้าสู่ระบบด้วย LINE หนึ่งครั้งเพื่อผูกบัญชี</p>
+                          <p className="pd-bid-hint">เพิ่มเพื่อน LINE OA แล้วกดปุ่มด้านล่างเพื่อผูก LINE กับบัญชีนี้ (ไม่สลับบัญชี)</p>
                           <div className="pd-line-oa-actions">
                             {lineOaUrl ? (
                               <a className="btn btn-soft btn-sm" href={lineOaUrl} target="_blank" rel="noreferrer">
                                 เพิ่มเพื่อน LINE OA
                               </a>
                             ) : null}
-                            <a
+                            <Link
                               className="btn btn-soft btn-sm"
-                              href={`/api/auth/line?returnTo=${encodeURIComponent(`/marketplace/${listing.id}`)}`}
+                              href={`/auth/line/link?returnTo=${encodeURIComponent(`/marketplace/${listing.id}`)}`}
                             >
-                              เชื่อมด้วย LINE Login
-                            </a>
+                              ผูก LINE กับบัญชีนี้
+                            </Link>
                           </div>
                         </>
                       )}
