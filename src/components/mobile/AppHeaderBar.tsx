@@ -6,6 +6,7 @@ import { ReactNode } from 'react';
 import { Icon } from '@/components/Icon';
 import { AppHeaderActions } from './AppHeaderActions';
 import { MainNavIcons } from '@/components/header/MainNavIcons';
+import { DesktopNavMenus } from '@/components/header/DesktopNavMenus';
 
 export type AppHeaderBarProps = {
   title?: string;
@@ -39,7 +40,8 @@ function HeaderLogo({ compact = false }: { compact?: boolean }) {
 
 /**
  * Top bar มาตรฐานทุกหน้า
- * [โloโก้][←][ชื่อหน้า] · [สมัคร][บริการ][ตลาด][เช็ค] · [ข้อความ][ตะกr้า][แจ้ง][โปroไฟล์]
+ * Desktop: [โloโก้][เมนูตัวอักษร▾]····[ชื่อหน้า]····[utility]
+ * Mobile:  แถบ1 [โloโก้][←][ชื่อ]····[utility] · แถบ2 [ไอคอน+label x4]
  */
 export function AppHeaderBar({
   title,
@@ -83,11 +85,7 @@ export function AppHeaderBar({
           {backEl}
         </div>
 
-        {showMainNav && (
-          <div className="app-hdr-mainnav">
-            <MainNavIcons />
-          </div>
-        )}
+        {showMainNav && <DesktopNavMenus />}
 
         <div className="app-hdr-center">
           {hasPageMeta && (
@@ -109,6 +107,12 @@ export function AppHeaderBar({
           {actions ?? defaultActions}
         </div>
       </div>
+
+      {showMainNav && (
+        <div className="app-hdr-services-row">
+          <MainNavIcons />
+        </div>
+      )}
     </header>
   );
 }

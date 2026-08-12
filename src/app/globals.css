@@ -4509,11 +4509,9 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   .app-hdr-row { min-height: 72px; padding: 8px 16px; gap: 12px; }
 }
 .app-hdr-brand { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.app-hdr-mainnav { display: flex; align-items: center; flex: 1; min-width: 0; justify-content: center; overflow-x: auto; scrollbar-width: none; }
-.app-hdr-mainnav::-webkit-scrollbar { display: none; }
-.app-hdr-center { min-width: 0; overflow: hidden; flex-shrink: 1; }
-.app-hdr-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex-shrink: 0; min-width: 0; }
-.app-hdr-actions-inner { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.app-hdr-center { min-width: 0; overflow: hidden; flex: 1; flex-shrink: 1; }
+.app-hdr-actions { display: flex; align-items: flex-start; justify-content: flex-end; gap: 2px; flex-shrink: 0; min-width: 0; }
+.app-hdr-actions-inner { display: flex; align-items: flex-start; gap: 2px; flex-shrink: 0; }
 .app-hdr-logo { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink); flex-shrink: 0; }
 .app-hdr-logo-mark { width: 40px; height: 40px; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
 @media (min-width: 980px) { .app-hdr-logo-mark { width: 48px; height: 48px; } }
@@ -4523,25 +4521,55 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .app-hdr-brand--compact .app-hdr-logo-word { display: none; }
 @media (min-width: 980px) { .app-hdr-brand--compact .app-hdr-logo-word { display: flex; } }
 
-/* ไอคอนหลัก 4 ตัว */
-.hdr-main-nav { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.hdr-main-dd { flex-shrink: 0; }
-.hdr-main-icon {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  min-width: 40px; height: 40px; padding: 0 8px; border-radius: 11px; border: 1px solid rgba(15,23,42,.08);
-  background: #fff; color: var(--ink-2); cursor: pointer; font-size: 11px; font-weight: 700;
-  box-shadow: 0 1px 2px rgba(15,23,42,.06); transition: transform .15s, box-shadow .15s;
+/* Desktop — เมนูตัวอักษร */
+.app-hdr-desktop-nav {
+  display: none; align-items: center; gap: 2px; flex: 1; min-width: 0; justify-content: center;
 }
-@media (min-width: 980px) { .hdr-main-icon { min-width: 48px; height: 48px; padding: 0 10px; border-radius: 12px; font-size: 12px; } }
-.hdr-main-icon:hover { box-shadow: 0 2px 8px rgba(15,23,42,.1); transform: translateY(-1px); }
-.hdr-main-icon.is-active { box-shadow: inset 0 0 0 2px var(--accent); color: var(--accent-strong); }
-.hdr-main-icon-label { display: none; white-space: nowrap; }
-@media (min-width: 980px) { .hdr-main-icon-label { display: inline; } }
-.hdr-main-icon--orange { background: linear-gradient(145deg,#fff7ed,#ffedd5); color: #c2410c; }
-.hdr-main-icon--cyan { background: linear-gradient(145deg,#ecfeff,#cffafe); color: #0e7490; }
-.hdr-main-icon--purple { background: linear-gradient(145deg,#f5f3ff,#ede9fe); color: #6d28d9; }
-.hdr-main-icon--rose { background: linear-gradient(145deg,#fff1f2,#ffe4e6); color: #be123c; }
-.hdr-main-dropdown { min-width: 220px; }
+@media (min-width: 980px) {
+  .app-hdr-desktop-nav { display: flex; }
+  .app-hdr-desktop-nav .nav-link { font-size: 14px; padding: 8px 12px; }
+}
+
+/* Mobile — แถบบริการ 4 ไอคอน (ชั้น 2) */
+.app-hdr-services-row {
+  display: flex; align-items: stretch; justify-content: space-around; gap: 4px;
+  padding: 6px 10px 8px;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+}
+@media (min-width: 980px) { .app-hdr-services-row { display: none; } }
+
+.hdr-main-nav {
+  display: flex; align-items: flex-start; justify-content: space-around;
+  gap: 4px; width: 100%; flex: 1;
+}
+.hdr-main-dd { flex: 1; min-width: 0; max-width: 88px; }
+.hdr-main-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 100%; padding: 0; border: none; background: none; cursor: pointer;
+}
+.hdr-main-icon {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--accent-strong, var(--accent));
+  box-shadow: 0 1px 2px rgba(15,23,42,.04);
+  transition: border-color .15s, box-shadow .15s;
+}
+.hdr-main-tile:hover .hdr-main-icon,
+.hdr-main-tile.is-active .hdr-main-icon {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  box-shadow: 0 2px 6px rgba(15,23,42,.06);
+}
+.hdr-main-tile.is-active .hdr-main-icon { color: var(--accent-strong, var(--accent)); }
+.hdr-main-icon-label {
+  display: block; font-size: 10px; font-weight: 600; line-height: 1.2;
+  color: var(--muted); text-align: center; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.hdr-main-dropdown { min-width: 220px; left: 0; right: auto; transform-origin: top left; }
+
 .site-header-wrap { position: sticky; top: 0; z-index: 60; }
 
 .app-hdr-back {
@@ -4567,24 +4595,31 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 }
 .app-hdr-loading { font-size: 12px; color: var(--muted); padding: 0 6px; }
 
-/* ปุ่มไอคอน header — ขนาดเท่ากันทุกปุ่ม */
+/* ปุ่มไอคอน utility — โทนเดียวกับพื้น */
+.hdr-action-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0;
+}
+.hdr-action-label {
+  font-size: 9px; font-weight: 600; color: var(--muted); line-height: 1.1;
+  white-space: nowrap; max-width: 52px; overflow: hidden; text-overflow: ellipsis; text-align: center;
+}
+@media (min-width: 980px) { .hdr-action-label { display: none; } }
+
 .hdr-icon-btn {
   position: relative;
-  display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0;
-  border-radius: 11px; border: 1px solid rgba(15,23,42,.08); background: #fff; color: var(--app-muted, var(--ink-2));
-  box-shadow: 0 1px 2px rgba(15,23,42,.06); text-decoration: none; cursor: pointer;
-  transition: color .15s, box-shadow .15s, background .15s, transform .15s;
+  display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 11px; border: 1px solid var(--line); background: var(--surface);
+  color: var(--accent-strong, var(--accent));
+  box-shadow: 0 1px 2px rgba(15,23,42,.04); text-decoration: none; cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
   padding: 0;
 }
-@media (min-width: 980px) { .hdr-icon-btn { width: 44px; height: 44px; border-radius: 12px; } }
-.hdr-icon-btn:hover { box-shadow: 0 2px 8px rgba(15,23,42,.1); transform: translateY(-1px); }
-.hdr-icon-btn.nb-btn-active { color: var(--accent-strong, var(--accent)); background: var(--accent-soft, #eff6ff); }
-.hdr-icon-btn--msg { background: linear-gradient(145deg,#eff6ff,#dbeafe); color: #2563eb; }
-.hdr-icon-btn--cart { background: linear-gradient(145deg,#ecfdf5,#d1fae5); color: #059669; }
-.hdr-icon-btn--notify { background: linear-gradient(145deg,#fefce8,#fef08a); color: #a16207; }
-.hdr-icon-btn--profile { background: linear-gradient(145deg,#f8fafc,#e2e8f0); color: var(--accent-strong, var(--accent)); }
+@media (min-width: 980px) { .hdr-icon-btn { width: 40px; height: 40px; border-radius: 10px; } }
+.hdr-icon-btn:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); box-shadow: 0 2px 6px rgba(15,23,42,.06); }
+.hdr-icon-btn.nb-btn-active { color: var(--accent-strong, var(--accent)); background: var(--accent-soft, #eff6ff); border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
 .hdr-profile-dd { flex-shrink: 0; }
-.hdr-profile-av { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+.hdr-profile-av { width: 26px; height: 26px; border-radius: 8px; object-fit: cover; }
+@media (min-width: 980px) { .hdr-profile-av { border-radius: 50%; } }
 
 /* legacy class names — ใช้ layout เดียวกับ app-header-bar */
 .sub-header, .dr-header.app-header-bar {
@@ -4602,12 +4637,16 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 @media (min-width: 980px) {
   .app-hdr-sub { display: block; }
   .dr-header.app-header-bar .app-hdr-sub { display: block; font-size: 12px; color: var(--muted); }
+  .app-hdr-row { min-height: 70px; }
+  .app-hdr-center { flex: 0 1 auto; }
 }
 
 @media (max-width: 979px) {
   .app-hdr-sub { display: none; }
-  .sub-header, .dr-header.app-header-bar { padding: 0; gap: 6px; min-height: 52px; }
-  .app-hdr-actions-inner { gap: 3px; }
+  .app-hdr-row { min-height: 52px; padding: 6px 10px; }
+  .sub-header, .dr-header.app-header-bar { padding: 0; }
+  .app-hdr-actions-inner { gap: 1px; }
+  .app-hdr-center { flex: 1; }
   /* ปิดแถบบริการล่าง — ย้ายไปไอคอนหลักบนแล้ว */
   .mobile-service-tabs { display: none !important; }
   body { padding-bottom: env(safe-area-inset-bottom, 0px); }

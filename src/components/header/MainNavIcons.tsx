@@ -19,10 +19,8 @@ function DropItem({ it }: { it: NavItem }) {
   );
 }
 
-type Props = { compact?: boolean };
-
-/** ไอคอนหลัก 4 ตัว — สมัคร / บริการ / ตลาด / เช็คคนโกง (กดแล้วมี dropdown) */
-export function MainNavIcons({ compact = false }: Props) {
+/** ไอคอนหลัก 4 ตัว + label ใต้ไอคอน — mobile/tablet แถบที่ 2 */
+export function MainNavIcons() {
   const { locale } = useAppPreferences();
   const pathname = usePathname() || '';
   const menus = getMainNavMenus(locale);
@@ -45,7 +43,7 @@ export function MainNavIcons({ compact = false }: Props) {
   }, []);
 
   return (
-    <nav className={`hdr-main-nav${compact ? ' hdr-main-nav--compact' : ''}`} ref={wrapRef} aria-label={locale === 'th' ? 'เมนูหลัก' : 'Main menu'}>
+    <nav className="hdr-main-nav" ref={wrapRef} aria-label={locale === 'th' ? 'เมนูหลัก' : 'Main menu'}>
       {menus.map(menu => {
         const active = isActive(menu.hrefPrefix);
         const open = openKey === menu.key;
@@ -56,15 +54,16 @@ export function MainNavIcons({ compact = false }: Props) {
           >
             <button
               type="button"
-              className={`hdr-main-icon hdr-main-icon--${menu.tone}${active ? ' is-active' : ''}`}
+              className={`hdr-main-tile${active ? ' is-active' : ''}`}
               aria-haspopup="true"
               aria-expanded={open}
               aria-label={menu.label}
-              title={menu.label}
               onClick={() => setOpenKey(open ? null : menu.key)}
             >
-              <Icon name={menu.icon} size={compact ? 16 : 18} />
-              {!compact && <span className="hdr-main-icon-label">{menu.label}</span>}
+              <span className="hdr-main-icon">
+                <Icon name={menu.icon} size={20} />
+              </span>
+              <span className="hdr-main-icon-label">{menu.label}</span>
             </button>
             <div className="dropdown-menu hdr-main-dropdown">
               {menu.items.map(it => <DropItem key={it.href} it={it} />)}
