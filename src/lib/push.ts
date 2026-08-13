@@ -10,6 +10,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getApp, getApps, initializeApp, cert, type App } from 'firebase-admin/app';
 import { getMessaging, type Messaging, type BatchResponse, type Message } from 'firebase-admin/messaging';
 
+// ชื่อ channel ต้องตรงกับฝั่งแอป (nativePush.ts) และ AndroidManifest meta-data
+export const PUSH_CHANNEL_ALERTS = 'glanghub_alerts';
+export const PUSH_CHANNEL_CALL = 'glanghub_incoming_call';
+
 let cached: { messaging: Messaging } | null = null;
 
 /** Firebase env ครบไหม — ถ้าไม่ครบ push จะเงียบข้ามไป (เหมือน livekitConfigured()) */
@@ -81,11 +85,13 @@ export async function sendPush(db: SupabaseClient, userIds: string[], p: PushPay
       notification: { title: p.title.slice(0, 100), body: p.body.slice(0, 200) },
       data: dataPayload,
       android: {
-        priority: isCall ? 'high' : 'normal',
+        priority: isCall ? 'high' : 'high',
         notification: {
-          channel_id: isCall ? 'incoming_call' : 'default',
-          priority: isCall ? 'max' : 'default',
-          // สายเรียกเข้า: ให้ native สร้าง full-screen intent ได้ (ต้องขอ USE_FULL_SCREEN_INTENTION ที่แอป)
+          channel_id: isCall ? PUSH_CHANNEL_CALL : PUSH_CHANNEL_ALERTS,
+          priority: isCall ? 'max' : 'high',
+          sound: 'default',
+          default_sound: true,
+          default_vibrate_timings: true,
           visibility: isCall ? 'public' : 'private',
         },
       },

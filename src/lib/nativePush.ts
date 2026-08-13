@@ -8,6 +8,10 @@
 import { isGlanghubApp } from '@/lib/nativeAuth';
 import { authHeaders } from '@/lib/supabase';
 
+/** ต้องตรงกับ src/lib/push.ts และ AndroidManifest meta-data ใน glangApp */
+export const PUSH_CHANNEL_ALERTS = 'glanghub_alerts';
+export const PUSH_CHANNEL_CALL = 'glanghub_incoming_call';
+
 type PermissionStatus = {
   receive: 'prompt' | 'granted' | 'denied' | 'prompt-with-rationale';
 };
@@ -112,18 +116,21 @@ export async function unregisterPushToken(): Promise<void> {
 
 async function ensureAndroidChannels(plugin: PushNotificationsPlugin): Promise<void> {
   if (getNativePlatform() !== 'android') return;
+  // importance 4 = HIGH → มีเสียง + heads-up; ใช้ channel id ใหม่เพื่อไม่ติด channel เก่าที่เงียบ
   await plugin.createChannel({
-    id: 'default',
-    name: 'แจ้งเตือนทั่วไป',
-    description: 'แจ้งเตือนดีล แชท และกิจกรรม',
-    importance: 3,
+    id: PUSH_CHANNEL_ALERTS,
+    name: 'แจ้งเตือนกลางฮับ',
+    description: 'ดีล แชท ตลาด และกิจกรรม',
+    importance: 4,
+    sound: 'default',
     vibration: true,
   }).catch(() => {});
   await plugin.createChannel({
-    id: 'incoming_call',
+    id: PUSH_CHANNEL_CALL,
     name: 'สายเรียกเข้า',
-    description: 'เมื่อมีคนโทรในดีล',
+    description: 'เมื่อมีคนโทรในดีลหรือทีมงานโทรหา',
     importance: 5,
+    sound: 'default',
     vibration: true,
     visibility: 1,
   }).catch(() => {});
@@ -169,4 +176,9 @@ export async function initNativePushRegistration(): Promise<void> {
   }
 
   await plugin.register().catch(() => {});
+
+  // token อาจได้ก่อน login — ส่งซ้ำทุกครั้งที่ init หลัง login
+  if (lastToken) {
+    await registerTokenWithServer(lastToken, platform);
+  }
 }
