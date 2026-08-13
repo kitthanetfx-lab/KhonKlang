@@ -9531,4 +9531,49 @@ button.admin-app-stat-tile { cursor: pointer; }
 }
 @media (max-width: 767px) {
   .admin-main { padding: 12px !important; }
+  .admin-deals-page .flex.gap-2.mb-4,
+  .admin-deals-page .flex.gap-2.mb-5 {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .admin-deals-page .flex.gap-2.mb-4::-webkit-scrollbar,
+  .admin-deals-page .flex.gap-2.mb-5::-webkit-scrollbar { display: none; }
+  .admin-deals-page .flex.gap-2.mb-4 > button,
+  .admin-deals-page .flex.gap-2.mb-5 > button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .admin-deal-full-card .grid.grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+  .admin-deal-actions {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  .admin-deal-actions > button,
+  .admin-deal-actions > span.inline-flex,
+  .admin-deal-actions > span.inline-flex > button,
+  .admin-deal-actions > div > button {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .admin-deal-actions > span.inline-flex {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  .admin-deal-actions > p.w-full + button,
+  .admin-deal-actions > p.w-full + span {
+    width: 100%;
+  }
+  .admin-deal-full-card img,
+  .admin-deal-full-card video {
+    height: auto !important;
+    min-height: 120px;
+    max-height: 220px;
+  }
 }

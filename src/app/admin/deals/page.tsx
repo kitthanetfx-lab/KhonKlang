@@ -11,7 +11,6 @@ import { splitDealFeeComponents } from '@/lib/financeLedger';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { ADMIN_DEAL_CATEGORIES, type AdminDealCategory, parseAdminDealCategory } from '@/lib/adminDealCategory';
 import { isListingCheckoutOrder, marketplaceBuyerPayAmount, marketplaceShippingCost } from '@/lib/marketplaceOrder';
-import { AdminDealsApp, AdminDealCompactCard } from '@/components/admin/mobile/AdminDealsApp';
 import { DealProductGallery } from '@/components/deal/DealProductGallery';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
@@ -570,54 +569,7 @@ function AdminDealsInner() {
 
   return (
     <>
-      <div className="admin-mobile-only">
-        <AdminDealsApp
-          category={category}
-          tab={tab}
-          counts={counts}
-          categories={ADMIN_DEAL_CATEGORIES}
-          tabs={TABS}
-          activeCategoryDesc={activeCategoryMeta?.desc}
-          isLoading={isLoading}
-          isEmpty={isEmpty}
-          onCategoryChange={c => { setCategory(c); setTab('active'); }}
-          onTabChange={setTab}
-        >
-          {isOnsite && onsiteJobs?.map(j => {
-            const st = ONSITE_STATUS_LABEL[j.status] || { label: j.status, cls: 'bg-gray-100 text-gray-600' };
-            return (
-              <AdminDealCompactCard
-                key={j.id}
-                title={j.item_description}
-                statusLabel={st.label}
-                statusCls={st.cls}
-                price={Number(j.max_budget) > 0 ? `งบ ฿${Number(j.max_budget).toLocaleString()}` : undefined}
-                subtitle={`${j.buyer_name || '-'} · ${j.seller_province || '-'} · ${formatDealCreatedAt(j.created_at)}`}
-                href={`/onsite/${j.id}`}
-              />
-            );
-          })}
-          {!isOnsite && deals?.map(d => {
-            const st = statusBadge(d);
-            const pay = isListingCheckoutOrder(d) ? marketplaceBuyerPayAmount(d) : Number(d.price || 0);
-            return (
-              <AdminDealCompactCard
-                key={d.id}
-                code={dealCode(d.id)}
-                title={d.title}
-                statusLabel={st.label}
-                statusCls={st.cls}
-                price={`฿${pay.toLocaleString()}`}
-                subtitle={`${d.seller_name || '-'} · ${d.buyer_name || '-'}${d.middleman_name ? ` · ${d.middleman_name}` : ''}`}
-                href={`/deal/${d.id}`}
-              />
-            );
-          })}
-        </AdminDealsApp>
-      </div>
-
-      <div className="admin-desktop-only">
-    <div className="w-full">
+    <div className="w-full admin-deals-page">
       <div className="flex items-center gap-2 mb-1">
         <Handshake size={22} className="text-blue-600" />
         <h1 className="text-xl font-bold">ดีล & ข้อพิพาท</h1>
@@ -698,7 +650,7 @@ function AdminDealsInner() {
                     <p className="text-xs text-gray-600">📝 {j.report_notes}</p>
                   </div>
                 )}
-                <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
+                <div className="px-4 py-3 flex items-center gap-2 flex-wrap admin-deal-actions">
                   {canCancel && (
                     <button onClick={() => onsiteAct(j.id, 'cancel', 'เหตุผลยกเลิกงาน + คืนเงินผู้ว่าจ้าง:')} disabled={!!acting}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-1 disabled:opacity-50">
@@ -743,7 +695,7 @@ function AdminDealsInner() {
             && (!!d.meetup?.buyer_slip || !!d.meetup?.seller_slip)
             && !(d.meetup?.buyer_slip_verified_at && d.meetup?.seller_slip_verified_at);
           return (
-            <div key={d.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+            <div key={d.id} className="admin-deal-full-card bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
               <div className="bg-slate-50 dark:bg-slate-900/50 border-b border-gray-200 dark:border-gray-800 px-4 py-3">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="min-w-0 flex-1">
@@ -926,7 +878,7 @@ function AdminDealsInner() {
                 </div>
               )}
 
-              <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
+              <div className="px-4 py-3 flex items-center gap-2 flex-wrap admin-deal-actions">
                 {d.status === 'disputed' && (
                   <>
                     <button onClick={() => act(d.id, 'resolve_dispute', 'บันทึกผลการตัดสิน (ปล่อยเงินให้ผู้ขาย/ดำเนินการต่อ):')} disabled={!!acting}
@@ -1138,7 +1090,6 @@ function AdminDealsInner() {
         </div>
       )}
     </div>
-      </div>
     </>
   );
 }
