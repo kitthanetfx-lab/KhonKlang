@@ -1411,7 +1411,7 @@ export default function DealRoom() {
     return (
       <div className="dr-root">
         <SubPageHeader
-          className="dr-header app-header-bar"
+          hideMainNav
           title={deal.title}
           titleIcon="package"
           backHref="/admin/deals"
@@ -1491,7 +1491,7 @@ export default function DealRoom() {
     }
     return (
       <div className="dr-root">
-        <SubPageHeader className="dr-header app-header-bar" title={deal.title} titleIcon="package" backHref="/" />
+        <SubPageHeader hideMainNav title={deal.title} titleIcon="package" backHref="/" />
         <div style={{ maxWidth: 440, margin: '0 auto', padding: '40px 16px', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <DealFlowBrand className="dr-brand-slot" />
           <div className="dr-card">
@@ -5730,11 +5730,13 @@ export default function DealRoom() {
 
   return (
     <>
+      <SubPageHeader hideMainNav hideTitle />
       <div className="deal-mobile-shell">
         <DealRoomApp
           title={deal.title}
           subtitle={dealSubtitle}
           onBack={() => router.back()}
+          skipHeader
           showTabs={isMeetup}
           tab={tab === 'evidence' ? 'evidence' : 'steps'}
           onTab={setTab}
@@ -5749,13 +5751,6 @@ export default function DealRoom() {
 
       <div className="deal-desktop-shell">
         <div className="dr-root">
-          <SubPageHeader
-            className="dr-header app-header-bar"
-            title={deal.title}
-            subtitle={dealSubtitle}
-            titleIcon="package"
-            onBack={() => router.back()}
-          />
 
           {isInCall && callMode === 'video' ? videoCallOverlay : (
             <>

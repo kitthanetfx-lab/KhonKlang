@@ -13,6 +13,8 @@ export function UnifiedSiteHeader() {
 
   if (pathname.startsWith('/admin')) return null;
 
+  const showMainNav = !config.hideMainNav && !pathname.startsWith('/deal/');
+
   return (
     <div className="site-header-wrap">
       <InAppBanner />
@@ -28,7 +30,7 @@ export function UnifiedSiteHeader() {
         actions={config.actions}
         hideTitle={config.hideTitle}
         showBrand
-        showMainNav
+        showMainNav={showMainNav}
       />
     </div>
   );

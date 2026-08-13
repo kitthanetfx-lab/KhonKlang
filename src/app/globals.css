@@ -4092,8 +4092,8 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 
 .dr-root { min-height:100vh; background:var(--bg); display:flex; flex-direction:column; overflow-x:hidden; }
 
-/* Header */
-.dr-header {
+/* Header — legacy standalone deal header (ไม่ใช้กับ unified app-header-bar) */
+.dr-header:not(.app-header-bar) {
   position:sticky; top:0; z-index:40;
   background:color-mix(in srgb,var(--surface) 94%,transparent);
   backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
@@ -4987,7 +4987,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 @media (min-width: 980px) { .hdr-profile-av { border-radius: 50%; } }
 
 /* legacy class names — ใช้ layout เดียวกับ app-header-bar */
-.sub-header, .dr-header.app-header-bar {
+.sub-header {
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   border-bottom: 1px solid var(--line);
   box-shadow: var(--sh-xs);
@@ -5001,7 +5001,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 
 @media (min-width: 980px) {
   .app-hdr-sub { display: block; }
-  .dr-header.app-header-bar .app-hdr-sub { display: block; font-size: 12px; color: var(--muted); }
+  .sub-header .app-hdr-sub { display: block; font-size: 12px; color: var(--muted); }
   .app-hdr-row { min-height: 70px; }
   .app-hdr-center { flex: 0 1 auto; }
 }
@@ -5009,7 +5009,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 @media (max-width: 979px) {
   .app-hdr-sub { display: none; }
   .app-hdr-row { min-height: 52px; padding: 6px 10px; }
-  .sub-header, .dr-header.app-header-bar { padding: 0; }
+  .sub-header { padding: 0; }
   .app-hdr-actions-inner { gap: 1px; }
   .app-hdr-center { flex: 1; }
   /* ปิดแถบบริการล่าง — ย้ายไปไอคอนหลักบนแล้ว */

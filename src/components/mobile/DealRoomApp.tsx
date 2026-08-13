@@ -19,11 +19,13 @@ type Props = {
   floatBarBadge?: number | string;
   inVideoCall?: boolean;
   videoCallOverlay?: ReactNode;
+  /** ใช้ SubPageHeader ที่หน้า parent แทน — กัน config ซ้ำ */
+  skipHeader?: boolean;
 };
 
 /** Mobile shell ห้องดีล — โครงแยกจาก dr-root desktop */
 export function DealRoomApp({
-  title, subtitle, onBack, showTabs, tab, onTab, children, floatBar, floatBarBadge, inVideoCall, videoCallOverlay,
+  title, subtitle, onBack, showTabs, tab, onTab, children, floatBar, floatBarBadge, inVideoCall, videoCallOverlay, skipHeader,
 }: Props) {
   if (inVideoCall && videoCallOverlay) {
     return <div className="deal-app deal-app--call">{videoCallOverlay}</div>;
@@ -31,13 +33,15 @@ export function DealRoomApp({
 
   return (
     <div className="deal-app">
-      <AppTop
-        title={title}
-        subtitle={subtitle}
-        titleIcon="package"
-        onBack={onBack}
-        classPrefix="deal-app"
-      />
+      {!skipHeader && (
+        <AppTop
+          title={title}
+          subtitle={subtitle}
+          titleIcon="package"
+          onBack={onBack}
+          classPrefix="deal-app"
+        />
+      )}
 
       {showTabs && (
         <nav className="deal-app-tabs" role="tablist">
