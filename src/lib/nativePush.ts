@@ -9,8 +9,8 @@ import { isGlanghubApp } from '@/lib/nativeAuth';
 import { authHeaders } from '@/lib/supabase';
 
 /** ต้องตรงกับ src/lib/push.ts และ AndroidManifest meta-data ใน glangApp */
-export const PUSH_CHANNEL_ALERTS = 'glanghub_alerts';
-export const PUSH_CHANNEL_CALL = 'glanghub_incoming_call';
+export const PUSH_CHANNEL_ALERTS = 'glanghub_alerts_v2';
+export const PUSH_CHANNEL_CALL = 'glanghub_incoming_call_v2';
 
 type PermissionStatus = {
   receive: 'prompt' | 'granted' | 'denied' | 'prompt-with-rationale';

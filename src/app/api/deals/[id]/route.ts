@@ -1163,9 +1163,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           // สายเรียกเข้า → high-priority push + VoIP (iOS) + full-screen intent (Android)
           // ฝั่ง native ใช้ data payload (type/dealId/mode/callerName) สร้างหน้าจอรับสายเต็มจอ
           const callMode = body.mode === 'voice' ? 'voice' : 'video';
+          const callLabel = callMode === 'voice' ? 'โทรเสียง' : 'วิดีโอคอล';
           await notifyUsers(db, recipients, {
             title: `📞 สายเรียกเข้า: ${updated.title || 'ดีล'}`,
-            body: systemMsg,
+            body: `${myName || 'ผู้ใช้'} กำลัง${callLabel}หาคุณ — กดเพื่อรับสาย`,
             link: `/deal/${id}?call=1`,
             kind: 'call',
             data: { type: 'incoming_call', dealId: id, mode: callMode, callerName: myName || 'ผู้ใช้' },
