@@ -7,6 +7,7 @@ type DealSlice = {
   title: string;
   description?: string;
   price: number;
+  shipping_cost?: number | null;
   images?: string[];
   warranty_years?: number | null;
   warranty_months?: number | null;
@@ -49,6 +50,8 @@ export function SimpleDealPreJoinScreen({ deal, ...panelProps }: Props) {
   const participants = simpleDealParticipants(deal);
   const fpLabel = feePayerLabel(deal.fee_payer);
   const showDesc = deal.description && deal.description.trim() !== deal.title.trim();
+  const shipCost = Math.max(0, Math.round(Number(deal.shipping_cost) || 0));
+  const totalPrice = deal.price + shipCost;
 
   return (
     <div className="dr-inner simple-deal-prejoin">
@@ -58,7 +61,12 @@ export function SimpleDealPreJoinScreen({ deal, ...panelProps }: Props) {
             <div className="simple-deal-prejoin-title">{deal.title}</div>
             {showDesc ? <p className="simple-deal-prejoin-desc">{deal.description}</p> : null}
           </div>
-          <div className="simple-deal-prejoin-price">฿{deal.price.toLocaleString()}</div>
+          <div className="simple-deal-prejoin-price">
+            ฿{totalPrice.toLocaleString()}
+            {shipCost > 0 && (
+              <span className="simple-deal-prejoin-shipping">รวมขนส่ง</span>
+            )}
+          </div>
         </div>
 
         <DealProductGallery

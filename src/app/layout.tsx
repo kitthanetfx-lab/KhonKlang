@@ -10,6 +10,7 @@ import { AuthGate } from "@/components/AuthGate";
 import { AppPreferencesProvider } from "@/components/AppPreferences";
 import { AppChrome } from "@/components/AppChrome";
 import { GlobalPreferenceDock } from "@/components/GlobalPreferenceDock";
+import { GlobalLoadingProvider, GlobalButtonGuard } from "@/components/GlobalLoadingProvider";
 import { NativePushBridge } from "@/components/NativePushBridge";
 
 const displayFont = Anuphan({
@@ -79,8 +80,10 @@ export default function RootLayout({
     <html lang="th" className={`h-full antialiased ${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`}>
       <body className={bodyFont.className}>
         <AppPreferencesProvider>
+          <GlobalLoadingProvider>
           <DialogProvider>
             <AuthGate>
+              <GlobalButtonGuard />
               <NativePushBridge />
               <AppChrome>
                 {children}
@@ -92,6 +95,7 @@ export default function RootLayout({
               <MetaPixel />
             </AuthGate>
           </DialogProvider>
+          </GlobalLoadingProvider>
         </AppPreferencesProvider>
       </body>
     </html>

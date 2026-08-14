@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
+import { useGlobalLoadingOptional } from './GlobalLoadingProvider';
 
 type AsyncButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> & {
   /** ตัวจัดการการกด — รองรับ async (คืนค่าอะไรก็ได้); ปุ่มจะล็อก (กดได้ครั้งเดียว) และโชว์สปินเนอร์จนกว่าจะเสร็จ */
@@ -18,26 +19,35 @@ export function AsyncButton({ onClick, children, loadingChildren, disabled, clas
   const [internalLoading, setInternalLoading] = useState(false);
   const loading = loadingProp || internalLoading;
   const mounted = useRef(true);
+  const globalLoading = useGlobalLoadingOptional();
   useEffect(() => () => { mounted.current = false; }, []);
 
   async function handle(e: React.MouseEvent<HTMLButtonElement>) {
     if (loading || disabled) return;
     if (!onClick) return;
     if (loadingProp) {
-      await onClick(e);
+      globalLoading?.beginLoading();
+      try {
+        await onClick(e);
+      } finally {
+        globalLoading?.endLoading();
+      }
       return;
     }
     try {
       setInternalLoading(true);
+      globalLoading?.beginLoading();
       await onClick(e);
     } finally {
       if (mounted.current) setInternalLoading(false);
+      globalLoading?.endLoading();
     }
   }
 
   return (
     <button
       {...rest}
+      data-managed-loading=""
       className={`${className || ''}${loading ? ' is-loading' : ''}`}
       disabled={disabled || loading}
       aria-busy={loading}

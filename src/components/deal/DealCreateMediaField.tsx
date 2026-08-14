@@ -4,6 +4,7 @@
 
 import { useRef } from 'react';
 import { Icon } from '@/components/Icon';
+import { useGlobalLoadingOptional } from '@/components/GlobalLoadingProvider';
 import { uploadDealFile, type DealUploadResult } from '@/lib/uploadDealFile';
 
 export type CreateDealMedia = DealUploadResult;
@@ -19,6 +20,7 @@ type Props = {
 
 export function DealCreateMediaField({ items, onChange, uploading, onUploading, onError, userId }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const globalLoading = useGlobalLoadingOptional();
 
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return;
@@ -27,6 +29,7 @@ export function DealCreateMediaField({ items, onChange, uploading, onUploading, 
       return;
     }
     onUploading(true);
+    globalLoading?.beginLoading();
     onError('');
     const errors: string[] = [];
     const uploaded: CreateDealMedia[] = [];
@@ -42,6 +45,7 @@ export function DealCreateMediaField({ items, onChange, uploading, onUploading, 
       if (errors.length) onError(errors.join(' · '));
     } finally {
       onUploading(false);
+      globalLoading?.endLoading();
     }
   }
 
@@ -71,7 +75,7 @@ export function DealCreateMediaField({ items, onChange, uploading, onUploading, 
         </div>
       )}
       <div className="dr-card" style={{ marginTop: items.length ? 10 : 0 }}>
-        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading} className="btn btn-soft btn-block">
+        <button type="button" data-upload-trigger onClick={() => inputRef.current?.click()} disabled={uploading} className="btn btn-soft btn-block">
           <Icon name="upload" size={16} /> {uploading ? 'กำลังอัปโหลด…' : 'เลือกไฟล์ (รูป/วิดีโอ)'}
         </button>
         <input

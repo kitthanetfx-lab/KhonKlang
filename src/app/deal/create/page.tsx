@@ -12,6 +12,7 @@ import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { useUser } from '@/lib/useUser';
 import { DealCreateMediaField, type CreateDealMedia } from '@/components/deal/DealCreateMediaField';
+import { AsyncButton } from '@/components/AsyncButton';
 import { clampWarrantyInput, formatWarranty } from '@/lib/warranty';
 
 const CATS = ['สินค้าทั่วไป', 'อิเล็กทรอนิกส์', 'เสื้อผ้า', 'ยานพาหนะ', 'อสังหาริมทรัพย์', 'บริการ', 'อื่นๆ'];
@@ -46,9 +47,9 @@ function CreateDealForm() {
   const [title, setTitle] = useState(searchParams.get('title') || '');
   const [description, setDesc] = useState('');
   const [price, setPrice] = useState('');
+  const [shippingCost, setShippingCost] = useState('0');
   const [category, setCategory] = useState('');
   const [feePayer, setFeePayer] = useState<'buyer' | 'seller' | 'split'>('buyer');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fees, setFees] = useState<FeeConfig>(FEE_DEFAULTS);
   const [media, setMedia] = useState<CreateDealMedia[]>([]);
@@ -85,7 +86,7 @@ function CreateDealForm() {
 
   async function handleCreate() {
     if (!title || !price) { setError('กรุณากรอกชื่อและราคา'); return; }
-    setLoading(true); setError('');
+    setError('');
     try {
       const headers = await authHeaders();
       const res = await fetch('/api/deals', {
@@ -103,6 +104,7 @@ function CreateDealForm() {
           serviceIntent: isSafeZone ? 'safezone' : '',
           ...(isSimple ? {
             imageFileIds: media.map(m => m.fileId),
+            shippingCost: Number(shippingCost) || 0,
             warrantyYears: clampWarrantyInput('years', warrantyYears),
             warrantyMonths: clampWarrantyInput('months', warrantyMonths),
             warrantyDays: clampWarrantyInput('days', warrantyDays),
@@ -114,7 +116,6 @@ function CreateDealForm() {
       if (!res.ok) { setError(d.error || 'เกิดข้อผิดพลาด'); return; }
       router.push(`/deal/${d.deal.id}`);
     } catch { setError('เกิดข้อผิดพลาด'); }
-    finally { setLoading(false); }
   }
 
   return (
@@ -174,6 +175,16 @@ function CreateDealForm() {
                 onError={setError}
                 userId={user?.$id}
               />
+
+              <div className="deal-field">
+                <label>ราคา (บาท) *</label>
+                <input type="number" value={price} onChange={e => setPrice(e.target.value)} min="0" placeholder="0" inputMode="numeric" />
+              </div>
+
+              <div className="deal-field">
+                <label>ค่าขนส่ง (บาท)</label>
+                <input type="number" value={shippingCost} onChange={e => setShippingCost(e.target.value)} min="0" placeholder="0" inputMode="numeric" />
+              </div>
 
               <div className="deal-field">
                 <label>เงื่อนไขการประกัน</label>
@@ -236,11 +247,23 @@ function CreateDealForm() {
             </>
           )}
 
-          <div className="field-row">
-            <div className="deal-field">
-              <label>ราคา (บาท) *</label>
-              <input type="number" value={price} onChange={e => setPrice(e.target.value)} min="0" placeholder="0" />
+          {!isSimple && (
+            <div className="field-row">
+              <div className="deal-field">
+                <label>ราคา (บาท) *</label>
+                <input type="number" value={price} onChange={e => setPrice(e.target.value)} min="0" placeholder="0" />
+              </div>
+              <div className="deal-field">
+                <label>หมวดหมู่</label>
+                <select value={category} onChange={e => setCategory(e.target.value)}>
+                  <option value="">เลือก...</option>
+                  {CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
             </div>
+          )}
+
+          {isSimple && (
             <div className="deal-field">
               <label>หมวดหมู่</label>
               <select value={category} onChange={e => setCategory(e.target.value)}>
@@ -248,7 +271,7 @@ function CreateDealForm() {
                 {CATS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-          </div>
+          )}
 
           {Number(price) > 0 && (
             <div style={{ background: 'var(--accent-soft)', border: '1px solid #d7e3ff', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 4 }}>
@@ -258,6 +281,11 @@ function CreateDealForm() {
                   <span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span>
                 </div>
               ))}
+              {isSimple && Number(shippingCost) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', padding: '2px 0' }}>
+                  <span>ค่าขนส่ง</span><span>฿{Number(shippingCost).toLocaleString()}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid #d7e3ff', marginTop: 6, paddingTop: 6 }}>
                 <span>รวมค่าบริการ</span><span>฿{feeBreakdown.total.toLocaleString()}</span>
               </div>
@@ -272,9 +300,9 @@ function CreateDealForm() {
 
           {error && <p style={{ color: '#b22441', fontSize: 14, marginTop: 4 }}>⚠️ {error}</p>}
 
-          <button onClick={handleCreate} disabled={loading || mediaUploading || !serviceEnabled || authLoading || !user} className="btn btn-primary btn-block btn-lg" style={{ marginTop: 18 }}>
-            {loading ? 'กำลังสร้าง...' : 'สร้างดีล & รับลิงก์แชร์'}
-          </button>
+          <AsyncButton onClick={handleCreate} disabled={mediaUploading || !serviceEnabled || authLoading || !user} data-managed-loading loadingChildren="กำลังสร้าง..." className="btn btn-primary btn-block btn-lg" style={{ marginTop: 18 }}>
+            สร้างดีล & รับลิงก์แชร์
+          </AsyncButton>
           <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', marginTop: 12 }}>หลังสร้าง คัดลอกลิงก์จากหน้าดีลและส่งให้อีกฝ่าย</p>
         </div>
       </div>

@@ -130,6 +130,9 @@ export async function POST(req: NextRequest) {
     }
 
     const resolvedDealType = dealType === 'meetup' ? 'meetup' : dealType === 'simple' ? 'simple' : dealType === 'auction' ? 'auction' : 'normal';
+    const simpleShippingCost = resolvedDealType === 'simple'
+      ? Math.max(0, Math.round(Number(shippingCost) || 0))
+      : 0;
 
     const wYears = Math.max(0, Math.min(99, Math.round(Number(warrantyYears) || 0)));
     const wMonths = Math.max(0, Math.min(11, Math.round(Number(warrantyMonths) || 0)));
@@ -151,7 +154,7 @@ export async function POST(req: NextRequest) {
       deal_type: resolvedDealType,
       status: isBuyer ? 'waiting_seller' : 'posted',
       creator_id: me.id,
-      shipping_cost: source === 'listing' ? listingShippingCost : 0,
+      shipping_cost: source === 'listing' ? listingShippingCost : simpleShippingCost,
       shipping_providers: source === 'listing' ? listingShippingProviders : [],
       warranty_years: resolvedDealType === 'simple' ? wYears : 0,
       warranty_months: resolvedDealType === 'simple' ? wMonths : 0,

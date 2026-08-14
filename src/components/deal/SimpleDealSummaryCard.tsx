@@ -6,6 +6,7 @@ type Props = {
   title: string;
   description?: string;
   price: number;
+  shippingCost?: number | null;
   images?: string[];
   warrantyYears?: number | null;
   warrantyMonths?: number | null;
@@ -25,6 +26,7 @@ export function SimpleDealSummaryCard({
   title,
   description,
   price,
+  shippingCost,
   images,
   warrantyYears,
   warrantyMonths,
@@ -32,6 +34,7 @@ export function SimpleDealSummaryCard({
   feePayer,
 }: Props) {
   const fpLabel = feePayerLabel(feePayer);
+  const shipCost = Math.max(0, Math.round(Number(shippingCost) || 0));
 
   return (
     <div className="dr-card simple-deal-summary">
@@ -45,7 +48,10 @@ export function SimpleDealSummaryCard({
         warrantyDays={warrantyDays}
       />
 
-      <div className="simple-deal-summary-price">฿{price.toLocaleString()}</div>
+      <div className="simple-deal-summary-price">
+        ฿{(price + shipCost).toLocaleString()}
+        {shipCost > 0 && <span className="simple-deal-summary-shipping"> (รวมขนส่ง ฿{shipCost.toLocaleString()})</span>}
+      </div>
 
       {fpLabel && (
         <div className="simple-deal-summary-fee">
