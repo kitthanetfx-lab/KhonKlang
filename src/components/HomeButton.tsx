@@ -4,11 +4,15 @@ import { usePathname } from 'next/navigation';
 import { Icon } from './Icon';
 import { useAppPreferences } from './AppPreferences';
 
-/** ปุ่มลอย "กลับหน้าหลัก" — แสดงทุกหน้า (ยกเว้นหน้าแรกเองและหลังบ้าน /admin) */
+function isLoginOrRegister(pathname: string) {
+  return pathname === '/login' || pathname === '/register' || pathname.startsWith('/register/');
+}
+
+/** ปุ่มลอย "กลับหน้าหลัก" — แสดงทุกหน้า (ยกเว้นหน้าแรก, login/register และหลังบ้าน /admin) */
 export function HomeButton() {
   const { locale } = useAppPreferences();
   const pathname = usePathname();
-  if (!pathname || pathname === '/' || pathname.startsWith('/admin')) return null;
+  if (!pathname || pathname === '/' || pathname.startsWith('/admin') || isLoginOrRegister(pathname)) return null;
 
   return (
     <Link

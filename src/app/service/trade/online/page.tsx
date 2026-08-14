@@ -10,6 +10,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { ServiceSlideCarousel } from '@/components/ServiceSlideCarousel';
 import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { useServiceControls } from '@/lib/useServiceControls';
@@ -57,32 +58,7 @@ export default function TradeOnline() {
           </div>
 
           <div className="svc-simple-kicker svc-simple-fade">ขั้นตอนการดำเนินงาน</div>
-          <div className="svc-simple-slider svc-simple-fade">
-            <div className="svc-simple-slide-shell">
-              <div className="svc-simple-slide-frame">
-                <Image
-                  key={activeSlide}
-                  src={SLIDES[activeSlide].src}
-                  alt={SLIDES[activeSlide].alt}
-                  className="svc-simple-slide-image"
-                  priority
-                />
-              </div>
-
-              <div className="svc-simple-slider-dots" aria-label="ตัวเลือกรูปขั้นตอน">
-                {SLIDES.map((slide, index) => (
-                  <button
-                    key={slide.alt}
-                    type="button"
-                    className={`svc-simple-slider-dot${index === activeSlide ? ' is-active' : ''}`}
-                    onClick={() => setActiveSlide(index)}
-                    aria-label={`ดูรูปขั้นตอน ${index + 1}`}
-                    aria-pressed={index === activeSlide}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
+          <ServiceSlideCarousel slides={SLIDES} activeSlide={activeSlide} onSelect={setActiveSlide} />
 
           <div className="svc-simple-alert svc-simple-fade">
             <span className="svc-simple-alert-icon"><Icon name="info" size={20} strokeWidth={2.1} /></span>

@@ -21,10 +21,14 @@ function timeShort(iso: string) {
   try { return new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
 }
 
-/** ปุ่มลอย "ติดต่อทีมงาน" — แสดงทุกหน้า (ยกเว้นหลังบ้าน /admin) เปิดแชท + ขอให้พนักงานโทรกลับได้ */
+function isLoginOrRegister(pathname: string | null | undefined) {
+  return pathname === '/login' || pathname === '/register' || !!pathname?.startsWith('/register/');
+}
+
+/** ปุ่มลอย "ติดต่อทีมงาน" — แสดงทุกหน้า (ยกเว้น login/register และหลังบ้าน /admin) เปิดแชท + ขอให้พนักงานโทรกลับได้ */
 export function SupportWidget() {
   const pathname = usePathname();
-  if (pathname?.startsWith('/admin')) return null;
+  if (pathname?.startsWith('/admin') || isLoginOrRegister(pathname)) return null;
   return (
     <Suspense fallback={null}>
       <SupportWidgetPanel pathname={pathname || '/'} />

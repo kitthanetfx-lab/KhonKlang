@@ -5892,6 +5892,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .svc-simple-slide-frame {
   position: relative;
   width: min(100%, 520px);
+  aspect-ratio: 16 / 10;
   margin: 0 auto;
   border-radius: 24px;
   overflow: hidden;
@@ -5900,9 +5901,18 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   box-shadow: 0 18px 38px -32px rgba(34, 69, 139, .34);
 }
 .svc-simple-slide-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
-  display: block;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity .35s var(--ease-out);
+  pointer-events: none;
+}
+.svc-simple-slide-image.is-active {
+  opacity: 1;
+  z-index: 1;
 }
 .svc-online-page .svc-simple-slide-shell {
   width: min(100%, 680px);
@@ -6084,16 +6094,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   }
   .svc-simple-page .svc-simple-slide-frame {
     border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .svc-simple-page .svc-simple-slide-image {
-    max-height: min(34vw, 168px);
-    width: auto;
-    max-width: 100%;
-    margin: 0 auto;
-    object-fit: contain;
+    aspect-ratio: 16 / 10;
   }
   .svc-simple-page .svc-simple-slider-dots {
     margin-top: 6px;
@@ -6175,17 +6176,8 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
     width: min(100%, 440px);
   }
   .svc-simple-page:not(.svc-online-page) .svc-simple-slide-frame {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     border-radius: 18px;
-  }
-  .svc-simple-page:not(.svc-online-page) .svc-simple-slide-image {
-    max-height: min(30vh, 220px);
-    width: auto;
-    max-width: 100%;
-    margin: 0 auto;
-    object-fit: contain;
+    aspect-ratio: 16 / 10;
   }
   .svc-simple-page:not(.svc-online-page) .svc-simple-slider-dots {
     margin-top: 8px;
@@ -6305,8 +6297,12 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 @media (prefers-reduced-motion: reduce) {
   .svc-simple-slider-dot,
   .svc-simple-cta,
-  .svc-simple-fade {
+  .svc-simple-fade,
+  .svc-simple-slide-image {
     animation: none;
+    transition: none;
+  }
+  .svc-simple-slide-image.is-active {
     transition: none;
   }
 }
