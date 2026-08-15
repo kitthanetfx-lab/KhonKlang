@@ -15,33 +15,59 @@ const BANKS = [
 const PROVINCES = ['ไม่ระบุ','กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
 /* ── Web Speech API (พูดให้พิมพ์) ───────────────────────────── */
+interface SpeechErrorEvent { error?: string; message?: string; }
 interface SpeechResultEvent { resultIndex: number; results: { length: number; [i: number]: { isFinal: boolean; 0: { transcript: string } } }; }
 interface SpeechRec {
   lang: string; continuous: boolean; interimResults: boolean;
-  start(): void; stop(): void;
+  start(): void; stop(): void; abort?(): void;
   onresult: ((e: SpeechResultEvent) => void) | null;
   onend: (() => void) | null;
-  onerror: ((e: unknown) => void) | null;
+  onerror: ((e: SpeechErrorEvent) => void) | null;
+}
+
+function getSpeechCtor(): (new () => SpeechRec) | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
 function useDictation(append: (text: string) => void, setInterim: (t: string) => void) {
   const recRef = useRef<SpeechRec | null>(null);
+  const wantListenRef = useRef(false);
+  const restartTimerRef = useRef<number | null>(null);
   const [listening, setListening] = useState(false);
-  const [supported, setSupported] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
-    return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
-  });
+  const [supported, setSupported] = useState(() => getSpeechCtor() !== null);
+  const [micHint, setMicHint] = useState('');
 
-  function toggle() {
-    if (listening) { recRef.current?.stop(); return; }
-    const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
-    const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!Ctor) { setSupported(false); return; }
+  const clearRestartTimer = () => {
+    if (restartTimerRef.current != null) {
+      window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+  };
+
+  function stopListening() {
+    wantListenRef.current = false;
+    clearRestartTimer();
+    const rec = recRef.current;
+    recRef.current = null;
+    try {
+      rec?.abort?.();
+      rec?.stop();
+    } catch { /* ignore */ }
+    setListening(false);
+    setInterim('');
+  }
+
+  function startSession() {
+    const Ctor = getSpeechCtor();
+    if (!Ctor || !wantListenRef.current) return;
+
     const rec = new Ctor();
     rec.lang = 'th-TH';
     rec.continuous = true;
     rec.interimResults = true;
+
     rec.onresult = (e: SpeechResultEvent) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i += 1) {
@@ -51,15 +77,65 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
       }
       setInterim(interim);
     };
-    rec.onend = () => { setListening(false); setInterim(''); };
-    rec.onerror = () => { setListening(false); setInterim(''); };
+
+    rec.onend = () => {
+      if (recRef.current === rec) recRef.current = null;
+      setInterim('');
+      if (wantListenRef.current) scheduleRestart();
+      else setListening(false);
+    };
+
+    rec.onerror = (evt: SpeechErrorEvent) => {
+      const code = String(evt.error || '');
+      if (code === 'aborted') return;
+      if (code === 'no-speech') {
+        if (wantListenRef.current) scheduleRestart();
+        return;
+      }
+      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        setMicHint('กรุณาอนุญาตไมโครโฟนในเบราว์เซอร์ แล้วลองใหม่');
+        stopListening();
+        return;
+      }
+      if (code === 'network') setMicHint('เครือข่ายขัดข้อง — ลองใหม่อีกครั้ง');
+      if (wantListenRef.current) scheduleRestart();
+    };
+
     recRef.current = rec;
-    rec.start();
-    setListening(true);
+    try {
+      rec.start();
+      setListening(true);
+      setMicHint('');
+    } catch {
+      scheduleRestart();
+    }
   }
 
-  useEffect(() => () => { recRef.current?.stop(); }, []);
-  return { listening, supported, toggle };
+  function scheduleRestart() {
+    if (!wantListenRef.current) return;
+    clearRestartTimer();
+    restartTimerRef.current = window.setTimeout(() => {
+      restartTimerRef.current = null;
+      startSession();
+    }, 180);
+  }
+
+  function toggle() {
+    if (wantListenRef.current) {
+      stopListening();
+      return;
+    }
+    if (!getSpeechCtor()) {
+      setSupported(false);
+      setMicHint('เบราว์เซอร์นี้ไม่รองรับการพูดเป็นข้อความ');
+      return;
+    }
+    wantListenRef.current = true;
+    startSession();
+  }
+
+  useEffect(() => () => stopListening(), []);
+  return { listening, supported, toggle, micHint };
 }
 
 /* ── อัปโหลดรูปหลายรูปพร้อมพรีวิว + จัดลำดับ ────────────────── */
@@ -311,7 +387,17 @@ export function ScamReportForm({ onDone }: { onDone?: () => void }) {
         <button
           type="button"
           className={`csr-mic ${dictation.listening ? 'on' : ''}`}
-          onClick={dictation.toggle}
+          aria-pressed={dictation.listening}
+          aria-label={dictation.listening ? 'หยุดฟังเสียง' : 'พูดให้พิมพ์'}
+          onPointerDown={e => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={e => {
+            e.preventDefault();
+            e.stopPropagation();
+            dictation.toggle();
+          }}
           title={dictation.supported ? (dictation.listening ? 'หยุดฟัง' : 'พูดให้พิมพ์') : 'เบราว์เซอร์นี้ไม่รองรับการพูด'}
           disabled={!dictation.supported}
         >
@@ -319,7 +405,8 @@ export function ScamReportForm({ onDone }: { onDone?: () => void }) {
         </button>
         {interim && <div className="csr-interim">{interim}</div>}
       </div>
-      {!dictation.supported && <p className="csr-hint" style={{ color: 'var(--amber-500)' }}>เบราว์เซอร์นี้ไม่รองรับการพูดเป็นข้อความ — แนะนำ Chrome หรือ Edge</p>}
+      {dictation.micHint && <p className="csr-hint" style={{ color: 'var(--amber-500)', marginTop: 6 }}>{dictation.micHint}</p>}
+      {!dictation.supported && !dictation.micHint && <p className="csr-hint" style={{ color: 'var(--amber-500)' }}>เบราว์เซอร์นี้ไม่รองรับการพูดเป็นข้อความ — แนะนำ Chrome หรือ Edge</p>}
       <p className="csr-hint" style={{ textAlign: 'right' }}>{detail.length.toLocaleString()}/5,000</p>
 
       {/* ── หลักฐาน ── */}
