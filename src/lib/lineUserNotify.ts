@@ -99,6 +99,4 @@ export async function notifySellerLineNewBid(
   await pushLineText(lineUserId, text);
 }
 
-export function lineOaAddFriendUrl(): string {
-  return (process.env.NEXT_PUBLIC_LINE_OA_ADD_FRIEND_URL || process.env.NEXT_PUBLIC_LINE_OA_URL || '').trim();
-}
+export { lineOaAddFriendUrl } from './lineFriendship';

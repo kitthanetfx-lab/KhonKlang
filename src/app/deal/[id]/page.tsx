@@ -32,6 +32,7 @@ import { DealCommFloatbar, DealCommOrb } from '@/components/deal/DealCommFloatba
 import { DealOthersReviewsSummary } from '@/components/deal/DealOthersReviewsSummary';
 import { SimpleDealShell } from '@/components/deal/SimpleDealShell';
 import { DealRoomApp } from '@/components/mobile/DealRoomApp';
+import { LineOaConnect } from '@/components/LineOaConnect';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -476,8 +477,6 @@ export default function DealRoom() {
   const [evidenceType, setEvidenceType] = useState('packing');
   const [copied, setCopied] = useState(false);
   const [authHdrs, setAuthHdrs] = useState<Record<string, string>>({});
-  const [hasLineNotify, setHasLineNotify] = useState(false);
-  const [lineOaUrl, setLineOaUrl] = useState('');
   const [completionReviewed, setCompletionReviewed] = useState(false);
   const [completionAllRated, setCompletionAllRated] = useState(false);
   const [completionSubmitTrigger, setCompletionSubmitTrigger] = useState(0);
@@ -680,8 +679,6 @@ export default function DealRoom() {
         setBuyerBank(d.buyerBank || null); setSellerBank(d.sellerBank || null); setMiddlemanBank(d.middlemanBank || null);
         setBuyerShipping(d.buyerShipping || null);
         setSimpleShare(d.simpleShare || null);
-        setHasLineNotify(Boolean(d.hasLineNotify));
-        setLineOaUrl(String(d.lineOaUrl || ''));
         return nextDeal;
       } else setDealError(d.error || `Error ${r.status}`);
     } catch (e: any) { setDealError(e?.message || 'Network error'); }
@@ -5636,29 +5633,10 @@ export default function DealRoom() {
   const dealWizardBody = (
     <>
       {myId && isDealParty(deal, myId) && (
-        <div className="pd-line-oa">
-          {hasLineNotify ? (
-            <p className="pd-line-oa-ok">✓ พร้อมรับแจ้งเตือนขั้นตอนดีลผ่าน LINE OA</p>
-          ) : (
-            <>
-              <p className="pd-line-oa-title">รับแจ้งเตือนขั้นตอนดีลผ่าน LINE</p>
-              <p className="pd-bid-hint">เพิ่มเพื่อน LINE OA แล้วกดปุ่มด้านล่างเพื่อผูก LINE กับบัญชีนี้ (ไม่สลับบัญชี)</p>
-              <div className="pd-line-oa-actions">
-                {lineOaUrl ? (
-                  <a className="btn btn-soft btn-sm" href={lineOaUrl} target="_blank" rel="noreferrer">
-                    เพิ่มเพื่อน LINE OA
-                  </a>
-                ) : null}
-                <Link
-                  className="btn btn-soft btn-sm"
-                  href={`/auth/line/link?returnTo=${encodeURIComponent(`/deal/${dealId}`)}`}
-                >
-                  ผูก LINE กับบัญชีนี้
-                </Link>
-              </div>
-            </>
-          )}
-        </div>
+        <LineOaConnect
+          returnTo={`/deal/${dealId}`}
+          readyLabel="✓ พร้อมรับแจ้งเตือนขั้นตอนดีลผ่าน LINE OA"
+        />
       )}
       {tab === 'steps' && isMarketplaceCheckout && renderMarketplaceWizard()}
       {tab === 'steps' && isSimple && !isMarketplaceCheckout && renderSimpleWizard()}

@@ -10,6 +10,7 @@ import { ProfileConsentModal } from '@/components/ProfileConsentModal';
 import { Icon } from '@/components/Icon';
 import { THAI_BANKS } from '@/lib/banks';
 import { isProfileComplete } from '@/lib/profileComplete';
+import { LineOaConnect } from '@/components/LineOaConnect';
 
 const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -172,7 +173,7 @@ function ProfilePage() {
     const linked = searchParams.get('line_linked');
     const err = searchParams.get('line_link_error');
     if (linked === '1') {
-      setLineLinkMsg('✓ ผูก LINE กับบัญชีนี้แล้ว — จะแจ้งเมื่อมีคน overbid แม้ปิดเว็บ');
+      setLineLinkMsg('✓ ผูก LINE กับบัญชีนี้แล้ว — ขั้นถัดไปเพิ่มเพื่อน Official Account');
       (async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -363,32 +364,11 @@ function ProfilePage() {
 
         <div className="pf-card">
           <div className="pf-card-title">แจ้งเตือน LINE OA (ประมูล)</div>
-          {prefs.line_user_id ? (
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--green-600, #15803d)', fontWeight: 600 }}>
-              ✓ ผูก LINE แล้ว — จะแจ้งเมื่อมีคน overbid คุณ แม้ปิดเว็บ
-            </p>
-          ) : (
-            <>
-              <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
-                เพิ่มเพื่อน Official Account แล้วกดปุ่มด้านล่างเพื่อ<strong>ผูก LINE กับบัญชีนี้</strong> — ใช้รับแจ้งเมื่อสินค้าถูกประมูลสูงกว่า (ไม่สลับบัญชี Google/อื่น ๆ)
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {process.env.NEXT_PUBLIC_LINE_OA_ADD_FRIEND_URL ? (
-                  <a
-                    className="btn btn-soft btn-sm"
-                    href={process.env.NEXT_PUBLIC_LINE_OA_ADD_FRIEND_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    เพิ่มเพื่อน LINE OA
-                  </a>
-                ) : null}
-                <Link className="btn btn-soft btn-sm" href={`/auth/line/link?returnTo=${encodeURIComponent('/profile')}`}>
-                  ผูก LINE กับบัญชีนี้
-                </Link>
-              </div>
-            </>
-          )}
+          <LineOaConnect
+            variant="profile"
+            returnTo="/profile"
+            readyLabel="✓ พร้อมรับแจ้งเมื่อมีคน overbid คุณ แม้ปิดเว็บ"
+          />
         </div>
 
         {/* Bank info — บัญชีรับเงินของผู้ใช้ (แก้ไขได้ทุก role) — ขึ้นก่อนเพราะสำคัญที่สุด */}

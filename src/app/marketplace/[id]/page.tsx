@@ -12,6 +12,7 @@ import { isCertifiedMode, supportsSellerChat } from '@/lib/listingMode';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
 import { marketplaceListingBuyState } from '@/lib/marketplaceOrder';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
+import { LineOaConnect } from '@/components/LineOaConnect';
 import type { AuctionPublic } from '@/lib/auction';
 
 interface ListingDetail {
@@ -69,8 +70,6 @@ export default function MarketplaceDetailPage() {
   const [autoBidOn, setAutoBidOn] = useState(false);
   const [myAutoBidMax, setMyAutoBidMax] = useState<number | null>(null);
   const [myAutoBidStep, setMyAutoBidStep] = useState<number | null>(null);
-  const [hasLineNotify, setHasLineNotify] = useState(false);
-  const [lineOaUrl, setLineOaUrl] = useState('');
   const [bidding, setBidding] = useState(false);
   const [bidError, setBidError] = useState('');
   const [walletAvail, setWalletAvail] = useState<number | null>(null);
@@ -88,8 +87,6 @@ export default function MarketplaceDetailPage() {
     setSellerShop(data.sellerShop || null);
     setAuction(data.auction || null);
     setAuctionBids(data.auctionBids || []);
-    setHasLineNotify(Boolean(data.hasLineNotify));
-    setLineOaUrl(String(data.lineOaUrl || ''));
     const autoMax = data.myAutoBidMax ?? null;
     const autoStep = data.myAutoBidStep != null ? Number(data.myAutoBidStep) : null;
     setMyAutoBidMax(autoMax);
@@ -433,29 +430,10 @@ export default function MarketplaceDetailPage() {
                   </div>
 
                   {myId && (
-                    <div className="pd-line-oa">
-                      {hasLineNotify ? (
-                        <p className="pd-line-oa-ok">✓ พร้อมรับแจ้ง overbid ผ่าน LINE OA</p>
-                      ) : (
-                        <>
-                          <p className="pd-line-oa-title">รับแจ้งเตือนเมื่อถูกประมูลสูงกว่า</p>
-                          <p className="pd-bid-hint">เพิ่มเพื่อน LINE OA แล้วกดปุ่มด้านล่างเพื่อผูก LINE กับบัญชีนี้ (ไม่สลับบัญชี)</p>
-                          <div className="pd-line-oa-actions">
-                            {lineOaUrl ? (
-                              <a className="btn btn-soft btn-sm" href={lineOaUrl} target="_blank" rel="noreferrer">
-                                เพิ่มเพื่อน LINE OA
-                              </a>
-                            ) : null}
-                            <Link
-                              className="btn btn-soft btn-sm"
-                              href={`/auth/line/link?returnTo=${encodeURIComponent(`/marketplace/${listing.id}`)}`}
-                            >
-                              ผูก LINE กับบัญชีนี้
-                            </Link>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    <LineOaConnect
+                      returnTo={`/marketplace/${listing.id}`}
+                      readyLabel="✓ พร้อมรับแจ้ง overbid ผ่าน LINE OA"
+                    />
                   )}
 
                   <div className="pd-bid-row">

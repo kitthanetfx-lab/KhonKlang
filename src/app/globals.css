@@ -2124,6 +2124,24 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   gap: 8px;
   margin-top: 8px;
 }
+.line-oa-connect-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.line-oa-connect-ok {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #15803d;
+}
+.line-oa-connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
 
 .pd-ship-lbl { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 8px; }
 .pd-ship-list { display: flex; flex-wrap: wrap; gap: 8px; }
