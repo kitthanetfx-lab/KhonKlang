@@ -50,14 +50,20 @@ export default function CheckScamPage() {
 
         {/* ── เมนูแท็บ ── */}
         <nav className="cs-tabs" aria-label="เมนูเช็คคนโกง">
-          <button className={`cs-tab ${tab === 'db' ? 'active' : ''}`} onClick={() => setTab('db')}>
-            <Icon name="shieldCheck" size={14} /> ฐานข้อมูลคนกลาง
+          <button type="button" className={`cs-tab ${tab === 'db' ? 'active' : ''}`} onClick={() => setTab('db')}>
+            <Icon name="shieldCheck" size={14} aria-hidden />
+            <span className="cs-tab-full">ฐานข้อมูลคนกลาง</span>
+            <span className="cs-tab-short">ฐานข้อมูล</span>
           </button>
-          <button className={`cs-tab ${tab === 'web' ? 'active' : ''}`} onClick={() => setTab('web')}>
-            <Icon name="search" size={14} /> เช็คเว็บภายนอก
+          <button type="button" className={`cs-tab ${tab === 'web' ? 'active' : ''}`} onClick={() => setTab('web')}>
+            <Icon name="search" size={14} aria-hidden />
+            <span className="cs-tab-full">เช็คเว็บภายนอก</span>
+            <span className="cs-tab-short">เช็คเว็บ</span>
           </button>
-          <button className={`cs-tab report ${tab === 'report' ? 'active' : ''}`} onClick={() => setTab('report')}>
-            🚨 รายงานคนโกง
+          <button type="button" className={`cs-tab report ${tab === 'report' ? 'active' : ''}`} onClick={() => setTab('report')}>
+            <span aria-hidden>🚨</span>
+            <span className="cs-tab-full">รายงานคนโกง</span>
+            <span className="cs-tab-short">รายงาน</span>
           </button>
         </nav>
 
