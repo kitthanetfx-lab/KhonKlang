@@ -31,13 +31,14 @@ export interface SlipResult {
   via?: 'upload' | 'signed_url' | 'public_url';
 }
 
-type SlipAccountBlob = string | { value?: string | null; type?: string | null; account?: string | null } | null | undefined;
+type SlipAccountBlob = unknown;
 
 interface RawParty {
   displayName?: string;
   name?: string;
   account?: SlipAccountBlob;
   proxy?: SlipAccountBlob;
+  [key: string]: unknown;
 }
 
 interface RawSlip {
@@ -45,33 +46,85 @@ interface RawSlip {
   sendingBank?: string; receivingBank?: string;
   sender?: RawParty;
   receiver?: RawParty;
+  data?: RawSlip;
 }
 
-function textAccount(blob: SlipAccountBlob): string {
-  if (!blob) return '';
-  if (typeof blob === 'string') return blob.trim();
-  return String(blob.value || blob.account || '').trim();
+/** เลขบัญชีจากสลิป — รับทั้งเลขเต็มและ mask (x / X / * / ●) */
+function looksLikeAccount(value: string): boolean {
+  const compact = value.replace(/[\s-]/g, '');
+  const digits = compact.replace(/\D/g, '');
+  if (digits.length >= 4) return true;
+  return /[0-9xX*×●•]{6,}/.test(compact);
+}
+
+function extractAccountNumber(input: unknown, depth = 0): string {
+  if (depth > 5 || input == null) return '';
+  if (typeof input === 'number' && Number.isFinite(input)) {
+    const s = String(Math.trunc(input));
+    return looksLikeAccount(s) ? s : '';
+  }
+  if (typeof input === 'string') {
+    const s = input.trim();
+    return looksLikeAccount(s) ? s : '';
+  }
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const got = extractAccountNumber(item, depth + 1);
+      if (got) return got;
+    }
+    return '';
+  }
+  if (typeof input !== 'object') return '';
+  const o = input as Record<string, unknown>;
+  for (const key of ['value', 'account', 'acc', 'number', 'acct', 'bankAccount', 'bank_account']) {
+    if (key in o) {
+      const got = extractAccountNumber(o[key], depth + 1);
+      if (got) return got;
+    }
+  }
+  if (o.bank) {
+    const got = extractAccountNumber(o.bank, depth + 1);
+    if (got) return got;
+  }
+  for (const [key, val] of Object.entries(o)) {
+    if (key === 'type' || key === 'typeName' || key === 'displayName' || key === 'name') continue;
+    const got = extractAccountNumber(val, depth + 1);
+    if (got) return got;
+  }
+  return '';
 }
 
 function partyFields(party?: RawParty | null) {
   return {
     name: String(party?.displayName || party?.name || '').trim(),
-    account: textAccount(party?.account),
-    proxy: textAccount(party?.proxy),
+    account: extractAccountNumber(party?.account),
+    proxy: extractAccountNumber(party?.proxy),
   };
 }
 
+function unwrapSlipData(raw: unknown): RawSlip {
+  if (!raw || typeof raw !== 'object') return {};
+  const d = raw as RawSlip & Record<string, unknown>;
+  if (d.receiver || d.sender || d.amount != null || d.transRef) return d;
+  if (d.data && typeof d.data === 'object') return unwrapSlipData(d.data);
+  return d;
+}
+
 function norm(d: RawSlip): SlipInfo {
-  const sender = partyFields(d.sender);
-  const receiver = partyFields(d.receiver);
+  const payload = unwrapSlipData(d);
+  const sender = partyFields(payload.sender);
+  const receiver = partyFields(payload.receiver);
+  if (payload.receiver && !receiver.account) {
+    console.warn('[slipok] receiver.account empty after parse', JSON.stringify(payload.receiver));
+  }
   return {
-    amount: Number(d.amount) || 0,
-    transRef: String(d.transRef || ''),
-    transTimestamp: d.transTimestamp,
-    transDate: d.transDate,
-    transTime: d.transTime,
-    sendingBank: d.sendingBank,
-    receivingBank: d.receivingBank,
+    amount: Number(payload.amount) || 0,
+    transRef: String(payload.transRef || ''),
+    transTimestamp: payload.transTimestamp,
+    transDate: payload.transDate,
+    transTime: payload.transTime,
+    sendingBank: payload.sendingBank,
+    receivingBank: payload.receivingBank,
     senderName: sender.name,
     senderAccount: sender.account || sender.proxy,
     receiverName: receiver.name,
@@ -137,7 +190,7 @@ function parseSlipokApiResponse(res: Response, j: Record<string, unknown>, via?:
       ok: true,
       code: 'ok',
       message: String((j.data as Record<string, unknown>).message || '✅'),
-      slip: norm(j.data as RawSlip),
+      slip: norm(unwrapSlipData(j.data)),
       via,
     };
   }
@@ -146,7 +199,7 @@ function parseSlipokApiResponse(res: Response, j: Record<string, unknown>, via?:
     ok: false,
     code,
     message: String(j.message || res.statusText || 'ตรวจสลิปไม่สำเร็จ'),
-    slip: j.data ? norm(j.data as RawSlip) : undefined,
+    slip: j.data ? norm(unwrapSlipData(j.data)) : undefined,
     duplicate: code === '1012',
     wrongReceiver: code === '1014',
     via,

@@ -43,6 +43,7 @@ export function slipAccountPattern(value: string): string {
   return String(value || '')
     .replace(/[\s-]/g, '')
     .toLowerCase()
+    .replace(/[×*●•]/g, 'x')
     .replace(/[^0-9x]/g, '');
 }
 
@@ -100,16 +101,14 @@ function receiverMatchesCompany(slip: SlipInfo, opts: { companyBankAcct?: string
   const bankActual = String(slip.receiverAccount || '').trim();
   const ppActual = String(slip.receiverProxy || '').trim();
 
-  const typed: boolean[] = [];
-  if (bankExpected && bankActual) typed.push(accountsMatch(bankExpected, bankActual));
-  if (ppExpected && ppActual) typed.push(accountsMatch(ppExpected, ppActual));
+  if (bankExpected && bankActual) {
+    if (accountsMatch(bankExpected, bankActual)) return true;
+    if (ppExpected && ppActual && accountsMatch(ppExpected, ppActual)) return true;
+    return false;
+  }
 
-  const cross =
-    (bankExpected && ppActual && accountsMatch(bankExpected, ppActual))
-    || (ppExpected && bankActual && accountsMatch(ppExpected, bankActual));
-
-  if (!typed.length) return cross ? true : null;
-  return typed.some(Boolean) || Boolean(cross);
+  if (ppExpected && ppActual) return accountsMatch(ppExpected, ppActual);
+  return null;
 }
 
 export function evaluateSlipCheck(
@@ -155,13 +154,11 @@ export function evaluateSlipCheck(
     reasons.push(`ยอดเงินไม่ตรง (สลิป ฿${Number(slip.amount).toLocaleString()} / ต้องโอน ฿${expected.toLocaleString()})`);
   }
 
-  // SlipOK สำเร็จแล้ว = ไม่ใช่บัญชีผิด (1014 จะ fail เอง)
-  // เทียบเลขได้เฉพาะเมื่อมีข้อมูลทั้งฝั่งเราและบนสลิป — ห้ามตีความว่า "ไม่พบเลข" เป็นข้อเตือน
+  // บัญชีธนาคารเป็นหลัก — เทียบได้เมื่ออ่านเลขจากสลิปได้ (รวม mask)
+  // อ่านไม่ได้ ≠ บัญชีว่าง และห้ามขึ้นแดงตอนผลผ่าน: SlipOK สำเร็จแล้ว 1014 จะตกเองถ้าเข้าคนละบัญชี
   const receiverOk = receiverMatchesCompany(slip, opts);
   if (receiverOk === false) {
-    const shown = [slip.receiverAccount, slip.receiverProxy].filter(Boolean).join(' / ') || '-';
-    const expectedIds = [opts.companyBankAcct, opts.companyPromptPay].map(v => String(v || '').trim()).filter(Boolean).join(' / ');
-    reasons.push(`เลขบัญชีผู้รับไม่ตรง (สลิป: ${shown} / บัญชีกลาง: ${expectedIds})`);
+    reasons.push(`เลขบัญชีผู้รับไม่ตรง (สลิป: ${slip.receiverAccount} / บัญชีกลาง: ${opts.companyBankAcct})`);
   }
 
   const transferAt = parseSlipTransferDate(slip);
