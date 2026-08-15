@@ -6412,60 +6412,40 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
    Check-scam: tabs + report form + DB search results
    ============================================================ */
 .cs-tabs {
-  display: flex; gap: 8px; margin-bottom: 24px;
-  background: var(--surface-2); border: 1px solid var(--line);
-  border-radius: var(--r-pill); padding: 5px;
+  display: flex; align-items: stretch; gap: 6px;
+  margin-bottom: 24px;
   max-width: 100%; box-sizing: border-box;
 }
 .cs-tab {
   flex: 1; min-width: 0;
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  border: none; background: none; border-radius: var(--r-pill);
-  padding: 11px 10px;
-  font-family: var(--font-display); font-weight: 600; font-size: 13.5px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--r-md);
+  padding: 8px 6px;
+  font-family: var(--font-display); font-weight: 600; font-size: 12px;
   color: var(--muted); cursor: pointer;
-  transition: all .2s var(--ease-out);
-  white-space: nowrap;
+  transition: border-color .2s, background .2s, color .2s, box-shadow .2s;
+  white-space: normal; text-align: center; line-height: 1.25;
+  box-shadow: var(--sh-sm);
 }
-.cs-tab:hover { color: var(--ink); }
-.cs-tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--sh-sm); }
-.cs-tab.report.active { background: var(--rose-500); color: #fff; }
-
-@media (max-width: 900px) {
-  .cs-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    border-radius: var(--r-lg);
-    padding: 6px;
-  }
-  .cs-tab {
-    flex: none;
-    width: 100%;
-    min-height: 46px;
-    padding: 10px 12px;
-    font-size: 13px;
-    white-space: normal;
-    text-align: center;
-    line-height: 1.3;
-  }
-  .cs-tab.report { grid-column: 1 / -1; }
+.cs-tab:hover { color: var(--ink); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.cs-tab.active {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
-
+.cs-tab.report { border-color: color-mix(in srgb, var(--rose-500) 35%, var(--line)); }
+.cs-tab.report.active {
+  background: var(--rose-500);
+  border-color: var(--rose-500);
+  color: #fff;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--rose-500) 22%, transparent);
+}
 @media (max-width: 560px) {
-  .cs-tabs {
-    grid-template-columns: 1fr;
-    gap: 5px;
-  }
-  .cs-tab {
-    justify-content: flex-start;
-    text-align: left;
-    padding: 12px 16px;
-    font-size: 14px;
-    white-space: nowrap;
-    border-radius: var(--r-md);
-  }
-  .cs-tab.report { grid-column: auto; }
+  .cs-tabs { gap: 4px; }
+  .cs-tab { font-size: 10.5px; padding: 7px 4px; gap: 3px; border-radius: var(--r-sm); }
 }
 
 .csr-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-sm); padding: 24px 22px; }

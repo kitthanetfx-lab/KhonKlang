@@ -51,10 +51,10 @@ export default function CheckScamPage() {
         {/* ── เมนูแท็บ ── */}
         <nav className="cs-tabs" aria-label="เมนูเช็คคนโกง">
           <button className={`cs-tab ${tab === 'db' ? 'active' : ''}`} onClick={() => setTab('db')}>
-            <Icon name="shieldCheck" size={16} /> ฐานข้อมูลคนกลาง
+            <Icon name="shieldCheck" size={14} /> ฐานข้อมูลคนกลาง
           </button>
           <button className={`cs-tab ${tab === 'web' ? 'active' : ''}`} onClick={() => setTab('web')}>
-            <Icon name="search" size={16} /> เช็คเว็บภายนอก
+            <Icon name="search" size={14} /> เช็คเว็บภายนอก
           </button>
           <button className={`cs-tab report ${tab === 'report' ? 'active' : ''}`} onClick={() => setTab('report')}>
             🚨 รายงานคนโกง
