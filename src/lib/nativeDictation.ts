@@ -1,15 +1,22 @@
 /**
- * พูดให้พิมพ์ในแอpมือถือกลางฮับ (Capacitor — @capacitor-community/speech-recognition)
+ * พูดให้พิมพ์ — ใช้เฉพาะในแอpมือถือกลางฮับ (Capacitor)
+ * ฝั่งเว็บ/เบราว์เซอร์ใช้ Web Speech API ใน ScamReportForm ตามเดิม ไม่เกี่ยวกับไฟล์นี้
  *
  * ห้าม npm install plugin ฝั่งเว็บ — Capacitor ฉีด shim ของทุก plugin ที่โหลดไว้
  * เข้ามาที่ window.Capacitor.Plugins ให้เองตอน WebView เปิดหน้า (ดู JSExport.java)
  * ถ้า import @capacitor/core มาใน bundle เว็บ มันจะเขียนทับ window.Capacitor
  * ของ native bridge ทำให้ plugin อื่น (SocialLogin / PushNotifications) พังตามไปด้วย
  *
- * สำคัญ: ต้องเรียก start() ด้วย partialResults: false เท่านั้น
- * เพราะฝั่ง Android ถ้า partialResults เป็น true จะ call.resolve() ทันทีที่เริ่มฟัง
- * แล้วเวลาเกิด error, onError() จะ call.reject() บน call ที่ถูก resolve ไปแล้ว
- * ทำให้ JS ไม่เคยได้รับ error — อาการคือปุ่มแดงค้างแบบไม่มีข้อความและไม่มีคำเตือน
+ * ข้อควรระวังของ @capacitor-community/speech-recognition@7.0.1 (Android):
+ *
+ * 1) stop() ไม่เคยเรียก call.resolve() — resolve เฉพาะกรณี exception ซึ่งไม่เคยเกิด
+ *    ดังนั้น `await plugin.stop()` จะค้างตลอดกาล ห้าม await เด็ดขาด
+ *    (บั๊กนี้ทำให้ start() ไม่ถูกเรียก → ไมค์ไม่เปิด แต่ปุ่มขึ้นแดงเพราะ
+ *    available() กับ requestPermissions() ผ่านไปก่อนแล้ว)
+ *
+ * 2) partialResults: true จะ call.resolve() ทันทีที่เริ่มฟัง แล้ว onError()
+ *    ไป reject บน call ที่ resolve แล้ว JS จึงไม่เคยได้รับ error
+ *    ต้องใช้ partialResults: false เพื่ออ่านผลจากค่าที่ start() คืนกลับ
  */
 
 import { isGlanghubApp } from '@/lib/nativeAuth';
@@ -17,6 +24,9 @@ import { isGlanghubApp } from '@/lib/nativeAuth';
 export const NATIVE_DICTATION_SILENCE_SEC = 10;
 
 const LANGUAGE_CANDIDATES = ['th-TH', 'th_TH', 'en-US'];
+
+/** เวลาสูงสุดที่ยอมรอ native call ที่ควรตอบกลับทันที */
+const NATIVE_CALL_TIMEOUT_MS = 6000;
 
 type PermissionState = 'prompt' | 'prompt-with-rationale' | 'granted' | 'denied';
 
@@ -27,7 +37,6 @@ type SpeechRecognitionPlugin = {
     maxResults?: number;
     partialResults?: boolean;
     popup?: boolean;
-    prompt?: string;
   }): Promise<{ matches?: string[] }>;
   stop(): Promise<void>;
   isListening(): Promise<{ listening: boolean }>;
@@ -57,6 +66,19 @@ export type NativeDictationCallbacks = {
   setListening: (on: boolean) => void;
   setMicHint: (hint: string) => void;
 };
+
+/** กัน native call ที่ไม่ยอม settle ไม่ให้ค้างทั้งระบบเงียบ ๆ */
+function withTimeout<T>(label: string, work: Promise<T>, ms = NATIVE_CALL_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`${label} ไม่ตอบกลับใน ${Math.round(ms / 1000)} วินาที`));
+    }, ms);
+    work.then(
+      value => { window.clearTimeout(timer); resolve(value); },
+      err => { window.clearTimeout(timer); reject(err); },
+    );
+  });
+}
 
 function rawMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -122,21 +144,22 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
     return LANGUAGE_CANDIDATES[languageIndex] ?? LANGUAGE_CANDIDATES[0];
   }
 
-  /** SpeechRecognizer รับ startListening() ซ้อนไม่ได้ — ต้องรอให้ปล่อยไมค์ก่อน */
+  /**
+   * สั่งปล่อยไมค์แบบไม่ await — stop() ของ plugin ไม่ resolve (ดูหมายเหตุหัวไฟล์)
+   * แล้วรอด้วย isListening() ที่ resolve จริงแทน
+   */
   async function releaseMic(p: SpeechRecognitionPlugin) {
-    try {
-      await p.stop();
-    } catch { /* ไม่ได้ฟังอยู่ ก็ไม่เป็นไร */ }
+    void Promise.resolve(p.stop()).catch(() => { /* ไม่มีทาง settle อยู่แล้ว */ });
+
     for (let i = 0; i < 8; i += 1) {
       try {
-        const { listening } = await p.isListening();
-        if (!listening) break;
+        const { listening } = await withTimeout('isListening', p.isListening(), 1500);
+        if (!listening) return;
       } catch {
-        break;
+        return;
       }
       await sleep(120);
     }
-    await sleep(200);
   }
 
   async function listenLoop(gen: number) {
@@ -152,12 +175,10 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
           break;
         }
 
-        await releaseMic(p);
-        if (!active || gen !== generation) break;
-
         callbacks.setInterim('กำลังฟัง… พูดได้เลย');
 
         try {
+          // ไม่ใส่ timeout — start() จะค้างไว้จนผู้ใช้พูดจบ (นั่นคือพฤติกรรมที่ถูก)
           const result = await p.start({
             language: currentLanguage(),
             maxResults: 5,
@@ -178,6 +199,8 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
             emptyStreak += 1;
           }
           resetSilenceTimer();
+          await releaseMic(p);
+          if (!active || gen !== generation) break;
           await sleep(150);
         } catch (err) {
           if (!active || gen !== generation) break;
@@ -190,6 +213,8 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
               callbacks.setMicHint(`ยังไม่ได้ยินเสียงพูด — สลับภาษาเป็น ${currentLanguage()}`);
             }
             resetSilenceTimer();
+            await releaseMic(p);
+            if (!active || gen !== generation) break;
             await sleep(400);
             continue;
           }
@@ -217,7 +242,7 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
     callbacks.setInterim('กำลังเปิดไมค์…');
 
     try {
-      const avail = await p.available();
+      const avail = await withTimeout('available()', p.available());
       if (!avail?.available) {
         callbacks.setMicHint('เครื่องนี้ยังไม่มีตัวถอดเสียง — ติดตั้ง/อัปเดตแอป Google แล้วลองใหม่');
         callbacks.setInterim('');
@@ -230,7 +255,8 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
     }
 
     try {
-      const perm = await p.requestPermissions();
+      // ครั้งแรกจะเด้ง dialog ขอสิทธิ์ ผู้ใช้อาจกดช้า จึงให้เวลามากกว่าปกติ
+      const perm = await withTimeout('requestPermissions()', p.requestPermissions(), 60000);
       if (perm?.speechRecognition !== 'granted') {
         callbacks.setMicHint('ยังไม่ได้สิทธิ์ไมโครโฟน — ตั้งค่า → แอป → กลางฮับ → สิทธิ์ → ไมโครโฟน');
         callbacks.setInterim('');
@@ -241,6 +267,9 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
       callbacks.setInterim('');
       return false;
     }
+
+    // เคลียร์ session ค้างจากรอบก่อน ก่อนเริ่มฟังรอบใหม่
+    await releaseMic(p);
 
     generation += 1;
     const gen = generation;
@@ -261,7 +290,7 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
     callbacks.setInterim('');
     callbacks.setListening(false);
     const p = plugin();
-    if (p) await releaseMic(p);
+    if (p) void Promise.resolve(p.stop()).catch(() => { /* stop() ไม่ resolve */ });
   }
 
   async function toggle() {
