@@ -1,271 +1,595 @@
 /**
- * พูดให้พิมพ์ในแอปมือถือกลางฮับ (Capacitor — โปรเจกต์ glangApp)
+
+ * พูดให้พิมพ์ในแอpมือถือกลางฮับ (Capacitor — @capacitor-community/speech-recognition)
+
  */
 
 import { isGlanghubApp } from '@/lib/nativeAuth';
 
-/** ปิดไมค์อัตโนมัติเมื่อไม่มีเสียงพูด (วินาที) */
+
+
 export const NATIVE_DICTATION_SILENCE_SEC = 10;
 
+
+
 const LANGUAGE_CANDIDATES = ['th-TH', 'th_TH', 'en-US'];
-const BETWEEN_SESSION_MS = 380;
+
+
 
 type PermissionState = 'prompt' | 'prompt-with-rationale' | 'granted' | 'denied';
 
+
+
+type PluginListenerHandle = { remove: () => Promise<void> };
+
+
+
 type SpeechRecognitionPlugin = {
+
   available(): Promise<{ available: boolean }>;
+
   start(opts: {
+
     language: string;
+
     maxResults?: number;
+
     partialResults?: boolean;
+
     popup?: boolean;
+
   }): Promise<{ matches?: string[] }>;
+
   stop(): Promise<void>;
+
   isListening(): Promise<{ listening: boolean }>;
+
   requestPermissions(): Promise<{ speechRecognition: PermissionState }>;
+
+  addListener(
+
+    event: 'partialResults',
+
+    cb: (data: { matches: string[] }) => void,
+
+  ): Promise<PluginListenerHandle>;
+
+  addListener(
+
+    event: 'listeningState',
+
+    cb: (data: { status: 'started' | 'stopped' }) => void,
+
+  ): Promise<PluginListenerHandle>;
+
 };
+
+
 
 function sleep(ms: number) {
+
   return new Promise<void>(resolve => window.setTimeout(resolve, ms));
+
 }
 
-function pickMatch(data: { matches?: unknown }): string {
-  const m = data.matches;
-  if (Array.isArray(m) && typeof m[0] === 'string') return m[0].trim();
-  return '';
-}
 
-function getCapacitorPlugins(): Record<string, unknown> | null {
+
+function getCapacitor(): {
+
+  Plugins?: Record<string, unknown>;
+
+  getPlugin?: (name: string) => unknown;
+
+} | null {
+
   if (typeof window === 'undefined') return null;
-  const cap = (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor;
-  return cap?.Plugins ?? null;
+
+  return (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown>; getPlugin?: (n: string) => unknown } }).Capacitor ?? null;
+
 }
+
+
 
 export function getSpeechRecognitionPlugin(): SpeechRecognitionPlugin | null {
-  const plugins = getCapacitorPlugins();
-  if (!plugins) return null;
-  return (plugins.SpeechRecognition as SpeechRecognitionPlugin | undefined) ?? null;
+
+  const cap = getCapacitor();
+
+  if (!cap) return null;
+
+  const fromPlugins = cap.Plugins?.SpeechRecognition as SpeechRecognitionPlugin | undefined;
+
+  if (fromPlugins) return fromPlugins;
+
+  try {
+
+    return cap.getPlugin?.('SpeechRecognition') as SpeechRecognitionPlugin | undefined ?? null;
+
+  } catch {
+
+    return null;
+
+  }
+
 }
+
+
 
 export function isNativeDictationAvailable(): boolean {
+
   return isGlanghubApp() && getSpeechRecognitionPlugin() != null;
+
 }
+
+
 
 export type NativeDictationCallbacks = {
+
   append: (text: string) => void;
+
   setInterim: (text: string) => void;
+
   setListening: (on: boolean) => void;
+
   setMicHint: (hint: string) => void;
+
 };
 
+
+
 function errorHint(err: unknown): string {
+
   const msg = err instanceof Error ? err.message : String(err ?? '');
-  if (/network/i.test(msg)) return 'เครือข่ายขัดข้อง — ตรวจสอบเน็ตและ Google Play services';
-  if (/permission|insufficient/i.test(msg)) return 'กรุณาอนุญาตไมโครโฟนในแอป แล้วลองใหม่';
-  if (/not available|unavailable/i.test(msg)) return 'อุปกรณ์นี้ไม่รองรับการรู้จำเสียงพูด';
-  if (/busy/i.test(msg)) return 'ระบบฟังเสียงไม่ว่าง — ลองอีกครั้ง';
-  return '';
+
+  if (/network/i.test(msg)) return 'เครือข่ายขัดข้อง — ตรวจสอบเน็ตและ Google app';
+
+  if (/permission|insufficient|not allowed/i.test(msg)) return 'กรุณาอนุญาตไมโครโฟนในแอp แล้วลองใหม่';
+
+  if (/not available|unavailable/i.test(msg)) return 'อุปกรณ์นี้ไม่รองรับการรู้จำเสียงพูด — ติดตั้ง/อัปเดต Google app';
+
+  if (/busy|recognizer/i.test(msg)) return 'ระบบฟังเสียงไม่ว่าง — ลองอีกครั้ง';
+
+  if (/no match|no speech|didn't understand/i.test(msg)) return '';
+
+  return msg ? `ไม่สามารถฟังเสียงได้ (${msg.slice(0, 80)})` : '';
+
 }
 
-/** ควบคุม native speech — แตะเปิด/ปิด + ปิดอัตโนมัติเมื่อเงียบ */
+
+
+/** ควบคุม native speech — แตะเปิด/ปิด + partial results แบบต่อเนื่อง */
+
 export function createNativeDictation(callbacks: NativeDictationCallbacks) {
+
   let active = false;
+
   let loopRunning = false;
+
   let toggling = false;
+
   let generation = 0;
+
   let languageIndex = 0;
+
   let silenceTimer: number | null = null;
-  let noMatchStreak = 0;
+
+  let lastPartial = '';
+
+  let listenersBound = false;
+
+  let partialHandle: PluginListenerHandle | null = null;
+
+  let stateHandle: PluginListenerHandle | null = null;
+
+
 
   function plugin() {
+
     return getSpeechRecognitionPlugin();
+
   }
+
+
 
   function clearSilenceTimer() {
+
     if (silenceTimer != null) {
+
       window.clearTimeout(silenceTimer);
+
       silenceTimer = null;
+
     }
+
   }
+
+
 
   function resetSilenceTimer() {
+
     clearSilenceTimer();
+
     if (!active) return;
+
     silenceTimer = window.setTimeout(() => {
+
       callbacks.setMicHint(`ปิดไมค์อัตโนมัติ — ไม่ได้ยินเสียง ${NATIVE_DICTATION_SILENCE_SEC} วินาที`);
+
       void stopInternal();
+
     }, NATIVE_DICTATION_SILENCE_SEC * 1000);
+
   }
+
+
 
   function currentLanguage() {
+
     return LANGUAGE_CANDIDATES[languageIndex] ?? LANGUAGE_CANDIDATES[0];
+
   }
 
-  function appendText(text: string) {
-    const t = text.trim();
-    if (!t) return;
-    noMatchStreak = 0;
-    resetSilenceTimer();
-    callbacks.append(t);
+
+
+  function flushPartial() {
+
+    const t = lastPartial.trim();
+
+    lastPartial = '';
+
+    callbacks.setInterim('');
+
+    if (t) {
+
+      callbacks.append(t);
+
+      resetSilenceTimer();
+
+    }
+
   }
+
+
+
+  async function ensureListeners(p: SpeechRecognitionPlugin) {
+
+    if (listenersBound) return;
+
+    listenersBound = true;
+
+    partialHandle = await p.addListener('partialResults', ({ matches }) => {
+
+      const text = Array.isArray(matches) ? String(matches[0] || '').trim() : '';
+
+      if (!text || !active) return;
+
+      lastPartial = text;
+
+      callbacks.setInterim(text);
+
+      resetSilenceTimer();
+
+    });
+
+    stateHandle = await p.addListener('listeningState', ({ status }) => {
+
+      if (status === 'started') {
+
+        callbacks.setListening(true);
+
+        resetSilenceTimer();
+
+      }
+
+      if (status === 'stopped' && active) {
+
+        flushPartial();
+
+        if (active) void scheduleNextListen();
+
+      }
+
+    });
+
+  }
+
+
 
   async function releaseMic() {
+
     const p = plugin();
+
     if (!p) return;
+
     try {
+
       await p.stop();
+
     } catch { /* ignore */ }
-    for (let i = 0; i < 8; i += 1) {
+
+    for (let i = 0; i < 6; i += 1) {
+
       try {
+
         const { listening } = await p.isListening();
+
         if (!listening) break;
+
       } catch {
+
         break;
+
       }
-      await sleep(100);
+
+      await sleep(120);
+
     }
-    await sleep(BETWEEN_SESSION_MS);
+
+    await sleep(280);
+
   }
 
-  async function listenOnce(gen: number): Promise<'ok' | 'stop' | 'retry'> {
-    if (!active || gen !== generation) return 'stop';
-    const p = plugin();
-    if (!p) return 'stop';
 
-    await releaseMic();
-    if (!active || gen !== generation) return 'stop';
 
-    callbacks.setInterim('…');
-    try {
-      const result = await p.start({
-        language: currentLanguage(),
-        maxResults: 1,
-        partialResults: false,
-        popup: false,
-      });
-      if (!active || gen !== generation) return 'stop';
+  async function scheduleNextListen() {
 
-      callbacks.setInterim('');
-      const text = pickMatch(result);
-      if (text) appendText(text);
-      else noMatchStreak += 1;
-      return 'ok';
-    } catch (err) {
-      if (!active || gen !== generation) return 'stop';
-      callbacks.setInterim('');
-      const msg = err instanceof Error ? err.message : String(err ?? '');
-      if (/busy/i.test(msg)) return 'retry';
-      if (/no match|no speech|didn't understand/i.test(msg)) {
-        noMatchStreak += 1;
-        if (noMatchStreak >= 6 && languageIndex < LANGUAGE_CANDIDATES.length - 1) {
-          languageIndex += 1;
-          noMatchStreak = 0;
-          callbacks.setMicHint(`สลับภาษาเป็น ${currentLanguage()} — ลองพูดอีกครั้ง`);
-        }
-        return 'ok';
-      }
-      const hint = errorHint(err);
-      if (hint) callbacks.setMicHint(hint);
-      return 'ok';
-    }
+    if (!active) return;
+
+    await sleep(320);
+
+    if (active) void listenLoop(generation);
+
   }
+
+
 
   async function listenLoop(gen: number) {
-    if (loopRunning) return;
+
+    if (loopRunning || !active || gen !== generation) return;
+
+    const p = plugin();
+
+    if (!p) return;
+
+
+
     loopRunning = true;
+
     try {
+
       while (active && gen === generation) {
-        if (!plugin()) {
-          callbacks.setMicHint('ไม่พบ speech plugin — อัปเดตแอปเป็นเวอร์ชันล่าสุด');
-          await stopInternal();
+
+        await releaseMic();
+
+        if (!active || gen !== generation) break;
+
+
+
+        try {
+
+          await p.start({
+
+            language: currentLanguage(),
+
+            maxResults: 5,
+
+            partialResults: true,
+
+            popup: false,
+
+          });
+
+          resetSilenceTimer();
+
+          // partialResults=true → start() คืนทันที, รอ event listeningState
+
           break;
+
+        } catch (err) {
+
+          if (!active || gen !== generation) break;
+
+          const hint = errorHint(err);
+
+          if (/busy/i.test(String(err))) {
+
+            await sleep(700);
+
+            continue;
+
+          }
+
+          if (/no match|no speech|didn't understand/i.test(String(err))) {
+
+            if (languageIndex < LANGUAGE_CANDIDATES.length - 1) {
+
+              languageIndex += 1;
+
+              callbacks.setMicHint(`สลับภาษาเป็น ${currentLanguage()} — ลองพูดอีกครั้ง`);
+
+            }
+
+            await sleep(500);
+
+            continue;
+
+          }
+
+          if (hint) callbacks.setMicHint(hint);
+
+          await stopInternal();
+
+          break;
+
         }
-        const outcome = await listenOnce(gen);
-        if (!active || gen !== generation || outcome === 'stop') break;
-        if (outcome === 'retry') {
-          await sleep(700);
-          continue;
-        }
-        await sleep(BETWEEN_SESSION_MS);
+
       }
+
     } finally {
+
       loopRunning = false;
-      if (gen === generation) callbacks.setInterim('');
+
     }
+
   }
+
+
 
   async function startInternal(): Promise<boolean> {
+
     if (active) return true;
+
     const p = plugin();
+
     if (!p) {
-      callbacks.setMicHint('ไม่พบ speech plugin — อัปเดตแอปเป็นเวอร์ชันล่าสุด');
+
+      callbacks.setMicHint('ไม่พบ speech plugin — อัpเดตแอpเป็นเวอร์ชันล่าสุด');
+
       return false;
+
     }
 
-    callbacks.setListening(true);
-    callbacks.setInterim('กำลังเปิดไมค์…');
+
+
     callbacks.setMicHint('');
 
+    callbacks.setInterim('กำลังเปิดไมค์…');
+
+
+
     try {
+
       const avail = await p.available();
+
       if (!avail.available) {
+
         callbacks.setMicHint('อุปกรณ์นี้ไม่รองรับการรู้จำเสียงพูด (ต้องมี Google app)');
-        callbacks.setListening(false);
+
         callbacks.setInterim('');
+
         return false;
+
       }
+
       const perm = await p.requestPermissions();
+
       if (perm.speechRecognition !== 'granted') {
-        callbacks.setMicHint('กรุณาอนุญาตไมโครโฟนในแอป แล้วลองใหม่');
-        callbacks.setListening(false);
+
+        callbacks.setMicHint('กรุณาอนุญาตไมโครโฟนในแอp (ตั้งค่า → กลางฮับ → ไมโครโฟน)');
+
         callbacks.setInterim('');
+
         return false;
+
       }
+
     } catch {
+
       callbacks.setMicHint('ไม่สามารถขอสิทธิ์ไมโครโฟนได้ — ลองใหม่อีกครั้ง');
-      callbacks.setListening(false);
+
       callbacks.setInterim('');
+
       return false;
+
     }
 
+
+
+    await ensureListeners(p);
+
+
+
     generation += 1;
+
     const gen = generation;
+
     active = true;
+
     languageIndex = 0;
-    noMatchStreak = 0;
+
+    lastPartial = '';
+
+    callbacks.setListening(true);
+
     callbacks.setInterim('');
+
     resetSilenceTimer();
+
     void listenLoop(gen);
+
     return true;
+
   }
+
+
 
   async function stopInternal() {
+
     generation += 1;
+
     active = false;
+
     clearSilenceTimer();
-    callbacks.setInterim('');
+
+    flushPartial();
+
     callbacks.setListening(false);
+
     await releaseMic();
+
   }
+
+
 
   async function toggle() {
+
     if (toggling) return;
+
     toggling = true;
+
     try {
+
       if (active) {
+
         callbacks.setMicHint('');
+
         await stopInternal();
+
         return;
+
       }
+
       await startInternal();
+
     } finally {
+
       toggling = false;
+
     }
+
   }
+
+
 
   async function destroy() {
+
     await stopInternal();
+
+    await partialHandle?.remove();
+
+    await stateHandle?.remove();
+
+    partialHandle = null;
+
+    stateHandle = null;
+
+    listenersBound = false;
+
   }
 
+
+
   return { toggle, stop: stopInternal, destroy, silenceSec: NATIVE_DICTATION_SILENCE_SEC };
+
 }
+
+

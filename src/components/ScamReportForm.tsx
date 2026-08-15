@@ -68,14 +68,19 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
   }
 
   useEffect(() => {
-    if (isNativeDictationAvailable()) {
-      ensureNativeController();
-      return () => {
-        void nativeRef.current?.destroy();
-        nativeRef.current = null;
-      };
-    }
-    return () => stopListening();
+    const boot = () => {
+      if (isNativeDictationAvailable()) {
+        ensureNativeController();
+        setSupported(true);
+      }
+    };
+    boot();
+    const t = window.setTimeout(boot, 600);
+    return () => {
+      window.clearTimeout(t);
+      void nativeRef.current?.destroy();
+      nativeRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
