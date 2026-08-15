@@ -290,17 +290,6 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
   const backHref = isAuction ? '/marketplace?zone=auction' : '/marketplace';
   const backLabel = isAuction ? 'กลับตลาดประมูล' : 'กลับตลาดซื้อขาย';
 
-  const shareBtn = (
-    <button
-      type="button"
-      className={`btn btn-soft btn-sm mkt-pd-share-btn${linkCopied ? ' is-copied' : ''}`}
-      onClick={() => void copyShareLink()}
-      aria-label="คัดลอกลิงก์สินค้า"
-    >
-      {linkCopied ? '✓ คัดลอกแล้ว' : '🔗 คัดลอกลิงก์'}
-    </button>
-  );
-
   const panelProps = {
     listing,
     sellerShop,
@@ -348,7 +337,6 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
           titleIcon="store"
           hideMainNav
           backHref={backHref}
-          extraActions={shareBtn}
         />
         <main className="mkt-pd-feed">
           <MarketplaceDetailPanel {...panelProps} bidIdSuffix="-mobile" />
@@ -363,7 +351,6 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
         title={listing.title}
         titleIcon="store"
         backHref={backHref}
-        extraActions={shareBtn}
       />
       <div className="mkt-pd-desktop-shell">
         <div className="pd-shell">
@@ -463,13 +450,13 @@ function MarketplaceDetailPanel({
   linkCopied,
   bidIdSuffix,
 }: DetailPanelProps) {
+  const needsDeposit = !!(isAuction && auction && auction.bidDeposit > 0);
+  const walletLoading = !!myId && needsDeposit && walletAvail === null;
+  const walletInsufficient = needsDeposit && walletAvail != null && walletAvail < (auction?.bidDeposit ?? 0);
+  const canShowBidForm = !walletLoading && !walletInsufficient;
+
   return (
     <div className="pd-panel">
-      <div className="pd-share-row">
-        <button type="button" className={`pd-share-btn${linkCopied ? ' is-copied' : ''}`} onClick={onCopyLink}>
-          {linkCopied ? '✓ คัดลอกลิงก์แล้ว — วางในเพจ/กลุ่มได้เลย' : '🔗 คัดลอกลิงก์แชร์สินค้า'}
-        </button>
-      </div>
       <aside className="pd-media">
         <div className="pd-main">
           {displayImage ? (
@@ -494,6 +481,11 @@ function MarketplaceDetailPanel({
             ))}
           </div>
         )}
+        <div className="pd-share-row pd-share-row--below">
+          <button type="button" className={`pd-share-btn${linkCopied ? ' is-copied' : ''}`} onClick={onCopyLink}>
+            {linkCopied ? '✓ คัดลอกลิงก์แล้ว — วางในเพจ/กลุ่มได้เลย' : '🔗 คัดลอกลิงก์แชร์สินค้า'}
+          </button>
+        </div>
       </aside>
 
       <section className={`pd-info${isAuction ? ' pd-info--auction' : ''}`}>
@@ -550,13 +542,20 @@ function MarketplaceDetailPanel({
                   มัดจำสิทธิประมูล <b>฿{auction.bidDeposit.toLocaleString()}</b> จะถูกล็อกจากกระเป๋าตอน Bid
                   {walletAvail != null && <> · ยอดว่าง <b>฿{walletAvail.toLocaleString()}</b></>}
                 </div>
-                {walletAvail != null && walletAvail < auction.bidDeposit && (
+                {walletInsufficient && (
                   <Link href="/wallet" className="btn btn-green btn-sm" style={{ marginTop: 8 }}>
                     เติมเงินเข้ากระเป๋าก่อนบิด →
                   </Link>
                 )}
               </div>
             )}
+
+            {walletLoading && (
+              <p className="pd-bid-hint" style={{ margin: '8px 0 0' }}>กำลังตรวจสอบยอดในกระเป๋า…</p>
+            )}
+
+            {canShowBidForm && (
+              <>
             <div className="pd-autobid">
               <button
                 type="button"
@@ -647,6 +646,8 @@ function MarketplaceDetailPanel({
                 </p>
               )}
             </div>
+              </>
+            )}
           </div>
         )}
 

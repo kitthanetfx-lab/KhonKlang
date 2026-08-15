@@ -10,6 +10,30 @@ async function loadFonts() {
   return [{ name: 'TH', data: bold, weight: 700 as const, style: 'normal' as const }];
 }
 
+/** ดึงรูปจาก URL แล้ว embed เป็น data URL — Satori บน Vercel โหลด external URL ไม่เสถียร */
+async function fetchImageDataUrl(url: string): Promise<string | undefined> {
+  if (!url || url.startsWith('data:')) return url || undefined;
+  try {
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return undefined;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const ct = res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';
+    return `data:${ct};base64,${buf.toString('base64')}`;
+  } catch {
+    return undefined;
+  }
+}
+
+async function embedImageUrls(urls: (string | undefined)[]): Promise<(string | undefined)[]> {
+  const unique = [...new Set(urls.filter(Boolean) as string[])];
+  const map = new Map<string, string>();
+  await Promise.all(unique.map(async u => {
+    const data = await fetchImageDataUrl(u);
+    if (data) map.set(u, data);
+  }));
+  return urls.map(u => (u ? map.get(u) : undefined));
+}
+
 function ImageSlot({ src, label }: { src?: string; label: string }) {
   if (src) {
     return (
@@ -68,11 +92,11 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
     );
   }
 
-  const imgs = [
+  const imgs = await embedImageUrls([
     meta.imageUrls[0],
     meta.imageUrls[1] || meta.imageUrls[0],
     meta.imageUrls[2] || meta.imageUrls[0],
-  ];
+  ]);
   const accent = meta.isAuction ? '#7c3aed' : '#2563eb';
   const accentSoft = meta.isAuction ? '#f5f3ff' : '#eef4ff';
   const priceLabel = meta.isAuction

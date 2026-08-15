@@ -7,6 +7,7 @@ import { Icon } from '@/components/Icon';
 import { NotifyBell } from '@/components/NotifyBell';
 import { MessengerIcon } from '@/components/MessengerIcon';
 import { MarketplaceOrdersIcon } from '@/components/MarketplaceOrdersIcon';
+import { WalletHeaderAction } from '@/components/mobile/WalletHeaderAction';
 import { useAppPreferences } from '@/components/AppPreferences';
 import { getProfileItems } from '@/lib/navData';
 import { useUser } from '@/lib/useUser';
@@ -81,6 +82,7 @@ export function AppHeaderActions({ className = '' }: { className?: string }) {
           <ActionTile label={notifyLabel}>
             <NotifyBell buttonClassName={BTN} />
           </ActionTile>
+          <WalletHeaderAction locale={locale} />
           <ActionTile label={profileLabel}>
             <div
               className={`dropdown hdr-profile-dd ${profileOpen ? 'open' : ''}`}
