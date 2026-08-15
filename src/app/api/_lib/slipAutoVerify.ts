@@ -37,12 +37,47 @@ export function normalizeAccount(value: string): string {
   return String(value || '').replace(/\D/g, '');
 }
 
+/** แปลงเลขบัญชีจากสลิปเป็น pattern ตัวเลข + x (ตัด - ช่องว่าง และอักขระอื่น) */
+export function slipAccountPattern(value: string): string {
+  return String(value || '')
+    .replace(/[\s-]/g, '')
+    .toLowerCase()
+    .replace(/[^0-9x]/g, '');
+}
+
+/**
+ * เทียบเลขบัญชีแอดมิน (เต็ม) กับเลขจากสลิป (มักเป็น mask เช่น xxx-x-x1493-x)
+ * — ทุกหลักที่สลิปแสดงตัวเลข ต้องตรงตำแหน่งเดียวกับเลขในแอดมิน
+ * — หลักที่เป็น x บนสลิป ข้าม (ธนาคารปิดไว้)
+ */
 export function accountsMatch(expected: string, actual: string): boolean {
-  const a = normalizeAccount(expected);
-  const b = normalizeAccount(actual);
-  if (!a || !b) return false;
-  if (a === b) return true;
-  return a.endsWith(b) || b.endsWith(a);
+  const adminDigits = normalizeAccount(expected);
+  const pattern = slipAccountPattern(actual);
+  if (!adminDigits || !pattern) return false;
+
+  if (adminDigits === pattern) return true;
+
+  // สลิปเป็นเลขล้วน (ไม่มี x) — เต็มหรือท้ายบัญชี
+  if (/^\d+$/.test(pattern)) {
+    if (adminDigits.endsWith(pattern) || pattern.endsWith(adminDigits)) return true;
+    return false;
+  }
+
+  // mask แบบไทย — ความยาว pattern ต้องเท่าจำนวนหลักในแอดมิน
+  if (pattern.length === adminDigits.length) {
+    for (let i = 0; i < pattern.length; i++) {
+      const ch = pattern[i];
+      if (ch === 'x') continue;
+      if (ch !== adminDigits[i]) return false;
+    }
+    return true;
+  }
+
+  // fallback: mask สั้น/ยาวไม่เท่า — ใช้เฉพาะตัวเลขที่เห็น ถ้าอยู่ท้ายบัญชี
+  const visible = pattern.replace(/x/g, '');
+  if (visible.length >= 4 && adminDigits.endsWith(visible)) return true;
+
+  return false;
 }
 
 export function parseSlipTransferDate(slip: SlipInfo): Date | null {
@@ -102,7 +137,7 @@ export function evaluateSlipCheck(
 
   const companyAcct = String(opts.companyBankAcct || '').trim();
   if (companyAcct && slip.receiverAccount && !accountsMatch(companyAcct, slip.receiverAccount)) {
-    reasons.push(`เลขบัญชีผู้รับไม่ตรง (สลิป: ${slip.receiverAccount} / บริษัท: ${companyAcct})`);
+    reasons.push(`เลขบัญชีผู้รับไม่ตรง (สลิป: ${slip.receiverAccount} / บัญชีกลาง: ${companyAcct})`);
   } else if (companyAcct && !slip.receiverAccount) {
     warnings.push('ไม่พบเลขบัญชีผู้รับบนสลิป — ตรวจด้วยตนเองเพิ่มเติม');
   }
