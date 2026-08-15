@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { placeAuctionBid } from '../../../_lib/auctionSync';
+import { WalletInsufficientError } from '../../../_lib/userWallet';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -22,6 +23,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const auction = await placeAuctionBid(db, id, me.id, name, amount, { maxBid, stepAmount, clearAutoBid });
     return NextResponse.json({ ok: true, auction });
   } catch (err: unknown) {
+    if (err instanceof WalletInsufficientError) {
+      return NextResponse.json({
+        error: err.message,
+        code: 'WALLET_INSUFFICIENT',
+        need: err.need,
+        available: err.available,
+      }, { status: 400 });
+    }
     const status = err instanceof HttpError ? err.status : 400;
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status });
   }

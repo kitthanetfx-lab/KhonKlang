@@ -18,6 +18,7 @@ import {
 } from '@/lib/marketplaceOrder';
 import { finalizeAuction } from '../../_lib/auctionSync';
 import { rowToAuctionPublic, computeAuctionEndsAt, type AuctionRow, type AuctionDurationInput } from '@/lib/auction';
+import { settleAuctionCancel, releaseAuctionDepositOnPaid } from '../../_lib/userWallet';
 
 // หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
 async function getAdminIds(db: SupabaseClient): Promise<string[]> {
@@ -569,6 +570,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
         updates = { status: 'packing', middleman_confirmed_payment: true };
         systemMsg = 'คนกลางยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้า';
+        await releaseAuctionDepositOnPaid(db, deal).catch(() => {});
         break;
       }
       case 'add_evidence': {
@@ -692,6 +694,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             if (deal.deal_type === 'auction') {
               updates = { status: 'cancelled', reject_reason: body.reason || 'ผู้ซื้อยกเลิกหลังชนะประมูล' };
               systemMsg = `ยกเลิกคำสั่งซื้อประมูล${body.reason ? ': ' + body.reason : ''}`;
+              await settleAuctionCancel(db, deal, Boolean(deal.buyer_id));
               break;
             }
             updates = {
@@ -710,6 +713,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
         updates = { status: 'cancelled', reject_reason: body.reason || '' };
         systemMsg = `ยกเลิกดีล${body.reason ? ': ' + body.reason : ''}`;
+        if (deal.deal_type === 'auction') {
+          await settleAuctionCancel(db, deal, Boolean(deal.buyer_id));
+        }
         break;
       }
       case 'dispute': {
@@ -1068,6 +1074,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           const ad = body.auctionData as Record<string, unknown>;
           const auctionPatch: Record<string, unknown> = {};
           if (ad.bidIncrement != null) auctionPatch.bid_increment = Math.max(1, Math.round(Number(ad.bidIncrement) || 10));
+          if (ad.bidDeposit != null) {
+            const { data: liveAuction } = await db.from('deal_auction').select('bid_count').eq('deal_id', id).maybeSingle();
+            if (Number(liveAuction?.bid_count || 0) > 0) {
+              return NextResponse.json({ error: 'มีคนบิดแล้ว เปลี่ยนมัดจำสิทธิประมูลไม่ได้' }, { status: 400 });
+            }
+            const dep = Math.round(Number(ad.bidDeposit) || 0);
+            if (dep < 1) return NextResponse.json({ error: 'มัดจำสิทธิประมูลต้องอย่างน้อย ฿1' }, { status: 400 });
+            auctionPatch.bid_deposit = dep;
+          }
           const hasDuration = ad.durationMinutes != null
             || ad.durationDays != null
             || ad.durationHoursPart != null

@@ -6,6 +6,7 @@ import { notifyUsers } from '../../_lib/notify';
 import { verifySlipByUrl, verifySlipByFileId, dealSlipPublicUrl, formatSlipokError } from '@/lib/slipok';
 import { getBankInfoMap, type BankInfo } from '@/lib/bankInfo';
 import { readFeesConfig, syncDealLedger, syncFinanceProjection } from '../../_lib/financeLedger';
+import { releaseAuctionDepositOnPaid } from '../../_lib/userWallet';
 
 function slipUrl(bucket: 'deal_files' | 'kyc_docs', fileId: string) {
   if (bucket === 'kyc_docs') {
@@ -596,6 +597,7 @@ export async function PATCH(req: NextRequest) {
         if (!priceState?.seller_fee_slip_verified_at) return NextResponse.json({ error: 'กรุณาตรวจสลิปค่าบริการของผู้ขายก่อนอนุมัติ' }, { status: 400 });
       }
       const { data: updated } = await db.from('deals').update({ status: 'packing', middleman_confirmed_payment: true }).eq('id', id).select().single();
+      await releaseAuctionDepositOnPaid(db, updated || deal).catch(() => {});
       const msg = 'ศูนย์กลางยืนยันรับเงินแล้ว — ผู้ขายเริ่มแพ็คสินค้า';
       await sysMsg(db, id, msg);
       if (recipients.length) await notifyUsers(db, recipients, { title: `ยืนยันรับเงิน: ${deal.title || 'ดีล'}`, body: msg, link: `/deal/${id}` });

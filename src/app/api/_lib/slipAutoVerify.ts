@@ -13,6 +13,7 @@ import { notifyAdminLineSlipResult } from '@/lib/lineAdminNotify';
 import { readFeesConfig, syncDealLedger } from '@/app/api/_lib/financeLedger';
 import { readServiceControlsConfig } from '@/app/api/_lib/appConfig';
 import { shouldAutoVerifySlip } from '@/lib/serviceControls';
+import { releaseAuctionDepositOnPaid } from '@/app/api/_lib/userWallet';
 import { notifyUsers } from '@/app/api/_lib/notify';
 import { maybeNotifyAdminLineQueues } from '@/app/api/_lib/adminLineNotifyHook';
 import { loadAdminDealSnapshot, type AdminDealRow } from '@/app/api/_lib/adminDealQueue';
@@ -242,6 +243,8 @@ async function tryAutoApprove(db: SupabaseClient, dealId: string, deal: Record<s
   }).eq('id', dealId).select().single();
 
   if (!updated) return null;
+
+  await releaseAuctionDepositOnPaid(db, updated as { id: string; title?: string; buyer_id?: string | null; deal_type?: string }).catch(() => {});
 
   const msg = '🤖 ระบบตรวจสลิปครบและอนุมัติรับเงินอัตโนมัติ — ผู้ขายเริ่มแพ็คสินค้าได้';
   await insertSystemMsg(db, dealId, msg);

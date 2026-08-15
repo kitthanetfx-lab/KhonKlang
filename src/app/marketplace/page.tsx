@@ -317,6 +317,12 @@ export default function Marketplace() {
             <span className="lc-auction-foot-bidders">👥 {a.uniqueBidderCount} คน bid</span>
             <span className="lc-auction-foot-sep">·</span>
             <span className="lc-auction-bid-step">+฿{a.bidIncrement.toLocaleString()}/bid</span>
+            {a.bidDeposit > 0 && (
+              <>
+                <span className="lc-auction-foot-sep">·</span>
+                <span>มัดจำ ฿{a.bidDeposit.toLocaleString()}</span>
+              </>
+            )}
             {(listing.location || listing.condition) && (
               <span className="lc-auction-foot-extra">
                 {listing.location && (

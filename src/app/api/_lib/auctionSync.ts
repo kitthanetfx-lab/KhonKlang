@@ -4,6 +4,7 @@ import { computeAuctionGp } from '@/lib/fees';
 import { readFeesConfig } from './financeLedger';
 import { notifyUsers } from './notify';
 import { notifyUserLineOverbid, notifySellerLineNewBid } from '@/lib/lineUserNotify';
+import { holdAuctionDeposit, releaseLosingAuctionDeposits } from './userWallet';
 
 /** แนบข้อมูลประมูลให้รายการ deals */
 export async function attachAuctions<T extends { id: string; deal_type?: string }>(
@@ -60,9 +61,15 @@ export async function finalizeAuction(db: SupabaseClient, dealId: string) {
       fee_payer: deal.fee_payer || 'buyer',
     }).eq('id', dealId);
 
+    await releaseLosingAuctionDeposits(db, {
+      dealId,
+      winnerId: String(auction.current_bidder_id),
+      title: String(deal.title || 'ประมูล'),
+    }).catch(() => {});
+
     await notifyUsers(db, [auction.current_bidder_id as string], {
       title: '🔨 คุณชนะประมูล!',
-      body: `"${deal.title}" — ราคาที่ชนะ ฿${winningBid.toLocaleString()} กรุณาชำระเงิน`,
+      body: `"${deal.title}" — ราคาที่ชนะ ฿${winningBid.toLocaleString()} กรุณาชำระเงิน (มัดจำยังถูกล็อกไว้จนกว่าจะชำระครบ)`,
       link: `/cart/checkout/${dealId}`,
     });
     if (deal.seller_id) {
@@ -72,6 +79,12 @@ export async function finalizeAuction(db: SupabaseClient, dealId: string) {
         link: `/dashboard/seller`,
       });
     }
+  } else {
+    await releaseLosingAuctionDeposits(db, {
+      dealId,
+      winnerId: null,
+      title: String(deal.title || 'ประมูล'),
+    }).catch(() => {});
   }
 
   return { ...auction, ended_at: endedAt };
@@ -269,6 +282,25 @@ export async function placeAuctionBid(
     if (stepAmount > 0 && stepAmount < pub.bidIncrement) {
       throw new Error(`จำนวนเงินต่อบิดต้องไม่ต่ำกว่าขั้นต่ำรายการ ฿${pub.bidIncrement.toLocaleString()}`);
     }
+    bidAmount = Math.min(bidAmount, maxBid);
+  }
+
+  if (bidAmount < pub.minNextBid) {
+    throw new Error(`ราคา bid ต่ำเกินไป — ต้องอย่างน้อย ฿${pub.minNextBid.toLocaleString()}`);
+  }
+
+  const bidDeposit = Math.max(0, Math.round(Number(auction.bid_deposit) || 0));
+  if (bidDeposit > 0) {
+    await holdAuctionDeposit(db, {
+      dealId,
+      bidderId,
+      amount: bidDeposit,
+      title: String(deal.title || 'ประมูล'),
+    });
+  }
+
+  if (!options?.clearAutoBid && maxBid != null) {
+    const effectiveStep = autoBidStepAmount(pub.bidIncrement, stepAmount);
     await db.from('auction_auto_bids').upsert({
       deal_id: dealId,
       bidder_id: bidderId,
@@ -277,11 +309,6 @@ export async function placeAuctionBid(
       step_amount: stepAmount > 0 ? effectiveStep : 0,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'deal_id,bidder_id' });
-    bidAmount = Math.min(bidAmount, maxBid);
-  }
-
-  if (bidAmount < pub.minNextBid) {
-    throw new Error(`ราคา bid ต่ำเกินไป — ต้องอย่างน้อย ฿${pub.minNextBid.toLocaleString()}`);
   }
 
   const prevLeader = auction.current_bidder_id;

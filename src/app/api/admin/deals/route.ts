@@ -18,6 +18,7 @@ import {
 import { readFeesConfig, syncDealLedger } from '../../_lib/financeLedger';
 import { isListingCheckoutOrder, isMarketplaceSold } from '@/lib/marketplaceOrder';
 import { notifyUsers } from '../../_lib/notify';
+import { settleAuctionCancel, releaseAuctionDepositOnPaid } from '../../_lib/userWallet';
 
 async function attachDealImages<T extends { id: string }>(
   db: ReturnType<typeof getAdminClient>,
@@ -219,6 +220,7 @@ export async function PATCH(req: NextRequest) {
           status: 'cancelled',
           reject_reason: note || null,
         }).eq('id', id);
+        await settleAuctionCancel(db, deal, deal.deal_type === 'auction' && Boolean(deal.buyer_id));
         await db.from('messages').insert({
           deal_id: id, sender_id: null, sender_name: 'ระบบ',
           role: 'system', type: 'system',
@@ -241,6 +243,7 @@ export async function PATCH(req: NextRequest) {
           status: isMeetup ? 'meetup_ready' : 'packing',
           middleman_confirmed_payment: true,
         }).eq('id', id);
+        await releaseAuctionDepositOnPaid(db, deal).catch(() => {});
         // meetup: ยืนยันรับเงิน = ตรวจสลิปครบทั้งสองฝ่าย (กันสถานะ "นัดเจอ" แต่สลิปยัง "รอตรวจ")
         if (isMeetup) {
           const now = new Date().toISOString();
@@ -350,6 +353,7 @@ export async function PATCH(req: NextRequest) {
             middleman_confirmed_payment: false,
           }).eq('id', id);
           msg = `แอดมินยกเลิกคำสั่งซื้อประมูล${note ? `: ${note}` : ''}`;
+          await settleAuctionCancel(db, deal, Boolean(deal.buyer_id));
         } else {
           await db.from('deals').update({
             status: 'posted',

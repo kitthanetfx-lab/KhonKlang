@@ -175,13 +175,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (isAuction && source === 'listing') {
-      const ad = (auctionData || {}) as AuctionDurationInput & { bidIncrement?: number };
+      const ad = (auctionData || {}) as AuctionDurationInput & { bidIncrement?: number; bidDeposit?: number };
       const bidIncrement = Math.max(1, Math.round(Number(ad.bidIncrement) || 10));
+      const bidDeposit = Math.round(Number(ad.bidDeposit) || 0);
+      if (bidDeposit < 1) throw new Error('กรุณาตั้งมัดจำสิทธิประมูล (อย่างน้อย ฿1)');
       const endsAt = computeAuctionEndsAt(ad);
       const { error: aErr } = await db.from('deal_auction').insert({
         deal_id: doc.id,
         display_start_price: dealPrice,
         bid_increment: bidIncrement,
+        bid_deposit: bidDeposit,
         ends_at: endsAt,
       });
       if (aErr) throw new Error(aErr.message);

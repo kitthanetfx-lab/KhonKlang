@@ -6,6 +6,7 @@ export interface AuctionRow {
   deal_id: string;
   display_start_price: number;
   bid_increment: number;
+  bid_deposit?: number;
   ends_at: string;
   current_bid: number | null;
   current_bidder_id: string | null;
@@ -19,6 +20,7 @@ export interface AuctionPublic {
   dealId: string;
   displayStartPrice: number;
   bidIncrement: number;
+  bidDeposit: number;
   endsAt: string;
   currentBid: number | null;
   currentBidderId: string | null;
@@ -62,6 +64,7 @@ export function rowToAuctionPublic(row: AuctionRow, now = Date.now()): AuctionPu
     dealId: row.deal_id,
     displayStartPrice: Number(row.display_start_price) || 0,
     bidIncrement: Number(row.bid_increment) || 1,
+    bidDeposit: Math.max(0, Math.round(Number(row.bid_deposit) || 0)),
     endsAt: row.ends_at,
     currentBid: row.current_bid != null ? Number(row.current_bid) : null,
     currentBidderId: row.current_bidder_id || null,

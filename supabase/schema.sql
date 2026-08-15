@@ -284,6 +284,7 @@ create table deal_auction (
   deal_id               uuid primary key references deals(id) on delete cascade,
   display_start_price   integer not null check (display_start_price >= 0),
   bid_increment         integer not null check (bid_increment > 0),
+  bid_deposit           integer not null default 0 check (bid_deposit >= 0),
   ends_at               timestamptz not null,
   current_bid           integer check (current_bid is null or current_bid >= 0),
   current_bidder_id     uuid references profiles(id) on delete set null,
@@ -424,6 +425,67 @@ create table middleman_wallets (
   penalty_credit      integer not null default 0,
   active_deal_count   integer not null default 0,
   updated_at          timestamptz not null default now()
+);
+
+create table user_wallets (
+  user_id             uuid primary key,
+  display_name        text not null default '',
+  available_balance   integer not null default 0 check (available_balance >= 0),
+  held_balance        integer not null default 0 check (held_balance >= 0),
+  updated_at          timestamptz not null default now()
+);
+
+create table wallet_ledger (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null,
+  entry_key           text not null unique,
+  type                text not null,
+  amount              integer not null check (amount > 0),
+  available_delta     integer not null default 0,
+  held_delta          integer not null default 0,
+  title               text not null default '',
+  reference_type      text not null default '',
+  reference_id        text not null default '',
+  meta                jsonb not null default '{}',
+  created_at          timestamptz not null default now()
+);
+create index idx_wallet_ledger_user on wallet_ledger(user_id, created_at desc);
+
+create table wallet_topups (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null,
+  amount        integer not null check (amount > 0),
+  slip_file_id  text,
+  status        approval_status not null default 'pending_review',
+  reject_reason text,
+  created_at    timestamptz not null default now(),
+  reviewed_at   timestamptz,
+  reviewed_by   uuid
+);
+
+create table wallet_withdrawals (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null,
+  amount        integer not null check (amount > 0),
+  bank_name     text not null default '',
+  bank_acct     text not null default '',
+  bank_owner    text not null default '',
+  status        approval_status not null default 'pending_review',
+  reject_reason text,
+  created_at    timestamptz not null default now(),
+  reviewed_at   timestamptz,
+  reviewed_by   uuid
+);
+
+create table auction_deposit_holds (
+  id            uuid primary key default gen_random_uuid(),
+  deal_id       uuid not null references deals(id) on delete cascade,
+  bidder_id     uuid not null,
+  amount        integer not null check (amount > 0),
+  status        text not null default 'held' check (status in ('held', 'released', 'forfeited')),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  unique (deal_id, bidder_id)
 );
 
 -- ============================================================================
@@ -893,6 +955,22 @@ create policy finance_ledger_owner_or_admin on finance_ledger
 alter table middleman_wallets enable row level security;
 create policy wallet_owner_or_admin on middleman_wallets
   for select using (middleman_id = auth.uid() or is_admin());
+
+alter table user_wallets enable row level security;
+create policy user_wallets_owner_or_admin on user_wallets
+  for select using (user_id = auth.uid() or is_admin());
+alter table wallet_ledger enable row level security;
+create policy wallet_ledger_owner_or_admin on wallet_ledger
+  for select using (user_id = auth.uid() or is_admin());
+alter table wallet_topups enable row level security;
+create policy wallet_topups_owner_or_admin on wallet_topups
+  for select using (user_id = auth.uid() or is_admin());
+alter table wallet_withdrawals enable row level security;
+create policy wallet_withdrawals_owner_or_admin on wallet_withdrawals
+  for select using (user_id = auth.uid() or is_admin());
+alter table auction_deposit_holds enable row level security;
+create policy auction_deposit_holds_owner_or_admin on auction_deposit_holds
+  for select using (bidder_id = auth.uid() or is_admin());
 
 alter table seller_applications enable row level security;
 create policy seller_app_owner_or_admin on seller_applications

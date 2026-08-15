@@ -10,6 +10,8 @@ import { Icon } from '@/components/Icon';
 import { isCertifiedMode } from '@/lib/listingMode';
 import { computeMarketplaceGp, computeAuctionGp, FEE_DEFAULTS, type FeeConfig } from '@/lib/fees';
 import { formatDurationPartsLabel } from '@/lib/auction';
+import type { AuctionPublic } from '@/lib/auction';
+import { AUCTION_DEPOSIT_PRESETS, baht } from '@/lib/userWallet';
 import { ShippingCarrierPicker } from '@/components/ShippingCarrierPicker';
 import { getLogisticsProviderLabel } from '@/lib/logistics';
 import { SellerPackingPanel } from '@/components/seller/SellerPackingPanel';
@@ -29,6 +31,7 @@ interface Deal {
   shipping_cost?: number; shipping_providers?: string[];
   buyer_id?: string | null;
   payment_slip_file_id?: string | null;
+  auction?: AuctionPublic;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -102,6 +105,7 @@ export default function SellerDashboard() {
   const [postError, setPostError] = useState('');
   const [postDone, setPostDone] = useState(false);
   const [bidIncrement, setBidIncrement] = useState('10');
+  const [bidDeposit, setBidDeposit] = useState('300');
   const [durationDays, setDurationDays] = useState('3');
   const [durationHoursPart, setDurationHoursPart] = useState('0');
   const [durationMinutesPart, setDurationMinutesPart] = useState('0');
@@ -112,7 +116,7 @@ export default function SellerDashboard() {
 
   function resetListingForm() {
     setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation('');
-    setImages([]); setPostError(''); setBidIncrement('10');
+    setImages([]); setPostError(''); setBidIncrement('10'); setBidDeposit('300');
     setDurationDays('3'); setDurationHoursPart('0'); setDurationMinutesPart('0');
     setShippingCost('0'); setShippingProviders([]); setEditDealId('');
   }
@@ -301,6 +305,8 @@ export default function SellerDashboard() {
     if (!title || !price) { setPostError('กรุณากรอกชื่อสินค้าและราคาเริ่มต้น'); return; }
     if (!condition) { setPostError('กรุณาเลือกสภาพสินค้า'); return; }
     if (shippingProviders.length === 0) { setPostError('กรุณาเลือกขนส่งอย่างน้อย 1 รายการ'); return; }
+    const dep = Math.round(Number(bidDeposit) || 0);
+    if (dep < 1) { setPostError('กรุณาตั้งมัดจำสิทธิประมูล'); return; }
     if (editDealId) { await handleUpdateListing(); return; }
     const inc = Math.max(1, Math.round(Number(bidIncrement) || 10));
     setPosting(true); setPostError('');
@@ -314,7 +320,7 @@ export default function SellerDashboard() {
           category, condition, location, creatorRole: 'seller', source: 'listing',
           shippingCost: Number(shippingCost) || 0, shippingProviders,
           dealType: 'auction', imageFileIds: images.map(i => i.fileId),
-          auctionData: { bidIncrement: inc, ...buildAuctionDurationPayload() },
+          auctionData: { bidIncrement: inc, bidDeposit: Math.round(Number(bidDeposit) || 0), ...buildAuctionDurationPayload() },
         }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
@@ -341,6 +347,10 @@ export default function SellerDashboard() {
     setPostError('');
     setPostDone(false);
     setPostModal(deal.deal_type === 'auction' ? 'auction' : 'listing');
+    if (deal.deal_type === 'auction' && deal.auction) {
+      setBidIncrement(String(deal.auction.bidIncrement || 10));
+      setBidDeposit(String(deal.auction.bidDeposit || 300));
+    }
   }
 
   async function handleUpdateListing() {
@@ -357,7 +367,7 @@ export default function SellerDashboard() {
           title, description, price: Number(price), category, condition, location,
           shippingCost: Number(shippingCost) || 0, shippingProviders,
           imageFileIds: images.map(i => i.fileId),
-          ...(postModal === 'auction' ? { auctionData: { bidIncrement: inc, ...buildAuctionDurationPayload() } } : {}),
+          ...(postModal === 'auction' ? { auctionData: { bidIncrement: inc, bidDeposit: Math.round(Number(bidDeposit) || 0), ...buildAuctionDurationPayload() } } : {}),
         }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'บันทึกไม่สำเร็จ'); return; }
@@ -766,6 +776,26 @@ export default function SellerDashboard() {
                           </div>
                         </div>
                         <p className="auction-duration-hint">ปิดประมูลใน <strong>{auctionDurationPreview()}</strong> · นับถอยหลังทุกวินาทีบนตลาด</p>
+                      </div>
+                      <div className="mkt-yahoo-cats seller-auction-duration-section">
+                        <span className="mkt-yahoo-cats-title">มัดจำสิทธิประมูล *</span>
+                        <p className="auction-duration-hint">ผู้บิดต้องมียอดในกระเป๋าอย่างน้อยเท่านี้ ระบบล็อกตอน Bid — ชนะแล้วไม่รับของจะถูกหักเป็นค่าเสียเวลาให้คุณ</p>
+                        <div className="wal-chips" style={{ marginTop: 8 }}>
+                          {AUCTION_DEPOSIT_PRESETS.map(n => (
+                            <button
+                              key={n}
+                              type="button"
+                              className={`wal-chip${Number(bidDeposit) === n ? ' is-on' : ''}`}
+                              onClick={() => setBidDeposit(String(n))}
+                            >
+                              {baht(n)}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="form-field" style={{ margin: '10px 0 0' }}>
+                          <label>กำหนดเอง (บาท)</label>
+                          <input type="number" min="1" value={bidDeposit} onChange={e => setBidDeposit(e.target.value)} />
+                        </div>
                       </div>
                     </div>
                   </div>

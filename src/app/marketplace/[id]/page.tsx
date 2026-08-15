@@ -73,6 +73,7 @@ export default function MarketplaceDetailPage() {
   const [lineOaUrl, setLineOaUrl] = useState('');
   const [bidding, setBidding] = useState(false);
   const [bidError, setBidError] = useState('');
+  const [walletAvail, setWalletAvail] = useState<number | null>(null);
 
   async function loadListing(authOverride?: Record<string, string>) {
     const headers = authOverride
@@ -116,6 +117,11 @@ export default function MarketplaceDetailPage() {
             setMyId(user.id);
             setHdrs(headers);
           }
+          try {
+            const wres = await fetch('/api/wallet', { headers });
+            const wdata = wres.ok ? await wres.json() : null;
+            if (!cancelled && wdata?.wallet) setWalletAvail(Number(wdata.wallet.availableBalance) || 0);
+          } catch { /* ignore */ }
         }
         if (!cancelled) await loadListing(headers);
       } catch (err: unknown) {
@@ -216,7 +222,13 @@ export default function MarketplaceDetailPage() {
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Bid ไม่สำเร็จ');
+      if (!res.ok) {
+        if (data.code === 'WALLET_INSUFFICIENT') {
+          setBidError(data.error || 'ยอดในกระเป๋าไม่พอ');
+          return;
+        }
+        throw new Error(data.error || 'Bid ไม่สำเร็จ');
+      }
       if (data.auction) {
         setAuction(data.auction);
         setBidAmount(String(data.auction.minNextBid));
@@ -345,12 +357,31 @@ export default function MarketplaceDetailPage() {
                     <span className="pd-auction-lbl">บิทครั้งละ</span>
                     <strong className="pd-auction-val">฿{auction.bidIncrement.toLocaleString()}</strong>
                   </div>
+                  {auction.bidDeposit > 0 && (
+                    <div className="pd-auction-cell">
+                      <span className="pd-auction-lbl">มัดจำสิทธิ</span>
+                      <strong className="pd-auction-val">฿{auction.bidDeposit.toLocaleString()}</strong>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* ประมูล: กล่อง Bid — เพดาน Auto-bid เหนือปุ่ม Bid (ลำดับสายตา + contrast) */}
               {isAuction && !isOwner && auction.phase === 'live' && (
                 <div className="pd-bid">
+                  {auction.bidDeposit > 0 && (
+                    <div className="pd-deposit-note">
+                      <div>
+                        มัดจำสิทธิประมูล <b>฿{auction.bidDeposit.toLocaleString()}</b> จะถูกล็อกจากกระเป๋าตอน Bid
+                        {walletAvail != null && <> · ยอดว่าง <b>฿{walletAvail.toLocaleString()}</b></>}
+                      </div>
+                      {walletAvail != null && walletAvail < auction.bidDeposit && (
+                        <Link href="/wallet" className="btn btn-green btn-sm" style={{ marginTop: 8 }}>
+                          เติมเงินเข้ากระเป๋าก่อนบิด →
+                        </Link>
+                      )}
+                    </div>
+                  )}
                   <div className="pd-autobid">
                     <button
                       type="button"
@@ -451,7 +482,14 @@ export default function MarketplaceDetailPage() {
                         <Icon name="chat" size={15} /> แชทกับผู้ขาย
                       </button>
                     )}
-                    {bidError && <p className="pd-bid-err">{bidError}</p>}
+                    {bidError && (
+                      <p className="pd-bid-err">
+                        {bidError}
+                        {bidError.includes('กระเป๋า') && (
+                          <> {' '}<Link href="/wallet">ไปเติมเงิน</Link></>
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

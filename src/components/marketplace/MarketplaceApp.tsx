@@ -314,6 +314,12 @@ function AppAuctionRow({
             )}
             <span>·</span>
             <span>{a.uniqueBidderCount} คน bid</span>
+            {a.bidDeposit > 0 && (
+              <>
+                <span>·</span>
+                <span>มัดจำ ฿{a.bidDeposit.toLocaleString()}</span>
+              </>
+            )}
           </div>
         </div>
         <Icon name="chevronRight" size={18} className="mkt-app-chevron" />

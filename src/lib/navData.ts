@@ -66,6 +66,7 @@ export function getProfileItems(locale: 'th' | 'en'): NavItem[] {
   if (locale === 'en') {
     return [
       { icon: 'user', tint: '', t: 'Profile', d: 'View and edit your account details', href: '/profile' },
+      { icon: 'wallet', tint: 'green', t: 'Wallet', d: 'Top up, pay auction deposits, and withdraw', href: '/wallet' },
       { icon: 'clock', tint: 'amber', t: 'My Deals / History', d: 'All transactions and message history', href: '/orders' },
       { icon: 'store', tint: '', t: 'My Shop', d: 'Manage your shop and listings', href: '/dashboard/seller' },
       { icon: 'handCoins', tint: 'green', t: 'Middleman Board', d: 'See deals currently under your care', href: '/dashboard/middleman' },
@@ -73,6 +74,7 @@ export function getProfileItems(locale: 'th' | 'en'): NavItem[] {
   }
   return [
     { icon: 'user', tint: '', t: 'เข้าสู่โปรไฟล์', d: 'ดูและแก้ไขข้อมูลบัญชี', href: '/profile' },
+    { icon: 'wallet', tint: 'green', t: 'กระเป๋าเงิน', d: 'เติมเงิน มัดจำประมูล และถอนออก', href: '/wallet' },
     { icon: 'clock', tint: 'amber', t: 'ดีลของฉัน / ประวัติ', d: 'ประวัติซื้อขายทุกบทบาท + กล่องข้อความ', href: '/orders' },
     { icon: 'store', tint: '', t: 'ร้านของฉัน', d: 'ตั้งค่าร้านและลงขายสินค้า', href: '/dashboard/seller' },
     { icon: 'handCoins', tint: 'green', t: 'บอร์ดคนกลาง', d: 'ดูดีลที่กำลังดูแลอยู่', href: '/dashboard/middleman' },
