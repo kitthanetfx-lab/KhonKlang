@@ -10085,3 +10085,69 @@ button.admin-app-stat-tile { cursor: pointer; }
   line-height: 1.55;
   margin-bottom: 10px;
 }
+
+/* ── Pull-to-refresh (แอp Glanghub เท่านั้น) ─────────────────── */
+html.glanghub-app {
+  overscroll-behavior-y: contain;
+}
+.native-ptr {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9998;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  padding-top: calc(6px + env(safe-area-inset-top, 0px));
+  transform: translateY(calc(var(--ptr-pull, 0px) - 100%));
+  opacity: 0;
+  transition: opacity .18s var(--ease-out), transform .12s var(--ease-out);
+}
+.native-ptr.visible {
+  opacity: 1;
+  transition: opacity .12s var(--ease-out);
+}
+.native-ptr.ready .native-ptr-inner {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 88%, var(--surface));
+}
+.native-ptr.refreshing {
+  transform: translateY(0);
+  opacity: 1;
+}
+.native-ptr-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--sh-sm);
+  backdrop-filter: blur(8px);
+}
+.native-ptr-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  border-top-color: var(--accent);
+  flex-shrink: 0;
+  transform: rotate(calc(var(--ptr-pull, 0px) * 2.4deg));
+}
+.native-ptr-spinner.spin {
+  animation: nativePtrSpin .75s linear infinite;
+}
+.native-ptr-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+@keyframes nativePtrSpin {
+  to { transform: rotate(360deg); }
+}
+

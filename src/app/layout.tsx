@@ -13,6 +13,7 @@ import { GlobalPreferenceDock } from "@/components/GlobalPreferenceDock";
 import { GlobalLoadingProvider, GlobalButtonGuard } from "@/components/GlobalLoadingProvider";
 import { NativePushBridge } from "@/components/NativePushBridge";
 import { NativeDeepLinkBridge } from "@/components/NativeDeepLinkBridge";
+import { NativePullToRefreshBridge } from "@/components/NativePullToRefreshBridge";
 
 const displayFont = Anuphan({
   subsets: ["latin", "thai"],
@@ -87,6 +88,7 @@ export default function RootLayout({
               <GlobalButtonGuard />
               <NativePushBridge />
               <NativeDeepLinkBridge />
+              <NativePullToRefreshBridge />
               <AppChrome>
                 {children}
               </AppChrome>
