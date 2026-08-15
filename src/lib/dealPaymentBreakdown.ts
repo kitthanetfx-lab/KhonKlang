@@ -43,6 +43,8 @@ type PriceStateInput = {
   proposed_fee_payer?: string | null;
 } | null | undefined;
 
+export type { PriceStateInput };
+
 /** คำนวณยอดชำระแยกรายการ — ใช้ร่วม UI, ตรวจสลิป และ ledger */
 export function computeDealPaymentBreakdown(
   deal: DealPaymentInput,

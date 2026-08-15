@@ -41,6 +41,7 @@ export type AdminDealRow = {
 
 export type AdminPriceStateRow = {
   deal_id?: string;
+  proposed_fee_payer?: string | null;
   payout_slip_file_id?: string | null;
   refund_slip_file_id?: string | null;
   middleman_fee_sent_at?: string | null;

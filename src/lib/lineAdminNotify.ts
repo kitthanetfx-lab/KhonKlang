@@ -3,7 +3,7 @@ import type { AdminDealSnapshot, AdminQueueStep } from '@/app/api/_lib/adminDeal
 import type { FeeConfig } from '@/lib/fees';
 import { DEAL_BUCKET, fileViewUrl } from '@/lib/supabase';
 import { adminDealsPagePath, getAdminCategoryLabel, getDealCategory } from '@/lib/adminDealCategory';
-import { computeDealPaymentBreakdown, formatDealPaymentBreakdownLines } from '@/lib/dealPaymentBreakdown';
+import { computeDealPaymentBreakdown, formatDealPaymentBreakdownLines, type PriceStateInput } from '@/lib/dealPaymentBreakdown';
 import { formatWarranty } from '@/lib/warranty';
 
 const STEP_LABELS: Record<AdminQueueStep, string> = {
@@ -183,7 +183,7 @@ export async function notifyAdminLineSlipResult(params: {
   autoApproved?: boolean;
   expectedAmount?: number;
   fees?: FeeConfig;
-  priceState?: Record<string, unknown> | null;
+  priceState?: PriceStateInput;
 }): Promise<void> {
   const { deal, side, evaluation, slipUrl, autoApproved, expectedAmount, fees, priceState } = params;
   const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
@@ -271,7 +271,7 @@ export async function notifyAdminLineSlipCheck(params: {
 export async function notifyAdminLineAutoApproved(
   deal: Record<string, unknown>,
   fees?: FeeConfig,
-  priceState?: Record<string, unknown> | null,
+  priceState?: PriceStateInput,
 ): Promise<void> {
   const num = String(deal.deal_number || String(deal.id || '').slice(0, 8).toUpperCase());
   const title = String(deal.title || 'ดีล');
