@@ -21,7 +21,7 @@ export async function generateMetadata({
 
   const pageTitle = `${meta.title} | ${meta.isAuction ? 'ประมูล' : 'ตลาด'} กลางฮับ`;
   const url = `${SITE}/marketplace/${meta.id}`;
-  const ogImage = meta.imageUrl || `${SITE}/og-tag.webp`;
+  const ogImage = `${url}/opengraph-image`;
 
   return {
     title: pageTitle,
@@ -30,7 +30,7 @@ export async function generateMetadata({
     openGraph: {
       type: 'website',
       url,
-      title: pageTitle,
+      title: meta.title,
       description: meta.description,
       siteName: 'กลางฮับ',
       locale: 'th_TH',
@@ -45,7 +45,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: 'summary_large_image',
-      title: pageTitle,
+      title: meta.title,
       description: meta.description,
       images: [ogImage],
     },
