@@ -827,31 +827,37 @@ export default function SellerDashboard() {
                           placeholder="เช่น iPhone 15 Pro Max 256GB สีดำ"
                         />
                       </div>
-                      <div className="mkt-yahoo-search seller-auction-yahoo-row">
-                        <label className="mkt-yahoo-cat-select">
-                          <select value={category} onChange={e => setCategory(e.target.value)} aria-label="หมวดหมู่">
-                            <option value="">หมวดหมู่</option>
-                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </label>
-                        <input
-                          type="number"
-                          className="mkt-yahoo-input"
-                          value={price}
-                          onChange={e => setPrice(e.target.value)}
-                          placeholder="ราคาเริ่มประมูล (บาท)"
-                          min="0"
-                          aria-label="ราคาเริ่มประมูล"
-                        />
-                        <input
-                          type="number"
-                          className="mkt-yahoo-input seller-auction-bid-input"
-                          value={bidIncrement}
-                          onChange={e => setBidIncrement(e.target.value)}
-                          min="1"
-                          placeholder="บิทครั้งละ (บาท)"
-                          aria-label="บิทครั้งละ"
-                        />
+                      <div className="form-field seller-auction-cat-field">
+                        <label>หมวดหมู่</label>
+                        <select value={category} onChange={e => setCategory(e.target.value)} aria-label="หมวดหมู่">
+                          <option value="">เลือกหมวดหมู่...</option>
+                          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-row-2 seller-auction-price-row">
+                        <div className="form-field" style={{ margin: 0 }}>
+                          <label>ราคาเริ่มประมูล (บาท) *</label>
+                          <input
+                            type="number"
+                            value={price}
+                            onChange={e => setPrice(e.target.value)}
+                            placeholder="0"
+                            min="0"
+                            aria-label="ราคาเริ่มประมูล"
+                          />
+                        </div>
+                        <div className="form-field" style={{ margin: 0 }}>
+                          <label>บิดครั้งละ (บาท) *</label>
+                          <input
+                            type="number"
+                            className="seller-auction-bid-input"
+                            value={bidIncrement}
+                            onChange={e => setBidIncrement(e.target.value)}
+                            min="1"
+                            placeholder="10"
+                            aria-label="บิดครั้งละ"
+                          />
+                        </div>
                       </div>
                       <div className="mkt-yahoo-cats seller-auction-duration-section">
                         <span className="mkt-yahoo-cats-title">ระยะเวลาประมูล *</span>
