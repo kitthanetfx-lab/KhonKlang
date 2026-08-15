@@ -21,7 +21,7 @@ export async function generateMetadata({
 
   const pageTitle = `${meta.title} | ${meta.isAuction ? 'ประมูล' : 'ตลาด'} กลางฮับ`;
   const url = `${SITE}/marketplace/${meta.id}`;
-  const ogImage = `${url}/opengraph-image`;
+  const ogImage = `${SITE}/api/og/marketplace/${meta.id}`;
 
   return {
     title: pageTitle,

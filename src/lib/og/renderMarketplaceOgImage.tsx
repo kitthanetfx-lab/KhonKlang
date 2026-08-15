@@ -1,17 +1,13 @@
 import { ImageResponse } from 'next/og';
-import { getMarketplaceListingShareMeta } from '@/lib/marketplaceShareMeta';
+import type { MarketplaceShareMeta } from '@/lib/marketplaceShareMeta';
 
-export const runtime = 'edge';
-export const alt = 'กลางฮับ — สินค้าในตลาด';
-export const size = { width: 1200, height: 630 };
-export const contentType = 'image/png';
+export const OG_SIZE = { width: 1200, height: 630 };
 
 async function loadFonts() {
-  const [bold, regular] = await Promise.all([
-    fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/ibmplexsansthai/IBMPlexSansThai-Bold.ttf').then(r => r.arrayBuffer()),
-    fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/ibmplexsansthai/IBMPlexSansThai-Regular.ttf').then(r => r.arrayBuffer()),
-  ]);
-  return { bold, regular };
+  const bold = await fetch(
+    'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/ibmplexsansthai/IBMPlexSansThai-Bold.ttf',
+  ).then(r => r.arrayBuffer());
+  return [{ name: 'TH', data: bold, weight: 700 as const, style: 'normal' as const }];
 }
 
 function ImageSlot({ src, label }: { src?: string; label: string }) {
@@ -23,12 +19,7 @@ function ImageSlot({ src, label }: { src?: string; label: string }) {
         alt=""
         width={180}
         height={180}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          display: 'block',
-        }}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
       />
     );
   }
@@ -50,13 +41,7 @@ function ImageSlot({ src, label }: { src?: string; label: string }) {
   );
 }
 
-export default async function MarketplaceOgImage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const meta = await getMarketplaceListingShareMeta(id);
+export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null) {
   const fonts = await loadFonts();
 
   if (!meta) {
@@ -79,7 +64,7 @@ export default async function MarketplaceOgImage({
           ไม่พบสินค้า · กลางฮับ
         </div>
       ),
-      { ...size, fonts: [{ name: 'TH', data: fonts.bold, weight: 700, style: 'normal' }] },
+      { ...OG_SIZE, fonts },
     );
   }
 
@@ -155,15 +140,7 @@ export default async function MarketplaceOgImage({
         </div>
 
         <div style={{ display: 'flex', flex: 1, padding: '24px 28px', gap: 24 }}>
-          <div
-            style={{
-              width: 420,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              flexShrink: 0,
-            }}
-          >
+          <div style={{ width: 420, display: 'flex', flexDirection: 'column', gap: 12, flexShrink: 0 }}>
             <div style={{ display: 'flex', gap: 12, height: 196 }}>
               <div style={{ flex: 1, borderRadius: 16, overflow: 'hidden', border: '2px solid #e2e8f0' }}>
                 <ImageSlot src={imgs[0]} label="📦" />
@@ -189,58 +166,21 @@ export default async function MarketplaceOgImage({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {meta.category && (
-                  <span
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 999,
-                      background: '#f1f5f9',
-                      color: '#334155',
-                      fontSize: 16,
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span style={{ padding: '6px 12px', borderRadius: 999, background: '#f1f5f9', color: '#334155', fontSize: 16, fontWeight: 600 }}>
                     {meta.category}
                   </span>
                 )}
                 {meta.condition && (
-                  <span
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 999,
-                      background: '#f1f5f9',
-                      color: '#334155',
-                      fontSize: 16,
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span style={{ padding: '6px 12px', borderRadius: 999, background: '#f1f5f9', color: '#334155', fontSize: 16, fontWeight: 600 }}>
                     {meta.condition}
                   </span>
                 )}
               </div>
-
-              <div
-                style={{
-                  fontSize: 34,
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  lineHeight: 1.25,
-                  maxHeight: 90,
-                  overflow: 'hidden',
-                }}
-              >
+              <div style={{ fontSize: 34, fontWeight: 700, color: '#0f172a', lineHeight: 1.25, maxHeight: 90, overflow: 'hidden' }}>
                 {meta.title.length > 70 ? `${meta.title.slice(0, 68)}…` : meta.title}
               </div>
-
               {meta.shortDescription && (
-                <div
-                  style={{
-                    fontSize: 20,
-                    color: '#475569',
-                    lineHeight: 1.45,
-                    maxHeight: 60,
-                    overflow: 'hidden',
-                  }}
-                >
+                <div style={{ fontSize: 20, color: '#475569', lineHeight: 1.45, maxHeight: 60, overflow: 'hidden' }}>
                   {meta.shortDescription.length > 100 ? `${meta.shortDescription.slice(0, 98)}…` : meta.shortDescription}
                 </div>
               )}
@@ -249,33 +189,14 @@ export default async function MarketplaceOgImage({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {meta.isAuction && meta.auction && (
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <span
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: 12,
-                      background: accentSoft,
-                      color: accent,
-                      fontSize: 18,
-                      fontWeight: 700,
-                    }}
-                  >
+                  <span style={{ padding: '8px 14px', borderRadius: 12, background: accentSoft, color: accent, fontSize: 18, fontWeight: 700 }}>
                     ⏱ {meta.auction.timeRemainingLabel}
                   </span>
-                  <span
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: 12,
-                      background: '#f8fafc',
-                      color: '#334155',
-                      fontSize: 18,
-                      fontWeight: 700,
-                    }}
-                  >
+                  <span style={{ padding: '8px 14px', borderRadius: 12, background: '#f8fafc', color: '#334155', fontSize: 18, fontWeight: 700 }}>
                     👥 {meta.auction.uniqueBidderCount} คนบิด · {meta.auction.bidCount} bid
                   </span>
                 </div>
               )}
-
               <div
                 style={{
                   display: 'flex',
@@ -288,14 +209,7 @@ export default async function MarketplaceOgImage({
                 }}
               >
                 <span style={{ fontSize: 22, color: '#64748b', fontWeight: 600 }}>{priceLabel}</span>
-                <span
-                  style={{
-                    fontSize: 56,
-                    fontWeight: 700,
-                    color: meta.isAuction ? accent : '#15803d',
-                    letterSpacing: '-0.02em',
-                  }}
-                >
+                <span style={{ fontSize: 56, fontWeight: 700, color: meta.isAuction ? accent : '#15803d', letterSpacing: '-0.02em' }}>
                   ฿{meta.displayPrice.toLocaleString('th-TH')}
                 </span>
               </div>
@@ -304,12 +218,6 @@ export default async function MarketplaceOgImage({
         </div>
       </div>
     ),
-    {
-      ...size,
-      fonts: [
-        { name: 'TH', data: fonts.bold, weight: 700, style: 'normal' },
-        { name: 'TH', data: fonts.regular, weight: 400, style: 'normal' },
-      ],
-    },
+    { ...OG_SIZE, fonts },
   );
 }
