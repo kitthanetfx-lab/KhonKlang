@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
-import { createNativeDictation, isNativeDictationAvailable, NATIVE_DICTATION_SILENCE_SEC } from '@/lib/nativeDictation';
+import { createNativeDictation, getSpeechRecognitionPlugin, isNativeDictationAvailable, NATIVE_DICTATION_SILENCE_SEC } from '@/lib/nativeDictation';
 import { isGlanghubApp } from '@/lib/nativeAuth';
 import { Icon } from './Icon';
 
@@ -17,8 +17,8 @@ const BANKS = [
 const PROVINCES = ['ไม่ระบุ','กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
 /* ── Web Speech API (พูดให้พิมพ์) ───────────────────────────── */
-/** ปิดไมค์อัตโนมัติเมื่อไม่มีเสียงพูด (วินาที) */
-const DICTATION_SILENCE_SEC = 20;
+/** ปิดไมค์อัตโนมัติเมื่อไม่มีเสียงพูด (วินาที) — ใช้ค่าเดียวกับ native */
+const DICTATION_SILENCE_SEC = 10;
 
 interface SpeechErrorEvent { error?: string; message?: string; }
 interface SpeechResultEvent { resultIndex: number; results: { length: number; [i: number]: { isFinal: boolean; 0: { transcript: string } } }; }
@@ -53,15 +53,23 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
   const [supported, setSupported] = useState(() => isNativeDictationAvailable() || getSpeechCtor() !== null);
   const [micHint, setMicHint] = useState('');
 
-  useEffect(() => {
-    useNativeRef.current = isNativeDictationAvailable();
-    if (useNativeRef.current) {
+  function ensureNativeController() {
+    if (!isGlanghubApp() || !getSpeechRecognitionPlugin()) return false;
+    useNativeRef.current = true;
+    if (!nativeRef.current) {
       nativeRef.current = createNativeDictation({
         append: text => appendRef.current(text),
         setInterim: text => setInterimRef.current(text),
         setListening,
         setMicHint,
       });
+    }
+    return true;
+  }
+
+  useEffect(() => {
+    if (isNativeDictationAvailable()) {
+      ensureNativeController();
       return () => {
         void nativeRef.current?.destroy();
         nativeRef.current = null;
@@ -114,7 +122,7 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
     restartTimerRef.current = window.setTimeout(() => {
       restartTimerRef.current = null;
       startSession();
-    }, 200);
+    }, 450);
   }
 
   function startSession() {
@@ -183,19 +191,23 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
   }
 
   function toggle() {
-    if (useNativeRef.current) {
-      void nativeRef.current?.toggle();
-      return;
-    }
-    if (activeRef.current) {
+    if (listening) {
+      if (ensureNativeController()) {
+        void nativeRef.current?.toggle();
+        return;
+      }
       setMicHint('');
       stopListening();
+      return;
+    }
+    if (ensureNativeController()) {
+      void nativeRef.current?.toggle();
       return;
     }
     startListening();
   }
 
-  const silenceSec = useNativeRef.current ? NATIVE_DICTATION_SILENCE_SEC : DICTATION_SILENCE_SEC;
+  const silenceSec = isGlanghubApp() ? NATIVE_DICTATION_SILENCE_SEC : DICTATION_SILENCE_SEC;
   return { listening, supported, toggle, micHint, silenceSec };
 }
 
