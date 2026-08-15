@@ -72,6 +72,7 @@ export default function SellerDashboard() {
   const [loading, setLoading] = useState(true);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [tab, setTab] = useState<'selling' | 'packing' | 'shipping' | 'done' | 'history'>('selling');
+  const [sellKind, setSellKind] = useState<'listing' | 'auction'>('listing');
   const [postModal, setPostModal] = useState<null | 'pick' | 'listing' | 'auction'>(null);
   const [packingDealId, setPackingDealId] = useState('');
   const [myId, setMyId] = useState('');
@@ -295,7 +296,7 @@ export default function SellerDashboard() {
       setPostDone(true);
       resetListingForm();
       await fetchDeals(headers);
-      setTimeout(() => { setPostDone(false); closePostModal(); setTab('selling'); }, 1800);
+      setTimeout(() => { setPostDone(false); closePostModal(); setTab('selling'); setSellKind('listing'); }, 1800);
     } catch (err: unknown) {
       setPostError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally { setPosting(false); }
@@ -327,7 +328,7 @@ export default function SellerDashboard() {
       setPostDone(true);
       resetListingForm();
       await fetchDeals(headers);
-      setTimeout(() => { setPostDone(false); closePostModal(); setTab('selling'); }, 1800);
+      setTimeout(() => { setPostDone(false); closePostModal(); setTab('selling'); setSellKind('auction'); }, 1800);
     } catch (err: unknown) {
       setPostError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally { setPosting(false); }
@@ -394,15 +395,36 @@ export default function SellerDashboard() {
   const doneDeals = storeListings.filter(d => DONE_STATUSES.includes(d.status));
   const historyDeals = myListings.filter(d => HISTORY_STATUSES.includes(d.status) || (!isListingStoreOrder(d) && DONE_STATUSES.includes(d.status)));
   const totalRev = storeListings.filter(d => d.status === 'completed').reduce((s, d) => s + (d.price || 0), 0);
-  const packingOpenDeal = packingDeals.find(d => d.id === packingDealId) || null;
+  const isAuctionDeal = (d: Deal) => d.deal_type === 'auction';
+  const filterByKind = (list: Deal[]) => list.filter(d => sellKind === 'auction' ? isAuctionDeal(d) : !isAuctionDeal(d));
+
+  const tabDealsRaw = tab === 'selling' ? sellingDeals
+    : tab === 'packing' ? packingDeals
+      : tab === 'shipping' ? shippingDeals
+        : tab === 'done' ? doneDeals
+          : historyDeals;
+  const tabDeals = filterByKind(tabDealsRaw);
+  const kindCounts = {
+    listing: tabDealsRaw.filter(d => !isAuctionDeal(d)).length,
+    auction: tabDealsRaw.filter(d => isAuctionDeal(d)).length,
+  };
+
+  const filteredPackingDeals = filterByKind(packingDeals);
+  const packingOpenDeal = filteredPackingDeals.find(d => d.id === packingDealId) || null;
   const listingGpPreview = price && Number(price) > 0 && postModal === 'listing' ? computeMarketplaceGp(feeConfig, Number(price)) : null;
   const auctionGpPreview = price && Number(price) > 0 && postModal === 'auction' ? computeAuctionGp(feeConfig, Number(price)) : null;
 
   useEffect(() => {
-    if (tab === 'packing' && packingDeals.length === 1 && !packingDealId) {
-      setPackingDealId(packingDeals[0].id);
+    if (tab === 'packing' && filteredPackingDeals.length === 1 && !packingDealId) {
+      setPackingDealId(filteredPackingDeals[0].id);
     }
-  }, [tab, packingDeals, packingDealId]);
+  }, [tab, filteredPackingDeals, packingDealId]);
+
+  useEffect(() => {
+    if (packingDealId && !filteredPackingDeals.some(d => d.id === packingDealId)) {
+      setPackingDealId('');
+    }
+  }, [sellKind, packingDealId, filteredPackingDeals]);
 
   if (loading) return (
     <div className="dash-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -422,18 +444,29 @@ export default function SellerDashboard() {
     const statusCls = isStore ? sellerListingStatusClass(deal) : (STATUS_CLS[deal.status] || 'sb-gray');
     const canEdit = deal.status === 'posted' && isStore && !deal.buyer_id;
     const needsPack = isStore && deal.status === 'packing';
+    const isAuction = isAuctionDeal(deal);
     return (
-      <div className="deal-card">
+      <div className={`deal-card${isStore ? (isAuction ? ' deal-card--auction' : ' deal-card--listing') : ''}`}>
         <div className="deal-card-header">
           <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 0 }}>
-            {firstImg && <img src={firstImg} alt="" style={{ width: 56, height: 56, borderRadius: 'var(--r-md)', objectFit: 'cover', flexShrink: 0 }} />}
+            <div className="deal-card-thumb-wrap">
+              {firstImg ? (
+                <img src={firstImg} alt="" className="deal-card-thumb" />
+              ) : (
+                <div className="deal-card-thumb deal-card-thumb--empty">📦</div>
+              )}
+              {isStore && (
+                <span className={`deal-card-kind${isAuction ? ' deal-card-kind--auction' : ' deal-card-kind--listing'}`}>
+                  {isAuction ? '🔨 ประมูล' : '🛒 ขาย'}
+                </span>
+              )}
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="deal-card-title">{deal.title}</div>
               <div className="deal-card-meta">
                 <span className="deal-card-price">฿{(deal.price || 0).toLocaleString()}</span>
                 {deal.condition && <span>{deal.condition}</span>}
                 {deal.location && <span>📍 {deal.location}</span>}
-                {deal.deal_type === 'auction' && <span style={{ color: '#7c3aed', fontWeight: 700 }}>🔨 ประมูล</span>}
                 {isCertifiedMode(deal.selling_mode) && <span style={{ color: 'var(--amber-500)', fontWeight: 700 }}>⭐ Certified</span>}
               </div>
             </div>
@@ -592,6 +625,31 @@ export default function SellerDashboard() {
             ))}
           </nav>
 
+          <div className="dash-sell-kind">
+            <div className="mkt-mode-tabs dash-sell-kind-tabs" role="tablist" aria-label="ประเภทสินค้าในร้าน">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={sellKind === 'listing'}
+                className={`mkt-mode-tab mkt-mode-tab--listing${sellKind === 'listing' ? ' active' : ''}`}
+                onClick={() => setSellKind('listing')}
+              >
+                <span className="mkt-mode-tab-ic">🛒</span>
+                ขายสินค้า ({kindCounts.listing})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={sellKind === 'auction'}
+                className={`mkt-mode-tab mkt-mode-tab--auction${sellKind === 'auction' ? ' active' : ''}`}
+                onClick={() => setSellKind('auction')}
+              >
+                <span className="mkt-mode-tab-ic">🔨</span>
+                สินค้าประมูล ({kindCounts.auction})
+              </button>
+            </div>
+          </div>
+
           <main className="dash-body">
             <div className="dash-stats">
               <div className="dash-stat"><div className="dash-stat-val">{packingDeals.length}</div><div className="dash-stat-lbl">รอแพค</div></div>
@@ -601,20 +659,44 @@ export default function SellerDashboard() {
             </div>
 
             <div className="dash-deal-grid">
-              {tab === 'selling' && (sellingDeals.length === 0 ? (
+              {tab === 'selling' && (tabDeals.length === 0 ? (
                 <div className="dash-empty">
-                  <div className="dash-empty-icon">📦</div>
-                  <p>ยังไม่มีประกาศที่กำลังดำเนินการ</p>
-                  <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setPostModal('pick')}>+ ลงประกาศใหม่</button>
+                  <div className="dash-empty-icon">{sellKind === 'auction' ? '🔨' : '📦'}</div>
+                  <p>
+                    {tabDealsRaw.length === 0
+                      ? 'ยังไม่มีประกาศที่กำลังดำเนินการ'
+                      : sellKind === 'auction'
+                        ? 'ยังไม่มีสินค้าประมูลในสถานะนี้'
+                        : 'ยังไม่มีสินค้าขายปกติในสถานะนี้'}
+                  </p>
+                  {tabDealsRaw.length === 0 ? (
+                    <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setPostModal('pick')}>+ ลงประกาศใหม่</button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-soft"
+                      style={{ marginTop: 16 }}
+                      onClick={() => setSellKind(sellKind === 'auction' ? 'listing' : 'auction')}
+                    >
+                      ดู{sellKind === 'auction' ? 'สินค้าขายปกติ' : 'สินค้าประมูล'}แทน
+                    </button>
+                  )}
                 </div>
-              ) : sellingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+              ) : tabDeals.map(d => <DealCard key={d.id} deal={d} />))}
 
               {tab === 'packing' && (
-                packingDeals.length === 0 ? (
-                  <div className="dash-empty"><p>ไม่มีสินค้ารอแพค</p></div>
+                filteredPackingDeals.length === 0 ? (
+                  <div className="dash-empty">
+                    <p>{packingDeals.length === 0 ? 'ไม่มีสินค้ารอแพค' : sellKind === 'auction' ? 'ไม่มีสินค้าประมูลรอแพค' : 'ไม่มีสินค้าขายปกติรอแพค'}</p>
+                    {packingDeals.length > 0 && (
+                      <button type="button" className="btn btn-soft" style={{ marginTop: 12 }} onClick={() => setSellKind(sellKind === 'auction' ? 'listing' : 'auction')}>
+                        ดู{sellKind === 'auction' ? 'สินค้าขายปกติ' : 'สินค้าประมูล'}แทน
+                      </button>
+                    )}
+                  </div>
                 ) : packingOpenDeal ? (
                   <div className="seller-pack-list">
-                    {packingDeals.length > 1 && (
+                    {filteredPackingDeals.length > 1 && (
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
@@ -638,7 +720,7 @@ export default function SellerDashboard() {
                   </div>
                 ) : (
                   <div className="seller-pack-list">
-                    {packingDeals.map(d => (
+                    {filteredPackingDeals.map(d => (
                       <div key={d.id}>
                         <DealCard deal={d} hidePackButton />
                         <button
@@ -655,11 +737,23 @@ export default function SellerDashboard() {
                 )
               )}
 
-              {tab === 'shipping' && (shippingDeals.length === 0 ? <div className="dash-empty"><p>ไม่มีสินค้ารอจัดส่ง</p></div> : shippingDeals.map(d => <DealCard key={d.id} deal={d} />))}
+              {tab === 'shipping' && (tabDeals.length === 0 ? (
+                <div className="dash-empty">
+                  <p>{shippingDeals.length === 0 ? 'ไม่มีสินค้ารอจัดส่ง' : sellKind === 'auction' ? 'ไม่มีสินค้าประมูลรอจัดส่ง' : 'ไม่มีสินค้าขายปกติรอจัดส่ง'}</p>
+                </div>
+              ) : tabDeals.map(d => <DealCard key={d.id} deal={d} />))}
 
-              {tab === 'done' && (doneDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีออเดอร์สำเร็จ</p></div> : doneDeals.map(d => <DealCard key={d.id} deal={d} />))}
+              {tab === 'done' && (tabDeals.length === 0 ? (
+                <div className="dash-empty">
+                  <p>{doneDeals.length === 0 ? 'ยังไม่มีออเดอร์สำเร็จ' : sellKind === 'auction' ? 'ยังไม่มีประมูลที่สำเร็จ' : 'ยังไม่มีการขายปกติที่สำเร็จ'}</p>
+                </div>
+              ) : tabDeals.map(d => <DealCard key={d.id} deal={d} />))}
 
-              {tab === 'history' && (historyDeals.length === 0 ? <div className="dash-empty"><p>ยังไม่มีประวัติการขาย</p></div> : historyDeals.map(d => <DealCard key={d.id} deal={d} />))}
+              {tab === 'history' && (tabDeals.length === 0 ? (
+                <div className="dash-empty">
+                  <p>{historyDeals.length === 0 ? 'ยังไม่มีประวัติการขาย' : sellKind === 'auction' ? 'ยังไม่มีประวัติประมูล' : 'ยังไม่มีประวัติขายปกติ'}</p>
+                </div>
+              ) : tabDeals.map(d => <DealCard key={d.id} deal={d} />))}
             </div>
           </main>
         </section>

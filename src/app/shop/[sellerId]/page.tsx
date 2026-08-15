@@ -52,6 +52,7 @@ export default function PublicShopPage() {
   const [stats, setStats] = useState<ShopPublicStats | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [sold, setSold] = useState<Listing[]>([]);
+  const [shopZone, setShopZone] = useState<'listing' | 'auction'>('listing');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -89,6 +90,33 @@ export default function PublicShopPage() {
 
   const bannerSrc = shop.shopBannerFileId ? imgUrl(shop.shopBannerFileId) : '';
   const avatarSrc = shop.shopAvatarFileId ? imgUrl(shop.shopAvatarFileId) : '';
+  const saleListings = listings.filter(item => item.deal_type !== 'auction');
+  const auctionListings = listings.filter(item => item.deal_type === 'auction');
+  const visibleListings = shopZone === 'auction' ? auctionListings : saleListings;
+
+  function renderListingCard(item: Listing) {
+    const thumb = item.images?.[0] ? imgUrl(item.images[0]) : '';
+    const isAuction = item.deal_type === 'auction';
+    return (
+      <Link
+        key={item.id}
+        href={`/marketplace/${item.id}`}
+        className={`lc-card mkt-card${isAuction ? ' lc-card--auction' : ''}`}
+      >
+        <div className="lc-card-img-wrap">
+          {thumb ? <img src={thumb} alt="" className="lc-card-img" /> : <div className="lc-card-img lc-card-img--empty">📦</div>}
+          <span className={`shop-card-badge${isAuction ? ' shop-card-badge--auction' : ' shop-card-badge--listing'}`}>
+            {isAuction ? '🔨 ประมูล' : '🛒 ขาย'}
+          </span>
+        </div>
+        <div className="lc-card-body">
+          <div className="lc-card-title">{item.title}</div>
+          <div className="lc-card-price">฿{(item.price || 0).toLocaleString()}{isAuction ? ' เริ่ม' : ''}</div>
+          {item.condition && <div className="lc-card-meta">{item.condition}</div>}
+        </div>
+      </Link>
+    );
+  }
 
   return (
     <div className="sub-page shop-public-page">
@@ -124,27 +152,43 @@ export default function PublicShopPage() {
       </div>
 
       <section className="shop-listings-section">
-        <h2 className="shop-listings-title">สินค้าในร้าน ({listings.length})</h2>
+        <div className="shop-listings-head">
+          <h2 className="shop-listings-title">สินค้าในร้าน</h2>
+          <div className="mkt-mode-tabs shop-zone-tabs" role="tablist" aria-label="ประเภทสินค้าในร้าน">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={shopZone === 'listing'}
+              className={`mkt-mode-tab mkt-mode-tab--listing${shopZone === 'listing' ? ' active' : ''}`}
+              onClick={() => setShopZone('listing')}
+            >
+              <span className="mkt-mode-tab-ic">🛒</span>
+              ขายสินค้า ({saleListings.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={shopZone === 'auction'}
+              className={`mkt-mode-tab mkt-mode-tab--auction${shopZone === 'auction' ? ' active' : ''}`}
+              onClick={() => setShopZone('auction')}
+            >
+              <span className="mkt-mode-tab-ic">🔨</span>
+              ประมูล ({auctionListings.length})
+            </button>
+          </div>
+        </div>
         {listings.length === 0 ? (
           <div className="dash-empty"><p>ยังไม่มีสินค้าในร้าน</p></div>
+        ) : visibleListings.length === 0 ? (
+          <div className="dash-empty">
+            <p>{shopZone === 'auction' ? 'ยังไม่มีสินค้าประมูลในร้าน' : 'ยังไม่มีสินค้าขายปกติในร้าน'}</p>
+            <button type="button" className="btn btn-soft btn-sm" style={{ marginTop: 12 }} onClick={() => setShopZone(shopZone === 'auction' ? 'listing' : 'auction')}>
+              ดู{shopZone === 'auction' ? 'สินค้าขายปกติ' : 'สินค้าประมูล'}แทน
+            </button>
+          </div>
         ) : (
           <div className="mkt-grid shop-listings-grid">
-            {listings.map(item => {
-              const thumb = item.images?.[0] ? imgUrl(item.images[0]) : '';
-              return (
-                <Link key={item.id} href={`/marketplace/${item.id}`} className="lc-card mkt-card">
-                  <div className="lc-card-img-wrap">
-                    {thumb ? <img src={thumb} alt="" className="lc-card-img" /> : <div className="lc-card-img lc-card-img--empty">📦</div>}
-                    {item.deal_type === 'auction' && <span className="shop-card-badge shop-card-badge--auction">ประมูล</span>}
-                  </div>
-                  <div className="lc-card-body">
-                    <div className="lc-card-title">{item.title}</div>
-                    <div className="lc-card-price">฿{(item.price || 0).toLocaleString()}</div>
-                    {item.condition && <div className="lc-card-meta">{item.condition}</div>}
-                  </div>
-                </Link>
-              );
-            })}
+            {visibleListings.map(renderListingCard)}
           </div>
         )}
       </section>

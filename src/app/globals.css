@@ -7463,7 +7463,83 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 }
 .shop-card-badge--sold { background: #15803d; }
 .shop-card-badge--auction { background: #6d28d9; }
+.shop-card-badge--listing { background: #2563eb; }
+.shop-listings-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.shop-zone-tabs { width: 100%; }
+.shop-zone-tabs .mkt-mode-tab { flex: 1; }
+@media (min-width: 640px) {
+  .shop-listings-head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .shop-zone-tabs { width: auto; }
+  .shop-zone-tabs .mkt-mode-tab { flex: initial; }
+}
 .lc-card-img-wrap { position: relative; }
+
+.dash-sell-kind {
+  padding: 12px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.dash-sell-kind-tabs {
+  width: 100%;
+  margin-bottom: 0;
+}
+.dash-sell-kind-tabs .mkt-mode-tab {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+@media (min-width: 640px) {
+  .dash-sell-kind-tabs .mkt-mode-tab {
+    flex: initial;
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+}
+.deal-card-thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.deal-card-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--r-md);
+  object-fit: cover;
+  display: block;
+}
+.deal-card-thumb--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  font-size: 22px;
+}
+.deal-card-kind {
+  position: absolute;
+  left: -4px;
+  bottom: -6px;
+  z-index: 2;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .18);
+}
+.deal-card-kind--listing { background: #2563eb; }
+.deal-card-kind--auction { background: #7c3aed; }
+.deal-card--listing { border-color: color-mix(in srgb, #2563eb 16%, var(--line)); }
+.deal-card--auction { border-color: color-mix(in srgb, #7c3aed 18%, var(--line)); }
 
 .seller-pack-list { display: flex; flex-direction: column; gap: 12px; }
 .seller-pack-panel {
