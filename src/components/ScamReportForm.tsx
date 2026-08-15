@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
-import { createNativeDictation, isNativeDictationAvailable, NATIVE_DICTATION_SILENCE_SEC } from '@/lib/nativeDictation';
+import { createNativeDictation, getSpeechRecognitionPlugin, isNativeDictationAvailable, NATIVE_DICTATION_SILENCE_SEC } from '@/lib/nativeDictation';
 import { isGlanghubApp } from '@/lib/nativeAuth';
 import { Icon } from './Icon';
 
@@ -54,7 +54,7 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
   const [micHint, setMicHint] = useState('');
 
   function ensureNativeController() {
-    if (!isGlanghubApp()) return false;
+    if (!isGlanghubApp() || !getSpeechRecognitionPlugin()) return false;
     useNativeRef.current = true;
     if (!nativeRef.current) {
       nativeRef.current = createNativeDictation({
