@@ -14,7 +14,10 @@ export interface SlipInfo {
   senderName?: string;
   senderAccount?: string;
   receiverName?: string;
+  /** เลขบัญชีธนาคารผู้รับ (account.value) */
   receiverAccount?: string;
+  /** PromptPay / proxy ผู้รับ (proxy.value) — สลิปพร้อมเพย์มักมีค่านี้แทนเลขบัญชี */
+  receiverProxy?: string;
 }
 
 export interface SlipResult {
@@ -28,14 +31,39 @@ export interface SlipResult {
   via?: 'upload' | 'signed_url' | 'public_url';
 }
 
+type SlipAccountBlob = string | { value?: string | null; type?: string | null; account?: string | null } | null | undefined;
+
+interface RawParty {
+  displayName?: string;
+  name?: string;
+  account?: SlipAccountBlob;
+  proxy?: SlipAccountBlob;
+}
+
 interface RawSlip {
   amount?: number; transRef?: string; transTimestamp?: string; transDate?: string; transTime?: string;
   sendingBank?: string; receivingBank?: string;
-  sender?: { displayName?: string; name?: string; account?: { value?: string } };
-  receiver?: { displayName?: string; name?: string; account?: { value?: string } };
+  sender?: RawParty;
+  receiver?: RawParty;
+}
+
+function textAccount(blob: SlipAccountBlob): string {
+  if (!blob) return '';
+  if (typeof blob === 'string') return blob.trim();
+  return String(blob.value || blob.account || '').trim();
+}
+
+function partyFields(party?: RawParty | null) {
+  return {
+    name: String(party?.displayName || party?.name || '').trim(),
+    account: textAccount(party?.account),
+    proxy: textAccount(party?.proxy),
+  };
 }
 
 function norm(d: RawSlip): SlipInfo {
+  const sender = partyFields(d.sender);
+  const receiver = partyFields(d.receiver);
   return {
     amount: Number(d.amount) || 0,
     transRef: String(d.transRef || ''),
@@ -44,10 +72,11 @@ function norm(d: RawSlip): SlipInfo {
     transTime: d.transTime,
     sendingBank: d.sendingBank,
     receivingBank: d.receivingBank,
-    senderName: d.sender?.displayName || d.sender?.name || '',
-    senderAccount: d.sender?.account?.value || '',
-    receiverName: d.receiver?.displayName || d.receiver?.name || '',
-    receiverAccount: d.receiver?.account?.value || '',
+    senderName: sender.name,
+    senderAccount: sender.account || sender.proxy,
+    receiverName: receiver.name,
+    receiverAccount: receiver.account,
+    receiverProxy: receiver.proxy,
   };
 }
 

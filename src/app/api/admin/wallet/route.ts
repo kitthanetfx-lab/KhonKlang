@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { applyUserWallet, creditApprovedWalletTopup } from '../../_lib/userWallet';
 import { notifyUsers } from '../../_lib/notify';
+import { runAutoWalletTopupVerification } from '../../_lib/walletTopupVerify';
 
 export async function GET(req: NextRequest) {
   try {
@@ -42,6 +43,20 @@ export async function PATCH(req: NextRequest) {
     const table = isWithdraw ? 'wallet_withdrawals' : 'wallet_topups';
     const { data: doc, error: getErr } = await db.from(table).select('*').eq('id', docId).single();
     if (getErr || !doc) return NextResponse.json({ error: 'ไม่พบรายการ' }, { status: 404 });
+
+    if (action === 'recheck') {
+      if (isWithdraw) return NextResponse.json({ error: 'คำขอถอนไม่มีสลิปให้ตรวจซ้ำ' }, { status: 400 });
+      const { data: profile } = await db.from('profiles').select('display_name').eq('id', doc.user_id).maybeSingle();
+      const result = await runAutoWalletTopupVerification(
+        db,
+        doc as { id: string; user_id: string; amount: number; slip_file_id?: string; created_at?: string; status?: string },
+        profile?.display_name || 'สมาชิก',
+        { rerun: true },
+      );
+      const { data: fresh } = await db.from('wallet_topups').select('*').eq('id', docId).maybeSingle();
+      return NextResponse.json({ success: true, document: fresh || doc, autoApproved: result.autoApproved, skipped: result.skipped });
+    }
+
     if (doc.status !== 'pending_review') {
       return NextResponse.json({ error: 'รายการนี้ดำเนินการแล้ว' }, { status: 400 });
     }

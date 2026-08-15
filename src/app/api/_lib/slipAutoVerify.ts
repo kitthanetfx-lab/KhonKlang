@@ -94,11 +94,30 @@ export function parseSlipTransferDate(slip: SlipInfo): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function receiverMatchesCompany(slip: SlipInfo, opts: { companyBankAcct?: string; companyPromptPay?: string }): boolean | null {
+  const bankExpected = String(opts.companyBankAcct || '').trim();
+  const ppExpected = String(opts.companyPromptPay || '').trim();
+  const bankActual = String(slip.receiverAccount || '').trim();
+  const ppActual = String(slip.receiverProxy || '').trim();
+
+  const typed: boolean[] = [];
+  if (bankExpected && bankActual) typed.push(accountsMatch(bankExpected, bankActual));
+  if (ppExpected && ppActual) typed.push(accountsMatch(ppExpected, ppActual));
+
+  const cross =
+    (bankExpected && ppActual && accountsMatch(bankExpected, ppActual))
+    || (ppExpected && bankActual && accountsMatch(ppExpected, bankActual));
+
+  if (!typed.length) return cross ? true : null;
+  return typed.some(Boolean) || Boolean(cross);
+}
+
 export function evaluateSlipCheck(
   result: SlipResult,
   opts: {
     expectedAmount: number;
     companyBankAcct: string;
+    companyPromptPay?: string;
     uploadedAt: Date;
   },
 ): SlipCheckEvaluation {
@@ -136,11 +155,13 @@ export function evaluateSlipCheck(
     reasons.push(`ยอดเงินไม่ตรง (สลิป ฿${Number(slip.amount).toLocaleString()} / ต้องโอน ฿${expected.toLocaleString()})`);
   }
 
-  const companyAcct = String(opts.companyBankAcct || '').trim();
-  if (companyAcct && slip.receiverAccount && !accountsMatch(companyAcct, slip.receiverAccount)) {
-    reasons.push(`เลขบัญชีผู้รับไม่ตรง (สลิป: ${slip.receiverAccount} / บัญชีกลาง: ${companyAcct})`);
-  } else if (companyAcct && !slip.receiverAccount) {
-    warnings.push('ไม่พบเลขบัญชีผู้รับบนสลิป — ตรวจด้วยตนเองเพิ่มเติม');
+  // SlipOK สำเร็จแล้ว = ไม่ใช่บัญชีผิด (1014 จะ fail เอง)
+  // เทียบเลขได้เฉพาะเมื่อมีข้อมูลทั้งฝั่งเราและบนสลิป — ห้ามตีความว่า "ไม่พบเลข" เป็นข้อเตือน
+  const receiverOk = receiverMatchesCompany(slip, opts);
+  if (receiverOk === false) {
+    const shown = [slip.receiverAccount, slip.receiverProxy].filter(Boolean).join(' / ') || '-';
+    const expectedIds = [opts.companyBankAcct, opts.companyPromptPay].map(v => String(v || '').trim()).filter(Boolean).join(' / ');
+    reasons.push(`เลขบัญชีผู้รับไม่ตรง (สลิป: ${shown} / บัญชีกลาง: ${expectedIds})`);
   }
 
   const transferAt = parseSlipTransferDate(slip);
@@ -154,8 +175,6 @@ export function evaluateSlipCheck(
     if (transferMs - uploadAt > FUTURE_TOLERANCE_MS) {
       reasons.push('เวลาโอนบนสลิปอยู่หลังเวลาอัปสลิปผิดปกติ');
     }
-  } else {
-    warnings.push('อ่านเวลาโอนจากสลิปไม่ได้ — ไม่ใช้เป็นข้อ fail');
   }
 
   return {
@@ -210,12 +229,13 @@ async function verifyOneSide(
   fileId: string,
   expectedAmount: number,
   companyBankAcct: string,
+  companyPromptPay = '',
 ): Promise<SlipCheckEvaluation> {
-  // ยอดตรวจใน evaluateSlipCheck ฝั่งเรา — ไม่ส่ง amount ให้ SlipOK (ลด false reject)
   const result = await verifySlipByFileId(fileId);
   return evaluateSlipCheck(result, {
     expectedAmount,
     companyBankAcct,
+    companyPromptPay,
     uploadedAt: new Date(),
   });
 }
@@ -340,6 +360,7 @@ export async function runAutoMeetupSlipVerification(
 
   const fees = await readFeesConfig(db);
   const companyBankAcct = fees.companyBankAcct || '';
+  const companyPromptPay = fees.companyPromptPay || '';
 
   let latestDeal = deal as Record<string, unknown>;
   const sides: SlipSide[] = [];
@@ -357,7 +378,7 @@ export async function runAutoMeetupSlipVerification(
 
     anySlipChecked = true;
     const expected = meetupExpectedAmount(md, side);
-    const evaluation = await verifyOneSide(deal, fileId, expected, companyBankAcct);
+    const evaluation = await verifyOneSide(deal, fileId, expected, companyBankAcct, companyPromptPay);
     const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
     const reasonText = evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน';
 
@@ -443,6 +464,7 @@ export async function runAutoSlipVerification(
   const fees = await readFeesConfig(db);
   const amounts = computeExpectedAmounts(deal, priceState, fees);
   const companyBankAcct = fees.companyBankAcct || '';
+  const companyPromptPay = fees.companyPromptPay || '';
 
   let latestDeal = deal as Record<string, unknown>;
 
@@ -463,7 +485,7 @@ export async function runAutoSlipVerification(
 
     anySlipChecked = true;
     const expected = side === 'buyer' ? amounts.buyer : amounts.seller;
-    const evaluation = await verifyOneSide(deal, fileId, expected, companyBankAcct);
+    const evaluation = await verifyOneSide(deal, fileId, expected, companyBankAcct, companyPromptPay);
     const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
     const reasonText = evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน';
 

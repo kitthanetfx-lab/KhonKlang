@@ -10,14 +10,15 @@ import { notifyAdminLineWalletTopup } from '@/lib/lineAdminNotify';
 
 export async function runAutoWalletTopupVerification(
   db: SupabaseClient,
-  topup: { id: string; user_id: string; amount: number; slip_file_id?: string | null; created_at?: string },
+  topup: { id: string; user_id: string; amount: number; slip_file_id?: string | null; created_at?: string; status?: string },
   userName: string,
+  opts?: { rerun?: boolean },
 ): Promise<{ autoApproved: boolean; evaluation?: SlipCheckEvaluation; skipped?: boolean }> {
   const amount = Math.round(Number(topup.amount) || 0);
   const fileId = String(topup.slip_file_id || '');
   const displayName = userName || 'สมาชิก';
 
-  const notifyAdmin = async (opts: {
+  const notifyAdmin = async (params: {
     autoApproved: boolean;
     skipped?: boolean;
     skipReason?: string;
@@ -26,12 +27,14 @@ export async function runAutoWalletTopupVerification(
     await notifyAdminLineWalletTopup({
       userName: displayName,
       amount,
-      autoApproved: opts.autoApproved,
-      skipped: opts.skipped,
-      skipReason: opts.skipReason,
-      evaluation: opts.evaluation,
+      autoApproved: params.autoApproved,
+      skipped: params.skipped,
+      skipReason: params.skipReason,
+      evaluation: params.evaluation,
       slipFileId: fileId,
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error('[walletTopup] admin LINE failed', err);
+    });
   };
 
   if (!fileId || amount <= 0) {
@@ -56,23 +59,34 @@ export async function runAutoWalletTopupVerification(
   const evaluation = evaluateSlipCheck(result, {
     expectedAmount: amount,
     companyBankAcct: fees.companyBankAcct || '',
+    companyPromptPay: fees.companyPromptPay || '',
     uploadedAt: topup.created_at ? new Date(topup.created_at) : new Date(),
   });
 
   if (evaluation.pass) {
-    const { data: updated } = await db.from('wallet_topups').update({
+    const { data: newlyApproved } = await db.from('wallet_topups').update({
       status: 'approved',
       reviewed_at: new Date().toISOString(),
-      reject_reason: evaluation.warnings.length ? evaluation.warnings.join(' · ').slice(0, 400) : null,
+      reject_reason: null,
     }).eq('id', topup.id).eq('status', 'pending_review').select('id').maybeSingle();
 
-    if (updated) {
-      await creditApprovedWalletTopup(db, topup);
+    if (!newlyApproved && opts?.rerun) {
+      await db.from('wallet_topups').update({ reject_reason: null }).eq('id', topup.id).eq('status', 'approved');
+    }
+
+    if (newlyApproved || opts?.rerun) {
+      try {
+        if (newlyApproved) await creditApprovedWalletTopup(db, topup);
+      } catch (err) {
+        console.error('[walletTopup] credit after approve failed', err);
+      }
       await notifyUsers(db, [topup.user_id], {
         title: 'เติมเงินเข้ากระเป๋าแล้ว',
         body: `ตรวจสลิปผ่าน — ยอด ฿${amount.toLocaleString()} เข้ากระเป๋าแล้ว`,
         link: '/wallet',
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error('[walletTopup] user notify failed', err);
+      });
     }
 
     await notifyAdmin({ autoApproved: true, evaluation });
@@ -80,15 +94,19 @@ export async function runAutoWalletTopupVerification(
   }
 
   const reasonText = evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน';
-  await db.from('wallet_topups').update({
-    reject_reason: `[ระบบตรวจสลิป] ${reasonText}`.slice(0, 400),
-  }).eq('id', topup.id).eq('status', 'pending_review');
+  if (topup.status !== 'approved') {
+    await db.from('wallet_topups').update({
+      reject_reason: `[ระบบตรวจสลิป] ${reasonText}`.slice(0, 400),
+    }).eq('id', topup.id).eq('status', 'pending_review');
 
-  await notifyUsers(db, [topup.user_id], {
-    title: 'สลิปเติมเงินยังไม่ผ่าน',
-    body: `${reasonText} — ทีมงานจะตรวจให้อีกครั้ง`,
-    link: '/wallet',
-  }).catch(() => {});
+    await notifyUsers(db, [topup.user_id], {
+      title: 'สลิปเติมเงินยังไม่ผ่าน',
+      body: `${reasonText} — ทีมงานจะตรวจให้อีกครั้ง`,
+      link: '/wallet',
+    }).catch((err) => {
+      console.error('[walletTopup] user notify failed', err);
+    });
+  }
 
   await notifyAdmin({ autoApproved: false, evaluation });
   return { autoApproved: false, evaluation };

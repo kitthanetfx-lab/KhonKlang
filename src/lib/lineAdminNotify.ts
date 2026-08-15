@@ -128,20 +128,35 @@ async function sendLineAdminMessages(messages: LineMessage[]): Promise<void> {
   const token = process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN;
   const to = process.env.LINE_ADMIN_GROUP_ID;
   if (!token || !to || !messages.length) return;
-  try {
-    const res = await fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ to, messages: messages.slice(0, 5) }),
-    });
-    if (!res.ok) {
-      console.error('[lineAdminNotify] push failed:', res.status, await res.text());
+
+  const push = async (batch: LineMessage[]) => {
+    if (!batch.length) return true;
+    try {
+      const res = await fetch('https://api.line.me/v2/bot/message/push', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ to, messages: batch.slice(0, 5) }),
+      });
+      if (!res.ok) {
+        console.error('[lineAdminNotify] push failed:', res.status, await res.text());
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('[lineAdminNotify] push error:', err);
+      return false;
     }
-  } catch (err) {
-    console.error('[lineAdminNotify] push error:', err);
+  };
+
+  const texts = messages.filter((m): m is Extract<LineMessage, { type: 'text' }> => m.type === 'text');
+  const images = messages.filter((m): m is Extract<LineMessage, { type: 'image' }> => m.type === 'image');
+  const textOk = await push(texts.length ? texts : messages.slice(0, 1));
+  if (!textOk) return;
+  for (const img of images) {
+    await push([img]);
   }
 }
 
@@ -242,6 +257,7 @@ export async function notifyAdminLineSlipResult(params: {
     if (slip.amount != null) lines.push(`ยอดในสลิป: ฿${Number(slip.amount).toLocaleString('th-TH')}`);
     if (slip.senderName) lines.push(`ผู้โอน: ${slip.senderName}`);
     if (slip.receiverAccount) lines.push(`บัญชีผู้รับ: ${slip.receiverAccount}`);
+    if ('receiverProxy' in slip && slip.receiverProxy) lines.push(`PromptPay ผู้รับ: ${slip.receiverProxy}`);
     if (slip.transRef) lines.push(`เลขอ้างอิง: ${slip.transRef}`);
     if (slip.transDate || slip.transTime) lines.push(`เวลาโอน: ${[slip.transDate, slip.transTime].filter(Boolean).join(' ')}`);
   }
@@ -312,7 +328,7 @@ export async function notifyAdminLineWalletTopup(params: {
     pass: boolean;
     reasons: string[];
     warnings: string[];
-    slip?: { amount?: number; transRef?: string; receiverAccount?: string; senderName?: string; transDate?: string; transTime?: string };
+    slip?: { amount?: number; transRef?: string; receiverAccount?: string; receiverProxy?: string; senderName?: string; transDate?: string; transTime?: string };
   };
   slipFileId?: string;
 }): Promise<void> {
@@ -336,6 +352,7 @@ export async function notifyAdminLineWalletTopup(params: {
       if (slip.amount != null) lines.push(`ยอดในสลิป: ฿${Number(slip.amount).toLocaleString('th-TH')}`);
       if (slip.senderName) lines.push(`ผู้โอน: ${slip.senderName}`);
       if (slip.receiverAccount) lines.push(`บัญชีผู้รับ: ${slip.receiverAccount}`);
+      if (slip.receiverProxy) lines.push(`PromptPay ผู้รับ: ${slip.receiverProxy}`);
       if (slip.transRef) lines.push(`เลขอ้างอิง: ${slip.transRef}`);
       if (slip.transDate || slip.transTime) lines.push(`เวลาโอน: ${[slip.transDate, slip.transTime].filter(Boolean).join(' ')}`);
     }

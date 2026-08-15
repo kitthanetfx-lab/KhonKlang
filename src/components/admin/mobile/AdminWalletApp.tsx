@@ -82,7 +82,7 @@ export function AdminWalletApp({
                   <span className="admin-app-badge bg-blue-100 text-blue-700">{baht(d.amount)}</span>
                 </>
               }
-              meta={`แจ้ง ${fmtDate(d.created_at)}${d.reject_reason ? ` · ${d.reject_reason}` : ''}`}
+              meta={`แจ้ง ${fmtDate(d.created_at)}${d.status !== 'approved' && d.reject_reason ? ` · ${d.reject_reason}` : ''}`}
               actions={renderActions(d)}
             />
           );

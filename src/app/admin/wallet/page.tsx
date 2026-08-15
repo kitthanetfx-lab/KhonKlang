@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
-import { Wallet, CheckCircle2, XCircle, RefreshCw, Eye, FileText } from 'lucide-react';
+import { Wallet, CheckCircle2, XCircle, RefreshCw, Eye, FileText, RotateCcw } from 'lucide-react';
 import { AdminWalletApp, type WalletDoc } from '@/components/admin/mobile/AdminWalletApp';
 
 const STATUS_TABS = [
@@ -51,15 +51,17 @@ export default function AdminWalletPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function act(docId: string, action: 'approve' | 'reject', r?: string) {
+  async function act(docId: string, action: 'approve' | 'reject' | 'recheck', r?: string) {
     setActing(true);
     try {
       const headers = await authHeaders();
-      await fetch('/api/admin/wallet', {
+      const res = await fetch('/api/admin/wallet', {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind, docId, action, reason: r }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) alert(data.error || 'ดำเนินการไม่สำเร็จ');
       setRejectingId(null); setReason('');
       await load();
     } finally { setActing(false); }
@@ -68,10 +70,21 @@ export default function AdminWalletPage() {
   const pendingCount = docs.filter(d => d.status === 'pending_review').length;
 
   function renderActions(d: WalletDoc) {
+    const recheckBtn = kind === 'topup' && d.slip_file_id ? (
+      <button type="button" className="text-xs text-indigo-600" onClick={() => act(d.id, 'recheck')} disabled={acting}>
+        <RotateCcw size={13} /> ตรวจสอบอีกครั้ง
+      </button>
+    ) : null;
+
     if (d.status !== 'pending_review') {
-      return d.slip_file_id ? (
-        <a href={fileViewUrl(DEAL_BUCKET, d.slip_file_id)} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600"><Eye size={12} /> สลิป</a>
-      ) : null;
+      return (
+        <div className="flex flex-col gap-1 items-end">
+          {d.slip_file_id ? (
+            <a href={fileViewUrl(DEAL_BUCKET, d.slip_file_id)} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600"><Eye size={12} /> สลิป</a>
+          ) : null}
+          {recheckBtn}
+        </div>
+      );
     }
     if (rejectingId === d.id) {
       return (
@@ -87,6 +100,7 @@ export default function AdminWalletPage() {
     }
     return (
       <div className="flex flex-col gap-1">
+        {recheckBtn}
         <button type="button" className="text-xs text-red-600" onClick={() => setRejectingId(d.id)}><XCircle size={13} /> ปฏิเสธ</button>
         <button type="button" className="text-xs text-green-600" onClick={() => act(d.id, 'approve')} disabled={acting}><CheckCircle2 size={13} /> อนุมัติ</button>
       </div>
@@ -186,10 +200,10 @@ export default function AdminWalletPage() {
                       <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(d.created_at)}</td>
                       <td className="px-4 py-3.5">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_CFG[d.status]?.cls || ''}`}>{STATUS_CFG[d.status]?.label || d.status}</span>
-                        {d.reject_reason && <div className="text-xs text-red-500 mt-1 max-w-[220px]">{d.reject_reason}</div>}
+                        {d.status !== 'approved' && d.reject_reason && <div className="text-xs text-red-500 mt-1 max-w-[220px]">{d.reject_reason}</div>}
                       </td>
                       <td className="px-4 py-3.5">
-                        {d.status === 'pending_review' && (
+                        {d.status === 'pending_review' ? (
                           rejectingId === d.id ? (
                             <div className="flex flex-col gap-2 min-w-[200px]">
                               <textarea className="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs outline-none resize-none bg-white dark:bg-gray-800"
@@ -201,6 +215,11 @@ export default function AdminWalletPage() {
                             </div>
                           ) : (
                             <div className="flex items-center gap-2 justify-end">
+                              {kind === 'topup' && d.slip_file_id && (
+                                <button onClick={() => act(d.id, 'recheck')} disabled={acting} className="px-3 py-1.5 text-xs font-medium text-indigo-700 border border-indigo-200 dark:border-indigo-800 rounded-lg hover:bg-indigo-50 flex items-center gap-1 disabled:opacity-60">
+                                  <RotateCcw size={13} /> ตรวจสอบอีกครั้ง
+                                </button>
+                              )}
                               <button onClick={() => setRejectingId(d.id)} className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 flex items-center gap-1">
                                 <XCircle size={13} /> ปฏิเสธ
                               </button>
@@ -209,7 +228,13 @@ export default function AdminWalletPage() {
                               </button>
                             </div>
                           )
-                        )}
+                        ) : kind === 'topup' && d.slip_file_id ? (
+                          <div className="flex justify-end">
+                            <button onClick={() => act(d.id, 'recheck')} disabled={acting} className="px-3 py-1.5 text-xs font-medium text-indigo-700 border border-indigo-200 dark:border-indigo-800 rounded-lg hover:bg-indigo-50 flex items-center gap-1 disabled:opacity-60">
+                              <RotateCcw size={13} /> ตรวจสอบอีกครั้ง
+                            </button>
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
