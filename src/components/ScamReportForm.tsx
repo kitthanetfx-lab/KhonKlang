@@ -191,17 +191,13 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
   }
 
   function toggle() {
-    if (listening) {
-      if (ensureNativeController()) {
-        void nativeRef.current?.toggle();
-        return;
-      }
-      setMicHint('');
-      stopListening();
-      return;
-    }
     if (ensureNativeController()) {
       void nativeRef.current?.toggle();
+      return;
+    }
+    if (listening) {
+      setMicHint('');
+      stopListening();
       return;
     }
     startListening();

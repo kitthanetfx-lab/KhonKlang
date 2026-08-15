@@ -1,8 +1,5 @@
 /**
  * พูดให้พิมพ์ในแอปมือถือกลางฮับ (Capacitor — โปรเจกต์ glangApp)
- *
- * Web Speech API มักไม่ทำงานใน Android WebView — ใช้ native plugin
- * @capacitor-community/speech-recognition แทน (แอปฉีด bridge เข้า WebView)
  */
 
 import { isGlanghubApp } from '@/lib/nativeAuth';
@@ -11,9 +8,7 @@ import { isGlanghubApp } from '@/lib/nativeAuth';
 export const NATIVE_DICTATION_SILENCE_SEC = 10;
 
 const LANGUAGE_CANDIDATES = ['th-TH', 'th_TH', 'en-US'];
-/** รอให้ session ก่อนหน้าปิดสนิทก่อนเปิดใหม่ — กันไมค์ซ้อน / recognizer busy */
-const SESSION_COOLDOWN_MS = 480;
-const BUSY_RETRY_MS = 900;
+const BETWEEN_SESSION_MS = 380;
 
 type PermissionState = 'prompt' | 'prompt-with-rationale' | 'granted' | 'denied';
 
@@ -24,7 +19,6 @@ type SpeechRecognitionPlugin = {
     maxResults?: number;
     partialResults?: boolean;
     popup?: boolean;
-    prompt?: string;
   }): Promise<{ matches?: string[] }>;
   stop(): Promise<void>;
   isListening(): Promise<{ listening: boolean }>;
@@ -75,15 +69,17 @@ function errorHint(err: unknown): string {
 
 /** ควบคุม native speech — แตะเปิด/ปิด + ปิดอัตโนมัติเมื่อเงียบ */
 export function createNativeDictation(callbacks: NativeDictationCallbacks) {
-  let plugin = getSpeechRecognitionPlugin();
   let active = false;
   let loopRunning = false;
-  let toggleBusy = false;
-  /** เปลี่ยนทุกครั้งที่ stop — loop รุ่นเก่าจะหยุดทำงาน */
+  let toggling = false;
   let generation = 0;
   let languageIndex = 0;
   let silenceTimer: number | null = null;
   let noMatchStreak = 0;
+
+  function plugin() {
+    return getSpeechRecognitionPlugin();
+  }
 
   function clearSilenceTimer() {
     if (silenceTimer != null) {
@@ -97,7 +93,7 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
     if (!active) return;
     silenceTimer = window.setTimeout(() => {
       callbacks.setMicHint(`ปิดไมค์อัตโนมัติ — ไม่ได้ยินเสียง ${NATIVE_DICTATION_SILENCE_SEC} วินาที`);
-      void stop();
+      void stopInternal();
     }, NATIVE_DICTATION_SILENCE_SEC * 1000);
   }
 
@@ -113,36 +109,35 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
     callbacks.append(t);
   }
 
-  async function forceIdle() {
-    plugin = getSpeechRecognitionPlugin();
-    if (!plugin) return;
+  async function releaseMic() {
+    const p = plugin();
+    if (!p) return;
     try {
-      await plugin.stop();
+      await p.stop();
     } catch { /* ignore */ }
-    const deadline = Date.now() + 2500;
-    while (Date.now() < deadline) {
+    for (let i = 0; i < 8; i += 1) {
       try {
-        const { listening } = await plugin.isListening();
+        const { listening } = await p.isListening();
         if (!listening) break;
       } catch {
         break;
       }
-      await sleep(120);
+      await sleep(100);
     }
-    await sleep(SESSION_COOLDOWN_MS);
+    await sleep(BETWEEN_SESSION_MS);
   }
 
   async function listenOnce(gen: number): Promise<'ok' | 'stop' | 'retry'> {
     if (!active || gen !== generation) return 'stop';
-    plugin = getSpeechRecognitionPlugin();
-    if (!plugin) return 'stop';
+    const p = plugin();
+    if (!p) return 'stop';
 
-    await forceIdle();
+    await releaseMic();
     if (!active || gen !== generation) return 'stop';
 
     callbacks.setInterim('…');
     try {
-      const result = await plugin.start({
+      const result = await p.start({
         language: currentLanguage(),
         maxResults: 1,
         partialResults: false,
@@ -159,7 +154,6 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
       if (!active || gen !== generation) return 'stop';
       callbacks.setInterim('');
       const msg = err instanceof Error ? err.message : String(err ?? '');
-
       if (/busy/i.test(msg)) return 'retry';
       if (/no match|no speech|didn't understand/i.test(msg)) {
         noMatchStreak += 1;
@@ -181,20 +175,18 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
     loopRunning = true;
     try {
       while (active && gen === generation) {
-        plugin = getSpeechRecognitionPlugin();
-        if (!plugin) {
+        if (!plugin()) {
           callbacks.setMicHint('ไม่พบ speech plugin — อัปเดตแอปเป็นเวอร์ชันล่าสุด');
-          await stop();
+          await stopInternal();
           break;
         }
-
         const outcome = await listenOnce(gen);
         if (!active || gen !== generation || outcome === 'stop') break;
         if (outcome === 'retry') {
-          await sleep(BUSY_RETRY_MS);
+          await sleep(700);
           continue;
         }
-        await sleep(SESSION_COOLDOWN_MS);
+        await sleep(BETWEEN_SESSION_MS);
       }
     } finally {
       loopRunning = false;
@@ -202,76 +194,78 @@ export function createNativeDictation(callbacks: NativeDictationCallbacks) {
     }
   }
 
-  async function start(): Promise<boolean> {
-    if (active || toggleBusy) return active;
-    toggleBusy = true;
-    try {
-      plugin = getSpeechRecognitionPlugin();
-      if (!plugin) {
-        callbacks.setMicHint('ไม่พบ speech plugin — อัปเดตแอปเป็นเวอร์ชันล่าสุด');
-        return false;
-      }
-      try {
-        const avail = await plugin.available();
-        if (!avail.available) {
-          callbacks.setMicHint('อุปกรณ์นี้ไม่รองรับการรู้จำเสียงพูด (ต้องมี Google app)');
-          return false;
-        }
-        const perm = await plugin.requestPermissions();
-        if (perm.speechRecognition !== 'granted') {
-          callbacks.setMicHint('กรุณาอนุญาตไมโครโฟนในแอป แล้วลองใหม่');
-          return false;
-        }
-      } catch {
-        callbacks.setMicHint('ไม่สามารถขอสิทธิ์ไมโครโฟนได้ — ลองใหม่อีกครั้ง');
-        return false;
-      }
-
-      await forceIdle();
-
-      generation += 1;
-      const gen = generation;
-      active = true;
-      languageIndex = 0;
-      noMatchStreak = 0;
-      callbacks.setMicHint('');
-      callbacks.setListening(true);
-      resetSilenceTimer();
-      void listenLoop(gen);
-      return true;
-    } finally {
-      toggleBusy = false;
+  async function startInternal(): Promise<boolean> {
+    if (active) return true;
+    const p = plugin();
+    if (!p) {
+      callbacks.setMicHint('ไม่พบ speech plugin — อัปเดตแอปเป็นเวอร์ชันล่าสุด');
+      return false;
     }
+
+    callbacks.setListening(true);
+    callbacks.setInterim('กำลังเปิดไมค์…');
+    callbacks.setMicHint('');
+
+    try {
+      const avail = await p.available();
+      if (!avail.available) {
+        callbacks.setMicHint('อุปกรณ์นี้ไม่รองรับการรู้จำเสียงพูด (ต้องมี Google app)');
+        callbacks.setListening(false);
+        callbacks.setInterim('');
+        return false;
+      }
+      const perm = await p.requestPermissions();
+      if (perm.speechRecognition !== 'granted') {
+        callbacks.setMicHint('กรุณาอนุญาตไมโครโฟนในแอป แล้วลองใหม่');
+        callbacks.setListening(false);
+        callbacks.setInterim('');
+        return false;
+      }
+    } catch {
+      callbacks.setMicHint('ไม่สามารถขอสิทธิ์ไมโครโฟนได้ — ลองใหม่อีกครั้ง');
+      callbacks.setListening(false);
+      callbacks.setInterim('');
+      return false;
+    }
+
+    generation += 1;
+    const gen = generation;
+    active = true;
+    languageIndex = 0;
+    noMatchStreak = 0;
+    callbacks.setInterim('');
+    resetSilenceTimer();
+    void listenLoop(gen);
+    return true;
   }
 
-  async function stop() {
-    if (toggleBusy) await sleep(80);
+  async function stopInternal() {
     generation += 1;
     active = false;
     clearSilenceTimer();
     callbacks.setInterim('');
     callbacks.setListening(false);
-    await forceIdle();
+    await releaseMic();
   }
 
   async function toggle() {
-    if (toggleBusy) return;
-    toggleBusy = true;
+    if (toggling) return;
+    toggling = true;
     try {
       if (active) {
         callbacks.setMicHint('');
-        await stop();
+        await stopInternal();
         return;
       }
-      await start();
+      await startInternal();
     } finally {
-      toggleBusy = false;
+      toggling = false;
     }
   }
 
   async function destroy() {
-    await stop();
+    await stopInternal();
   }
 
-  return { toggle, stop, destroy, silenceSec: NATIVE_DICTATION_SILENCE_SEC };
+  return { toggle, stop: stopInternal, destroy, silenceSec: NATIVE_DICTATION_SILENCE_SEC };
 }
