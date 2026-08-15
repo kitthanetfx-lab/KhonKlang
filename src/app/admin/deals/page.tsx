@@ -10,7 +10,8 @@ import { FeeConfig, FEE_DEFAULTS, computeDealFees, computeSimpleDealShare, simpl
 import { splitDealFeeComponents } from '@/lib/financeLedger';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { ADMIN_DEAL_CATEGORIES, type AdminDealCategory, parseAdminDealCategory } from '@/lib/adminDealCategory';
-import { isListingCheckoutOrder, marketplaceBuyerPayAmount, marketplaceShippingCost } from '@/lib/marketplaceOrder';
+import { isListingCheckoutOrder, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
+import { computeDealPaymentBreakdown, type DealPaymentBreakdown } from '@/lib/dealPaymentBreakdown';
 import { DealProductGallery } from '@/components/deal/DealProductGallery';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
@@ -189,23 +190,82 @@ function AdminDealsInner() {
     });
   }
 
-  function renderMarketPayPanel(d: Deal) {
-    if (!isListingCheckoutOrder(d)) return null;
-    const ship = marketplaceShippingCost(d);
-    const pay = marketplaceBuyerPayAmount(d);
+  function paymentBreakdownOf(d: Deal): DealPaymentBreakdown | null {
+    if (d.deal_type === 'meetup') return null;
+    return computeDealPaymentBreakdown(d, d.priceState, fees);
+  }
+
+  function AdminPayRow({ label, amount, bold, muted }: { label: string; amount: number; bold?: boolean; muted?: boolean }) {
     return (
-      <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 px-3 py-2 text-xs space-y-1">
-        <p className="font-semibold text-emerald-800 dark:text-emerald-200">🛒 ยอดชำระตลาด/ประมูล</p>
-        <p className="text-gray-600 dark:text-gray-300">
-          ราคาสินค้า: <span className="font-mono font-semibold">฿{Number(d.price || 0).toLocaleString()}</span>
-          {ship > 0 && <> · ค่าขนส่ง: <span className="font-mono font-semibold">฿{ship.toLocaleString()}</span></>}
-        </p>
-        <p className="text-emerald-800 dark:text-emerald-200">
-          ยอดที่ผู้ซื้อต้องโอน (ตรวจสลิป): <span className="font-mono font-bold text-base">฿{pay.toLocaleString()}</span>
-        </p>
+      <div className={`flex justify-between gap-3 ${muted ? 'text-gray-400' : 'text-gray-600 dark:text-gray-300'}`}>
+        <span>{label}</span>
+        <span className={`font-mono tabular-nums ${bold ? 'font-bold text-gray-900 dark:text-gray-100' : 'font-semibold'}`}>
+          ฿{amount.toLocaleString()}
+        </span>
       </div>
     );
   }
+
+  function renderPaymentBreakdownPanel(d: Deal) {
+    const bd = paymentBreakdownOf(d);
+    if (!bd) return null;
+
+    return (
+      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 dark:bg-slate-900/40 dark:border-slate-700 px-3 py-2.5 text-xs space-y-2">
+        <p className="font-semibold text-slate-800 dark:text-slate-100">
+          {bd.isMarketplace ? '🛒 สรุปยอดชำระ (ตลาด/ประมูล)' : '💰 สรุปยอดชำระ'}
+        </p>
+
+        <div className="space-y-1 rounded-lg border border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-950/40 px-2.5 py-2">
+          <AdminPayRow label="ค่าสินค้า" amount={bd.productPrice} />
+          <AdminPayRow label="ค่าขนส่ง" amount={bd.shippingCost} muted={bd.shippingCost === 0} />
+          {!bd.isMarketplace && (
+            <>
+              <AdminPayRow label="ค่าบริการ (รวม)" amount={bd.serviceFeeTotal} />
+              {bd.serviceFeeLines.map(line => (
+                <div key={line.label} className="flex justify-between gap-3 pl-3 text-gray-500">
+                  <span>↳ {line.label}</span>
+                  <span className="font-mono tabular-nums">฿{line.amount.toLocaleString()}</span>
+                </div>
+              ))}
+              <p className="text-gray-600 dark:text-gray-300 pt-0.5">
+                ผู้จ่ายค่าบริการ: <span className="font-semibold">{bd.feePayerLabel}</span>
+              </p>
+              <div className="flex justify-between gap-3 text-gray-500">
+                <span>↳ ส่วนผู้ซื้อ</span>
+                <span className="font-mono tabular-nums">฿{bd.buyerServiceShare.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-3 text-gray-500">
+                <span>↳ ส่วนผู้ขาย</span>
+                <span className="font-mono tabular-nums">฿{bd.sellerServiceShare.toLocaleString()}</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-950/20 dark:border-emerald-900 px-2.5 py-2">
+          <p className="font-semibold text-emerald-800 dark:text-emerald-200">ยอดที่ต้องโอน</p>
+          <AdminPayRow label="ผู้ซื้อ → ศูนย์กลาง (ตรวจสลิป)" amount={bd.buyerTotalDue} bold />
+          {!bd.isMarketplace && bd.sellerServiceDue > 0 && (
+            <AdminPayRow label="ผู้ขาย → ค่าบริการ (แยกสลิป)" amount={bd.sellerServiceDue} />
+          )}
+          {!bd.isMarketplace && (
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-relaxed">
+              = สินค้า ฿{bd.productPrice.toLocaleString()}
+              {bd.shippingCost > 0 ? ` + ขนส่ง ฿${bd.shippingCost.toLocaleString()}` : ''}
+              {bd.buyerServiceShare > 0 ? ` + ค่าบริการฝั่งผู้ซื้อ ฿${bd.buyerServiceShare.toLocaleString()}` : ''}
+            </p>
+          )}
+          {!bd.isMarketplace && (
+            <p className="text-[11px] text-gray-500">
+              ผู้ขายได้รับสุทธิเมื่อสำเร็จ: <span className="font-mono font-semibold">฿{bd.sellerNetOnSuccess.toLocaleString()}</span>
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderSimpleSharePanel(d: Deal) {
     const share = simpleShareOf(d);
     if (!share) return null;
@@ -213,14 +273,14 @@ function AdminDealsInner() {
     const creatorSideLabel = SIMPLE_CREATOR_SIDE_LABEL[creatorSide];
     return (
       <div className="mt-2 rounded-xl border border-orange-200 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-900 px-3 py-2 text-xs space-y-1">
-        <p className="font-semibold text-orange-800 dark:text-orange-200">💼 ค่าสินค้า + คอมมิชชั่น</p>
+        <p className="font-semibold text-orange-800 dark:text-orange-200">💼 คอมมิชชั่นผู้สร้างดีล</p>
         {d.creator_id && (
           <p className="text-gray-600 dark:text-gray-300">
             ผู้สร้างดีล: <span className="font-semibold">{creatorSideLabel}</span>
             {d.creatorProfile?.display_name ? ` · ${d.creatorProfile.display_name}` : ''}
           </p>
         )}
-        <p className="text-gray-600 dark:text-gray-300">ค่าสินค้า: <span className="font-mono font-semibold">฿{Number(d.price || 0).toLocaleString()}</span></p>
+        <p className="text-gray-600 dark:text-gray-300">ค่าสินค้าฐาน: <span className="font-mono font-semibold">฿{Number(d.price || 0).toLocaleString()}</span></p>
         {share.creatorEligible ? (
           share.shareTier > 0 ? (
             <p className="text-emerald-700 dark:text-emerald-300">
@@ -687,6 +747,7 @@ function AdminDealsInner() {
           const buyerSlipVerified = !!d.payment_slip_verified_at;
           const sellerSlipVerified = sellerFeeNeeded ? !!d.priceState?.seller_fee_slip_verified_at : true;
           const canConfirmPayment = !!d.payment_slip_file_id && buyerSlipVerified && sellerSlipVerified;
+          const payBd = paymentBreakdownOf(d);
           // refund (คืนเงินประกัน) ทำได้เฉพาะตอนดีลจบแล้ว (เจอกันเสร็จ = completed) เท่านั้น
           const refundStage = d.deal_type === 'meetup' && d.status === 'completed';
           // ตรวจสลิปเงินประกัน: meetup ที่ยังไม่จบ มีสลิปอย่างน้อย 1 ฝ่าย และยังตรวจไม่ครบ
@@ -708,7 +769,12 @@ function AdminDealsInner() {
                       {isListingCheckoutOrder(d) ? (
                         <>
                           <span className="font-mono text-sm text-gray-500">สินค้า ฿{Number(d.price || 0).toLocaleString()}</span>
-                          <span className="font-mono text-sm font-bold text-green-600">โอน ฿{marketplaceBuyerPayAmount(d).toLocaleString()}</span>
+                          <span className="font-mono text-sm font-bold text-green-600">ผู้ซื้อโอน ฿{marketplaceBuyerPayAmount(d).toLocaleString()}</span>
+                        </>
+                      ) : payBd ? (
+                        <>
+                          <span className="font-mono text-sm text-gray-500">สินค้า ฿{payBd.productPrice.toLocaleString()}</span>
+                          <span className="font-mono text-sm font-bold text-green-600">ผู้ซื้อโอน ฿{payBd.buyerTotalDue.toLocaleString()}</span>
                         </>
                       ) : (
                         <span className="font-mono text-sm font-bold text-green-600">฿{Number(d.price || 0).toLocaleString()}</span>
@@ -747,8 +813,8 @@ function AdminDealsInner() {
               )}
 
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                <p className="text-[11px] font-bold text-orange-700 uppercase tracking-wide mb-2">② ค่าสินค้า + คอมมิชชั่น / บัญชีโอน</p>
-                {renderMarketPayPanel(d)}
+                <p className="text-[11px] font-bold text-orange-700 uppercase tracking-wide mb-2">② สรุปยอดชำระ + บัญชีโอน</p>
+                {renderPaymentBreakdownPanel(d)}
                 {renderSimpleSharePanel(d)}
                 {refund && refundStage && !refund.refundedAt && refund.outcome !== 'frozen' && (
                   <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs space-y-1">
@@ -895,6 +961,12 @@ function AdminDealsInner() {
                   <>
                     <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1.5 w-full">
                       🤖 ระบบตรวจสลิปอัตโนมัติเมื่ออัปโหลด — ผ่านแล้วจะแจ้ง LINE · ถ้าผลผิดกด「ตรวจอัตโนมัติอีกครั้ง」
+                      {payBd && (
+                        <span className="block mt-1 text-violet-800">
+                          ยอดตรวจสลิป: ผู้ซื้อ ฿{payBd.buyerTotalDue.toLocaleString()}
+                          {payBd.sellerServiceDue > 0 ? ` · ผู้ขาย (ค่าบริการ) ฿${payBd.sellerServiceDue.toLocaleString()}` : ''}
+                        </span>
+                      )}
                     </p>
                     {d.payment_slip_file_id && !buyerSlipVerified && (
                       <button onClick={() => rerunSlipVerify(d.id, 'buyer')} disabled={!!acting}
@@ -917,7 +989,9 @@ function AdminDealsInner() {
                         </button>
                       </span>
                     ) : (
-                      <span className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-500 border border-gray-200">⏳ ผู้ซื้อยังไม่อัปสลิป</span>
+                      <span className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-500 border border-gray-200">
+                        ⏳ ผู้ซื้อยังไม่อัปสลิป{payBd ? ` (ต้องโอน ฿${payBd.buyerTotalDue.toLocaleString()})` : ''}
+                      </span>
                     )}
                     {sellerFeeNeeded ? (
                       sellerSlipVerified ? (
@@ -941,7 +1015,9 @@ function AdminDealsInner() {
                           </button>
                         </span>
                       ) : (
-                        <span className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-500 border border-gray-200">⏳ ผู้ขายยังไม่อัปสลิปค่าบริการ</span>
+                        <span className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-500 border border-gray-200">
+                          ⏳ ผู้ขายยังไม่อัปสลิปค่าบริการ{payBd && payBd.sellerServiceDue > 0 ? ` (ต้องโอน ฿${payBd.sellerServiceDue.toLocaleString()})` : ''}
+                        </span>
                       )
                     ) : (
                       <span className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200">ℹ️ ดีลนี้ไม่ต้องมีสลิปค่าบริการฝั่งผู้ขาย</span>

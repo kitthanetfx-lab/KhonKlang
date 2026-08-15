@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { computeDealFees, type FeeConfig } from '@/lib/fees';
-import { splitFeeByPayer } from '@/lib/financeLedger';
+import { type FeeConfig } from '@/lib/fees';
 import {
   dealSlipPublicUrl,
   isSlipImageFile,
@@ -12,12 +11,14 @@ import {
 } from '@/lib/slipok';
 import { notifyAdminLineSlipResult } from '@/lib/lineAdminNotify';
 import { readFeesConfig, syncDealLedger } from '@/app/api/_lib/financeLedger';
+import { dealShippingCost } from '@/lib/dealPaymentBreakdown';
 import { readServiceControlsConfig } from '@/app/api/_lib/appConfig';
 import { shouldAutoVerifySlip } from '@/lib/serviceControls';
 import { notifyUsers } from '@/app/api/_lib/notify';
 import { maybeNotifyAdminLineQueues } from '@/app/api/_lib/adminLineNotifyHook';
 import { loadAdminDealSnapshot, type AdminDealRow } from '@/app/api/_lib/adminDealQueue';
 import { isListingCheckoutOrder, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
+import { dealBuyerPayAmount, dealSellerServiceDue } from '@/lib/dealPaymentBreakdown';
 
 export type SlipSide = 'buyer' | 'seller';
 
@@ -149,12 +150,9 @@ function computeExpectedAmounts(
       sellerRequired: false,
     };
   }
-  const price = Number(deal.price) || 0;
-  const feeBreakdown = computeDealFees(fees, price, String(deal.deal_type || ''));
-  const feePayer = splitFeeByPayer(feeBreakdown.total, String(priceState?.proposed_fee_payer || deal.fee_payer || 'split'));
   return {
-    buyer: price + feePayer.buyerShare,
-    seller: feePayer.sellerShare,
+    buyer: dealBuyerPayAmount(deal, priceState, fees),
+    seller: dealSellerServiceDue(deal, priceState, fees),
     sellerRequired: sellerSlipRequired(deal, priceState),
   };
 }

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { FEE_DEFAULTS, computeDealFees, effectiveRegFee, type FeeConfig, type FeeLine } from '@/lib/fees';
+import { dealShippingCost } from '@/lib/dealPaymentBreakdown';
 import {
   financeReferenceCode,
   splitDealFeeComponents,
@@ -270,7 +271,8 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
       }));
     }
   } else {
-    const buyerPaymentAmount = price + feePayer.buyerShare;
+    const shippingCost = dealShippingCost(deal);
+    const buyerPaymentAmount = price + shippingCost + feePayer.buyerShare;
     const sellerFeeAmount = feePayer.sellerShare;
     const buyerPaymentStatus: LedgerStatus = !deal.payment_slip_file_id
       ? (status === 'payment_pending' ? 'expected' : 'void')
@@ -289,7 +291,7 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
         entry_type: 'buyer_payment', direction: 'incoming', amount: buyerPaymentAmount, status: buyerPaymentStatus, title,
         purpose: 'ค่าสินค้าและค่าบริการส่วนผู้ซื้อ', counterparty_name: 'ศูนย์กลาง', bucket: 'deal-files', file_id: text(deal.payment_slip_file_id, 255),
         approve_link: `/deal/${dealId}`, active: buyerPaymentAmount > 0,
-        meta: { price, buyerFeeShare: feePayer.buyerShare, lines: feeSummary(feeBreakdown.lines), feePayer: feePayer.feePayer },
+        meta: { price, shippingCost, buyerFeeShare: feePayer.buyerShare, lines: feeSummary(feeBreakdown.lines), feePayer: feePayer.feePayer },
       }));
     }
 
