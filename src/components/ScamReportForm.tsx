@@ -3,6 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { authHeaders } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageCompress';
+import { createNativeDictation, isNativeDictationAvailable, NATIVE_DICTATION_SILENCE_SEC } from '@/lib/nativeDictation';
+import { isGlanghubApp } from '@/lib/nativeAuth';
 import { Icon } from './Icon';
 
 const BANKS = [
@@ -35,13 +37,39 @@ function getSpeechCtor(): (new () => SpeechRec) | null {
 }
 
 function useDictation(append: (text: string) => void, setInterim: (t: string) => void) {
+  const appendRef = useRef(append);
+  const setInterimRef = useRef(setInterim);
+  appendRef.current = append;
+  setInterimRef.current = setInterim;
+
+  const nativeRef = useRef<ReturnType<typeof createNativeDictation> | null>(null);
+  const useNativeRef = useRef(false);
+
   const recRef = useRef<SpeechRec | null>(null);
   const activeRef = useRef(false);
   const restartTimerRef = useRef<number | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
   const [listening, setListening] = useState(false);
-  const [supported, setSupported] = useState(() => getSpeechCtor() !== null);
+  const [supported, setSupported] = useState(() => isNativeDictationAvailable() || getSpeechCtor() !== null);
   const [micHint, setMicHint] = useState('');
+
+  useEffect(() => {
+    useNativeRef.current = isNativeDictationAvailable();
+    if (useNativeRef.current) {
+      nativeRef.current = createNativeDictation({
+        append: text => appendRef.current(text),
+        setInterim: text => setInterimRef.current(text),
+        setListening,
+        setMicHint,
+      });
+      return () => {
+        void nativeRef.current?.destroy();
+        nativeRef.current = null;
+      };
+    }
+    return () => stopListening();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function clearRestartTimer() {
     if (restartTimerRef.current != null) {
@@ -77,7 +105,7 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
       rec?.stop();
     } catch { /* ignore */ }
     setListening(false);
-    setInterim('');
+    setInterimRef.current('');
   }
 
   function scheduleRestart() {
@@ -103,15 +131,15 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i += 1) {
         const r = e.results[i];
-        if (r.isFinal) append(r[0].transcript);
+        if (r.isFinal) appendRef.current(r[0].transcript);
         else interim += r[0].transcript;
       }
-      setInterim(interim);
+      setInterimRef.current(interim);
     };
 
     rec.onend = () => {
       if (recRef.current === rec) recRef.current = null;
-      setInterim('');
+      setInterimRef.current('');
       if (activeRef.current) scheduleRestart();
       else setListening(false);
     };
@@ -155,6 +183,10 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
   }
 
   function toggle() {
+    if (useNativeRef.current) {
+      void nativeRef.current?.toggle();
+      return;
+    }
     if (activeRef.current) {
       setMicHint('');
       stopListening();
@@ -163,8 +195,8 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
     startListening();
   }
 
-  useEffect(() => () => stopListening(), []);
-  return { listening, supported, toggle, micHint, silenceSec: DICTATION_SILENCE_SEC };
+  const silenceSec = useNativeRef.current ? NATIVE_DICTATION_SILENCE_SEC : DICTATION_SILENCE_SEC;
+  return { listening, supported, toggle, micHint, silenceSec };
 }
 
 /* ── อัปโหลดรูปหลายรูปพร้อมพรีวิว + จัดลำดับ ────────────────── */
@@ -441,7 +473,13 @@ export function ScamReportForm({ onDone }: { onDone?: () => void }) {
         </p>
       </div>
       {dictation.micHint && <p className="csr-hint csr-mic-hint">{dictation.micHint}</p>}
-      {!dictation.supported && !dictation.micHint && <p className="csr-hint csr-mic-hint">เบราว์เซอร์นี้ไม่รองรับการพูดเป็นข้อความ — แนะนำ Chrome หรือ Edge</p>}
+      {!dictation.supported && !dictation.micHint && (
+        <p className="csr-hint csr-mic-hint">
+          {isGlanghubApp()
+            ? 'อัปเดตแอปเป็นเวอร์ชันล่าสุดเพื่อใช้พูดให้พิมพ์'
+            : 'เบราว์เซอร์นี้ไม่รองรับการพูดเป็นข้อความ — แนะนำ Chrome หรือ Edge'}
+        </p>
+      )}
       <p className="csr-hint" style={{ textAlign: 'right' }}>{(detail.length + interim.length).toLocaleString()}/5,000</p>
 
       {/* ── หลักฐาน ── */}
