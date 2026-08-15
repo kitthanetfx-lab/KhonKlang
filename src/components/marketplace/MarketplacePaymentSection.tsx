@@ -26,7 +26,7 @@ export function MarketplacePaymentSection({ deal, myRole, awaitingSlip, onUpload
   const inputRef = useRef<HTMLInputElement>(null);
   const shipCost = marketplaceShippingCost(deal);
   const buyerShouldPay = marketplaceBuyerPayAmount(deal);
-  const sellerNet = Math.max(0, Math.round(Number(deal.list_gross_price) || deal.price));
+  const sellerNet = Math.max(0, Math.round(Number(deal.list_gross_price) || deal.price)) + shipCost;
 
   return (
     <div className="dr-card dr-pay-card mkt-pay-card">
@@ -56,10 +56,15 @@ export function MarketplacePaymentSection({ deal, myRole, awaitingSlip, onUpload
           {shipCost > 0 ? ` + ค่าขนส่ง ฿${shipCost.toLocaleString()}` : ''}
           {' '}(ราคารวมค่าบริการแพลตฟอร์มแล้ว)
         </p>
-        <div className="mkt-pay-row mkt-pay-row-muted">
-          <span>ยอดสุทธิที่ผู้ขาย {deal.seller_name || ''} ได้รับเมื่อสำเร็จ</span>
+        <div className="mkt-pay-row mkt-pay-row-total mkt-pay-row-seller">
+          <span>ผู้ขายได้รับสุทธิเมื่อสำเร็จ</span>
           <span>฿{sellerNet.toLocaleString()}</span>
         </div>
+        {shipCost > 0 && (
+          <p className="mkt-pay-note">
+            = สินค้า ฿{Math.max(0, Math.round(Number(deal.list_gross_price) || deal.price)).toLocaleString()} + ขนส่ง ฿{shipCost.toLocaleString()}
+          </p>
+        )}
       </div>
 
       <div className="mkt-pay-status-rows">

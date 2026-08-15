@@ -195,11 +195,11 @@ function AdminDealsInner() {
     return computeDealPaymentBreakdown(d, d.priceState, fees);
   }
 
-  function AdminPayRow({ label, amount, bold, muted }: { label: string; amount: number; bold?: boolean; muted?: boolean }) {
+  function AdminPayRow({ label, amount, bold, muted, total }: { label: string; amount: number; bold?: boolean; muted?: boolean; total?: boolean }) {
     return (
-      <div className={`flex justify-between gap-3 ${muted ? 'text-gray-400' : 'text-gray-600 dark:text-gray-300'}`}>
-        <span>{label}</span>
-        <span className={`font-mono tabular-nums ${bold ? 'font-bold text-gray-900 dark:text-gray-100' : 'font-semibold'}`}>
+      <div className={`flex justify-between items-baseline gap-3 ${muted ? 'text-gray-400' : total ? 'text-emerald-900 dark:text-emerald-100' : 'text-gray-600 dark:text-gray-300'}`}>
+        <span className={total ? 'font-bold text-sm' : ''}>{label}</span>
+        <span className={`font-mono tabular-nums ${total ? 'text-xl font-extrabold tracking-tight' : bold ? 'text-lg font-bold text-gray-900 dark:text-gray-100' : 'font-semibold'}`}>
           ฿{amount.toLocaleString()}
         </span>
       </div>
@@ -243,23 +243,28 @@ function AdminDealsInner() {
           )}
         </div>
 
-        <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-950/20 dark:border-emerald-900 px-2.5 py-2">
-          <p className="font-semibold text-emerald-800 dark:text-emerald-200">ยอดที่ต้องโอน</p>
-          <AdminPayRow label="ผู้ซื้อ → ศูนย์กลาง (ตรวจสลิป)" amount={bd.buyerTotalDue} bold />
+        <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-950/20 dark:border-emerald-900 px-3 py-3">
+          <p className="font-bold text-sm text-emerald-800 dark:text-emerald-200">ยอดที่ต้องโอน</p>
+          <AdminPayRow label="ผู้ซื้อ → ศูนย์กลาง (ตรวจสลิป)" amount={bd.buyerTotalDue} total />
           {!bd.isMarketplace && bd.sellerServiceDue > 0 && (
-            <AdminPayRow label="ผู้ขาย → ค่าบริการ (แยกสลิป)" amount={bd.sellerServiceDue} />
+            <AdminPayRow label="ผู้ขาย → ค่าบริการ (แยกสลิป)" amount={bd.sellerServiceDue} bold />
           )}
           {!bd.isMarketplace && (
-            <p className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-relaxed">
+            <p className="text-[11px] text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed pl-0.5">
               = สินค้า ฿{bd.productPrice.toLocaleString()}
               {bd.shippingCost > 0 ? ` + ขนส่ง ฿${bd.shippingCost.toLocaleString()}` : ''}
               {bd.buyerServiceShare > 0 ? ` + ค่าบริการฝั่งผู้ซื้อ ฿${bd.buyerServiceShare.toLocaleString()}` : ''}
             </p>
           )}
           {!bd.isMarketplace && (
-            <p className="text-[11px] text-gray-500">
-              ผู้ขายได้รับสุทธิเมื่อสำเร็จ: <span className="font-mono font-semibold">฿{bd.sellerNetOnSuccess.toLocaleString()}</span>
-            </p>
+            <div className="mt-2 pt-2 border-t border-emerald-200/80 dark:border-emerald-800/60">
+              <AdminPayRow label="ผู้ขายได้รับสุทธิเมื่อสำเร็จ" amount={bd.sellerNetOnSuccess} total />
+              {bd.shippingCost > 0 && (
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 pl-0.5">
+                  = สินค้า ฿{bd.productPrice.toLocaleString()} + ขนส่ง ฿{bd.shippingCost.toLocaleString()}
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>

@@ -2016,7 +2016,7 @@ export default function DealRoom() {
           const buyerShare = fb.total - sellerShare;
           const shipCost = Math.max(0, Math.round(Number(deal!.shipping_cost) || 0));
           const buyerShouldPay = deal!.price + shipCost + buyerShare;
-          const sellerNet = Math.max(deal!.price, 0);
+          const sellerNet = Math.max(deal!.price, 0) + shipCost;
           const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
           const fpName = fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
           const isBuyerPaysAll = fp === 'buyer';
@@ -2108,7 +2108,7 @@ export default function DealRoom() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ค่าขนส่ง</span><span>฿{shipCost.toLocaleString()}</span></div>
                 )}
                 {fb.lines.map(l => (<div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>{l.label}</span><span>฿{l.amount.toLocaleString()}</span></div>))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'buyer' ? 700 : 400, color: myRole === 'buyer' ? 'var(--ink)' : 'var(--muted)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'buyer' ? 800 : 400, fontSize: myRole === 'buyer' ? 16 : 13, color: myRole === 'buyer' ? 'var(--ink)' : 'var(--muted)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 8 }}>
                   <span>ผู้ซื้อ {deal!.buyer_name || ''} โอนเงินเข้าศูนย์กลาง</span>
                   <span>฿{buyerShouldPay.toLocaleString()}</span>
                 </div>
@@ -2116,15 +2116,20 @@ export default function DealRoom() {
                   {`= ราคาสินค้า ฿${deal!.price.toLocaleString()}${shipCost > 0 ? ` + ค่าขนส่ง ฿${shipCost.toLocaleString()}` : ''}${buyerShare > 0 ? ` + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()}` : ''}`}
                 </div>
                 {sellerShouldPay > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'seller' ? 700 : 400, color: myRole === 'seller' ? 'var(--ink)' : (sellerShare > 0 ? '#8a5a00' : 'var(--muted)'), marginTop: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'seller' ? 800 : 400, fontSize: myRole === 'seller' ? 16 : 13, color: myRole === 'seller' ? 'var(--ink)' : (sellerShare > 0 ? '#8a5a00' : 'var(--muted)'), marginTop: 4 }}>
                     <span>ผู้ขาย {deal!.seller_name || ''} ชำระค่าบริการแยก</span>
                     <span>฿{sellerShouldPay.toLocaleString()}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginTop: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 15, color: 'var(--ink)', marginTop: 6, paddingTop: 8, borderTop: '1px solid var(--line)' }}>
                   <span>ยอดสุทธิที่ผู้ขาย {deal!.seller_name || ''} ได้รับเมื่อดีลสำเร็จ</span>
                   <span>฿{sellerNet.toLocaleString()}</span>
                 </div>
+                {shipCost > 0 && (
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+                    {`= สินค้า ฿${deal!.price.toLocaleString()} + ขนส่ง ฿${shipCost.toLocaleString()}`}
+                  </div>
+                )}
               </div>
               
               {isBuyerPaysAll ? (
@@ -2298,7 +2303,8 @@ export default function DealRoom() {
     const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
     const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
     const buyerShare = fb.total - sellerShare;
-    const sellerNet = Math.max(deal!.price, 0);
+    const shipCost = Math.max(0, Math.round(Number(deal!.shipping_cost) || 0));
+    const sellerNet = Math.max(deal!.price, 0) + shipCost;
     const finished = deal!.status === 'completed';
 
     const rows: { who: string; bank?: BankInfo | null; note: string }[] = [
@@ -2317,8 +2323,11 @@ export default function DealRoom() {
         {!isMt && (
           <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', marginBottom: 10, fontSize: 13 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}><span>ราคาสินค้า</span><span>฿{deal!.price.toLocaleString()}</span></div>
+            {shipCost > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}><span>ค่าขนส่ง (ผู้ขายได้รับ)</span><span>฿{shipCost.toLocaleString()}</span></div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}><span>ค่าบริการรวม</span><span>฿{fb.total.toLocaleString()}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}><span>ผู้ขายได้รับสุทธิ{finished ? '' : ' (เมื่อดีลสำเร็จ)'}</span><span>฿{sellerNet.toLocaleString()}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 16, color: 'var(--ink)', borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 8 }}><span>ผู้ขายได้รับสุทธิ{finished ? '' : ' (เมื่อดีลสำเร็จ)'}</span><span>฿{sellerNet.toLocaleString()}</span></div>
           </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>

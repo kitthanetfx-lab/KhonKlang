@@ -384,14 +384,14 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
     }
 
     if (status === 'completed') {
-      const sellerPayoutAmount = Math.max(price, 0);
+      const sellerPayoutAmount = Math.max(price, 0) + shippingCost;
       await push(buildEntry({
         entry_key: `deal:${dealId}:seller_payout`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
         owner_type: 'seller', owner_id: String(deal.seller_id || '') || null, owner_name: text(deal.seller_name, 200),
         entry_type: 'seller_payout', direction: 'outgoing', amount: sellerPayoutAmount, status: pd.payout_sent_at ? 'paid' : 'scheduled', title,
         purpose: 'จ่ายคืนผู้ขายเมื่อดีลสำเร็จ', counterparty_name: 'ศูนย์กลาง', bucket: '', file_id: '',
         approve_link: `/deal/${dealId}`, active: sellerPayoutAmount > 0,
-        meta: { payoutNote: text(pd.payout_note, 300), sellerFeeShare: sellerFeeAmount, goodsPrice: price },
+        meta: { payoutNote: text(pd.payout_note, 300), sellerFeeShare: sellerFeeAmount, goodsPrice: price, shippingCost },
       }));
     }
 

@@ -65,7 +65,7 @@ export function computeDealPaymentBreakdown(
       sellerServiceShare: 0,
       buyerTotalDue: marketplaceBuyerPayAmount(deal),
       sellerServiceDue: 0,
-      sellerNetOnSuccess: productPrice,
+      sellerNetOnSuccess: productPrice + shippingCost,
       isMarketplace: true,
     };
   }
@@ -86,7 +86,7 @@ export function computeDealPaymentBreakdown(
     sellerServiceShare: split.sellerShare,
     buyerTotalDue: productPrice + shippingCost + split.buyerShare,
     sellerServiceDue: split.sellerShare,
-    sellerNetOnSuccess: productPrice,
+    sellerNetOnSuccess: productPrice + shippingCost,
     isMarketplace: false,
   };
 }
@@ -132,13 +132,19 @@ export function formatDealPaymentBreakdownLines(
 
   lines.push('--- ยอดที่ต้องโอน ---');
   const buyerMark = opts?.highlightSide === 'buyer' ? '▶ ' : '';
-  lines.push(`${buyerMark}ผู้ซื้อ → ศูนย์กลาง: ${baht(bd.buyerTotalDue)}`);
+  lines.push(`${buyerMark}ผู้ซื้อ → ศูนย์กลาง`);
+  lines.push(`   💰 ${baht(bd.buyerTotalDue)}`);
   if (!bd.isMarketplace && bd.sellerServiceDue > 0) {
     const sellerMark = opts?.highlightSide === 'seller' ? '▶ ' : '';
-    lines.push(`${sellerMark}ผู้ขาย → ค่าบริการ: ${baht(bd.sellerServiceDue)}`);
+    lines.push(`${sellerMark}ผู้ขาย → ค่าบริการ`);
+    lines.push(`   💰 ${baht(bd.sellerServiceDue)}`);
   }
   if (!bd.isMarketplace) {
-    lines.push(`ผู้ขายได้รับสุทธิ: ${baht(bd.sellerNetOnSuccess)}`);
+    lines.push('--- ผู้ขายได้รับสุทธิ ---');
+    if (bd.shippingCost > 0) {
+      lines.push(`   สินค้า ${baht(bd.productPrice)} + ขนส่ง ${baht(bd.shippingCost)}`);
+    }
+    lines.push(`   💰 ${baht(bd.sellerNetOnSuccess)}`);
   }
 
   return lines;
