@@ -15,6 +15,9 @@ const BANKS = [
 const PROVINCES = ['ไม่ระบุ','กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'];
 
 /* ── Web Speech API (พูดให้พิมพ์) ───────────────────────────── */
+/** ปิดไมค์อัตโนมัติเมื่อไม่มีเสียงพูด (วินาที) */
+const DICTATION_SILENCE_SEC = 20;
+
 interface SpeechErrorEvent { error?: string; message?: string; }
 interface SpeechResultEvent { resultIndex: number; results: { length: number; [i: number]: { isFinal: boolean; 0: { transcript: string } } }; }
 interface SpeechRec {
@@ -33,22 +36,40 @@ function getSpeechCtor(): (new () => SpeechRec) | null {
 
 function useDictation(append: (text: string) => void, setInterim: (t: string) => void) {
   const recRef = useRef<SpeechRec | null>(null);
-  const wantListenRef = useRef(false);
+  const activeRef = useRef(false);
   const restartTimerRef = useRef<number | null>(null);
+  const silenceTimerRef = useRef<number | null>(null);
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(() => getSpeechCtor() !== null);
   const [micHint, setMicHint] = useState('');
 
-  const clearRestartTimer = () => {
+  function clearRestartTimer() {
     if (restartTimerRef.current != null) {
       window.clearTimeout(restartTimerRef.current);
       restartTimerRef.current = null;
     }
-  };
+  }
+
+  function clearSilenceTimer() {
+    if (silenceTimerRef.current != null) {
+      window.clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  }
+
+  function resetSilenceTimer() {
+    clearSilenceTimer();
+    if (!activeRef.current) return;
+    silenceTimerRef.current = window.setTimeout(() => {
+      setMicHint(`ปิดไมค์อัตโนมัติ — ไม่ได้ยินเสียง ${DICTATION_SILENCE_SEC} วินาที`);
+      stopListening();
+    }, DICTATION_SILENCE_SEC * 1000);
+  }
 
   function stopListening() {
-    wantListenRef.current = false;
+    activeRef.current = false;
     clearRestartTimer();
+    clearSilenceTimer();
     const rec = recRef.current;
     recRef.current = null;
     try {
@@ -59,9 +80,18 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
     setInterim('');
   }
 
+  function scheduleRestart() {
+    if (!activeRef.current) return;
+    clearRestartTimer();
+    restartTimerRef.current = window.setTimeout(() => {
+      restartTimerRef.current = null;
+      startSession();
+    }, 200);
+  }
+
   function startSession() {
     const Ctor = getSpeechCtor();
-    if (!Ctor || !wantListenRef.current) return;
+    if (!Ctor || !activeRef.current) return;
 
     const rec = new Ctor();
     rec.lang = 'th-TH';
@@ -69,6 +99,7 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
     rec.interimResults = true;
 
     rec.onresult = (e: SpeechResultEvent) => {
+      resetSilenceTimer();
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i += 1) {
         const r = e.results[i];
@@ -81,7 +112,7 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
     rec.onend = () => {
       if (recRef.current === rec) recRef.current = null;
       setInterim('');
-      if (wantListenRef.current) scheduleRestart();
+      if (activeRef.current) scheduleRestart();
       else setListening(false);
     };
 
@@ -89,7 +120,7 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
       const code = String(evt.error || '');
       if (code === 'aborted') return;
       if (code === 'no-speech') {
-        if (wantListenRef.current) scheduleRestart();
+        if (activeRef.current) scheduleRestart();
         return;
       }
       if (code === 'not-allowed' || code === 'service-not-allowed') {
@@ -98,44 +129,42 @@ function useDictation(append: (text: string) => void, setInterim: (t: string) =>
         return;
       }
       if (code === 'network') setMicHint('เครือข่ายขัดข้อง — ลองใหม่อีกครั้ง');
-      if (wantListenRef.current) scheduleRestart();
+      if (activeRef.current) scheduleRestart();
     };
 
     recRef.current = rec;
     try {
       rec.start();
       setListening(true);
-      setMicHint('');
     } catch {
       scheduleRestart();
     }
   }
 
-  function scheduleRestart() {
-    if (!wantListenRef.current) return;
-    clearRestartTimer();
-    restartTimerRef.current = window.setTimeout(() => {
-      restartTimerRef.current = null;
-      startSession();
-    }, 180);
-  }
-
-  function toggle() {
-    if (wantListenRef.current) {
-      stopListening();
-      return;
-    }
+  function startListening() {
     if (!getSpeechCtor()) {
       setSupported(false);
       setMicHint('เบราว์เซอร์นี้ไม่รองรับการพูดเป็นข้อความ');
       return;
     }
-    wantListenRef.current = true;
+    activeRef.current = true;
+    setListening(true);
+    setMicHint('');
+    resetSilenceTimer();
     startSession();
   }
 
+  function toggle() {
+    if (activeRef.current) {
+      setMicHint('');
+      stopListening();
+      return;
+    }
+    startListening();
+  }
+
   useEffect(() => () => stopListening(), []);
-  return { listening, supported, toggle, micHint };
+  return { listening, supported, toggle, micHint, silenceSec: DICTATION_SILENCE_SEC };
 }
 
 /* ── อัปโหลดรูปหลายรูปพร้อมพรีวิว + จัดลำดับ ────────────────── */
@@ -375,39 +404,45 @@ export function ScamReportForm({ onDone }: { onDone?: () => void }) {
         บรรยายเหตุการณ์ให้ละเอียด: ทักซื้ออย่างไร โอนแล้วเกิดอะไรขึ้น คนขายอ้างอะไร สุดท้ายติดต่อได้หรือไม่
         — พิมพ์เอง หรือกดไมค์แล้วพูดให้ระบบพิมพ์ให้ แล้วค่อยแก้ไขทีหลังได้
       </p>
-      <div className={`csr-detail-wrap ${dictation.listening ? 'recording' : ''}`}>
-        <textarea
-          ref={detailRef}
-          value={detail}
-          onChange={e => setDetail(e.target.value)}
-          rows={7}
-          maxLength={5000}
-          placeholder="เช่น เห็นโพสต์ขายกล้องราคา 3,500 ทักแชทแล้วแอดไลน์ไปคุย โอนเงินไปบัญชีชื่อ... หลังโอนถูกบอกให้โอนค่าส่งเพิ่ม... สุดท้ายถูกบล็อก..."
-        />
+      <div className={`csr-detail-block ${dictation.listening ? 'recording' : ''}`}>
+        <div className="csr-detail-wrap">
+          <textarea
+            ref={detailRef}
+            value={detail + (interim ? (detail && !detail.endsWith(' ') ? ' ' : '') + interim : '')}
+            onChange={e => {
+              if (dictation.listening) return;
+              setDetail(e.target.value);
+            }}
+            readOnly={dictation.listening}
+            rows={7}
+            maxLength={5000}
+            placeholder="เช่น เห็นโพสต์ขายกล้องราคา 3,500 ทักแชทแล้วแอดไลน์ไปคุย โอนเงินไปบัญชีชื่อ... หลังโอนถูกบอกให้โอนค่าส่งเพิ่ม... สุดท้ายถูกบล็อก..."
+          />
+        </div>
         <button
           type="button"
-          className={`csr-mic ${dictation.listening ? 'on' : ''}`}
+          className={`csr-mic-bar ${dictation.listening ? 'on' : ''}`}
           aria-pressed={dictation.listening}
-          aria-label={dictation.listening ? 'หยุดฟังเสียง' : 'พูดให้พิมพ์'}
-          onPointerDown={e => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onClick={e => {
-            e.preventDefault();
-            e.stopPropagation();
+          aria-label={dictation.listening ? 'ปิดไมโครโฟน' : 'เปิดไมโครโฟน — พูดให้พิมพ์'}
+          onClick={() => {
+            detailRef.current?.blur();
             dictation.toggle();
           }}
-          title={dictation.supported ? (dictation.listening ? 'หยุดฟัง' : 'พูดให้พิมพ์') : 'เบราว์เซอร์นี้ไม่รองรับการพูด'}
           disabled={!dictation.supported}
         >
-          {dictation.listening ? <><span className="csr-mic-dot" /> กำลังฟัง... แตะเพื่อหยุด</> : <>🎤 พูดให้พิมพ์</>}
+          {dictation.listening
+            ? <><span className="csr-mic-dot" /> กำลังฟัง — แตะเพื่อปิดไมค์</>
+            : <>🎤 พูดให้พิมพ์ — แตะเพื่อเปิดไมค์</>}
         </button>
-        {interim && <div className="csr-interim">{interim}</div>}
+        <p className="csr-mic-help">
+          {dictation.listening
+            ? `พูดได้เลย · แตะปุ่มอีกครั้งเพื่อปิด · ปิดอัตโนมัติเมื่อเงียบ ${dictation.silenceSec} วินาที`
+            : `แตะเปิดไมค์ · แตะอีกครั้งปิด · ปิดอัตโนมัติเมื่อเงียบ ${dictation.silenceSec} วินาที`}
+        </p>
       </div>
-      {dictation.micHint && <p className="csr-hint" style={{ color: 'var(--amber-500)', marginTop: 6 }}>{dictation.micHint}</p>}
-      {!dictation.supported && !dictation.micHint && <p className="csr-hint" style={{ color: 'var(--amber-500)' }}>เบราว์เซอร์นี้ไม่รองรับการพูดเป็นข้อความ — แนะนำ Chrome หรือ Edge</p>}
-      <p className="csr-hint" style={{ textAlign: 'right' }}>{detail.length.toLocaleString()}/5,000</p>
+      {dictation.micHint && <p className="csr-hint csr-mic-hint">{dictation.micHint}</p>}
+      {!dictation.supported && !dictation.micHint && <p className="csr-hint csr-mic-hint">เบราว์เซอร์นี้ไม่รองรับการพูดเป็นข้อความ — แนะนำ Chrome หรือ Edge</p>}
+      <p className="csr-hint" style={{ textAlign: 'right' }}>{(detail.length + interim.length).toLocaleString()}/5,000</p>
 
       {/* ── หลักฐาน ── */}
       <h3 className="csr-sec"><span className="csr-sec-ic"><Icon name="camera" size={15} /></span> หลักฐาน</h3>
