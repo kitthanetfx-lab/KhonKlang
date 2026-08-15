@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { Nav, Footer } from '@/components/Site';
 import { Icon } from '@/components/Icon';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
@@ -269,339 +269,471 @@ export default function MarketplaceDetailPage() {
   }
 
   const isOwner = listing.seller_id === myId;
-  const isAuction = listing.deal_type === 'auction' && auction;
+  const isAuction = !!(listing.deal_type === 'auction' && auction);
   const canSellerChat = supportsSellerChat(listing.selling_mode);
-  const displayPrice = isAuction ? auction.leadingPrice : (listing.price || 0);
+  const displayPrice = isAuction && auction ? auction.leadingPrice : (listing.price || 0);
   const shippingProviders = listing.shipping_providers || [];
   const shippingCost = listing.shipping_cost ?? 0;
   const buyState = marketplaceListingBuyState(listing, myId || undefined);
+  const backHref = isAuction ? '/marketplace?zone=auction' : '/marketplace';
+  const backLabel = isAuction ? 'กลับตลาดประมูล' : 'กลับตลาดซื้อขาย';
+
+  const panelProps = {
+    listing,
+    sellerShop,
+    images,
+    displayImage,
+    setMainImage,
+    isOwner,
+    isAuction,
+    auction,
+    canSellerChat,
+    displayPrice,
+    shippingProviders,
+    shippingCost,
+    buyState,
+    selectedShipping,
+    setSelectedShipping,
+    autoBidOn,
+    setAutoBidOn,
+    maxBidAmount,
+    setMaxBidAmount,
+    bidStepAmount,
+    setBidStepAmount,
+    myAutoBidMax,
+    myAutoBidStep,
+    bidAmount,
+    setBidAmount,
+    bidding,
+    bidError,
+    walletAvail,
+    myId,
+    joining,
+    auctionBids,
+    placeBid,
+    sellerChatHref,
+    buyViaEscrow,
+  };
 
   return (
     <>
       <Nav active="market" />
-      <div className="pd-shell">
-        <div className="container">
-          <Link
-            href={isAuction ? '/marketplace?zone=auction' : '/marketplace'}
-            className="pd-back"
-          >
-            <Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} />
-            {isAuction ? 'กลับตลาดประมูล' : 'กลับตลาดซื้อขาย'}
-          </Link>
 
-          {/* โครงแบบ Shopee: การ์ดเดียว · ซ้ายแกลเลอรี · ขวาข้อมูล */}
-          <div className="pd-panel">
-            <aside className="pd-media">
-              <div className="pd-main">
-                {displayImage ? (
-                  <img src={displayImage} alt={listing.title} />
-                ) : (
-                  <div className="pd-main-empty"><Icon name="package" size={56} /></div>
-                )}
-              </div>
-              {images.length > 0 && (
-                <div className="pd-thumbs" role="list">
-                  {images.map(src => (
-                    <button
-                      key={src}
-                      type="button"
-                      role="listitem"
-                      className={`pd-thumb${displayImage === src ? ' is-active' : ''}`}
-                      onClick={() => setMainImage(src)}
-                      aria-label="ดูรูปนี้"
-                    >
-                      <img src={src} alt="" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </aside>
-
-            <section className={`pd-info${isAuction ? ' pd-info--auction' : ''}`}>
-              <div className="pd-tags">
-                {listing.category && <span className="badge badge-gray">{listing.category}</span>}
-                {listing.condition && <span className="badge badge-gray">{listing.condition}</span>}
-                {isAuction && <span className="badge badge-purple">🔨 ประมูล</span>}
-                {isCertifiedMode(listing.selling_mode) && <span className="badge badge-amber">⭐ Certified</span>}
-              </div>
-
-              <h1 className="pd-title">{listing.title}</h1>
-
-              <div className="pd-price-box">
-                <span className="pd-price-lbl">
-                  {isAuction && auction.bidCount > 0 ? 'ราคาปัจจุบัน' : isAuction ? 'ราคาเริ่ม' : 'ราคา'}
-                </span>
-                <span className="pd-price">฿{displayPrice.toLocaleString()}</span>
-              </div>
-
-              {isAuction && (
-                <div className="pd-auction">
-                  <div className="pd-auction-cell">
-                    <span className="pd-auction-lbl">เหลือเวลา</span>
-                    <strong className="pd-auction-val">
-                      <AuctionCountdown endsAt={auction.endsAt} endedAt={auction.endedAt} liveClassName="is-live" />
-                    </strong>
-                  </div>
-                  <div className="pd-auction-cell">
-                    <span className="pd-auction-lbl">ผู้ประมูล</span>
-                    <strong className="pd-auction-val">{auction.uniqueBidderCount} คน · {auction.bidCount} bid</strong>
-                  </div>
-                  <div className="pd-auction-cell">
-                    <span className="pd-auction-lbl">นำอยู่</span>
-                    <strong className="pd-auction-val">{auction.currentBidderName || '— ยังไม่มี'}</strong>
-                  </div>
-                  <div className="pd-auction-cell">
-                    <span className="pd-auction-lbl">บิทครั้งละ</span>
-                    <strong className="pd-auction-val">฿{auction.bidIncrement.toLocaleString()}</strong>
-                  </div>
-                  {auction.bidDeposit > 0 && (
-                    <div className="pd-auction-cell">
-                      <span className="pd-auction-lbl">มัดจำสิทธิ</span>
-                      <strong className="pd-auction-val">฿{auction.bidDeposit.toLocaleString()}</strong>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ประมูล: กล่อง Bid — เพดาน Auto-bid เหนือปุ่ม Bid (ลำดับสายตา + contrast) */}
-              {isAuction && !isOwner && auction.phase === 'live' && (
-                <div className="pd-bid">
-                  {auction.bidDeposit > 0 && (
-                    <div className="pd-deposit-note">
-                      <div>
-                        มัดจำสิทธิประมูล <b>฿{auction.bidDeposit.toLocaleString()}</b> จะถูกล็อกจากกระเป๋าตอน Bid
-                        {walletAvail != null && <> · ยอดว่าง <b>฿{walletAvail.toLocaleString()}</b></>}
-                      </div>
-                      {walletAvail != null && walletAvail < auction.bidDeposit && (
-                        <Link href="/wallet" className="btn btn-green btn-sm" style={{ marginTop: 8 }}>
-                          เติมเงินเข้ากระเป๋าก่อนบิด →
-                        </Link>
-                      )}
-                    </div>
-                  )}
-                  <div className="pd-autobid">
-                    <button
-                      type="button"
-                      className={`pd-autobid-toggle${autoBidOn ? ' is-on' : ''}`}
-                      onClick={() => setAutoBidOn(v => !v)}
-                      aria-pressed={autoBidOn}
-                    >
-                      {autoBidOn ? '✓ Auto-bid เปิดอยู่' : '+ เปิด Auto-bid'}
-                    </button>
-                    {autoBidOn && (
-                      <div className="pd-autobid-panel">
-                        <label className="pd-bid-lbl pd-bid-lbl--max" htmlFor="pd-max-bid">
-                          ราคาสูงสุดที่สู้ (เพดาน Auto-bid)
-                        </label>
-                        <input
-                          id="pd-max-bid"
-                          className="pd-bid-input pd-bid-input--max"
-                          type="number"
-                          min={auction.minNextBid}
-                          step={auction.bidIncrement}
-                          value={maxBidAmount}
-                          onChange={e => setMaxBidAmount(e.target.value)}
-                          placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
-                        />
-                        <label className="pd-bid-lbl" htmlFor="pd-bid-step" style={{ marginTop: 8 }}>
-                          จำนวนเงินต่อบิด (อย่างน้อย ฿{auction.bidIncrement.toLocaleString()})
-                        </label>
-                        <input
-                          id="pd-bid-step"
-                          className="pd-bid-input"
-                          type="number"
-                          min={auction.bidIncrement}
-                          step={auction.bidIncrement}
-                          value={bidStepAmount || String(auction.bidIncrement)}
-                          onChange={e => setBidStepAmount(e.target.value)}
-                        />
-                        <p className="pd-bid-hint">
-                          ถูก overbid แล้วระบบจะสู้เพิ่มทีละจำนวนนี้ จนถึงเพดาน — ทำงานแม้ปิดเว็บ
-                        </p>
-                        {myAutoBidMax != null && (
-                          <p className="pd-bid-auto">
-                            บันทึกไว้เพดาน ฿{myAutoBidMax.toLocaleString()}
-                            {myAutoBidStep ? ` · ต่อบิด ฿${myAutoBidStep.toLocaleString()}` : ''}
-                            {' — กด Bid เพื่ออัปเดต'}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {myId && (
-                    <LineOaConnect
-                      returnTo={`/marketplace/${listing.id}`}
-                      readyLabel="✓ พร้อมรับแจ้ง overbid ผ่าน LINE OA"
-                    />
-                  )}
-
-                  <div className="pd-bid-row">
-                    <div className="pd-bid-field">
-                      <label className="pd-bid-lbl" htmlFor="pd-bid-amount">ราคา bid (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
-                      <input
-                        id="pd-bid-amount"
-                        className="pd-bid-input"
-                        type="number"
-                        min={auction.minNextBid}
-                        step={auction.bidIncrement}
-                        value={bidAmount}
-                        onChange={e => setBidAmount(e.target.value)}
-                      />
-                    </div>
-                    <button type="button" className="btn btn-primary btn-lg pd-bid-btn" onClick={placeBid} disabled={bidding}>
-                      {bidding ? '...' : '🔨 Bid'}
-                    </button>
-                  </div>
-
-                  <div className="pd-bid-foot">
-                    {canSellerChat && (
-                      <button type="button" className="pd-chat-link" onClick={sellerChatHref}>
-                        <Icon name="chat" size={15} /> แชทกับผู้ขาย
-                      </button>
-                    )}
-                    {bidError && (
-                      <p className="pd-bid-err">
-                        {bidError}
-                        {bidError.includes('กระเป๋า') && (
-                          <> {' '}<Link href="/wallet">ไปเติมเงิน</Link></>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {isAuction && !isOwner && auction.phase !== 'live' && (
-                <div className="pd-note">
-                  <div className="pd-note-title">
-                    {listing.buyer_id || auction.endedAt ? 'ขายแล้ว · ประมูลปิด' : 'ประมูลปิดแล้ว'}
-                  </div>
-                  <p>{auction.currentBidderName ? `ผู้ชนะ: ${auction.currentBidderName} · ฿${(auction.currentBid || displayPrice).toLocaleString()}` : 'ไม่มีผู้ bid'}</p>
-                  {myId && listing.buyer_id === myId && (
-                    <Link href={`/cart/checkout/${listing.id}`} className="btn btn-primary btn-lg" style={{ marginTop: 12 }}>
-                      ไปชำระเงิน / ติดตามสถานะ →
-                    </Link>
-                  )}
-                </div>
-              )}
-
-              {!isAuction && (
-                <div className="pd-row">
-                  <span className="pd-row-lbl">ค่าขนส่ง</span>
-                  <strong>{shippingCost > 0 ? `฿${shippingCost.toLocaleString()}` : 'ฟรี'}</strong>
-                </div>
-              )}
-
-              <div className="pd-meta">
-                <span><Icon name="user" size={15} /> {listing.seller_name || 'ผู้ขาย'}</span>
-                {listing.location && <span><Icon name="mapPin" size={15} /> {listing.location}</span>}
-              </div>
-
-              {listing.description && <p className="pd-desc">{listing.description}</p>}
-
-              {sellerShop && (
-                <Link href={`/shop/${sellerShop.sellerId || listing.seller_id}`} className="pd-shop">
-                  {sellerShop.avatarFileId ? (
-                    <img className="pd-shop-av" src={fileViewUrl(DEAL_BUCKET, sellerShop.avatarFileId)} alt="" />
-                  ) : (
-                    <div className="pd-shop-av pd-shop-av--empty">🏪</div>
-                  )}
-                  <div className="pd-shop-body">
-                    <div className="pd-shop-name">{sellerShop.name}</div>
-                    {sellerShop.tagline && <p className="pd-shop-tag">{sellerShop.tagline}</p>}
-                    {sellerShop.location && <p className="pd-shop-loc">📍 {sellerShop.location}</p>}
-                    <span className="pd-shop-go">เข้าชมหน้าร้าน →</span>
-                  </div>
-                </Link>
-              )}
-
-              {/* ตลาดปกติ / เจ้าของ — ปุ่มซื้อด้านล่าง */}
-              <div className="pd-actions">
-                {isOwner ? (
-                  <Link href={listing.status === 'posted' ? `/marketplace/${listing.id}` : `/deal/${listing.id}`} className="btn btn-primary btn-lg">รายการของคุณ</Link>
-                ) : isAuction ? null : buyState === 'sold' || buyState === 'reserved' ? (
-                  <div className="pd-note">
-                    <div className="pd-note-title">
-                      {buyState === 'sold' ? 'สินค้าขายแล้ว' : 'มีผู้จองแล้ว'}
-                    </div>
-                    <p>{buyState === 'sold' ? 'สินค้านี้กำลังอยู่ในขั้นตอนจัดส่งหรือเสร็จสิ้นแล้ว' : 'ผู้ซื้ออัปสลิปแล้ว รอทีมงานตรวจสอบ'}</p>
-                    {canSellerChat && (
-                      <button type="button" className="btn btn-soft btn-lg" style={{ marginTop: 12 }} onClick={sellerChatHref}>
-                        <Icon name="chat" size={18} /> แชทกับผู้ขาย
-                      </button>
-                    )}
-                  </div>
-                ) : buyState === 'continue_checkout' ? (
-                  <>
-                    <Link href={`/cart/checkout/${listing.id}`} className="btn btn-primary btn-lg">
-                      {listing.status === 'payment_uploaded' ? 'ดูสถานะการสั่งซื้อ →' : 'ดำเนินการโอนเงิน →'}
-                    </Link>
-                    {canSellerChat && (
-                      <button type="button" className="btn btn-soft btn-lg" onClick={sellerChatHref}>
-                        <Icon name="chat" size={18} /> แชทกับผู้ขาย
-                      </button>
-                    )}
-                  </>
-                ) : buyState === 'can_buy' ? (
-                  <>
-                    {shippingProviders.length > 0 && (
-                      <div className="pd-ship">
-                        <div className="pd-ship-lbl">เลือกขนส่ง</div>
-                        <div className="pd-ship-list">
-                          {shippingProviders.map(id => (
-                            <button
-                              key={id}
-                              type="button"
-                              className={`pd-ship-chip${selectedShipping === id ? ' is-active' : ''}`}
-                              onClick={() => setSelectedShipping(id)}
-                            >
-                              {getLogisticsProviderLabel(id)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <button type="button" className="btn btn-primary btn-lg" onClick={buyViaEscrow} disabled={joining}>
-                      {joining ? 'กำลังเข้าระบบซื้อขาย...' : 'ซื้อทันที'}
-                    </button>
-                    {canSellerChat && (
-                      <button type="button" className="btn btn-soft btn-lg" onClick={sellerChatHref}>
-                        <Icon name="chat" size={18} /> แชทกับผู้ขาย
-                      </button>
-                    )}
-                    <p className="pd-escrow-note">
-                      เมื่อกดซื้อ ระบบจะพาไปยืนยันที่อยู่จัดส่งและชำระเงิน — ไม่มีคนกลาง ผู้ขายจัดส่งตรงถึงคุณ
-                    </p>
-                  </>
-                ) : (
-                  <div className="pd-note">
-                    <div className="pd-note-title">สินค้าไม่พร้อมขาย</div>
-                    <p>รายการนี้ไม่เปิดขายบนตลาดแล้ว</p>
-                    <Link href="/marketplace" className="btn btn-soft btn-lg" style={{ marginTop: 12 }}>กลับตลาดซื้อขาย</Link>
-                  </div>
-                )}
-              </div>
-
-              {isAuction && auctionBids.length > 0 && (
-                <div className="pd-history">
-                  <h3>ประวัติ bid ล่าสุด</h3>
-                  <ul>
-                    {auctionBids.map(b => (
-                      <li key={b.id}>
-                        <span>{b.bidder_name}</span>
-                        <strong>฿{b.amount.toLocaleString()}</strong>
-                        <time>{new Date(b.created_at).toLocaleString('th-TH')}</time>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </section>
-          </div>
+      <div className={`mkt-pd-mobile-shell${isAuction ? ' mkt-pd-mobile-shell--auction' : ''}`}>
+        <div className={`mkt-pd-app${isAuction ? ' mkt-pd-app--auction' : ''}`}>
+          <header className="mkt-pd-top">
+            <Link href={backHref} className="mkt-pd-back">
+              <Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} />
+              {backLabel}
+            </Link>
+          </header>
+          <main className="mkt-pd-feed">
+            <MarketplaceDetailPanel {...panelProps} bidIdSuffix="-mobile" />
+          </main>
         </div>
       </div>
-      <Footer />
+
+      <div className="mkt-pd-desktop-shell">
+        <div className="pd-shell">
+          <div className="container">
+            <Link href={backHref} className="pd-back">
+              <Icon name="chevronRight" size={16} style={{ transform: 'rotate(180deg)' }} />
+              {backLabel}
+            </Link>
+            <MarketplaceDetailPanel {...panelProps} bidIdSuffix="" />
+          </div>
+        </div>
+        <Footer />
+      </div>
     </>
+  );
+}
+
+type DetailPanelProps = {
+  listing: ListingDetail;
+  sellerShop: {
+    sellerId?: string; name: string; location: string; address: string;
+    tagline?: string; avatarFileId?: string;
+  } | null;
+  images: string[];
+  displayImage: string;
+  setMainImage: (src: string) => void;
+  isOwner: boolean;
+  isAuction: boolean;
+  auction: AuctionPublic | null;
+  canSellerChat: boolean;
+  displayPrice: number;
+  shippingProviders: string[];
+  shippingCost: number;
+  buyState: ReturnType<typeof marketplaceListingBuyState>;
+  selectedShipping: string;
+  setSelectedShipping: (v: string) => void;
+  autoBidOn: boolean;
+  setAutoBidOn: Dispatch<SetStateAction<boolean>>;
+  maxBidAmount: string;
+  setMaxBidAmount: (v: string) => void;
+  bidStepAmount: string;
+  setBidStepAmount: (v: string) => void;
+  myAutoBidMax: number | null;
+  myAutoBidStep: number | null;
+  bidAmount: string;
+  setBidAmount: (v: string) => void;
+  bidding: boolean;
+  bidError: string;
+  walletAvail: number | null;
+  myId: string;
+  joining: boolean;
+  auctionBids: AuctionBid[];
+  placeBid: () => void;
+  sellerChatHref: () => void;
+  buyViaEscrow: () => void;
+  bidIdSuffix: string;
+};
+
+function MarketplaceDetailPanel({
+  listing,
+  sellerShop,
+  images,
+  displayImage,
+  setMainImage,
+  isOwner,
+  isAuction,
+  auction,
+  canSellerChat,
+  displayPrice,
+  shippingProviders,
+  shippingCost,
+  buyState,
+  selectedShipping,
+  setSelectedShipping,
+  autoBidOn,
+  setAutoBidOn,
+  maxBidAmount,
+  setMaxBidAmount,
+  bidStepAmount,
+  setBidStepAmount,
+  myAutoBidMax,
+  myAutoBidStep,
+  bidAmount,
+  setBidAmount,
+  bidding,
+  bidError,
+  walletAvail,
+  myId,
+  joining,
+  auctionBids,
+  placeBid,
+  sellerChatHref,
+  buyViaEscrow,
+  bidIdSuffix,
+}: DetailPanelProps) {
+  return (
+    <div className="pd-panel">
+      <aside className="pd-media">
+        <div className="pd-main">
+          {displayImage ? (
+            <img src={displayImage} alt={listing.title} />
+          ) : (
+            <div className="pd-main-empty"><Icon name="package" size={56} /></div>
+          )}
+        </div>
+        {images.length > 0 && (
+          <div className="pd-thumbs" role="list">
+            {images.map(src => (
+              <button
+                key={src}
+                type="button"
+                role="listitem"
+                className={`pd-thumb${displayImage === src ? ' is-active' : ''}`}
+                onClick={() => setMainImage(src)}
+                aria-label="ดูรูปนี้"
+              >
+                <img src={src} alt="" />
+              </button>
+            ))}
+          </div>
+        )}
+      </aside>
+
+      <section className={`pd-info${isAuction ? ' pd-info--auction' : ''}`}>
+        <div className="pd-tags">
+          {listing.category && <span className="badge badge-gray">{listing.category}</span>}
+          {listing.condition && <span className="badge badge-gray">{listing.condition}</span>}
+          {isAuction && <span className="badge badge-purple">🔨 ประมูล</span>}
+          {isCertifiedMode(listing.selling_mode) && <span className="badge badge-amber">⭐ Certified</span>}
+        </div>
+
+        <h1 className="pd-title">{listing.title}</h1>
+
+        <div className="pd-price-box">
+          <span className="pd-price-lbl">
+            {isAuction && auction.bidCount > 0 ? 'ราคาปัจจุบัน' : isAuction ? 'ราคาเริ่ม' : 'ราคา'}
+          </span>
+          <span className="pd-price">฿{displayPrice.toLocaleString()}</span>
+        </div>
+
+        {isAuction && auction && (
+          <div className="pd-auction">
+            <div className="pd-auction-cell">
+              <span className="pd-auction-lbl">เหลือเวลา</span>
+              <strong className="pd-auction-val">
+                <AuctionCountdown endsAt={auction.endsAt} endedAt={auction.endedAt} liveClassName="is-live" />
+              </strong>
+            </div>
+            <div className="pd-auction-cell">
+              <span className="pd-auction-lbl">ผู้ประมูล</span>
+              <strong className="pd-auction-val">{auction.uniqueBidderCount} คน · {auction.bidCount} bid</strong>
+            </div>
+            <div className="pd-auction-cell">
+              <span className="pd-auction-lbl">นำอยู่</span>
+              <strong className="pd-auction-val">{auction.currentBidderName || '— ยังไม่มี'}</strong>
+            </div>
+            <div className="pd-auction-cell">
+              <span className="pd-auction-lbl">บิทครั้งละ</span>
+              <strong className="pd-auction-val">฿{auction.bidIncrement.toLocaleString()}</strong>
+            </div>
+            {auction.bidDeposit > 0 && (
+              <div className="pd-auction-cell">
+                <span className="pd-auction-lbl">มัดจำสิทธิ</span>
+                <strong className="pd-auction-val">฿{auction.bidDeposit.toLocaleString()}</strong>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isAuction && auction && !isOwner && auction.phase === 'live' && (
+          <div className="pd-bid">
+            {auction.bidDeposit > 0 && (
+              <div className="pd-deposit-note">
+                <div>
+                  มัดจำสิทธิประมูล <b>฿{auction.bidDeposit.toLocaleString()}</b> จะถูกล็อกจากกระเป๋าตอน Bid
+                  {walletAvail != null && <> · ยอดว่าง <b>฿{walletAvail.toLocaleString()}</b></>}
+                </div>
+                {walletAvail != null && walletAvail < auction.bidDeposit && (
+                  <Link href="/wallet" className="btn btn-green btn-sm" style={{ marginTop: 8 }}>
+                    เติมเงินเข้ากระเป๋าก่อนบิด →
+                  </Link>
+                )}
+              </div>
+            )}
+            <div className="pd-autobid">
+              <button
+                type="button"
+                className={`pd-autobid-toggle${autoBidOn ? ' is-on' : ''}`}
+                onClick={() => setAutoBidOn(v => !v)}
+                aria-pressed={autoBidOn}
+              >
+                {autoBidOn ? '✓ Auto-bid เปิดอยู่' : '+ เปิด Auto-bid'}
+              </button>
+              {autoBidOn && (
+                <div className="pd-autobid-panel">
+                  <label className="pd-bid-lbl pd-bid-lbl--max" htmlFor={`pd-max-bid${bidIdSuffix}`}>
+                    ราคาสูงสุดที่สู้ (เพดาน Auto-bid)
+                  </label>
+                  <input
+                    id={`pd-max-bid${bidIdSuffix}`}
+                    className="pd-bid-input pd-bid-input--max"
+                    type="number"
+                    min={auction.minNextBid}
+                    step={auction.bidIncrement}
+                    value={maxBidAmount}
+                    onChange={e => setMaxBidAmount(e.target.value)}
+                    placeholder={`เช่น ${(auction.minNextBid + auction.bidIncrement * 5).toLocaleString()}`}
+                  />
+                  <label className="pd-bid-lbl" htmlFor={`pd-bid-step${bidIdSuffix}`} style={{ marginTop: 8 }}>
+                    จำนวนเงินต่อบิด (อย่างน้อย ฿{auction.bidIncrement.toLocaleString()})
+                  </label>
+                  <input
+                    id={`pd-bid-step${bidIdSuffix}`}
+                    className="pd-bid-input"
+                    type="number"
+                    min={auction.bidIncrement}
+                    step={auction.bidIncrement}
+                    value={bidStepAmount || String(auction.bidIncrement)}
+                    onChange={e => setBidStepAmount(e.target.value)}
+                  />
+                  <p className="pd-bid-hint">
+                    ถูก overbid แล้วระบบจะสู้เพิ่มทีละจำนวนนี้ จนถึงเพดาน — ทำงานแม้ปิดเว็บ
+                  </p>
+                  {myAutoBidMax != null && (
+                    <p className="pd-bid-auto">
+                      บันทึกไว้เพดาน ฿{myAutoBidMax.toLocaleString()}
+                      {myAutoBidStep ? ` · ต่อบิด ฿${myAutoBidStep.toLocaleString()}` : ''}
+                      {' — กด Bid เพื่ออัปเดต'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {myId && (
+              <LineOaConnect
+                returnTo={`/marketplace/${listing.id}`}
+                readyLabel="✓ พร้อมรับแจ้ง overbid ผ่าน LINE OA"
+              />
+            )}
+
+            <div className="pd-bid-row">
+              <div className="pd-bid-field">
+                <label className="pd-bid-lbl" htmlFor={`pd-bid-amount${bidIdSuffix}`}>ราคา bid (ขั้นต่ำ ฿{auction.minNextBid.toLocaleString()})</label>
+                <input
+                  id={`pd-bid-amount${bidIdSuffix}`}
+                  className="pd-bid-input"
+                  type="number"
+                  min={auction.minNextBid}
+                  step={auction.bidIncrement}
+                  value={bidAmount}
+                  onChange={e => setBidAmount(e.target.value)}
+                />
+              </div>
+              <button type="button" className="btn btn-primary btn-lg pd-bid-btn" onClick={placeBid} disabled={bidding}>
+                {bidding ? '...' : '🔨 Bid'}
+              </button>
+            </div>
+
+            <div className="pd-bid-foot">
+              {canSellerChat && (
+                <button type="button" className="pd-chat-link" onClick={sellerChatHref}>
+                  <Icon name="chat" size={15} /> แชทกับผู้ขาย
+                </button>
+              )}
+              {bidError && (
+                <p className="pd-bid-err">
+                  {bidError}
+                  {bidError.includes('กระเป๋า') && (
+                    <> {' '}<Link href="/wallet">ไปเติมเงิน</Link></>
+                  )}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {isAuction && auction && !isOwner && auction.phase !== 'live' && (
+          <div className="pd-note">
+            <div className="pd-note-title">
+              {listing.buyer_id || auction.endedAt ? 'ขายแล้ว · ประมูลปิด' : 'ประมูลปิดแล้ว'}
+            </div>
+            <p>{auction.currentBidderName ? `ผู้ชนะ: ${auction.currentBidderName} · ฿${(auction.currentBid || displayPrice).toLocaleString()}` : 'ไม่มีผู้ bid'}</p>
+            {myId && listing.buyer_id === myId && (
+              <Link href={`/cart/checkout/${listing.id}`} className="btn btn-primary btn-lg" style={{ marginTop: 12 }}>
+                ไปชำระเงิน / ติดตามสถานะ →
+              </Link>
+            )}
+          </div>
+        )}
+
+        {!isAuction && (
+          <div className="pd-row">
+            <span className="pd-row-lbl">ค่าขนส่ง</span>
+            <strong>{shippingCost > 0 ? `฿${shippingCost.toLocaleString()}` : 'ฟรี'}</strong>
+          </div>
+        )}
+
+        <div className="pd-meta">
+          <span><Icon name="user" size={15} /> {listing.seller_name || 'ผู้ขาย'}</span>
+          {listing.location && <span><Icon name="mapPin" size={15} /> {listing.location}</span>}
+        </div>
+
+        {listing.description && <p className="pd-desc">{listing.description}</p>}
+
+        {sellerShop && (
+          <Link href={`/shop/${sellerShop.sellerId || listing.seller_id}`} className="pd-shop">
+            {sellerShop.avatarFileId ? (
+              <img className="pd-shop-av" src={fileViewUrl(DEAL_BUCKET, sellerShop.avatarFileId)} alt="" />
+            ) : (
+              <div className="pd-shop-av pd-shop-av--empty">🏪</div>
+            )}
+            <div className="pd-shop-body">
+              <div className="pd-shop-name">{sellerShop.name}</div>
+              {sellerShop.tagline && <p className="pd-shop-tag">{sellerShop.tagline}</p>}
+              {sellerShop.location && <p className="pd-shop-loc">📍 {sellerShop.location}</p>}
+              <span className="pd-shop-go">เข้าชมหน้าร้าน →</span>
+            </div>
+          </Link>
+        )}
+
+        <div className="pd-actions">
+          {isOwner ? (
+            <Link href={listing.status === 'posted' ? `/marketplace/${listing.id}` : `/deal/${listing.id}`} className="btn btn-primary btn-lg">รายการของคุณ</Link>
+          ) : isAuction ? null : buyState === 'sold' || buyState === 'reserved' ? (
+            <div className="pd-note">
+              <div className="pd-note-title">
+                {buyState === 'sold' ? 'สินค้าขายแล้ว' : 'มีผู้จองแล้ว'}
+              </div>
+              <p>{buyState === 'sold' ? 'สินค้านี้กำลังอยู่ในขั้นตอนจัดส่งหรือเสร็จสิ้นแล้ว' : 'ผู้ซื้ออัปสลิปแล้ว รอทีมงานตรวจสอบ'}</p>
+              {canSellerChat && (
+                <button type="button" className="btn btn-soft btn-lg" style={{ marginTop: 12 }} onClick={sellerChatHref}>
+                  <Icon name="chat" size={18} /> แชทกับผู้ขาย
+                </button>
+              )}
+            </div>
+          ) : buyState === 'continue_checkout' ? (
+            <>
+              <Link href={`/cart/checkout/${listing.id}`} className="btn btn-primary btn-lg">
+                {listing.status === 'payment_uploaded' ? 'ดูสถานะการสั่งซื้อ →' : 'ดำเนินการโอนเงิน →'}
+              </Link>
+              {canSellerChat && (
+                <button type="button" className="btn btn-soft btn-lg" onClick={sellerChatHref}>
+                  <Icon name="chat" size={18} /> แชทกับผู้ขาย
+                </button>
+              )}
+            </>
+          ) : buyState === 'can_buy' ? (
+            <>
+              {shippingProviders.length > 0 && (
+                <div className="pd-ship">
+                  <div className="pd-ship-lbl">เลือกขนส่ง</div>
+                  <div className="pd-ship-list">
+                    {shippingProviders.map(id => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`pd-ship-chip${selectedShipping === id ? ' is-active' : ''}`}
+                        onClick={() => setSelectedShipping(id)}
+                      >
+                        {getLogisticsProviderLabel(id)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button type="button" className="btn btn-primary btn-lg" onClick={buyViaEscrow} disabled={joining}>
+                {joining ? 'กำลังเข้าระบบซื้อขาย...' : 'ซื้อทันที'}
+              </button>
+              {canSellerChat && (
+                <button type="button" className="btn btn-soft btn-lg" onClick={sellerChatHref}>
+                  <Icon name="chat" size={18} /> แชทกับผู้ขาย
+                </button>
+              )}
+              <p className="pd-escrow-note">
+                เมื่อกดซื้อ ระบบจะพาไปยืนยันที่อยู่จัดส่งและชำระเงิน — ไม่มีคนกลาง ผู้ขายจัดส่งตรงถึงคุณ
+              </p>
+            </>
+          ) : (
+            <div className="pd-note">
+              <div className="pd-note-title">สินค้าไม่พร้อมขาย</div>
+              <p>รายการนี้ไม่เปิดขายบนตลาดแล้ว</p>
+              <Link href="/marketplace" className="btn btn-soft btn-lg" style={{ marginTop: 12 }}>กลับตลาดซื้อขาย</Link>
+            </div>
+          )}
+        </div>
+
+        {isAuction && auctionBids.length > 0 && (
+          <div className="pd-history">
+            <h3>ประวัติ bid ล่าสุด</h3>
+            <ul>
+              {auctionBids.map(b => (
+                <li key={b.id}>
+                  <span>{b.bidder_name}</span>
+                  <strong>฿{b.amount.toLocaleString()}</strong>
+                  <time>{new Date(b.created_at).toLocaleString('th-TH')}</time>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+    </div>
   );
 }

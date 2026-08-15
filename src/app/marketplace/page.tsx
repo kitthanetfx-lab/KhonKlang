@@ -94,8 +94,12 @@ export default function Marketplace() {
 
   const setZone = useCallback((next: Zone) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (next === 'auction') params.set('zone', 'auction');
-    else params.delete('zone');
+    if (next === 'auction') {
+      params.set('zone', 'auction');
+    } else {
+      params.delete('zone');
+      params.delete('view');
+    }
     const qs = params.toString();
     router.replace(qs ? `/marketplace?${qs}` : '/marketplace', { scroll: false });
   }, [router, searchParams]);
