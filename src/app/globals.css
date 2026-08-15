@@ -6999,7 +6999,7 @@ body.in-call .dr-floatbar { display: flex; }
    Mobile overflow fixes — กันตัวหนังสือ/วัตถุล้นขอบจอ
    ============================================================ */
 html, body { overflow-x: hidden; max-width: 100%; }
-.dr-root, .sub-page, .page-body, .dm-shell { overflow-x: clip; }
+.dr-root, .sub-page, .page-body, .dm-shell, .mkt-pd-page { overflow-x: clip; }
 .dr-card, .csr-card, .od-card, .wt-card, .prose-card, .mu-result, .mu-note, .mu-side,
 .svc-card, .dr-sys-msg, .nb-tx, .dm-bubble, .dr-bubble, .pm-box, .rv-row, .contact-card,
 .faq-item, .csr-hit, .dr-tl-label { overflow-wrap: anywhere; min-width: 0; }
@@ -8868,170 +8868,179 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
   .mkt-desktop-shell { display: contents; }
 }
 
-/* ========== Marketplace Detail — mobile app shell (แยกจาก desktop pd-shell) ========== */
-.mkt-pd-mobile-shell {
-  display: block;
+/* ========== Marketplace Detail — mobile sub-page (≠ desktop pd-shell) ========== */
+.mkt-pd-page {
   overflow-x: clip;
   max-width: 100vw;
-}
-.mkt-pd-desktop-shell { display: none; }
-@media (min-width: 768px) {
-  .mkt-pd-mobile-shell { display: none; }
-  .mkt-pd-desktop-shell { display: block; }
-}
-
-.mkt-pd-app {
-  --mkt-pd-pad: 14px;
-  --mkt-pd-accent: #2f6bf0;
-  --mkt-pd-accent-soft: #eef4ff;
-  min-height: calc(100dvh - 56px);
+  width: 100%;
+  box-sizing: border-box;
   background: #f4f6fb;
-  color: #0f172a;
-  overflow-x: clip;
-  max-width: 100vw;
-  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
-.mkt-pd-app--auction {
+.mkt-pd-page--auction {
   --mkt-pd-accent: #7c3aed;
-  --mkt-pd-accent-soft: #f5f3ff;
-}
-.mkt-pd-top {
-  position: sticky;
-  top: 0;
-  z-index: 35;
-  padding: 10px var(--mkt-pd-pad);
-  background: rgba(244, 246, 251, 0.94);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-}
-.mkt-pd-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--mkt-pd-accent);
-  text-decoration: none;
 }
 .mkt-pd-feed {
-  padding: 0 var(--mkt-pd-pad) 12px;
+  padding: 0 14px calc(24px + env(safe-area-inset-bottom, 0px));
   max-width: 100%;
+  width: 100%;
   overflow-x: clip;
+  box-sizing: border-box;
 }
-.mkt-pd-app .pd-panel {
+.mkt-pd-loading,
+.mkt-pd-empty {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  min-height: 50vh;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+.mkt-pd-share-btn.is-copied {
+  color: #15803d;
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+.mkt-pd-page .pd-panel {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: 100%;
+  max-width: 100%;
   padding: 12px 0 0;
+  margin: 0;
   border: none;
   border-radius: 0;
   box-shadow: none;
   background: transparent;
-  max-width: 100%;
+  box-sizing: border-box;
 }
-.mkt-pd-app .pd-media {
+.mkt-pd-page .pd-media,
+.mkt-pd-page .pd-info,
+.mkt-pd-page .pd-main,
+.mkt-pd-page .pd-price-box,
+.mkt-pd-page .pd-auction,
+.mkt-pd-page .pd-bid,
+.mkt-pd-page .pd-shop,
+.mkt-pd-page .pd-note,
+.mkt-pd-page .pd-deposit-note,
+.mkt-pd-page .pd-autobid-panel,
+.mkt-pd-page .pd-line-oa {
   width: 100%;
   max-width: 100%;
-  margin: 0;
+  min-width: 0;
+  box-sizing: border-box;
 }
-.mkt-pd-app .pd-main {
-  width: 100%;
-  max-width: 100%;
+.mkt-pd-page .pd-main {
   border-radius: 12px;
+  overflow: hidden;
 }
-.mkt-pd-app .pd-main img {
+.mkt-pd-page .pd-main img,
+.mkt-pd-page .pd-thumb img {
+  max-width: 100%;
+  display: block;
+}
+.mkt-pd-page .pd-main img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   background: #fff;
 }
-.mkt-pd-app .pd-thumbs {
+.mkt-pd-page .pd-thumbs {
   max-width: 100%;
-  margin-top: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
-.mkt-pd-app .pd-info {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-}
-.mkt-pd-app .pd-title {
+.mkt-pd-page .pd-title {
   font-size: 22px;
   line-height: 1.35;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
-.mkt-pd-app .pd-price-box {
-  width: 100%;
-  box-sizing: border-box;
-}
-.mkt-pd-app .pd-price {
+.mkt-pd-page .pd-price {
   font-size: 28px;
 }
-.mkt-pd-app .pd-auction {
+.mkt-pd-page .pd-auction {
   grid-template-columns: 1fr 1fr;
   gap: 8px 10px;
   padding: 12px;
 }
-.mkt-pd-app .pd-auction-val {
+.mkt-pd-page .pd-auction-val {
   font-size: 13px;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
-.mkt-pd-app .pd-tags .badge-gray {
+.mkt-pd-page .pd-tags .badge-gray {
   color: #334155;
   background: #fff;
   border-color: #cbd5e1;
 }
-.mkt-pd-app .pd-bid {
-  max-width: 100%;
-  box-sizing: border-box;
-}
-.mkt-pd-app .pd-bid-row {
+.mkt-pd-page .pd-bid-row {
   flex-direction: column;
   align-items: stretch;
 }
-.mkt-pd-app .pd-bid-btn {
+.mkt-pd-page .pd-bid-btn,
+.mkt-pd-page .pd-actions > .btn-primary,
+.mkt-pd-page .pd-actions > .btn-soft,
+.mkt-pd-page .pd-actions .btn-lg {
   width: 100%;
   min-width: 0;
 }
-.mkt-pd-app .pd-bid-input,
-.mkt-pd-app .pd-bid-input--max {
+.mkt-pd-page .pd-bid-input,
+.mkt-pd-page .pd-bid-input--max {
   width: 100%;
   max-width: 100%;
-  box-sizing: border-box;
 }
-.mkt-pd-app .pd-deposit-note,
-.mkt-pd-app .pd-shop,
-.mkt-pd-app .pd-note,
-.mkt-pd-app .pd-line-oa,
-.mkt-pd-app .pd-autobid-panel {
-  max-width: 100%;
-  box-sizing: border-box;
-}
-.mkt-pd-app .pd-shop {
+.mkt-pd-page .pd-shop {
   align-items: flex-start;
 }
-.mkt-pd-app .pd-shop-body {
+.mkt-pd-page .pd-shop-body {
   min-width: 0;
   flex: 1;
 }
-.mkt-pd-app .pd-actions > .btn-primary,
-.mkt-pd-app .pd-actions > .btn-soft,
-.mkt-pd-app .pd-actions .btn-lg {
-  width: 100%;
-}
-.mkt-pd-app .pd-meta {
-  gap: 10px;
-  font-size: 13px;
-}
-.mkt-pd-app .pd-desc {
-  font-size: 14px;
+.mkt-pd-page .pd-desc {
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
-.mkt-pd-app .pd-history li {
+.mkt-pd-page .pd-history li {
   flex-wrap: wrap;
   gap: 4px 8px;
 }
+
+.pd-share-row {
+  width: 100%;
+}
+.pd-share-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.pd-share-btn:hover { filter: brightness(1.02); }
+.pd-share-btn.is-copied {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #15803d;
+}
+.mkt-pd-page--auction .pd-share-btn {
+  border-color: color-mix(in srgb, #7c3aed 28%, var(--line));
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.mkt-pd-desktop-shell { display: block; }
 
 .mkt-app {
   --mkt-app-pad: 14px;
