@@ -1286,6 +1286,10 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   background-position: right 10px center;
 }
 .mkt-yahoo-cat-select select:hover { filter: brightness(1.05); }
+.mkt-yahoo-cat-select select option {
+  color: var(--ink);
+  background: #fff;
+}
 .mkt-yahoo-input {
   flex: 1;
   min-width: 0;
@@ -8459,7 +8463,27 @@ body.in-call .sw-wrap, body.in-call .home-fab { display: none !important; }
 .seller-auction-yahoo-row { flex-wrap: wrap; }
 .seller-auction-bid-input { max-width: 140px; flex: 0 1 120px !important; }
 .seller-auction-duration-section { padding-top: 12px; margin: 0; border-top: 1px solid var(--line); }
-.seller-auction-yahoo .mkt-yahoo-cat-select select { min-width: 100px; max-width: 120px; }
+.seller-auction-yahoo .mkt-yahoo-cat-select select {
+  min-width: 100px;
+  max-width: 140px;
+  border: 2px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.seller-auction-yahoo .mkt-yahoo-cat-select select:hover { filter: none; background-color: #f8fafc; }
+.seller-auction-yahoo .mkt-yahoo-cat-select select:focus {
+  outline: none;
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, .12);
+}
+.seller-auction-yahoo .mkt-yahoo-cat-select select option {
+  color: var(--ink);
+  background: #fff;
+}
 
 .mkt-auction-countdown.is-live { color: #6d28d9; font-variant-numeric: tabular-nums; }
 .auction-countdown { font-variant-numeric: tabular-nums; }
