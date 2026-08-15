@@ -87,6 +87,25 @@ export async function applyUserWallet(
   };
 }
 
+export async function creditApprovedWalletTopup(
+  db: SupabaseClient,
+  topup: { id: string; user_id: string; amount: number },
+) {
+  const amount = Math.round(Number(topup.amount) || 0);
+  if (amount <= 0) return;
+  await applyUserWallet(db, {
+    userId: topup.user_id,
+    amount,
+    availableDelta: amount,
+    heldDelta: 0,
+    entryKey: `topup:${topup.id}`,
+    type: 'topup',
+    title: `เติมเงิน ฿${amount.toLocaleString()}`,
+    referenceType: 'wallet_topup',
+    referenceId: topup.id,
+  });
+}
+
 export async function holdAuctionDeposit(
   db: SupabaseClient,
   opts: { dealId: string; bidderId: string; amount: number; title: string },

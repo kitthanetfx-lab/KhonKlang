@@ -114,7 +114,9 @@ export default function WalletPage() {
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || 'ส่งคำขอไม่สำเร็จ'); return; }
-      setOk('ส่งคำขอเติมเงินแล้ว รอแอดมินตรวจสอบสลิป');
+      setOk(d.autoApproved
+        ? 'ตรวจสลิปผ่าน — เงินเข้ากระเป๋าแล้ว'
+        : 'ส่งคำขอแล้ว ระบบกำลังตรวจสลิป หากไม่ผ่านอัตโนมัติ แอดมินจะตรวจให้อีกครั้ง');
       setSlipId('');
       await load();
     } catch { setError('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
@@ -180,7 +182,7 @@ export default function WalletPage() {
         </section>
 
         <p className="wal-hint">
-          ยอดนี้ใช้เป็นสิทธิประมูล — ผู้ขายตั้งมัดจำคงที่ ระบบล็อกตอน Bid ถ้าชนะแล้วไม่รับของ จะหักเป็นค่าเสียเวลาให้ผู้ขาย
+          ยอดนี้ใช้เป็นสิทธิประมูล — ผู้ขายตั้งมัดจำคงที่ ระบบล็อกตอน Bid ถ้าชนะแล้วไม่รับของ จะหักเป็นค่าเสียเวลาให้ผู้ขาย เติมเงินแล้วระบบตรวจสลิปอัตโนมัติ ผ่านแล้วเข้ากระเป๋าทันที
         </p>
 
         {panel === 'topup' && (
@@ -250,7 +252,10 @@ export default function WalletPage() {
             <div className="wal-req-list">
               {topups.filter(t => t.status === 'pending_review').map(t => (
                 <div key={t.id} className="wal-req">
-                  <span>เติม {baht(t.amount)}</span>
+                  <div>
+                    <span>เติม {baht(t.amount)}</span>
+                    {t.reject_reason && <div className="wal-ledger-sub">{t.reject_reason}</div>}
+                  </div>
                   <span>{STATUS_LABEL[t.status]}</span>
                 </div>
               ))}

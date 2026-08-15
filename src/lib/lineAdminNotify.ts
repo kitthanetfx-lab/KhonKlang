@@ -296,3 +296,78 @@ export async function notifyAdminLineAutoApproved(
     text: lines.join('\n').slice(0, 5000),
   }]);
 }
+
+function appBaseUrl() {
+  return (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
+}
+
+/** แจ้ง LINE กลุ่มแอดมิน — สลิปเติมเงินกระเป๋า (ผ่านอัตโนมัติ / ไม่ผ่าน / รอตรวจมือ) */
+export async function notifyAdminLineWalletTopup(params: {
+  userName: string;
+  amount: number;
+  autoApproved: boolean;
+  skipped?: boolean;
+  skipReason?: string;
+  evaluation?: {
+    pass: boolean;
+    reasons: string[];
+    warnings: string[];
+    slip?: { amount?: number; transRef?: string; receiverAccount?: string; senderName?: string; transDate?: string; transTime?: string };
+  };
+  slipFileId?: string;
+}): Promise<void> {
+  const { userName, amount, autoApproved, skipped, skipReason, evaluation, slipFileId } = params;
+  const appUrl = appBaseUrl();
+  let headline: string;
+  if (skipped) headline = `🧾 เติมเงินกระเป๋า — รอแอดมินตรวจมือ${skipReason ? ` (${skipReason})` : ''}`;
+  else if (evaluation?.pass && autoApproved) headline = '✅ ตรวจสลิปเติมเงิน — ผ่าน · เข้ากระเป๋าอัตโนมัติแล้ว';
+  else if (evaluation?.pass) headline = '✅ ตรวจสลิปเติมเงิน — ผ่าน · รอแอดมินยืนยัน';
+  else headline = '⚠️ ตรวจสลิปเติมเงิน — ไม่ผ่าน · รอแอดมินตรวจมือ';
+
+  const lines = [
+    `[กลางฮับ · กระเป๋าเงิน] ${headline}`,
+    `ผู้ใช้: ${userName || '-'}`,
+    `ยอดที่แจ้งเติม: ฿${Math.round(amount).toLocaleString('th-TH')}`,
+  ];
+  if (evaluation) {
+    lines.push(evaluation.pass ? 'ผล: ผ่าน' : `ผล: ไม่ผ่าน — ${evaluation.reasons.join(' · ') || 'ตรวจไม่ผ่าน'}`);
+    const slip = evaluation.slip;
+    if (slip) {
+      if (slip.amount != null) lines.push(`ยอดในสลิป: ฿${Number(slip.amount).toLocaleString('th-TH')}`);
+      if (slip.senderName) lines.push(`ผู้โอน: ${slip.senderName}`);
+      if (slip.receiverAccount) lines.push(`บัญชีผู้รับ: ${slip.receiverAccount}`);
+      if (slip.transRef) lines.push(`เลขอ้างอิง: ${slip.transRef}`);
+      if (slip.transDate || slip.transTime) lines.push(`เวลาโอน: ${[slip.transDate, slip.transTime].filter(Boolean).join(' ')}`);
+    }
+    if (evaluation.warnings.length) lines.push(`หมายเหตุ: ${evaluation.warnings.join(' · ')}`);
+  }
+  lines.push(`${appUrl}/admin/wallet`);
+
+  const messages: LineMessage[] = [{ type: 'text', text: lines.join('\n').slice(0, 5000) }];
+  if (slipFileId && isLineImageFile(slipFileId) && messages.length < 5) {
+    const url = slipPublicUrl(slipFileId);
+    if (url) messages.push({ type: 'image', originalContentUrl: url, previewImageUrl: url });
+  }
+  await sendLineAdminMessages(messages);
+}
+
+/** แจ้ง LINE กลุ่มแอดมิน — มีคำขอถอนเงิน */
+export async function notifyAdminLineWalletWithdraw(params: {
+  userName: string;
+  amount: number;
+  bankName: string;
+  bankAcct: string;
+  bankOwner: string;
+}): Promise<void> {
+  const appUrl = appBaseUrl();
+  const lines = [
+    '[กลางฮับ · กระเป๋าเงิน] 💸 มีคำขอถอนเงิน — รอโอนออก',
+    `ผู้ใช้: ${params.userName || '-'}`,
+    `ยอด: ฿${Math.round(params.amount).toLocaleString('th-TH')}`,
+    `ธนาคาร: ${params.bankName || '-'}`,
+    `เลขบัญชี: ${params.bankAcct || '-'}`,
+    `ชื่อบัญชี: ${params.bankOwner || '-'}`,
+    `${appUrl}/admin/wallet`,
+  ];
+  await sendLineAdminMessages([{ type: 'text', text: lines.join('\n').slice(0, 5000) }]);
+}

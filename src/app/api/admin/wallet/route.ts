@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin, getAdminClient, HttpError } from '@/lib/supabaseServer';
-import { applyUserWallet } from '../../_lib/userWallet';
+import { applyUserWallet, creditApprovedWalletTopup } from '../../_lib/userWallet';
 import { notifyUsers } from '../../_lib/notify';
 
 export async function GET(req: NextRequest) {
@@ -83,17 +83,7 @@ export async function PATCH(req: NextRequest) {
         }).catch(() => {});
       }
     } else if (action === 'approve') {
-      await applyUserWallet(db, {
-        userId: doc.user_id,
-        amount,
-        availableDelta: amount,
-        heldDelta: 0,
-        entryKey: `topup:${doc.id}`,
-        type: 'topup',
-        title: `เติมเงิน ฿${amount.toLocaleString()}`,
-        referenceType: 'wallet_topup',
-        referenceId: doc.id,
-      });
+      await creditApprovedWalletTopup(db, { id: doc.id, user_id: doc.user_id, amount });
     }
 
     const title = isWithdraw

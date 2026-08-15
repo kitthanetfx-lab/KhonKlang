@@ -186,7 +186,7 @@ export default function AdminWalletPage() {
                       <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(d.created_at)}</td>
                       <td className="px-4 py-3.5">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_CFG[d.status]?.cls || ''}`}>{STATUS_CFG[d.status]?.label || d.status}</span>
-                        {d.status === 'rejected' && d.reject_reason && <div className="text-xs text-red-500 mt-1 max-w-[180px]">{d.reject_reason}</div>}
+                        {d.reject_reason && <div className="text-xs text-red-500 mt-1 max-w-[220px]">{d.reject_reason}</div>}
                       </td>
                       <td className="px-4 py-3.5">
                         {d.status === 'pending_review' && (

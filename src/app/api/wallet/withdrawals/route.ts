@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyUser, getAdminClient, HttpError } from '@/lib/supabaseServer';
 import { applyUserWallet, getUserWallet, WalletInsufficientError } from '../../_lib/userWallet';
 import { notifyUsers } from '../../_lib/notify';
+import { notifyAdminLineWalletWithdraw } from '@/lib/lineAdminNotify';
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,12 +67,22 @@ export async function POST(req: NextRequest) {
       throw holdErr;
     }
 
-    const { data: admins } = await db.from('profiles').select('id').eq('role', 'admin').limit(50);
-    await notifyUsers(db, (admins || []).map(a => a.id), {
-      title: 'กระเป๋าเงิน — มีคำขอถอนเงิน',
-      body: `${profile.display_name || 'สมาชิก'} ขอถอน ฿${amt.toLocaleString()}`,
-      link: '/admin/wallet',
+    await notifyAdminLineWalletWithdraw({
+      userName: profile.display_name || me.email || 'สมาชิก',
+      amount: amt,
+      bankName: profile.bank_name,
+      bankAcct: profile.bank_acct,
+      bankOwner: profile.bank_owner || profile.display_name || '',
     }).catch(() => {});
+
+    if (!process.env.LINE_ADMIN_GROUP_ID) {
+      const { data: admins } = await db.from('profiles').select('id').eq('role', 'admin').limit(50);
+      await notifyUsers(db, (admins || []).map(a => a.id), {
+        title: 'กระเป๋าเงิน — มีคำขอถอนเงิน',
+        body: `${profile.display_name || 'สมาชิก'} ขอถอน ฿${amt.toLocaleString()}`,
+        link: '/admin/wallet',
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true, withdrawal: created });
   } catch (err: unknown) {
