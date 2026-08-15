@@ -11,7 +11,6 @@ import {
 } from '@/lib/slipok';
 import { notifyAdminLineSlipResult } from '@/lib/lineAdminNotify';
 import { readFeesConfig, syncDealLedger } from '@/app/api/_lib/financeLedger';
-import { dealShippingCost } from '@/lib/dealPaymentBreakdown';
 import { readServiceControlsConfig } from '@/app/api/_lib/appConfig';
 import { shouldAutoVerifySlip } from '@/lib/serviceControls';
 import { notifyUsers } from '@/app/api/_lib/notify';
@@ -458,6 +457,8 @@ export async function runAutoSlipVerification(
         slipUrl: isSlipImageFile(fileId) ? dealSlipPublicUrl(fileId) : '',
         autoApproved: false,
         expectedAmount: expected,
+        fees,
+        priceState,
       });
     }
   }
@@ -477,6 +478,8 @@ export async function runAutoSlipVerification(
       slipUrl: isSlipImageFile(passed.fileId) ? dealSlipPublicUrl(passed.fileId) : '',
       autoApproved: !!approved,
       expectedAmount: passed.expected,
+      fees,
+      priceState: freshPrice,
     });
   }
 

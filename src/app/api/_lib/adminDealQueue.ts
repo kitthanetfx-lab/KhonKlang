@@ -27,6 +27,12 @@ export type AdminDealRow = {
   payment_slip_file_id?: string | null;
   middleman_id?: string | null;
   price?: number | null;
+  shipping_cost?: number | null;
+  fee_payer?: string | null;
+  buyer_id?: string | null;
+  warranty_years?: number | null;
+  warranty_months?: number | null;
+  warranty_days?: number | null;
   deal_number?: string | null;
   title?: string | null;
   buyer_name?: string | null;

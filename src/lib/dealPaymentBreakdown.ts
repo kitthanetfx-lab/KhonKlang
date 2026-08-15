@@ -108,3 +108,38 @@ export function dealSellerServiceDue(
 ): number {
   return computeDealPaymentBreakdown(deal, priceState, fees)?.sellerServiceDue ?? 0;
 }
+
+const baht = (amount: number) => `฿${Math.round(amount).toLocaleString('th-TH')}`;
+
+/** ข้อความสรุปยอดชำระสำหรับ LINE / แจ้งเตือน */
+export function formatDealPaymentBreakdownLines(
+  bd: DealPaymentBreakdown,
+  opts?: { highlightSide?: 'buyer' | 'seller' },
+): string[] {
+  const lines: string[] = ['--- สรุปยอดชำระ ---'];
+  lines.push(`ค่าสินค้า: ${baht(bd.productPrice)}`);
+  lines.push(`ค่าขนส่ง: ${baht(bd.shippingCost)}`);
+
+  if (!bd.isMarketplace) {
+    lines.push(`ค่าบริการ (รวม): ${baht(bd.serviceFeeTotal)}`);
+    for (const line of bd.serviceFeeLines) {
+      lines.push(`  ↳ ${line.label}: ${baht(line.amount)}`);
+    }
+    lines.push(`ผู้จ่ายค่าบริการ: ${bd.feePayerLabel}`);
+    lines.push(`  ↳ ส่วนผู้ซื้อ: ${baht(bd.buyerServiceShare)}`);
+    lines.push(`  ↳ ส่วนผู้ขาย: ${baht(bd.sellerServiceShare)}`);
+  }
+
+  lines.push('--- ยอดที่ต้องโอน ---');
+  const buyerMark = opts?.highlightSide === 'buyer' ? '▶ ' : '';
+  lines.push(`${buyerMark}ผู้ซื้อ → ศูนย์กลาง: ${baht(bd.buyerTotalDue)}`);
+  if (!bd.isMarketplace && bd.sellerServiceDue > 0) {
+    const sellerMark = opts?.highlightSide === 'seller' ? '▶ ' : '';
+    lines.push(`${sellerMark}ผู้ขาย → ค่าบริการ: ${baht(bd.sellerServiceDue)}`);
+  }
+  if (!bd.isMarketplace) {
+    lines.push(`ผู้ขายได้รับสุทธิ: ${baht(bd.sellerNetOnSuccess)}`);
+  }
+
+  return lines;
+}

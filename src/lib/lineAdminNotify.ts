@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AdminDealSnapshot, AdminQueueStep } from '@/app/api/_lib/adminDealQueue';
+import type { FeeConfig } from '@/lib/fees';
 import { DEAL_BUCKET, fileViewUrl } from '@/lib/supabase';
 import { adminDealsPagePath, getAdminCategoryLabel, getDealCategory } from '@/lib/adminDealCategory';
+import { computeDealPaymentBreakdown, formatDealPaymentBreakdownLines } from '@/lib/dealPaymentBreakdown';
+import { formatWarranty } from '@/lib/warranty';
 
 const STEP_LABELS: Record<AdminQueueStep, string> = {
   confirm_pay: '⚡ ยืนยันรับเงิน',
@@ -54,19 +57,28 @@ function slipsForStep(step: AdminQueueStep, snap: AdminDealSnapshot): SlipRef[] 
   return out;
 }
 
+function warrantyNotifyLine(deal: Record<string, unknown> | AdminDealSnapshot['deal']): string | null {
+  const w = formatWarranty(
+    Number((deal as Record<string, unknown>).warranty_years) || 0,
+    Number((deal as Record<string, unknown>).warranty_months) || 0,
+    Number((deal as Record<string, unknown>).warranty_days) || 0,
+  );
+  return w ? `🛡️ เงื่อนไขประกัน: ${w}` : null;
+}
+
 function buildNotifyText(
   snap: AdminDealSnapshot,
   step: AdminQueueStep,
   slips: SlipRef[],
+  fees: FeeConfig,
 ): string {
-  const { deal } = snap;
+  const { deal, priceState } = snap;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
   const label = STEP_LABELS[step];
   const category = getDealCategory(deal);
   const catLabel = getAdminCategoryLabel(category);
   const num = deal.deal_number || deal.id.slice(0, 8).toUpperCase();
   const title = deal.title || 'ดีล';
-  const price = Number(deal.price || 0).toLocaleString('th-TH');
   const buyer = deal.buyer_name?.trim() || '-';
   const seller = deal.seller_name?.trim() || '-';
 
@@ -75,8 +87,17 @@ function buildNotifyText(
     `${num} · ${title}`,
     `ผู้ขาย: ${seller}`,
     `ผู้ซื้อ: ${buyer}`,
-    `มูลค่า ฿${price}`,
   ];
+
+  const warranty = warrantyNotifyLine(deal);
+  if (warranty) lines.push(warranty);
+
+  const payBd = computeDealPaymentBreakdown(deal, priceState, fees);
+  if (payBd) {
+    lines.push(...formatDealPaymentBreakdownLines(payBd));
+  } else {
+    lines.push(`มูลค่า ฿${Number(deal.price || 0).toLocaleString('th-TH')}`);
+  }
 
   for (const slip of slips) {
     if (!isLineImageFile(slip.fileId)) {
@@ -88,9 +109,9 @@ function buildNotifyText(
   return lines.join('\n').slice(0, 5000);
 }
 
-function buildLineMessages(snap: AdminDealSnapshot, step: AdminQueueStep): LineMessage[] {
+function buildLineMessages(snap: AdminDealSnapshot, step: AdminQueueStep, fees: FeeConfig): LineMessage[] {
   const slips = slipsForStep(step, snap);
-  const messages: LineMessage[] = [{ type: 'text', text: buildNotifyText(snap, step, slips) }];
+  const messages: LineMessage[] = [{ type: 'text', text: buildNotifyText(snap, step, slips, fees) }];
 
   for (const slip of slips) {
     if (messages.length >= 5) break;
@@ -129,6 +150,7 @@ export async function notifyAdminLineStep(
   db: SupabaseClient,
   snap: AdminDealSnapshot,
   step: AdminQueueStep,
+  fees: FeeConfig,
 ): Promise<void> {
   const deal = snap.deal;
   const { error } = await db.from('admin_line_notifications').insert({ deal_id: deal.id, step });
@@ -138,16 +160,17 @@ export async function notifyAdminLineStep(
     return;
   }
 
-  await sendLineAdminMessages(buildLineMessages(snap, step));
+  await sendLineAdminMessages(buildLineMessages(snap, step, fees));
 }
 
 export async function notifyAdminLineSteps(
   db: SupabaseClient,
   snap: AdminDealSnapshot,
   steps: AdminQueueStep[],
+  fees: FeeConfig,
 ): Promise<void> {
   for (const step of steps) {
-    await notifyAdminLineStep(db, snap, step);
+    await notifyAdminLineStep(db, snap, step, fees);
   }
 }
 
@@ -159,8 +182,10 @@ export async function notifyAdminLineSlipResult(params: {
   slipUrl?: string;
   autoApproved?: boolean;
   expectedAmount?: number;
+  fees?: FeeConfig;
+  priceState?: Record<string, unknown> | null;
 }): Promise<void> {
-  const { deal, side, evaluation, slipUrl, autoApproved, expectedAmount } = params;
+  const { deal, side, evaluation, slipUrl, autoApproved, expectedAmount, fees, priceState } = params;
   const sideLabel = side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย';
   const num = String(deal.deal_number || String(deal.id || '').slice(0, 8).toUpperCase());
   const title = String(deal.title || 'ดีล');
@@ -173,7 +198,6 @@ export async function notifyAdminLineSlipResult(params: {
   const catLabel = getAdminCategoryLabel(category);
   const buyer = String(deal.buyer_name || '-').trim() || '-';
   const seller = String(deal.seller_name || '-').trim() || '-';
-  const price = Number(deal.price || 0).toLocaleString('th-TH');
 
   let headline: string;
   if (evaluation.pass && autoApproved) {
@@ -191,11 +215,20 @@ export async function notifyAdminLineSlipResult(params: {
     `${num} · ${title}`,
     `ผู้ขาย: ${seller}`,
     `ผู้ซื้อ: ${buyer}`,
-    `มูลค่าสินค้า ฿${price}`,
   ];
 
-  if (expectedAmount != null && expectedAmount > 0) {
-    lines.push(`ยอดที่ต้องโอน: ฿${Math.round(expectedAmount).toLocaleString('th-TH')}`);
+  const warranty = warrantyNotifyLine(deal);
+  if (warranty) lines.push(warranty);
+
+  if (fees && String(deal.deal_type || '') !== 'meetup') {
+    const payBd = computeDealPaymentBreakdown(deal, priceState, fees);
+    if (payBd) {
+      lines.push(...formatDealPaymentBreakdownLines(payBd, { highlightSide: side }));
+    }
+  } else if (expectedAmount != null && expectedAmount > 0) {
+    lines.push(`ยอดที่ต้องโอน (${sideLabel}): ฿${Math.round(expectedAmount).toLocaleString('th-TH')}`);
+  } else {
+    lines.push(`มูลค่าสินค้า ฿${Number(deal.price || 0).toLocaleString('th-TH')}`);
   }
 
   if (evaluation.pass) {
@@ -235,7 +268,11 @@ export async function notifyAdminLineSlipCheck(params: {
 }
 
 /** แจ้ง LINE เมื่อระบบอนุมัติรับเงินอัตโนมัติครบทุกสลิป */
-export async function notifyAdminLineAutoApproved(deal: Record<string, unknown>): Promise<void> {
+export async function notifyAdminLineAutoApproved(
+  deal: Record<string, unknown>,
+  fees?: FeeConfig,
+  priceState?: Record<string, unknown> | null,
+): Promise<void> {
   const num = String(deal.deal_number || String(deal.id || '').slice(0, 8).toUpperCase());
   const title = String(deal.title || 'ดีล');
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.glanghub.com').replace(/\/$/, '');
@@ -245,12 +282,17 @@ export async function notifyAdminLineAutoApproved(deal: Record<string, unknown>)
     deal_type: String(deal.deal_type || ''),
   });
   const catLabel = getAdminCategoryLabel(category);
+  const lines = [
+    `[กลางฮับ · ${catLabel}] ✅ อนุมัติรับเงินอัตโนมัติ — เริ่มแพ็คได้`,
+    `${num} · ${title}`,
+  ];
+  if (fees) {
+    const payBd = computeDealPaymentBreakdown(deal, priceState, fees);
+    if (payBd) lines.push(...formatDealPaymentBreakdownLines(payBd));
+  }
+  lines.push(`${appUrl}${adminDealsPagePath(category, 'confirm_pay')}`);
   await sendLineAdminMessages([{
     type: 'text',
-    text: [
-      `[กลางฮับ · ${catLabel}] ✅ อนุมัติรับเงินอัตโนมัติ — เริ่มแพ็คได้`,
-      `${num} · ${title}`,
-      `${appUrl}${adminDealsPagePath(category, 'confirm_pay')}`,
-    ].join('\n').slice(0, 5000),
+    text: lines.join('\n').slice(0, 5000),
   }]);
 }

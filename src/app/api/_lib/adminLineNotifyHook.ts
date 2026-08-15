@@ -23,7 +23,7 @@ export async function maybeNotifyAdminLineQueues(
     ]);
     const skip = new Set(opts?.skipSteps || []);
     const steps = detectEnteredAdminQueueSteps(before, after, fees).filter(s => !skip.has(s));
-    if (steps.length) await notifyAdminLineSteps(db, after, steps);
+    if (steps.length) await notifyAdminLineSteps(db, after, steps, fees);
   } catch (err) {
     console.error('[adminLineNotifyHook]', err);
   }
