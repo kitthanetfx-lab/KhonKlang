@@ -15,7 +15,7 @@ interface SiteStats {
   sellers?: number; totalMembers?: number; promoVideoUrl?: string;
 }
 
-/** สถิติจริงจากระบบ — ดึงจาก /api/stats (นับจากดีลที่เสร็จสมบูรณ์, คนกลางที่อนุมัติ, รีวิวจริง) */
+/** สถิติจริงจากระบบ — ดึงจาก /api/stats (ดีลสำเร็จ, คนกลางอนุมัติ, ความพึงพอใจจากดาวรีวิวดีลที่สำเร็จ) */
 function useSiteStats() {
   const [stats, setStats] = useState<SiteStats | null>(null);
   useEffect(() => {
@@ -42,7 +42,7 @@ function buildStatItems(s: SiteStats | null) {
     { v: inMillions ? Math.round(value / 100_000) / 10 : value, suf: inMillions ? 'ล้าน' : '', pre: '฿', label: 'มูลค่าที่คุ้มครอง' },
     s && s.reviewCount > 0
       ? { v: s.satisfaction, suf: '%', pre: '', label: 'ความพึงพอใจผู้ใช้' }
-      : { v: -1, suf: '', pre: '', label: 'ความพึงพอใจผู้ใช้' }, // -1 = ยังไม่มีรีวิว แสดง "—"
+      : { v: -1, suf: '', pre: '', label: 'ความพึงพอใจผู้ใช้' }, // -1 = ยังไม่มีรีวิวจากดีลสำเร็จ แสดง "—"
   ];
 }
 

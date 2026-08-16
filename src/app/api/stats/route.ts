@@ -8,10 +8,11 @@ export async function GET() {
   try {
     const db = getAdminClient();
 
-    const [dealsRes, middlemenRes, platformRes, listingsRes, meetupRes, scamRes, mmReviewRes, sellersRes, membersRes, feeConfigRes] = await Promise.allSettled([
+    const [dealsRes, middlemenRes, dealReviewRes, listingsRes, meetupRes, scamRes, mmReviewRes, sellersRes, membersRes, feeConfigRes] = await Promise.allSettled([
       db.from('deals').select('price', { count: 'exact' }).eq('status', 'completed').limit(1000),
       db.from('middleman_applications').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
-      db.from('reviews').select('rating', { count: 'exact' }).eq('target_role', 'platform').limit(1000),
+      // ดาวรีวิวทั้งหมดจากดีลที่สำเร็จ — ใช้คำนวณความพึงพอใจผู้ใช้หน้าแรก
+      db.from('reviews').select('rating, deals!inner(status)', { count: 'exact' }).eq('deals.status', 'completed').limit(1000),
       // ประกาศขายที่เปิดอยู่ในตลาด — นับต่อหมวดหมู่
       db.from('deals').select('category', { count: 'exact' }).eq('status', 'posted').eq('source', 'listing').limit(1000),
       // ดีลนัดรับ (ประกันการเดินทาง) ทั้งหมด
@@ -37,9 +38,9 @@ export async function GET() {
     const totalMembers = membersRes.status === 'fulfilled' ? (membersRes.value.count || 0) : 0;
 
     let satisfaction = 0, reviewCount = 0;
-    if (platformRes.status === 'fulfilled') {
-      const ratings = (platformRes.value.data || []).map(d => Number(d.rating) || 0).filter(Boolean);
-      reviewCount = platformRes.value.count || 0;
+    if (dealReviewRes.status === 'fulfilled') {
+      const ratings = (dealReviewRes.value.data || []).map(d => Number(d.rating) || 0).filter(Boolean);
+      reviewCount = dealReviewRes.value.count || 0;
       if (ratings.length) satisfaction = Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length / 5) * 1000) / 10;
     }
 
