@@ -989,37 +989,10 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   }
 }
 
-/* Desktop hero — บีบพอดีให้ stats-band เห็นครบ โดย diagram + วิดีโอยังไม่พัง */
+/* Desktop hero — ปรับความสูงส่วน diagram + วิดีโอ (hero-bottom) เท่านั้น */
 @media (min-width: 900px) {
-  .hero--home {
-    --hero-logo-top: 88px;
-    padding-bottom: 16px;
-  }
-  .hero--home .hero-inner {
-    row-gap: 16px;
-  }
-  .hero--home .hero-top {
-    gap: clamp(16px, 2vw, 28px);
-  }
-  .hero--home .hero-brand-image {
-    width: clamp(108px, 12vw, 168px);
-  }
-  .hero--home .hero-head {
-    margin-inline-start: clamp(12px, 2vw, 28px);
-  }
-  .hero--home .hero-title {
-    font-size: clamp(21px, 2.5vw, 32px);
-  }
-  .hero--home .hero-title-primary-row {
-    gap: clamp(8px, 1.5vw, 28px);
-  }
-  .hero--home .hero-cta-btn {
-    padding: 14px 26px;
-    font-size: 16px;
-  }
   .hero--home .hero-bottom {
     height: clamp(325px, 40vh, 403px);
-    column-gap: clamp(16px, 2vw, 28px);
     align-items: stretch;
   }
   .hero--home .hero-visual,
@@ -1042,9 +1015,6 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   .hero--home .hero-promo-mini .promo-video-wrap {
     min-height: 0;
     height: 100%;
-  }
-  .hero--home + .stats-band {
-    padding: 20px 0;
   }
 }
 
