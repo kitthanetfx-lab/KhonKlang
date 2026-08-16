@@ -13,9 +13,10 @@ function timeAgo(iso: string) {
   if (!iso) return '';
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
   if (s < 60) return 'เมื่อครู่';
-  if (s < 3600) return `${Math.floor(s / 60)} น.`;
+  if (s < 3600) return `${Math.floor(s / 60)} นาที`;
   if (s < 86400) return `${Math.floor(s / 3600)} ชม.`;
-  return `${Math.floor(s / 86400)} วัน`;
+  if (s < 604800) return `${Math.floor(s / 86400)} วัน`;
+  return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 }
 
 function MessagesInner() {
@@ -30,6 +31,8 @@ function MessagesInner() {
   const [msgs, setMsgs] = useState<Dm[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const bottomRef = useRef<HTMLDivElement>(null);
   const headersRef = useRef<Record<string, string>>({});
 
@@ -112,6 +115,13 @@ function MessagesInner() {
     setThreads(prev => (prev || []).map(x => (x.threadId === t.threadId ? { ...x, unread: 0 } : x)));
   }
 
+  const visibleThreads = (threads || []).filter(t => {
+    if (filter === 'unread' && t.unread <= 0) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return t.otherName.toLowerCase().includes(q) || t.lastContent.toLowerCase().includes(q);
+  });
+
   return (
     <>
       <Nav />
@@ -121,27 +131,42 @@ function MessagesInner() {
             {/* ── รายชื่อบทสนทนา ── */}
             <aside className="dm-list">
               <div className="dm-list-head">
-                <h1>กล่องข้อความ</h1>
+                <h1>ข้อความ</h1>
+                <div className="dm-search-wrap">
+                  <Icon name="search" size={16} className="dm-search-ic" />
+                  <input
+                    type="search"
+                    className="dm-search"
+                    placeholder="ค้นหา Messenger"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    aria-label="ค้นหาบทสนทนา"
+                  />
+                </div>
+                <div className="dm-filters" role="tablist" aria-label="ตัวกรองบทสนทนา">
+                  <button type="button" role="tab" aria-selected={filter === 'all'} className={`dm-filter${filter === 'all' ? ' active' : ''}`} onClick={() => setFilter('all')}>ทั้งหมด</button>
+                  <button type="button" role="tab" aria-selected={filter === 'unread'} className={`dm-filter${filter === 'unread' ? ' active' : ''}`} onClick={() => setFilter('unread')}>ยังไม่ได้อ่าน</button>
+                </div>
               </div>
               {threads === null && <div className="mkt-detail-loading" style={{ margin: '60px auto' }} />}
-              {threads !== null && threads.length === 0 && (
+              {threads !== null && visibleThreads.length === 0 && (
                 <div className="dm-empty">
                   <Icon name="message" size={28} />
-                  <p>ยังไม่มีข้อความ</p>
-                  <span>ทักผู้ขายจากหน้าสินค้า หรือทักผู้ซื้อจากประกาศหา ข้อความจะรวมอยู่ที่นี่</span>
+                  <p>{search || filter === 'unread' ? 'ไม่พบบทสนทนา' : 'ยังไม่มีข้อความ'}</p>
+                  <span>{search || filter === 'unread' ? 'ลองเปลี่ยนคำค้นหาหรือตัวกรอง' : 'ทักผู้ขายจากหน้าสินค้า หรือทักผู้ซื้อจากประกาศหา ข้อความจะรวมอยู่ที่นี่'}</span>
                 </div>
               )}
-              {(threads || []).map(t => (
+              {visibleThreads.map(t => (
                 <button key={t.threadId} type="button" className={`dm-thread ${active?.id === t.otherId ? 'active' : ''} ${t.unread > 0 ? 'unread' : ''}`} onClick={() => openThread(t)}>
                   <span className="dm-av">{(t.otherName || '?').slice(0, 1)}</span>
                   <span className="dm-thread-tx">
                     <b>{t.otherName}</b>
-                    <span>{t.fromMe ? 'คุณ: ' : ''}{t.lastContent}</span>
+                    <span className="dm-thread-preview">
+                      <span className="dm-thread-snippet">{t.fromMe ? 'คุณ: ' : ''}{t.lastContent}</span>
+                      <span className="dm-thread-time"> · {timeAgo(t.lastAt)}</span>
+                    </span>
                   </span>
-                  <span className="dm-thread-meta">
-                    <small>{timeAgo(t.lastAt)}</small>
-                    {t.unread > 0 && <span className="dm-unread">{t.unread}</span>}
-                  </span>
+                  {t.unread > 0 && <span className="dm-unread-dot" aria-label={`${t.unread} ข้อความใหม่`} />}
                 </button>
               ))}
             </aside>
@@ -165,28 +190,48 @@ function MessagesInner() {
                   </div>
                   <div className="dm-feed">
                     {msgs.length === 0 && <p className="dm-feed-empty">เริ่มบทสนทนากับ {active.name} — ข้อความจะถูกเก็บไว้ให้เปิดอ่านได้ตลอด</p>}
-                    {msgs.map(m => {
+                    {msgs.map((m, i) => {
                       const mine = m.from_id === myId;
+                      const prev = msgs[i - 1];
+                      const next = msgs[i + 1];
+                      const sameAsPrev = prev && prev.from_id === m.from_id;
+                      const sameAsNext = next && next.from_id === m.from_id;
+                      const showSender = !mine && !sameAsPrev;
                       return (
-                        <div key={m.id} className={`dm-row ${mine ? 'mine' : ''}`}>
+                        <div
+                          key={m.id}
+                          className={`dm-row ${mine ? 'mine' : ''}${sameAsPrev ? ' dm-row--cont' : ''}${sameAsNext ? ' dm-row--has-next' : ''}`}
+                        >
+                          {showSender && <span className="dm-sender">{m.from_name || active.name}</span>}
                           <div className={`dm-bubble ${mine ? 'mine' : ''}`}>{m.content}</div>
-                          <small>{new Date(m.created_at).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
                         </div>
                       );
                     })}
                     <div ref={bottomRef} />
                   </div>
                   <div className="dm-bar">
-                    <input
-                      value={input}
-                      onChange={e => setInput(e.target.value)}
-                      placeholder={`ส่งข้อความถึง ${active.name}...`}
-                      maxLength={2000}
-                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    />
-                    <button type="button" onClick={send} disabled={!input.trim() || sending} aria-label="ส่ง">
-                      <Icon name="arrowRight" size={17} />
-                    </button>
+                    <div className="dm-composer">
+                      <button type="button" className="dm-composer-ic" aria-label="เพิ่ม" tabIndex={-1}>
+                        <Icon name="plus" size={20} />
+                      </button>
+                      <input
+                        className="dm-composer-input"
+                        value={input}
+                        onChange={e => setInput(e.target.value)}
+                        placeholder="Aa"
+                        maxLength={2000}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                      />
+                      <button type="button" className="dm-composer-ic" aria-label="รูปภาพ" tabIndex={-1}>
+                        <Icon name="image" size={20} />
+                      </button>
+                      <button type="button" className="dm-composer-ic" aria-label="สติกเกอร์" tabIndex={-1}>
+                        <Icon name="sparkles" size={20} />
+                      </button>
+                      <button type="button" className="dm-composer-send" onClick={send} disabled={!input.trim() || sending} aria-label="ส่ง">
+                        <Icon name="arrowRight" size={18} />
+                      </button>
+                    </div>
                   </div>
                   <p className="dm-safety">⚠️ อย่าโอนเงินนอกระบบ และอย่ากดลิงก์/เปิดไฟล์แปลกปลอมจากคู่สนทนา — ชวนกัน<Link href="/deal/create">เปิดดีลผ่านคนกลาง</Link>เพื่อความปลอดภัย</p>
                 </>
