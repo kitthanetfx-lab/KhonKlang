@@ -989,164 +989,62 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
   }
 }
 
-/* Desktop hero — บีบส่วน diagram + วิดีโอ ให้ stats-band เห็นครบโดยไม่ scroll */
+/* Desktop hero — บีบพอดีให้ stats-band เห็นครบ โดย diagram + วิดีโอยังไม่พัง */
 @media (min-width: 900px) {
   .hero--home {
-    --hero-logo-top: 82px;
-    padding-bottom: 12px;
+    --hero-logo-top: 88px;
+    padding-bottom: 16px;
   }
   .hero--home .hero-inner {
-    row-gap: 12px;
+    row-gap: 16px;
   }
   .hero--home .hero-top {
-    gap: clamp(14px, 1.8vw, 22px);
+    gap: clamp(16px, 2vw, 28px);
   }
   .hero--home .hero-brand-image {
-    width: clamp(96px, 10vw, 140px);
+    width: clamp(108px, 12vw, 168px);
   }
   .hero--home .hero-head {
-    margin-inline-start: clamp(8px, 1.5vw, 24px);
-  }
-  .hero--home .hero-head .eyebrow {
-    margin-bottom: 6px;
-    font-size: 11px;
-    padding: 4px 10px;
-    gap: 5px;
-  }
-  .hero--home .hero-head .eyebrow svg {
-    width: 15px;
-    height: 15px;
+    margin-inline-start: clamp(12px, 2vw, 28px);
   }
   .hero--home .hero-title {
-    font-size: clamp(19px, 2.2vw, 28px);
-    gap: 3px;
+    font-size: clamp(21px, 2.5vw, 32px);
   }
   .hero--home .hero-title-primary-row {
-    gap: clamp(6px, 1.2vw, 20px);
-  }
-  .hero--home .hero-title-row {
-    gap: clamp(10px, 1.5vw, 16px);
+    gap: clamp(8px, 1.5vw, 28px);
   }
   .hero--home .hero-cta-btn {
-    padding: 11px 20px;
-    font-size: 14.5px;
-  }
-  .hero--home .hero-cta-btn svg {
-    width: 17px;
-    height: 17px;
+    padding: 14px 26px;
+    font-size: 16px;
   }
   .hero--home .hero-bottom {
-    max-height: clamp(210px, 27vh, 270px);
-    column-gap: clamp(12px, 1.8vw, 22px);
+    height: clamp(250px, 31vh, 310px);
+    column-gap: clamp(16px, 2vw, 28px);
     align-items: stretch;
   }
   .hero--home .hero-visual,
   .hero--home .hero-promo-mini {
-    min-height: 0;
     height: 100%;
+    min-height: 0;
   }
   .hero--home .ef-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 8px;
     height: 100%;
     min-height: 0;
   }
   .hero--home .ef-stage {
-    flex: 1 1 auto;
-    min-height: 0;
     aspect-ratio: unset;
-    height: auto;
-  }
-  .hero--home .ef-head {
-    padding: 7px 9px;
-  }
-  .hero--home .ef-live {
-    font-size: 9.5px;
-    padding: 3px 7px;
-    gap: 5px;
-  }
-  .hero--home .ef-live-dot {
-    width: 6px;
-    height: 6px;
-  }
-  .hero--home .ef-amount {
-    font-size: 9.5px;
-  }
-  .hero--home .ef-node-ic {
-    width: 38px;
-    height: 38px;
-    border-radius: 11px;
-  }
-  .hero--home .ef-vault-ring {
-    width: 58px;
-    height: 58px;
-  }
-  .hero--home .ef-vault-core svg {
-    width: 20px !important;
-    height: 20px !important;
-  }
-  .hero--home .ef-node-lb {
-    font-size: 9.5px;
-    padding: 1px 6px;
-  }
-  .hero--home .ef-vault-meta b {
-    font-size: 10.5px;
-  }
-  .hero--home .ef-vault-meta span {
-    font-size: 9px;
-  }
-  .hero--home .ef-token {
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-  }
-  .hero--home .ef-float {
-    font-size: 9px;
-    padding: 4px 7px;
-    gap: 4px;
-  }
-  .hero--home .ef-step-line {
-    padding: 5px 9px;
-    gap: 7px;
-  }
-  .hero--home .ef-step-no {
-    width: 18px;
-    height: 18px;
-    font-size: 10px;
-  }
-  .hero--home .ef-step-tx b {
-    font-size: 11px;
-    line-height: 1.3;
-  }
-  .hero--home .ef-step-tx span {
-    font-size: 9.5px;
-    line-height: 1.25;
-    margin-top: 0;
-  }
-  .hero--home .ef-step-dots {
-    gap: 4px;
-  }
-  .hero--home .ef-dot {
-    width: 5px;
-    height: 5px;
-  }
-  .hero--home .ef-dot.on {
-    width: 13px;
+    height: 100%;
+    min-height: 0;
   }
   .hero--home .hero-promo-mini .promo-video-wrap {
     min-height: 0;
     height: 100%;
   }
   .hero--home + .stats-band {
-    padding: 16px 0;
-  }
-  .hero--home + .stats-band .stat-v {
-    font-size: clamp(21px, 2.6vw, 28px);
-  }
-  .hero--home + .stats-band .stat-l {
-    font-size: 11.5px;
-    margin-top: 5px;
+    padding: 20px 0;
   }
 }
 
