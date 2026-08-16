@@ -1018,7 +1018,7 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
     font-size: 16px;
   }
   .hero--home .hero-bottom {
-    height: clamp(250px, 31vh, 310px);
+    height: clamp(325px, 40vh, 403px);
     column-gap: clamp(16px, 2vw, 28px);
     align-items: stretch;
   }
