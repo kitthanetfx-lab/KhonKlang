@@ -324,6 +324,7 @@ export async function notifyAdminLineWalletTopup(params: {
   autoApproved: boolean;
   skipped?: boolean;
   skipReason?: string;
+  retryScheduled?: boolean;
   evaluation?: {
     pass: boolean;
     reasons: string[];
@@ -332,10 +333,11 @@ export async function notifyAdminLineWalletTopup(params: {
   };
   slipFileId?: string;
 }): Promise<void> {
-  const { userName, amount, autoApproved, skipped, skipReason, evaluation, slipFileId } = params;
+  const { userName, amount, autoApproved, skipped, skipReason, retryScheduled, evaluation, slipFileId } = params;
   const appUrl = appBaseUrl();
   let headline: string;
-  if (skipped) headline = `🧾 เติมเงินกระเป๋า — รอแอดมินตรวจมือ${skipReason ? ` (${skipReason})` : ''}`;
+  if (retryScheduled) headline = '⏳ ตรวจสลิปเติมเงิน — รอธนาคารอัปเดต · ตรวจซ้ำอัตโนมัติใน 1 นาที';
+  else if (skipped) headline = `🧾 เติมเงินกระเป๋า — รอแอดมินตรวจมือ${skipReason ? ` (${skipReason})` : ''}`;
   else if (evaluation?.pass && autoApproved) headline = '✅ ตรวจสลิปเติมเงิน — ผ่าน · เข้ากระเป๋าอัตโนมัติแล้ว';
   else if (evaluation?.pass) headline = '✅ ตรวจสลิปเติมเงิน — ผ่าน · รอแอดมินยืนยัน';
   else headline = '⚠️ ตรวจสลิปเติมเงิน — ไม่ผ่าน · รอแอดมินตรวจมือ';

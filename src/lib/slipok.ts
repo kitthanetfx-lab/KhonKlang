@@ -378,6 +378,14 @@ export function isSlipokConfigured(): boolean {
   return Boolean(branchId && apiKey);
 }
 
+/** 1010 = ธนาคารยังไม่อัปเดต — ตรวจซ้ำอัตโนมัติ (ครั้งถัดไปอาจได้ 1012 พร้อมข้อมูลสลิป) */
+export const SLIPOK_AUTO_RETRY_CODES = ['1010'] as const;
+export const SLIPOK_AUTO_RETRY_DELAY_MS = 60_000;
+
+export function shouldAutoRetrySlipok(code: string): boolean {
+  return (SLIPOK_AUTO_RETRY_CODES as readonly string[]).includes(String(code || '').trim());
+}
+
 /** ข้อความภาษาไทยสำหรับรหัส SlipOK 1000–1014 และข้อผิดพลาดภายใน */
 const SLIPOK_CODE_TH: Record<string, string> = {
   '1000': 'SlipOK ไม่ได้รับไฟล์/URL — Vercel env ผิดหรือยังไม่ Redeploy (quota ok แต่ upload 1000 = credentials ไม่ตรง 69043)',
@@ -390,7 +398,7 @@ const SLIPOK_CODE_TH: Record<string, string> = {
   '1007': 'รูปภาพไม่มี QR Code',
   '1008': 'QR Code นี้ไม่ใช่ QR สำหรับตรวจสอบการชำระเงิน',
   '1009': 'ข้อมูลธนาคารขัดข้องชั่วคราว — ลองใหม่ใน 15 นาที (ไม่เสียโควต้า)',
-  '1010': 'SlipOK ตอบ 1010 — ถ้าสลิปอ่านได้แล้วครั้งก่อน ให้กด「ตรวจซ้ำ」(จะได้ 1012 แล้วผ่านอัตโนมัติถ้ายอดตรง) หรือกด「สลิปถูกต้อง」',
+  '1010': 'ธนาคารยังไม่อัปเดตรายการโอน — ระบบจะตรวจซ้ำอัตโนมัติใน 1 นาที',
   '1011': 'QR Code หมดอายุ หรือไม่มีรายการโอนนี้ในฐานข้อมูลธนาคาร',
   '1012': 'สลิปซ้ำ — เคยใช้ในระบบแล้ว',
   '1013': 'ยอดที่ส่งตรวจไม่ตรงกับยอดบนสลิป',

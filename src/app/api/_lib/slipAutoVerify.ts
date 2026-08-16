@@ -6,6 +6,7 @@ import {
   verifySlipByFileId,
   isSlipokConfigured,
   formatSlipokError,
+  shouldAutoRetrySlipok,
   type SlipInfo,
   type SlipResult,
 } from '@/lib/slipok';
@@ -19,6 +20,8 @@ import { maybeNotifyAdminLineQueues } from '@/app/api/_lib/adminLineNotifyHook';
 import { loadAdminDealSnapshot, type AdminDealRow } from '@/app/api/_lib/adminDealQueue';
 import { isListingCheckoutOrder, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
 import { dealBuyerPayAmount, dealSellerServiceDue } from '@/lib/dealPaymentBreakdown';
+import { getAdminClient } from '@/lib/supabaseServer';
+import { scheduleSlipRetry } from '@/app/api/_lib/slipRetrySchedule';
 
 export type SlipSide = 'buyer' | 'seller';
 
@@ -334,6 +337,7 @@ export async function runAutoMeetupSlipVerification(
   db: SupabaseClient,
   dealId: string,
   trigger: 'buyer' | 'seller' | 'both' = 'both',
+  opts?: { fromAutoRetry?: boolean },
 ): Promise<{ deal: Record<string, unknown>; skipConfirmPayLine: boolean }> {
   const { data: deal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
   if (!deal || deal.deal_type !== 'meetup') {
@@ -390,23 +394,39 @@ export async function runAutoMeetupSlipVerification(
       latestDeal = { ...latestDeal, reject_reason: '' };
       passedSides.push({ side, evaluation, fileId, expected });
     } else {
+      const willAutoRetry = !opts?.fromAutoRetry && shouldAutoRetrySlipok(evaluation.raw.code);
       const via = evaluation.raw.via ? ` · ${evaluation.raw.via}` : '';
-      const rejectReason = `[สลิปประกัน${sideLabel}${via}] ${reasonText}`.slice(0, 500);
+      const rejectReason = (willAutoRetry
+        ? `[รอตรวจซ้ำอัตโนมัติ ~1 นาที] ${reasonText}`
+        : `[สลิปประกัน${sideLabel}${via}] ${reasonText}`).slice(0, 500);
       await db.from('deals').update({ reject_reason: rejectReason }).eq('id', dealId);
       latestDeal = { ...latestDeal, reject_reason: rejectReason };
-      await insertSystemMsg(
-        db,
-        dealId,
-        `⚠️ สลิปเงินประกัน${sideLabel}ไม่ผ่าน — ${reasonText} (รอแอดมินตรวจสอบ)`,
-      );
-      await notifyAdminLineSlipResult({
-        deal: latestDeal,
-        side,
-        evaluation,
-        slipUrl: isSlipImageFile(fileId) ? dealSlipPublicUrl(fileId) : '',
-        autoApproved: false,
-        expectedAmount: expected,
-      });
+      if (willAutoRetry) {
+        await insertSystemMsg(
+          db,
+          dealId,
+          `⏳ สลิปเงินประกัน${sideLabel} — ธนาคารยังไม่อัปเดต ระบบจะตรวจซ้ำอัตโนมัติใน 1 นาที`,
+        );
+        const retrySide = side;
+        scheduleSlipRetry(async () => {
+          const db2 = getAdminClient();
+          await runAutoMeetupSlipVerification(db2, dealId, retrySide, { fromAutoRetry: true });
+        });
+      } else {
+        await insertSystemMsg(
+          db,
+          dealId,
+          `⚠️ สลิปเงินประกัน${sideLabel}ไม่ผ่าน — ${reasonText} (รอแอดมินตรวจสอบ)`,
+        );
+        await notifyAdminLineSlipResult({
+          deal: latestDeal,
+          side,
+          evaluation,
+          slipUrl: isSlipImageFile(fileId) ? dealSlipPublicUrl(fileId) : '',
+          autoApproved: false,
+          expectedAmount: expected,
+        });
+      }
     }
   }
 
@@ -436,13 +456,14 @@ export async function runAutoSlipVerification(
   db: SupabaseClient,
   dealId: string,
   trigger: 'buyer' | 'seller' | 'both' = 'both',
+  opts?: { fromAutoRetry?: boolean },
 ): Promise<{ deal: Record<string, unknown>; skipConfirmPayLine: boolean }> {
   const { data: deal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
   if (!deal) {
     return { deal: {} as Record<string, unknown>, skipConfirmPayLine: false };
   }
   if (deal.deal_type === 'meetup') {
-    return runAutoMeetupSlipVerification(db, dealId, trigger);
+    return runAutoMeetupSlipVerification(db, dealId, trigger, opts);
   }
   if (!['payment_pending', 'payment_uploaded', 'posted'].includes(String(deal.status))) {
     return { deal: deal as Record<string, unknown>, skipConfirmPayLine: false };
@@ -498,25 +519,41 @@ export async function runAutoSlipVerification(
       else latestDeal = { ...latestDeal, reject_reason: '' };
       passedSides.push({ side, evaluation, fileId, expected });
     } else {
+      const willAutoRetry = !opts?.fromAutoRetry && shouldAutoRetrySlipok(evaluation.raw.code);
       const via = evaluation.raw.via ? ` · ${evaluation.raw.via}` : '';
-      const rejectReason = `[สลิป${sideLabel}${via}] ${reasonText}`.slice(0, 500);
+      const rejectReason = (willAutoRetry
+        ? `[รอตรวจซ้ำอัตโนมัติ ~1 นาที] ${reasonText}`
+        : `[สลิป${sideLabel}${via}] ${reasonText}`).slice(0, 500);
       await db.from('deals').update({ reject_reason: rejectReason }).eq('id', dealId);
       latestDeal = { ...latestDeal, reject_reason: rejectReason };
-      await insertSystemMsg(
-        db,
-        dealId,
-        `⚠️ สลิป${sideLabel}ไม่ผ่าน — ${reasonText} (รอแอดมินตรวจสอบ)`,
-      );
-      await notifyAdminLineSlipResult({
-        deal: latestDeal,
-        side,
-        evaluation,
-        slipUrl: isSlipImageFile(fileId) ? dealSlipPublicUrl(fileId) : '',
-        autoApproved: false,
-        expectedAmount: expected,
-        fees,
-        priceState,
-      });
+      if (willAutoRetry) {
+        await insertSystemMsg(
+          db,
+          dealId,
+          `⏳ สลิป${sideLabel} — ธนาคารยังไม่อัปเดต ระบบจะตรวจซ้ำอัตโนมัติใน 1 นาที`,
+        );
+        const retrySide = side;
+        scheduleSlipRetry(async () => {
+          const db2 = getAdminClient();
+          await runAutoSlipVerification(db2, dealId, retrySide, { fromAutoRetry: true });
+        });
+      } else {
+        await insertSystemMsg(
+          db,
+          dealId,
+          `⚠️ สลิป${sideLabel}ไม่ผ่าน — ${reasonText} (รอแอดมินตรวจสอบ)`,
+        );
+        await notifyAdminLineSlipResult({
+          deal: latestDeal,
+          side,
+          evaluation,
+          slipUrl: isSlipImageFile(fileId) ? dealSlipPublicUrl(fileId) : '',
+          autoApproved: false,
+          expectedAmount: expected,
+          fees,
+          priceState,
+        });
+      }
     }
   }
 
