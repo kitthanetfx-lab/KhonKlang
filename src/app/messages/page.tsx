@@ -3,7 +3,7 @@ import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase, authHeaders } from '@/lib/supabase';
-import { Nav, Footer } from '@/components/Site';
+import { Nav } from '@/components/Site';
 import { Icon } from '@/components/Icon';
 
 interface Thread { threadId: string; otherId: string; otherName: string; lastContent: string; lastAt: string; fromMe: boolean; unread: number }
@@ -240,7 +240,6 @@ function MessagesInner() {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   );
 }

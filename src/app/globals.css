@@ -7046,8 +7046,9 @@ body.in-call .dr-floatbar { display: flex; }
 .dm-empty p { font-weight: 600; color: #050505; margin-top: 10px; font-size: 15px; }
 .dm-empty span { font-size: 13px; line-height: 1.6; display: block; margin-top: 4px; max-width: 32ch; margin-inline: auto; }
 @media (max-width: 800px){
-  .dm-shell { padding: 0; background: #fff; }
-  .dm-layout { grid-template-columns: 1fr; height: calc(100vh - 70px); border-radius: 0; box-shadow: none; }
+  .dm-shell { padding: 0; background: #fff; min-height: calc(100dvh - 70px); }
+  .dm-shell .container { padding: 0; max-width: none; }
+  .dm-layout { grid-template-columns: 1fr; height: calc(100dvh - 70px); border-radius: 0; box-shadow: none; }
   .dm-list { border-right: none; }
   .dm-layout.has-active .dm-list { display: none; }
   .dm-layout:not(.has-active) .dm-room { display: none; }
