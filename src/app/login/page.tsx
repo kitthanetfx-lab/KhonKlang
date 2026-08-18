@@ -3,6 +3,7 @@
 import { supabase } from '@/lib/supabase';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Suspense, useLayoutEffect } from 'react';
 import { InAppBanner } from '@/components/InAppBanner';
 import { detectInApp } from '@/lib/inApp';
@@ -91,10 +92,7 @@ function LoginForm() {
 
         <div className="login-logo-wrap">
           <div className="login-logo-mark">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2.5l7.5 2.8v5.2c0 4.7-3.2 8.1-7.5 9.5-4.3-1.4-7.5-4.8-7.5-9.5V5.3L12 2.5z" />
-              <path d="M8.6 12l2.2 2.2 4.6-4.8" />
-            </svg>
+            <Image src="/logo.png" alt="กลางฮับ" width={80} height={80} priority style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
         </div>
 
