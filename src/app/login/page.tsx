@@ -31,7 +31,7 @@ function LoginForm() {
         const idToken = await nativeGoogleIdToken();
         const { error: idErr } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken });
         if (idErr) throw idErr;
-        window.location.assign(`/auth/oauth/complete?returnTo=${encodeURIComponent(safeReturn)}`);
+        window.location.replace(safeReturn);
       } catch (e) {
         if (!isUserCancelled(e)) {
           console.error('Native Google login error:', e);

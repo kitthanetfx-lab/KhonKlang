@@ -4,13 +4,11 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { isGlanghubApp } from '@/lib/nativeAuth';
-import { APP_HANDOFF_FAIL_MSG } from '@/lib/appAuthHandoff';
+import { appLoginUrl } from '@/lib/appDeepLinkNav';
 
 /**
- * หน้ารับ callback จาก Google/Facebook OAuth.
- * supabase-js (detectSessionInUrl: true ใน src/lib/supabase.ts) จะอ่าน
- * access_token/refresh_token จาก URL hash ที่ Supabase ส่งกลับมาให้อัตโนมัติ
- * แล้วเก็บ session ไว้ใน localStorage เอง — ไม่ต้องแลก token เองแบบ Appwrite เดิม
+ * หน้ารับ callback จาก Google/Facebook OAuth (เว็บเบราว์เซอร์เท่านั้น)
+ * แอpp ใช้ Native Google Sign-In แล้วไป returnTo โดยตรง — ไม่ผ่านหน้านี้
  */
 function OAuthCompleteInner() {
   const searchParams = useSearchParams();
@@ -18,14 +16,20 @@ function OAuthCompleteInner() {
   const returnTo = searchParams.get('returnTo') || '/';
 
   useEffect(() => {
-    let done = false;
     const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
+
+    // แอpp ที่เปิด URL นี้จาก App Link = login จากเบราว์เซอร์ — ไม่รับ
+    if (isGlanghubApp()) {
+      window.location.replace(appLoginUrl(safeReturn));
+      return;
+    }
+
+    let done = false;
 
     function goHome() {
       if (done) return;
       done = true;
       setStatus('เข้าสู่ระบบสำเร็จ...');
-      // full navigation — WebView/Capacitor ยืนยัน session + AuthGate ใหม่ได้แน่นอน
       window.location.replace(safeReturn);
     }
 
@@ -34,11 +38,7 @@ function OAuthCompleteInner() {
       done = true;
       console.error('OAuth complete error:', err);
       const message = err instanceof Error ? err.message : 'session_invalid';
-      const errorCode = isGlanghubApp() ? 'app_handoff' : 'oauth_failed';
-      const msgParam = isGlanghubApp()
-        ? encodeURIComponent(APP_HANDOFF_FAIL_MSG)
-        : encodeURIComponent(message);
-      window.location.replace(`/login?error=${errorCode}&msg=${msgParam}&returnTo=${encodeURIComponent(returnTo)}`);
+      window.location.replace(`/login?error=oauth_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
     }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {

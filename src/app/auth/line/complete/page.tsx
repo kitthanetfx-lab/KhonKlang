@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { isGlanghubApp } from '@/lib/nativeAuth';
-import { APP_HANDOFF_FAIL_MSG } from '@/lib/appAuthHandoff';
+import { appLoginUrl } from '@/lib/appDeepLinkNav';
 
 function LineCompleteInner() {
   const searchParams = useSearchParams();
@@ -12,6 +12,8 @@ function LineCompleteInner() {
   const returnTo = searchParams.get('returnTo') || '/';
 
   useEffect(() => {
+    const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
+
     async function finish() {
       const cookieMap = Object.fromEntries(
         document.cookie.split(';').map(c => {
@@ -21,18 +23,22 @@ function LineCompleteInner() {
       );
       const raw = cookieMap['line_session_pending'];
 
+      // แอpp + ไม่มี cookie = ถูก App Link ดึงมาจาก login ในเบราว์เซอร์ — ไม่รับ
+      if (isGlanghubApp() && !raw) {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          window.location.replace(appLoginUrl(safeReturn));
+          return;
+        }
+      }
+
       if (!raw) {
-        // ไม่มี pending cookie — ลองใช้ session ที่มีอยู่แล้วใน localStorage
         try {
           const { data } = await supabase.auth.getSession();
           if (!data.session) throw new Error('no_session');
-          await routeAfterLogin();
+          routeAfterLogin();
         } catch {
-          const err = isGlanghubApp() ? 'app_handoff' : 'line_failed';
-          const msg = isGlanghubApp()
-            ? encodeURIComponent(APP_HANDOFF_FAIL_MSG)
-            : 'no_session';
-          window.location.replace(`/login?error=${err}&msg=${msg}&returnTo=${encodeURIComponent(returnTo)}`);
+          window.location.replace(`/login?error=line_failed&msg=no_session&returnTo=${encodeURIComponent(returnTo)}`);
         }
         return;
       }
@@ -44,21 +50,16 @@ function LineCompleteInner() {
         const { error } = await supabase.auth.setSession({ access_token, refresh_token });
         if (error) throw error;
         setStatus('กำลังโหลดข้อมูล...');
-        await routeAfterLogin();
+        routeAfterLogin();
       } catch (err: unknown) {
         console.error('LINE complete error:', err);
         const message = err instanceof Error ? err.message : 'session_invalid';
-        const errCode = isGlanghubApp() ? 'app_handoff' : 'line_failed';
-        const msgParam = isGlanghubApp()
-          ? encodeURIComponent(APP_HANDOFF_FAIL_MSG)
-          : encodeURIComponent(message);
-        window.location.replace(`/login?error=${errCode}&msg=${msgParam}&returnTo=${encodeURIComponent(returnTo)}`);
+        window.location.replace(`/login?error=line_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
       }
     }
 
-    async function routeAfterLogin() {
+    function routeAfterLogin() {
       setStatus('เข้าสู่ระบบสำเร็จ...');
-      const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
       window.location.replace(safeReturn);
     }
 

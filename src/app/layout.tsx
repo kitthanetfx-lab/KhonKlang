@@ -13,6 +13,7 @@ import { GlobalPreferenceDock } from "@/components/GlobalPreferenceDock";
 import { GlobalLoadingProvider, GlobalButtonGuard } from "@/components/GlobalLoadingProvider";
 import { NativePushBridge } from "@/components/NativePushBridge";
 import { NativeDeepLinkBridge } from "@/components/NativeDeepLinkBridge";
+import { AppColdStartBridge } from "@/components/AppColdStartBridge";
 import { NativePullToRefreshBridge } from "@/components/NativePullToRefreshBridge";
 
 const displayFont = Anuphan({
@@ -84,10 +85,11 @@ export default function RootLayout({
         <AppPreferencesProvider>
           <GlobalLoadingProvider>
           <DialogProvider>
+            <NativeDeepLinkBridge />
+            <AppColdStartBridge />
             <AuthGate>
               <GlobalButtonGuard />
               <NativePushBridge />
-              <NativeDeepLinkBridge />
               <NativePullToRefreshBridge />
               <AppChrome>
                 {children}

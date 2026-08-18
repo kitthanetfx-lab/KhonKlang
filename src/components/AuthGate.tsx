@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { isProfileComplete, REQUIRED_PROFILE_FIELDS } from '@/lib/profileComplete';
+import { appLoginUrl } from '@/lib/appDeepLinkNav';
 
 /**
  * บังคับให้ต้องล็อกอินก่อนเข้าใช้งานเว็บไซต์ทุกหน้า (ยกเว้นหน้าที่อยู่ใน allowlist
@@ -94,7 +95,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       const { data } = await supabase.auth.getSession();
       if (!active) return;
       if (!data.session) {
-        window.location.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
+        window.location.replace(appLoginUrl(`${pathname}${typeof window !== 'undefined' ? window.location.search : ''}`));
         return;
       }
       if (active) {
@@ -126,7 +127,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       if (!active) return;
       if (!session && !isPublicPath(pathname)) {
         gateVerifiedRef.current = false;
-        window.location.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
+        const dest = `${pathname}${typeof window !== 'undefined' ? window.location.search : ''}`;
+        window.location.replace(appLoginUrl(dest));
         return;
       }
       if (session && !isPublicPath(pathname) && !gateVerifiedRef.current) {
