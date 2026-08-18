@@ -59,12 +59,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname() || '/';
   const isPublic = isPublicPath(pathname);
-  // หน้า public (เช่น /login) ไม่ต้องรอ effect — กัน flash "กำลังตรวจสอบสิทธิ์..." ตอน logout
+  // หน้า public (เช่น /login) แสดงทันที — กัน flash "กำลังตรวจสอบสิทธิ์..." ตอน logout
   const [checked, setChecked] = useState(isPublic);
   const [authed, setAuthed] = useState(isPublic);
   const [profileComplete, setProfileComplete] = useState(true);
-  const checkedRef = useRef(isPublic);
-  const authedRef = useRef(isPublic);
+  /** ผ่านการยืนยัน session บนหน้าที่ต้องล็อกอินแล้ว (ไม่ใช่แค่เคยอยู่หน้า public) */
+  const gateVerifiedRef = useRef(false);
   const profileCompleteRef = useRef(true);
 
   useEffect(() => {
@@ -72,12 +72,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
     async function check() {
       if (isPublicPath(pathname)) {
-        if (active) { setAuthed(true); setChecked(true); }
+        if (active) {
+          setAuthed(true);
+          setChecked(true);
+        }
         return;
       }
 
-      // เคยผ่าน gate แล้ว — สลับหน้าไม่ต้อง unload ลูกทั้งหมดใหม่
-      if (authedRef.current && checkedRef.current) {
+      // เคยผ่าน gate บนหน้าที่ต้องล็อกอินแล้ว — สลับหน้าไม่ต้อง unload ลูกทั้งหมดใหม่
+      if (gateVerifiedRef.current) {
         if (
           !profileCompleteRef.current
           && isProfileRequiredPath(pathname)
@@ -91,12 +94,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       const { data } = await supabase.auth.getSession();
       if (!active) return;
       if (!data.session) {
-        router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
+        window.location.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
         return;
       }
       if (active) {
         setAuthed(true);
-        authedRef.current = true;
       }
 
       const { data: profile } = await supabase
@@ -110,23 +112,28 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setProfileComplete(complete);
       profileCompleteRef.current = complete;
 
-      if (!complete && isProfileRequiredPath(pathname)) {
+      if (!complete && isProfileRequiredPath(pathname) && !pathname.startsWith('/profile')) {
         router.replace(`/profile?returnTo=${encodeURIComponent(pathname)}`);
-        return;
       }
+
+      gateVerifiedRef.current = true;
       setChecked(true);
-      checkedRef.current = true;
     }
 
     check();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!active) return;
       if (!session && !isPublicPath(pathname)) {
-        authedRef.current = false;
-        checkedRef.current = false;
-        // ไม่ reset checked/authed ก่อน redirect — จะทำให้หน้ากระพริบ loading
+        gateVerifiedRef.current = false;
         window.location.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
+        return;
+      }
+      if (session && !isPublicPath(pathname) && !gateVerifiedRef.current) {
+        void check();
+      }
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        gateVerifiedRef.current = false;
       }
     });
 

@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 function LineCompleteInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState('กำลังเข้าสู่ระบบด้วย LINE...');
-  const returnTo = searchParams.get('returnTo') || '/register';
+  const returnTo = searchParams.get('returnTo') || '/';
 
   useEffect(() => {
     async function finish() {
@@ -27,7 +26,7 @@ function LineCompleteInner() {
           if (!data.session) throw new Error('no_session');
           await routeAfterLogin();
         } catch {
-          router.replace(`/login?error=line_failed&msg=no_session&returnTo=${encodeURIComponent(returnTo)}`);
+          window.location.replace(`/login?error=line_failed&msg=no_session&returnTo=${encodeURIComponent(returnTo)}`);
         }
         return;
       }
@@ -43,20 +42,18 @@ function LineCompleteInner() {
       } catch (err: unknown) {
         console.error('LINE complete error:', err);
         const message = err instanceof Error ? err.message : 'session_invalid';
-        router.replace(`/login?error=line_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
+        window.location.replace(`/login?error=line_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
       }
     }
 
     async function routeAfterLogin() {
       setStatus('เข้าสู่ระบบสำเร็จ...');
-      const safeReturn = returnTo.startsWith('/') ? returnTo : '/register';
-      // ไม่บังคับกรอกโปรไฟล์ทันทีหลังล็อกอิน — พาไปหน้าที่ตั้งใจจะไปเลย
-      // AuthGate จะเป็นคนเด้งไป /profile เองเฉพาะตอนเข้า "หน้าบริการ" ที่ต้องใช้ข้อมูลโปรไฟล์
-      router.replace(safeReturn);
+      const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
+      window.location.replace(safeReturn);
     }
 
     finish();
-  }, [returnTo, router]);
+  }, [returnTo]);
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center gap-4 text-white">

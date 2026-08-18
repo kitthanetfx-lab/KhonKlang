@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -11,33 +11,52 @@ import { supabase } from '@/lib/supabase';
  * แล้วเก็บ session ไว้ใน localStorage เอง — ไม่ต้องแลก token เองแบบ Appwrite เดิม
  */
 function OAuthCompleteInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState('กำลังเข้าสู่ระบบ...');
-  const returnTo = searchParams.get('returnTo') || '/register';
+  const returnTo = searchParams.get('returnTo') || '/';
 
   useEffect(() => {
-    async function finish() {
-      try {
-        // ให้เวลา supabase-js อ่าน token จาก URL hash ก่อน (เกิดทันทีตอนโหลดสคริปต์
-        // แต่ getSession() รอ promise นั้นให้เสร็จก่อนคืนค่าอยู่แล้ว)
-        const { data, error } = await supabase.auth.getSession();
-        if (error || !data.session) throw new Error(error?.message || 'no_session');
+    let done = false;
+    const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
 
-        setStatus('เข้าสู่ระบบสำเร็จ...');
-        const safeReturn = returnTo.startsWith('/') ? returnTo : '/register';
-        // ไม่บังคับกรอกโปรไฟล์ทันทีหลังล็อกอิน — พาไปหน้าที่ตั้งใจจะไปเลย
-        // AuthGate จะเป็นคนเด้งไป /profile เองเฉพาะตอนเข้า "หน้าบริการ" ที่ต้องใช้ข้อมูลโปรไฟล์
-        // (ซื้อขาย, นัดรับ, ตลาด/หาสินค้า, สมัครผู้ขาย/คนกลาง ฯลฯ — ดู PROFILE_REQUIRED_PATHS ใน AuthGate.tsx)
-        router.replace(safeReturn);
-      } catch (err: unknown) {
-        console.error('OAuth complete error:', err);
-        const message = err instanceof Error ? err.message : 'session_invalid';
-        router.replace(`/login?error=oauth_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
-      }
+    function goHome() {
+      if (done) return;
+      done = true;
+      setStatus('เข้าสู่ระบบสำเร็จ...');
+      // full navigation — WebView/Capacitor ยืนยัน session + AuthGate ใหม่ได้แน่นอน
+      window.location.replace(safeReturn);
     }
-    finish();
-  }, [returnTo, router]);
+
+    function fail(err: unknown) {
+      if (done) return;
+      done = true;
+      console.error('OAuth complete error:', err);
+      const message = err instanceof Error ? err.message : 'session_invalid';
+      window.location.replace(`/login?error=oauth_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
+    }
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
+        goHome();
+      }
+    });
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error || !data.session) return;
+      goHome();
+    }).catch(fail);
+
+    const timer = setTimeout(() => {
+      if (done) return;
+      fail(new Error('session_timeout'));
+    }, 15000);
+
+    return () => {
+      done = true;
+      sub.subscription.unsubscribe();
+      clearTimeout(timer);
+    };
+  }, [returnTo]);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: '#0a0f1e', color: '#fff' }}>
