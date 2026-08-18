@@ -41,9 +41,46 @@ type DealPaymentInput = {
 
 type PriceStateInput = {
   proposed_fee_payer?: string | null;
+  agreed?: boolean | null;
 } | null | undefined;
 
 export type { PriceStateInput };
+
+const PAYMENT_LOCKED_STATUSES = new Set([
+  'payment_pending',
+  'payment_uploaded',
+  'packing',
+  'shipped_to_buyer',
+  'receive',
+  'check',
+  'completed',
+  'disputed',
+]);
+
+function normalizeFeePayer(value?: string | null): 'buyer' | 'seller' | 'split' | null {
+  if (value === 'buyer' || value === 'seller' || value === 'split') return value;
+  return null;
+}
+
+/** ผู้จ่ายค่าบริการที่ใช้คำนวณยอด — ต้องใช้ฟังก์ชันนี้ทุกที่ (UI / ตรวจสลิป / admin) */
+export function resolveFeePayer(
+  deal: { fee_payer?: string | null; deal_type?: string | null; status?: string | null },
+  priceState?: PriceStateInput,
+): 'buyer' | 'seller' | 'split' {
+  if (deal.deal_type === 'simple') {
+    return normalizeFeePayer(deal.fee_payer) ?? 'buyer';
+  }
+
+  if (priceState?.agreed || PAYMENT_LOCKED_STATUSES.has(String(deal.status || ''))) {
+    return normalizeFeePayer(deal.fee_payer)
+      ?? normalizeFeePayer(priceState?.proposed_fee_payer)
+      ?? 'split';
+  }
+
+  return normalizeFeePayer(priceState?.proposed_fee_payer)
+    ?? normalizeFeePayer(deal.fee_payer)
+    ?? 'split';
+}
 
 /** คำนวณยอดชำระแยกรายการ — ใช้ร่วม UI, ตรวจสลิป และ ledger */
 export function computeDealPaymentBreakdown(
@@ -75,7 +112,7 @@ export function computeDealPaymentBreakdown(
   const productPrice = Math.max(0, Math.round(Number(deal.price) || 0));
   const shippingCost = dealShippingCost(deal);
   const fb = computeDealFees(fees, productPrice, String(deal.deal_type || ''));
-  const split = splitFeeByPayer(fb.total, String(priceState?.proposed_fee_payer || deal.fee_payer || 'split'));
+  const split = splitFeeByPayer(fb.total, resolveFeePayer(deal, priceState));
 
   return {
     productPrice,

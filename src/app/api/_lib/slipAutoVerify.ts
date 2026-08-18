@@ -19,7 +19,7 @@ import { notifyUsers } from '@/app/api/_lib/notify';
 import { maybeNotifyAdminLineQueues } from '@/app/api/_lib/adminLineNotifyHook';
 import { loadAdminDealSnapshot, type AdminDealRow } from '@/app/api/_lib/adminDealQueue';
 import { isListingCheckoutOrder, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
-import { dealBuyerPayAmount, dealSellerServiceDue } from '@/lib/dealPaymentBreakdown';
+import { dealBuyerPayAmount, dealSellerServiceDue, resolveFeePayer } from '@/lib/dealPaymentBreakdown';
 import { getAdminClient } from '@/lib/supabaseServer';
 import { scheduleSlipRetry } from '@/app/api/_lib/slipRetrySchedule';
 
@@ -188,7 +188,10 @@ export function evaluateSlipCheck(
 
 function sellerSlipRequired(deal: Record<string, unknown>, priceState: Record<string, unknown> | null): boolean {
   if (isListingCheckoutOrder(deal as { source?: string; deal_type?: string; buyer_id?: string })) return false;
-  const feePayer = String(priceState?.proposed_fee_payer || deal.fee_payer || 'split');
+  const feePayer = resolveFeePayer(
+    deal as { fee_payer?: string | null; deal_type?: string | null; status?: string | null },
+    priceState,
+  );
   return deal.deal_type !== 'meetup' && (feePayer === 'seller' || feePayer === 'split');
 }
 

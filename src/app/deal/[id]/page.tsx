@@ -16,6 +16,7 @@ import { distanceKm, midpointProvince } from '@/lib/provinceGeo';
 import { compressImage } from '@/lib/imageCompress';
 import { compressVideo, isVideoFile, VIDEO_UPLOAD_HINT } from '@/lib/videoCompress';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees, type SimpleDealShareBreakdown } from '@/lib/fees';
+import { computeDealPaymentBreakdown } from '@/lib/dealPaymentBreakdown';
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { MarketplacePaymentSection } from '@/components/marketplace/MarketplacePaymentSection';
@@ -2007,19 +2008,25 @@ export default function DealRoom() {
         <div className={`dr-card${compact ? ' simple-deal-pay-card' : ' dr-pay-card'}`}>
         {(() => {
           const pd: DealPriceState = priceState || {};
-          const fb = computeDealFees(feeConfig, deal!.price, deal!.deal_type);
-          const fp = String(deal!.fee_payer || pd.proposed_fee_payer || 'split');
-          const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
-          const buyerShare = fb.total - sellerShare;
-          const shipCost = Math.max(0, Math.round(Number(deal!.shipping_cost) || 0));
-          const buyerShouldPay = deal!.price + shipCost + buyerShare;
-          const sellerNet = Math.max(deal!.price, 0) + shipCost;
-          const sellerPaymentDone = sellerShare <= 0 ? true : !!pd.seller_fee_slip;
-          const fpName = fp === 'seller' ? 'ผู้ขายจ่าย' : fp === 'split' ? 'หารครึ่ง' : 'ผู้ซื้อจ่าย';
+          const bd = computeDealPaymentBreakdown(deal!, pd, feeConfig);
+          if (!bd) return null;
+          const {
+            buyerTotalDue: buyerShouldPay,
+            sellerServiceDue: sellerShouldPay,
+            feePayer: fp,
+            feePayerLabel: fpName,
+            shippingCost: shipCost,
+            buyerServiceShare: buyerShare,
+            productPrice,
+            sellerNetOnSuccess: sellerNet,
+            serviceFeeLines,
+            serviceFeeTotal,
+          } = bd;
+          const fb = { lines: serviceFeeLines, total: serviceFeeTotal };
+          const sellerPaymentDone = sellerShouldPay <= 0 ? true : !!pd.seller_fee_slip;
           const isBuyerPaysAll = fp === 'buyer';
           const isSellerPaysAll = fp === 'seller';
           const isSplit = fp === 'split';
-          const sellerShouldPay = sellerShare;
           
           const payTitle = myRole === 'buyer'
             ? 'ยอดที่คุณต้องโอน'
@@ -2032,7 +2039,7 @@ export default function DealRoom() {
               ? sellerShouldPay
               : buyerShouldPay;
           const feeHint = myRole === 'buyer'
-            ? `ราคา ฿${deal!.price.toLocaleString()}${shipCost > 0 ? ` + ขนส่ง ฿${shipCost.toLocaleString()}` : ''}${buyerShare > 0 ? ` + ค่าบริการ ฿${buyerShare.toLocaleString()}` : ''} · ${fpName}`
+            ? `ราคา ฿${productPrice.toLocaleString()}${shipCost > 0 ? ` + ขนส่ง ฿${shipCost.toLocaleString()}` : ''}${buyerShare > 0 ? ` + ค่าบริการ ฿${buyerShare.toLocaleString()}` : ''} · ${fpName}`
             : myRole === 'seller' && sellerShouldPay > 0
               ? `ค่าบริการ ${fpName} · แยกจากยอดสินค้า`
               : `ค่าบริการ: ${fpName}`;
@@ -2068,7 +2075,9 @@ export default function DealRoom() {
                   <>
                     <PaymentMethods compact amount={buyerShouldPay} note={
                       isSellerPaysAll
-                        ? `โอนค่าสินค้า ฿${deal!.price.toLocaleString()} เข้าบัญชีกลาง`
+                        ? shipCost > 0
+                          ? `โอนค่าสินค้า ฿${productPrice.toLocaleString()} + ค่าขนส่ง ฿${shipCost.toLocaleString()} = ฿${buyerShouldPay.toLocaleString()}`
+                          : `โอนค่าสินค้า ฿${productPrice.toLocaleString()} เข้าบัญชีกลาง`
                         : isSplit
                           ? `โอน ฿${buyerShouldPay.toLocaleString()} เข้าบัญชีกลาง`
                           : 'เงินพักกับศูนย์กลางจนกว่าจะยืนยันรับสินค้า'
@@ -2100,7 +2109,7 @@ export default function DealRoom() {
               <div className="dr-pay-amount">฿{payAmount.toLocaleString()}</div>
               <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 14px', margin: '4px 0 12px', fontSize: 13 }}>
                 <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 สรุปยอด · ค่าบริการ: {fpName}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ราคาสินค้า</span><span>฿{deal!.price.toLocaleString()}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ราคาสินค้า</span><span>฿{productPrice.toLocaleString()}</span></div>
                 {shipCost > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', padding: '2px 0' }}><span>ค่าขนส่ง</span><span>฿{shipCost.toLocaleString()}</span></div>
                 )}
@@ -2110,10 +2119,10 @@ export default function DealRoom() {
                   <span>฿{buyerShouldPay.toLocaleString()}</span>
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                  {`= ราคาสินค้า ฿${deal!.price.toLocaleString()}${shipCost > 0 ? ` + ค่าขนส่ง ฿${shipCost.toLocaleString()}` : ''}${buyerShare > 0 ? ` + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()}` : ''}`}
+                  {`= ราคาสินค้า ฿${productPrice.toLocaleString()}${shipCost > 0 ? ` + ค่าขนส่ง ฿${shipCost.toLocaleString()}` : ''}${buyerShare > 0 ? ` + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()}` : ''}`}
                 </div>
                 {sellerShouldPay > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'seller' ? 800 : 400, fontSize: myRole === 'seller' ? 16 : 13, color: myRole === 'seller' ? 'var(--ink)' : (sellerShare > 0 ? '#8a5a00' : 'var(--muted)'), marginTop: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: myRole === 'seller' ? 800 : 400, fontSize: myRole === 'seller' ? 16 : 13, color: myRole === 'seller' ? 'var(--ink)' : (sellerShouldPay > 0 ? '#8a5a00' : 'var(--muted)'), marginTop: 4 }}>
                     <span>ผู้ขาย {deal!.seller_name || ''} ชำระค่าบริการแยก</span>
                     <span>฿{sellerShouldPay.toLocaleString()}</span>
                   </div>
@@ -2124,7 +2133,7 @@ export default function DealRoom() {
                 </div>
                 {shipCost > 0 && (
                   <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
-                    {`= สินค้า ฿${deal!.price.toLocaleString()} + ขนส่ง ฿${shipCost.toLocaleString()}`}
+                    {`= สินค้า ฿${productPrice.toLocaleString()} + ขนส่ง ฿${shipCost.toLocaleString()}`}
                   </div>
                 )}
               </div>
@@ -2146,9 +2155,11 @@ export default function DealRoom() {
                   <div style={{ fontWeight: 700, color: '#075985', marginBottom: 6 }}>🏦 เลขบัญชีกลางสำหรับโอนเงิน</div>
                   <PaymentMethods amount={buyerShouldPay} note={
                     isSellerPaysAll
-                      ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} เข้าบัญชีกลาง (ผู้ขายจ่ายค่าบริการเอง)`
+                      ? shipCost > 0
+                        ? `โอนค่าสินค้า ฿${productPrice.toLocaleString()} + ค่าขนส่ง ฿${shipCost.toLocaleString()} = ฿${buyerShouldPay.toLocaleString()} (ผู้ขายจ่ายค่าบริการเอง)`
+                        : `โอนเงินค่าสินค้า ฿${productPrice.toLocaleString()} เข้าบัญชีกลาง (ผู้ขายจ่ายค่าบริการเอง)`
                       : isSplit
-                        ? `โอนเงินค่าสินค้า ฿${deal!.price.toLocaleString()} + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()} = ฿${buyerShouldPay.toLocaleString()}`
+                        ? `โอนเงินค่าสินค้า ฿${productPrice.toLocaleString()}${shipCost > 0 ? ` + ค่าขนส่ง ฿${shipCost.toLocaleString()}` : ''} + ค่าบริการส่วนผู้ซื้อ ฿${buyerShare.toLocaleString()} = ฿${buyerShouldPay.toLocaleString()}`
                         : `เงินจะพักไว้กับ บริษัท กลางฮับ จำกัด และโอนให้ผู้ขายเมื่อคุณยืนยันรับสินค้าแล้วเท่านั้น`
                   } />
                   <button onClick={() => evidInputRef.current?.click()} className="btn btn-green btn-block" style={{ marginTop: 12 }}>📎 โอนแล้ว — อัปโหลดสลิป</button>

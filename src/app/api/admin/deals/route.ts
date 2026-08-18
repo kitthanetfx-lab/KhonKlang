@@ -16,6 +16,7 @@ import {
   type AdminStatusTab,
 } from '@/lib/adminDealCategory';
 import { readFeesConfig, syncDealLedger } from '../../_lib/financeLedger';
+import { resolveFeePayer } from '@/lib/dealPaymentBreakdown';
 import { isListingCheckoutOrder, isMarketplaceSold } from '@/lib/marketplaceOrder';
 import { notifyUsers } from '../../_lib/notify';
 import { settleAuctionCancel, releaseAuctionDepositOnPaid } from '../../_lib/userWallet';
@@ -194,7 +195,7 @@ export async function PATCH(req: NextRequest) {
     if (dealErr || !deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
     const beforeSnapshot = await loadAdminDealSnapshot(db, deal);
     const { data: priceState } = await db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle();
-    const feePayer = String(priceState?.proposed_fee_payer || deal.fee_payer || 'split');
+    const feePayer = resolveFeePayer(deal, priceState);
     const sellerSlipRequired = !isListingCheckoutOrder(deal)
       && deal.deal_type !== 'meetup'
       && (feePayer === 'seller' || feePayer === 'split');

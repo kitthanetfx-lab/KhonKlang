@@ -8,6 +8,7 @@ import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
 import { runAutoSlipVerification, runAutoMeetupSlipVerification } from '../../_lib/slipAutoVerify';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide, computeMarketplaceGp } from '@/lib/fees';
+import { dealSellerServiceDue } from '@/lib/dealPaymentBreakdown';
 import { getLogisticsProviderLabel, sanitizeShippingProviders } from '@/lib/logistics';
 import {
   isDirectShipOrder,
@@ -548,9 +549,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'ยังรอผู้ซื้ออัปสลิปการโอนเงิน' }, { status: 400 });
         }
         // 2) สลิปผู้ขาย (กรณี seller/split)
-        const fp = String(deal.fee_payer || pd.proposed_fee_payer || 'split');
-        const fb = computeDealFees(FEE_DEFAULTS, Number(deal.price) || 0, deal.deal_type);
-        const sellerShare = fp === 'seller' ? fb.total : fp === 'split' ? Math.round(fb.total / 2) : 0;
+        const fees = await readFeesConfig(db);
+        const sellerShare = dealSellerServiceDue(deal, pd, fees);
         if (sellerShare > 0 && !pd.seller_fee_slip) {
           return NextResponse.json({ error: 'ยังรอผู้ขายอัปสลิปค่าบริการ' }, { status: 400 });
         }

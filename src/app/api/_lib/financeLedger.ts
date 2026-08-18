@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { FEE_DEFAULTS, computeDealFees, effectiveRegFee, type FeeConfig, type FeeLine } from '@/lib/fees';
-import { dealShippingCost } from '@/lib/dealPaymentBreakdown';
+import { dealShippingCost, resolveFeePayer } from '@/lib/dealPaymentBreakdown';
 import {
   financeReferenceCode,
   splitDealFeeComponents,
@@ -174,7 +174,10 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
   const { data: pdRow } = await db.from('deal_price_state').select('*').eq('deal_id', dealId).maybeSingle();
   const pd = pdRow || {};
 
-  const feePayerInput = String(deal.fee_payer || pd.proposed_fee_payer || 'split');
+  const feePayerInput = resolveFeePayer(
+    { fee_payer: String(deal.fee_payer || ''), deal_type: dealType, status },
+    pd as { proposed_fee_payer?: string | null; agreed?: boolean | null },
+  );
   const feeBreakdown = computeDealFees(fees, price, dealType);
   const feePayer = splitFeeByPayer(feeBreakdown.total, feePayerInput);
 

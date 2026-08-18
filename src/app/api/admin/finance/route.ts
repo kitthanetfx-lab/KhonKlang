@@ -6,6 +6,7 @@ import { notifyUsers } from '../../_lib/notify';
 import { verifySlipByUrl, verifySlipByFileId, dealSlipPublicUrl, formatSlipokError } from '@/lib/slipok';
 import { getBankInfoMap, type BankInfo } from '@/lib/bankInfo';
 import { readFeesConfig, syncDealLedger, syncFinanceProjection } from '../../_lib/financeLedger';
+import { resolveFeePayer } from '@/lib/dealPaymentBreakdown';
 import { releaseAuctionDepositOnPaid } from '../../_lib/userWallet';
 
 function slipUrl(bucket: 'deal_files' | 'kyc_docs', fileId: string) {
@@ -581,7 +582,7 @@ export async function PATCH(req: NextRequest) {
     const { data: deal } = await db.from('deals').select('*').eq('id', id).single();
     if (!deal) return NextResponse.json({ error: 'ไม่พบดีล' }, { status: 404 });
     const { data: priceState } = await db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle();
-    const feePayer = String(priceState?.proposed_fee_payer || deal.fee_payer || 'split');
+    const feePayer = resolveFeePayer(deal, priceState);
     const sellerSlipRequired = deal.deal_type !== 'meetup' && (feePayer === 'seller' || feePayer === 'split');
     if (deal.status !== 'payment_uploaded') {
       return NextResponse.json({ error: 'ดีลนี้ไม่ได้อยู่สถานะรอตรวจสอบการโอน' }, { status: 400 });

@@ -11,7 +11,7 @@ import { splitDealFeeComponents } from '@/lib/financeLedger';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { ADMIN_DEAL_CATEGORIES, type AdminDealCategory, parseAdminDealCategory } from '@/lib/adminDealCategory';
 import { isListingCheckoutOrder, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
-import { computeDealPaymentBreakdown, type DealPaymentBreakdown } from '@/lib/dealPaymentBreakdown';
+import { computeDealPaymentBreakdown, resolveFeePayer, type DealPaymentBreakdown } from '@/lib/dealPaymentBreakdown';
 import { DealProductGallery } from '@/components/deal/DealProductGallery';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
@@ -399,7 +399,7 @@ function AdminDealsInner() {
   }
 
   function needsSellerFeeSlip(d: Deal) {
-    const feePayer = d.priceState?.proposed_fee_payer || d.fee_payer || 'split';
+    const feePayer = resolveFeePayer(d, d.priceState);
     return d.deal_type !== 'meetup' && (feePayer === 'seller' || feePayer === 'split');
   }
 
