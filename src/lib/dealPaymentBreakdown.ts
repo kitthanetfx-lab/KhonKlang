@@ -37,6 +37,7 @@ type DealPaymentInput = {
   source?: string | null;
   buyer_id?: string | null;
   fee_payer?: string | null;
+  status?: string | null;
 };
 
 type PriceStateInput = {
@@ -136,7 +137,8 @@ export function dealBuyerPayAmount(
   priceState: PriceStateInput,
   fees: FeeConfig,
 ): number {
-  return computeDealPaymentBreakdown(deal, priceState, fees)?.buyerTotalDue ?? Math.max(0, Math.round(Number(deal.price) || 0));
+  return computeDealPaymentBreakdown(deal, priceState, fees)?.buyerTotalDue
+    ?? (Math.max(0, Math.round(Number(deal.price) || 0)) + dealShippingCost(deal));
 }
 
 /** ยอดผู้ขายต้องโอนค่าบริการ — shorthand สำหรับตรวจสลิป */

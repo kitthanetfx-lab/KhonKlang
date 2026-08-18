@@ -9,6 +9,7 @@ import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { DealFlowBrand } from '@/components/DealFlowBrand';
 import { ServiceDisabledNotice } from '@/components/ServiceDisabledNotice';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees } from '@/lib/fees';
+import { computeDealPaymentBreakdown } from '@/lib/dealPaymentBreakdown';
 import { useServiceControls } from '@/lib/useServiceControls';
 import { useUser } from '@/lib/useUser';
 import { DealCreateMediaField, type CreateDealMedia } from '@/components/deal/DealCreateMediaField';
@@ -65,6 +66,19 @@ function CreateDealForm() {
   }, []);
 
   const feeBreakdown = computeDealFees(fees, Number(price) || 0, isSimple ? 'simple' : '');
+  const payPreview = isSimple && Number(price) > 0
+    ? computeDealPaymentBreakdown(
+      {
+        price: Number(price),
+        shipping_cost: Number(shippingCost) || 0,
+        deal_type: 'simple',
+        fee_payer: feePayer,
+        status: 'payment_pending',
+      },
+      { proposed_fee_payer: feePayer, agreed: true },
+      fees,
+    )
+    : null;
   const roleOptions = isSimple ? ROLE_OPTIONS.simple : ROLE_OPTIONS.regular;
   const serviceEnabled = isSimple ? controls.isEnabled('tradeSimple') : isSafeZone ? controls.isEnabled('meetupSafeZone') : controls.isEnabled('tradeOnline');
   const serviceMessage = isSimple
@@ -292,6 +306,32 @@ function CreateDealForm() {
               {isSimple && (
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
                   ผู้จ่าย: {FEE_PAYER_OPTIONS.find(o => o.key === feePayer)?.label}
+                </div>
+              )}
+              {isSimple && payPreview && (
+                <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 'var(--r-md)', padding: '12px 14px', marginTop: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#065f46', marginBottom: 8 }}>💰 ยอดที่ผู้ซื้อต้องโอนเข้าศูนย์กลาง</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#047857', padding: '2px 0' }}>
+                    <span>ค่าสินค้า</span><span>฿{payPreview.productPrice.toLocaleString()}</span>
+                  </div>
+                  {payPreview.shippingCost > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#047857', padding: '2px 0' }}>
+                      <span>+ ค่าขนส่ง (ผู้ขายได้รับ)</span><span>฿{payPreview.shippingCost.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {payPreview.buyerServiceShare > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#047857', padding: '2px 0' }}>
+                      <span>+ ค่าบริการส่วนผู้ซื้อ</span><span>฿{payPreview.buyerServiceShare.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 800, color: '#065f46', borderTop: '1px solid #a7f3d0', marginTop: 6, paddingTop: 6 }}>
+                    <span>รวมผู้ซื้อโอน</span><span>฿{payPreview.buyerTotalDue.toLocaleString()}</span>
+                  </div>
+                  {payPreview.sellerServiceDue > 0 && (
+                    <div style={{ fontSize: 12, color: '#047857', marginTop: 6 }}>
+                      ผู้ขายโอนค่าบริการแยก ฿{payPreview.sellerServiceDue.toLocaleString()} · ค่าขนส่งไม่รวมในค่าบริการ
+                    </div>
+                  )}
                 </div>
               )}
               <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>* {feeBreakdown.note} · อัตราตามที่ระบบกำหนด แสดงให้ทราบก่อนเริ่มดีล</div>

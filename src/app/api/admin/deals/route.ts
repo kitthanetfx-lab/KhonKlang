@@ -182,10 +182,11 @@ export async function PATCH(req: NextRequest) {
     await verifyAdmin(req);
     const db = getAdminClient();
     const body = await req.json();
-    const { id, action, note, outcome, fileId, whichSlip, ok } = body as {
+    const { id, action, note, outcome, fileId, whichSlip, ok, shippingCost } = body as {
       id: string; action: string; note?: string;
       outcome?: 'buyer_all' | 'seller_all' | 'both' | 'frozen';
       fileId?: string; whichSlip?: 'buyer' | 'seller'; ok?: boolean;
+      shippingCost?: number;
     };
 
     if (!id || !action) return NextResponse.json({ error: 'Missing id or action' }, { status: 400 });
@@ -381,6 +382,28 @@ export async function PATCH(req: NextRequest) {
           body: msg,
           link: deal.deal_type === 'auction' ? `/marketplace/${id}` : `/marketplace/${id}`,
         });
+        break;
+      }
+      case 'update_shipping_cost': {
+        if (deal.deal_type !== 'simple') {
+          return NextResponse.json({ error: 'แก้ค่าขนส่งได้เฉพาะดีลแบบง่าย' }, { status: 400 });
+        }
+        if (!['payment_pending', 'payment_uploaded'].includes(String(deal.status))) {
+          return NextResponse.json({ error: 'แก้ค่าขนส่งได้เฉพาะก่อนยืนยันรับเงิน' }, { status: 400 });
+        }
+        const nextShipping = Math.max(0, Math.round(Number(shippingCost) || 0));
+        await db.from('deals').update({ shipping_cost: nextShipping }).eq('id', id);
+        await db.from('messages').insert({
+          deal_id: id, sender_id: null, sender_name: 'ระบบ',
+          role: 'system', type: 'system',
+          content: `📦 แอดมินอัปเดตค่าขนส่งเป็น ฿${nextShipping.toLocaleString()} — ยอดตรวจสลิปผู้ซื้อจะคำนวณใหม่`,
+        });
+        if (deal.payment_slip_file_id) {
+          const { runAutoSlipVerification } = await import('../../_lib/slipAutoVerify');
+          await db.from('deals').update({ reject_reason: '', payment_slip_verified_at: null }).eq('id', id);
+          await runAutoSlipVerification(db, id, 'buyer');
+        }
+        await syncDealLedger(db, { ...deal, shipping_cost: nextShipping } as Record<string, unknown>);
         break;
       }
       case 'rerun_slip_verify': {

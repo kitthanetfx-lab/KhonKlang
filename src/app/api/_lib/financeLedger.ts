@@ -292,7 +292,7 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
         entry_key: `deal:${dealId}:buyer_payment`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,
         owner_type: 'buyer', owner_id: String(deal.buyer_id || '') || null, owner_name: text(deal.buyer_name, 200),
         entry_type: 'buyer_payment', direction: 'incoming', amount: buyerPaymentAmount, status: buyerPaymentStatus, title,
-        purpose: 'ค่าสินค้าและค่าบริการส่วนผู้ซื้อ', counterparty_name: 'ศูนย์กลาง', bucket: 'deal-files', file_id: text(deal.payment_slip_file_id, 255),
+        purpose: 'ค่าสินค้า + ค่าขนส่ง + ค่าบริการส่วนผู้ซื้อ', counterparty_name: 'ศูนย์กลาง', bucket: 'deal-files', file_id: text(deal.payment_slip_file_id, 255),
         approve_link: `/deal/${dealId}`, active: buyerPaymentAmount > 0,
         meta: { price, shippingCost, buyerFeeShare: feePayer.buyerShare, lines: feeSummary(feeBreakdown.lines), feePayer: feePayer.feePayer },
       }));
