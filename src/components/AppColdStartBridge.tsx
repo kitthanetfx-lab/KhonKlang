@@ -1,20 +1,18 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { isGlanghubApp } from '@/lib/nativeAuth';
-import { handleAppCurrentUrl } from '@/lib/appDeepLinkNav';
+import { redirectAppEntrySync } from '@/lib/appDeepLinkNav';
 
-/**
- * ตอนแอpp เปิดจาก App Link (เช่น /deal/abc) WebView โหลด URL นั้นทันที
- * — ตรวจ session แล้วส่งไป /login?returnTo=... ก่อน AuthGate แสดง loading ค้าง
- */
+/** สำรองกรณี beforeInteractive script ไม่ทัน — redirect ก่อน paint */
 export function AppColdStartBridge() {
   const ran = useRef(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isGlanghubApp() || ran.current) return;
     ran.current = true;
-    void handleAppCurrentUrl();
+    const path = `${window.location.pathname}${window.location.search}`;
+    redirectAppEntrySync(path);
   }, []);
 
   return null;

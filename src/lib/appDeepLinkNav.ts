@@ -3,7 +3,6 @@
  * — ยังไม่ login → ไปหน้า login ในแอpp + เก็บ returnTo
  * — ไม่รับ session จากเบราว์เซอร์ (auth callback → login ในแอpp)
  */
-import { supabase } from '@/lib/supabase';
 import { isGlanghubApp } from '@/lib/nativeAuth';
 import { isAuthCallbackPath } from '@/lib/appAuthHandoff';
 
@@ -11,6 +10,50 @@ const APP_LOGIN_PATHS = ['/login', '/privacy', '/terms'];
 
 function pathOnly(path: string): string {
   return path.split('?')[0].split('#')[0];
+}
+
+/** อ่าน session จาก localStorage แบบ sync — ใช้ก่อน paint ในแอpp */
+export function hasSupabaseSessionSync(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.includes('-auth-token')) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const data = JSON.parse(raw) as { access_token?: string; expires_at?: number };
+      if (!data?.access_token) continue;
+      if (data.expires_at && data.expires_at * 1000 < Date.now() + 5000) continue;
+      return true;
+    }
+  } catch { /* ignore */ }
+  return false;
+}
+
+/** redirect ทันที (sync) ถ้ายังไม่ login — คืน true ถ้า redirect แล้ว */
+export function redirectAppEntrySync(path: string): boolean {
+  if (!isGlanghubApp()) return false;
+
+  const target = path.startsWith('/') ? path : `/${path}`;
+  const current = `${window.location.pathname}${window.location.search}`;
+
+  if (isAuthCallbackPath(target)) {
+    if (document.cookie.includes('line_session_pending=')) return false;
+    if (window.location.hash.includes('access_token')) return false;
+    const login = appLoginUrl(returnToFromAuthCallback(target));
+    if (current !== login) window.location.replace(login);
+    return true;
+  }
+
+  if (isAppLoginPage(target)) return false;
+
+  if (!hasSupabaseSessionSync()) {
+    const login = appLoginUrl(target);
+    if (current !== login) window.location.replace(login);
+    return true;
+  }
+
+  return false;
 }
 
 function isAppLoginPage(path: string): boolean {
@@ -49,28 +92,10 @@ export async function handleAppExternalLink(path: string): Promise<void> {
     return;
   }
 
+  if (redirectAppEntrySync(path)) return;
+
   const target = path.startsWith('/') ? path : `/${path}`;
-
-  // callback จาก login ในเบราว์เซอร์ — ไม่รับ ให้ login ในแอpp
-  if (isAuthCallbackPath(target)) {
-    window.location.replace(appLoginUrl(returnToFromAuthCallback(target)));
-    return;
-  }
-
-  if (isAppLoginPage(target)) {
-    window.location.replace(target);
-    return;
-  }
-
-  const { data } = await supabase.auth.getSession();
   const current = `${window.location.pathname}${window.location.search}`;
-
-  if (!data.session) {
-    const login = appLoginUrl(target);
-    if (current === login) return;
-    window.location.replace(login);
-    return;
-  }
 
   if (current === target) return;
   window.location.replace(target);

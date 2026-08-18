@@ -1,10 +1,11 @@
 'use client';
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { isProfileComplete, REQUIRED_PROFILE_FIELDS } from '@/lib/profileComplete';
-import { appLoginUrl } from '@/lib/appDeepLinkNav';
+import { appLoginUrl, redirectAppEntrySync } from '@/lib/appDeepLinkNav';
+import { isGlanghubApp } from '@/lib/nativeAuth';
 
 /**
  * บังคับให้ต้องล็อกอินก่อนเข้าใช้งานเว็บไซต์ทุกหน้า (ยกเว้นหน้าที่อยู่ใน allowlist
@@ -68,6 +69,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const gateVerifiedRef = useRef(false);
   const profileCompleteRef = useRef(true);
 
+  // แอpp + ยังไม่ login → redirect ก่อน paint (สำรอง entry guard)
+  useLayoutEffect(() => {
+    if (!isGlanghubApp() || isPublic) return;
+    redirectAppEntrySync(`${pathname}${window.location.search}`);
+  }, [pathname, isPublic]);
+
   useEffect(() => {
     let active = true;
 
@@ -95,6 +102,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       const { data } = await supabase.auth.getSession();
       if (!active) return;
       if (!data.session) {
+        if (isGlanghubApp()) {
+          redirectAppEntrySync(`${pathname}${window.location.search}`);
+          return;
+        }
         window.location.replace(appLoginUrl(`${pathname}${typeof window !== 'undefined' ? window.location.search : ''}`));
         return;
       }
@@ -144,6 +155,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   if (!checked) {
+    // แอpp — ไม่แสดง spinner (entry guard กำลังพาไป login)
+    if (isGlanghubApp()) return null;
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 14 }}>
         กำลังตรวจสอบสิทธิ์เข้าใช้งาน...

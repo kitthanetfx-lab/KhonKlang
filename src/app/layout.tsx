@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Anuphan, IBM_Plex_Mono, IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
+import { APP_ENTRY_GUARD_SCRIPT } from "@/lib/appEntryGuardScript";
 import { CookieConsent } from "@/components/CookieConsent";
 import { MetaPixel } from "@/components/MetaPixel";
 import { DialogProvider } from "@/components/Dialog";
@@ -82,6 +84,9 @@ export default function RootLayout({
   return (
     <html lang="th" className={`h-full antialiased ${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`}>
       <body className={bodyFont.className}>
+        <Script id="app-entry-guard" strategy="beforeInteractive">
+          {APP_ENTRY_GUARD_SCRIPT}
+        </Script>
         <AppPreferencesProvider>
           <GlobalLoadingProvider>
           <DialogProvider>
