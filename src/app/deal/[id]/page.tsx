@@ -1439,7 +1439,7 @@ export default function DealRoom() {
                   priceState={priceState}
                   fees={feeConfig}
                   variant="deal"
-                  onUpdated={() => fetchDeal()}
+                  onUpdated={() => { void fetchDeal(); }}
                 />
               </div>
             )}
