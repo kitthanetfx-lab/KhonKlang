@@ -138,7 +138,7 @@ export function ScamDbSearch({ initialReportId }: Props) {
                       className={`csr-hit-share${shareCopied ? ' is-copied' : ''}`}
                       onClick={() => void onShare(h)}
                     >
-                      {shareCopied ? '✓ คัดลอกแล้ว — วางในกลุ่มได้เลย' : '🔗 แชร์ลิงก์ลงกลุ่ม'}
+                      {shareCopied ? '✓ คัดลอกแล้ว' : '🔗 แชร์ลิงค์'}
                     </button>
                     <Link href={`/check-scam/appeal?report=${h.id}`} className="csr-hit-appeal">
                       📝 อุธรณ์ / คำชี้แจง
