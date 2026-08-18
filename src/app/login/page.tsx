@@ -83,10 +83,6 @@ function LoginForm() {
     )}
     <main className="login-page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div className="login-card">
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <Link href="/" className="login-back">← กลับหน้าหลัก</Link>
-        </div>
-
         {error && (
           <div style={{ position: 'relative', zIndex: 1, marginBottom: 16, padding: '10px 16px', background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-md)', color: '#b22441', fontSize: 14 }}>
             ⚠️ {errorMessages[error] || error}
