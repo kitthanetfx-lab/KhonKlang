@@ -388,8 +388,8 @@ export async function PATCH(req: NextRequest) {
         if (deal.deal_type !== 'simple') {
           return NextResponse.json({ error: 'แก้ค่าขนส่งได้เฉพาะดีลแบบง่าย' }, { status: 400 });
         }
-        if (!['payment_pending', 'payment_uploaded'].includes(String(deal.status))) {
-          return NextResponse.json({ error: 'แก้ค่าขนส่งได้เฉพาะก่อนยืนยันรับเงิน' }, { status: 400 });
+        if (!['completed', 'cancelled'].includes(String(deal.status))) {
+          return NextResponse.json({ error: 'แก้ค่าขนส่งได้เฉพาะดีลที่ยังไม่จบ' }, { status: 400 });
         }
         const nextShipping = Math.max(0, Math.round(Number(shippingCost) || 0));
         await db.from('deals').update({ shipping_cost: nextShipping }).eq('id', id);

@@ -17,6 +17,7 @@ import { compressImage } from '@/lib/imageCompress';
 import { compressVideo, isVideoFile, VIDEO_UPLOAD_HINT } from '@/lib/videoCompress';
 import { FeeConfig, FEE_DEFAULTS, computeDealFees, type SimpleDealShareBreakdown } from '@/lib/fees';
 import { computeDealPaymentBreakdown } from '@/lib/dealPaymentBreakdown';
+import { AdminDealPaymentBadge, AdminDealPaymentPanel } from '@/components/admin/AdminDealPaymentPanel';
 import { dealCode } from '@/lib/dealNumber';
 import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { MarketplacePaymentSection } from '@/components/marketplace/MarketplacePaymentSection';
@@ -1416,17 +1417,34 @@ export default function DealRoom() {
           extraActions={<span style={{ fontSize: 11, background: '#fee2e2', color: '#991b1b', borderRadius: 4, padding: '2px 7px', fontWeight: 700, whiteSpace: 'nowrap' }}>Admin</span>}
         />
         <main style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 60px', display: 'flex', flexDirection: 'column', gap: 14, width: '100%' }}>
-          {/* Deal summary */}
+          {/* Deal summary + payment breakdown (admin มุมมองเดียวกับหน้า admin/deals) */}
           <div className="dr-card">
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.04em', marginBottom: 8 }}>ADMIN · {dealCode(deal.id)}</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>{deal.title}</div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--green-600)', fontFamily: 'var(--font-display)', margin: '6px 0' }}>฿{deal.price.toLocaleString()}</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
+            <div style={{ marginTop: 8 }}>
+              <AdminDealPaymentBadge deal={deal} priceState={priceState} fees={feeConfig} />
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 13, color: 'var(--muted)', marginTop: 10, marginBottom: 10 }}>
               {deal.seller_name && <span>ผู้ขาย: <strong>{deal.seller_name}</strong></span>}
               {deal.buyer_name && <span>ผู้ซื้อ: <strong>{deal.buyer_name}</strong></span>}
               {deal.middleman_name && <span>คนกลาง: <strong>{deal.middleman_name}</strong></span>}
             </div>
             <div style={{ display: 'inline-block', background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 12px', fontSize: 13, fontWeight: 600 }}>
               สถานะ: {STAT_LABEL[deal.status] || deal.status}
+            </div>
+            {deal.deal_type !== 'meetup' && (
+              <div style={{ marginTop: 14 }}>
+                <AdminDealPaymentPanel
+                  deal={deal}
+                  priceState={priceState}
+                  fees={feeConfig}
+                  variant="deal"
+                  onUpdated={() => fetchDeal()}
+                />
+              </div>
+            )}
+            <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <Link href="/admin/deals" style={{ fontSize: 12, color: 'var(--accent-strong)', textDecoration: 'underline' }}>← กลับหน้า ดีล & ข้อพิพาท</Link>
             </div>
           </div>
           {/* Chat (read-only) */}

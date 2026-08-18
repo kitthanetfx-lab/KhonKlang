@@ -11,7 +11,8 @@ import { splitDealFeeComponents } from '@/lib/financeLedger';
 import { buildTrackingUrl, getLogisticsProviderLabel } from '@/lib/logistics';
 import { ADMIN_DEAL_CATEGORIES, type AdminDealCategory, parseAdminDealCategory } from '@/lib/adminDealCategory';
 import { isListingCheckoutOrder, marketplaceBuyerPayAmount } from '@/lib/marketplaceOrder';
-import { computeDealPaymentBreakdown, resolveFeePayer, type DealPaymentBreakdown } from '@/lib/dealPaymentBreakdown';
+import { resolveFeePayer, type DealPaymentBreakdown } from '@/lib/dealPaymentBreakdown';
+import { AdminDealPaymentBadge, AdminDealPaymentPanel, adminPaymentBreakdown } from '@/components/admin/AdminDealPaymentPanel';
 import { DealProductGallery } from '@/components/deal/DealProductGallery';
 
 const fileUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
@@ -191,124 +192,17 @@ function AdminDealsInner() {
   }
 
   function paymentBreakdownOf(d: Deal): DealPaymentBreakdown | null {
-    if (d.deal_type === 'meetup') return null;
-    return computeDealPaymentBreakdown(d, d.priceState, fees);
-  }
-
-  function AdminPayRow({ label, amount, bold, muted, total }: { label: string; amount: number; bold?: boolean; muted?: boolean; total?: boolean }) {
-    return (
-      <div className={`flex justify-between items-baseline gap-3 ${muted ? 'text-gray-400' : total ? 'text-emerald-900 dark:text-emerald-100' : 'text-gray-600 dark:text-gray-300'}`}>
-        <span className={total ? 'font-bold text-sm' : ''}>{label}</span>
-        <span className={`font-mono tabular-nums ${total ? 'text-xl font-extrabold tracking-tight' : bold ? 'text-lg font-bold text-gray-900 dark:text-gray-100' : 'font-semibold'}`}>
-          ฿{amount.toLocaleString()}
-        </span>
-      </div>
-    );
+    return adminPaymentBreakdown(d, d.priceState, fees);
   }
 
   function renderPaymentBreakdownPanel(d: Deal) {
-    const bd = paymentBreakdownOf(d);
-    if (!bd) return null;
-    const canEditShipping = d.deal_type === 'simple'
-      && ['payment_pending', 'payment_uploaded'].includes(d.status);
-
     return (
-      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 dark:bg-slate-900/40 dark:border-slate-700 px-3 py-2.5 text-xs space-y-2">
-        <p className="font-semibold text-slate-800 dark:text-slate-100">
-          {bd.isMarketplace ? '🛒 สรุปยอดชำระ (ตลาด/ประมูล)' : '💰 สรุปยอดชำระ'}
-        </p>
-
-        <div className="space-y-1 rounded-lg border border-sky-200 bg-sky-50/80 dark:bg-sky-950/20 dark:border-sky-900 px-2.5 py-2">
-          <p className="font-semibold text-sky-900 dark:text-sky-100">ยอดผู้ซื้อโอนเข้าศูนย์กลาง (สินค้า + ขนส่ง)</p>
-          <p className="text-[11px] text-sky-800/80 dark:text-sky-300/80">ค่าขนส่งไม่ใช่ค่าบริการ — ผู้ซื้อโอนเสมอ · ผู้ขายได้รับเมื่อดีลสำเร็จ</p>
-          <AdminPayRow label="ค่าสินค้า" amount={bd.productPrice} />
-          <div className="flex justify-between items-center gap-3">
-            <span className={bd.shippingCost === 0 ? 'text-gray-400' : 'text-gray-600 dark:text-gray-300'}>ค่าขนส่ง</span>
-            <div className="flex items-center gap-2">
-              {canEditShipping && (
-                <button
-                  type="button"
-                  className="text-[11px] text-blue-600 hover:underline"
-                  onClick={async () => {
-                    const v = window.prompt('แก้ค่าขนส่ง (บาท)', String(d.shipping_cost ?? bd.shippingCost ?? 0));
-                    if (v === null) return;
-                    const next = Math.max(0, Math.round(Number(v) || 0));
-                    setActing(d.id);
-                    try {
-                      const headers = await authHeaders();
-                      const r = await fetch('/api/admin/deals', {
-                        method: 'PATCH',
-                        headers: { ...headers, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: d.id, action: 'update_shipping_cost', shippingCost: next }),
-                      });
-                      const data = await r.json().catch(() => ({}));
-                      if (!r.ok) alert(data.error || 'บันทึกไม่สำเร็จ');
-                      else load(tab, category);
-                    } finally { setActing(''); }
-                  }}
-                >
-                  แก้ไข
-                </button>
-              )}
-              <span className={`font-mono tabular-nums font-semibold ${bd.shippingCost === 0 ? 'text-gray-400' : ''}`}>
-                ฿{bd.shippingCost.toLocaleString()}
-              </span>
-            </div>
-          </div>
-          {bd.buyerServiceShare > 0 && (
-            <AdminPayRow label="+ ค่าบริการส่วนผู้ซื้อ" amount={bd.buyerServiceShare} />
-          )}
-        </div>
-
-        {!bd.isMarketplace && (
-          <div className="space-y-1 rounded-lg border border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-950/40 px-2.5 py-2">
-            <p className="font-semibold text-slate-700 dark:text-slate-200">ค่าบริการระบบ (ไม่รวมขนส่ง)</p>
-            <AdminPayRow label="ค่าบริการ (รวม)" amount={bd.serviceFeeTotal} />
-            {bd.serviceFeeLines.map(line => (
-              <div key={line.label} className="flex justify-between gap-3 pl-3 text-gray-500">
-                <span>↳ {line.label}</span>
-                <span className="font-mono tabular-nums">฿{line.amount.toLocaleString()}</span>
-              </div>
-            ))}
-            <p className="text-gray-600 dark:text-gray-300 pt-0.5">
-              ผู้จ่ายค่าบริการ: <span className="font-semibold">{bd.feePayerLabel}</span>
-            </p>
-            <div className="flex justify-between gap-3 text-gray-500">
-              <span>↳ ส่วนผู้ซื้อ</span>
-              <span className="font-mono tabular-nums">฿{bd.buyerServiceShare.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between gap-3 text-gray-500">
-              <span>↳ ส่วนผู้ขาย (โอนแยก)</span>
-              <span className="font-mono tabular-nums">฿{bd.sellerServiceShare.toLocaleString()}</span>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-950/20 dark:border-emerald-900 px-3 py-3">
-          <p className="font-bold text-sm text-emerald-800 dark:text-emerald-200">ยอดที่ต้องโอน</p>
-          <AdminPayRow label="ผู้ซื้อ → ศูนย์กลาง (ตรวจสลิป)" amount={bd.buyerTotalDue} total />
-          {!bd.isMarketplace && bd.sellerServiceDue > 0 && (
-            <AdminPayRow label="ผู้ขาย → ค่าบริการ (แยกสลิป)" amount={bd.sellerServiceDue} bold />
-          )}
-          {!bd.isMarketplace && (
-            <p className="text-[11px] text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed pl-0.5">
-              = สินค้า ฿{bd.productPrice.toLocaleString()}
-              {bd.shippingCost > 0 ? ` + ขนส่ง ฿${bd.shippingCost.toLocaleString()}` : ''}
-              {bd.buyerServiceShare > 0 ? ` + ค่าบริการฝั่งผู้ซื้อ ฿${bd.buyerServiceShare.toLocaleString()}` : ''}
-            </p>
-          )}
-          {!bd.isMarketplace && (
-            <div className="mt-2 pt-2 border-t border-emerald-200/80 dark:border-emerald-800/60">
-              <AdminPayRow label="ผู้ขายได้รับสุทธิเมื่อสำเร็จ" amount={bd.sellerNetOnSuccess} total />
-              {bd.shippingCost > 0 && (
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 pl-0.5">
-                  = สินค้า ฿{bd.productPrice.toLocaleString()} + ขนส่ง ฿{bd.shippingCost.toLocaleString()}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      <AdminDealPaymentPanel
+        deal={d}
+        priceState={d.priceState}
+        fees={fees}
+        onUpdated={() => load(tab, category)}
+      />
     );
   }
 
@@ -818,10 +712,7 @@ function AdminDealsInner() {
                           <span className="font-mono text-sm font-bold text-green-600">ผู้ซื้อโอน ฿{marketplaceBuyerPayAmount(d).toLocaleString()}</span>
                         </>
                       ) : payBd ? (
-                        <>
-                          <span className="font-mono text-sm text-gray-500">สินค้า ฿{payBd.productPrice.toLocaleString()}</span>
-                          <span className="font-mono text-sm font-bold text-green-600">ผู้ซื้อโอน ฿{payBd.buyerTotalDue.toLocaleString()}</span>
-                        </>
+                        <AdminDealPaymentBadge deal={d} priceState={d.priceState} fees={fees} />
                       ) : (
                         <span className="font-mono text-sm font-bold text-green-600">฿{Number(d.price || 0).toLocaleString()}</span>
                       )}
