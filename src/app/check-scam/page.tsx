@@ -19,11 +19,14 @@ export default function CheckScamPage() {
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>('db');
   const [q, setQ] = useState('');
+  const reportId = searchParams.get('report');
+
   useEffect(() => {
     const t = searchParams.get('tab');
-    if (t === 'report') setTab('report');
+    if (reportId) setTab('db');
+    else if (t === 'report') setTab('report');
     else if (t === 'web') setTab('web');
-  }, [searchParams]);
+  }, [searchParams, reportId]);
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', '#2f6bf0'); r.style.setProperty('--accent-strong', '#1f54d6'); r.style.setProperty('--accent-soft', '#eef4ff');
@@ -67,7 +70,7 @@ export default function CheckScamPage() {
           </button>
         </nav>
 
-        {tab === 'db' && <ScamDbSearch />}
+        {tab === 'db' && <ScamDbSearch initialReportId={reportId} />}
 
         {tab === 'web' && (
           <>

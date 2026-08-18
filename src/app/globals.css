@@ -6636,6 +6636,22 @@ a.contact-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .csr-hit-detail { margin-top: 10px; font-size: 13.5px; color: var(--muted); line-height: 1.7; white-space: pre-wrap; }
 .csr-hit-imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 12px; }
 .csr-hit-imgs img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--line); }
+.csr-hit-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+.csr-hit-share, .csr-hit-appeal {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: var(--r-pill); padding: 8px 14px;
+  font-size: 12.5px; font-weight: 600; font-family: var(--font-display); cursor: pointer;
+  background: var(--surface-2); color: var(--ink-2); text-decoration: none;
+  transition: all .18s; white-space: nowrap;
+}
+.csr-hit-share:hover, .csr-hit-appeal:hover { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-soft); }
+.csr-hit-share.is-copied { border-color: var(--green-500); color: var(--green-700); background: #ecfdf5; }
+.csr-hit-appeal { border-color: color-mix(in srgb, var(--amber-500) 45%, var(--line)); color: #9a6209; background: #fef9ec; }
+.csr-hit-appeal:hover { border-color: var(--amber-500); color: #7c4a03; background: #fef5e3; }
+@media (max-width: 520px) {
+  .csr-hit-actions { flex-direction: column; align-items: stretch; }
+  .csr-hit-actions .btn, .csr-hit-share, .csr-hit-appeal { width: 100%; justify-content: center; }
+}
 /* ============================================================
    Notification bell
    ============================================================ */

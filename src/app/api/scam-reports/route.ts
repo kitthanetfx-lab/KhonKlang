@@ -8,9 +8,33 @@ function buildSearchBlob(parts: string[]) {
   return (text + ' ' + digits).slice(0, 2500);
 }
 
+function mapPublicScamReport(d: Record<string, unknown>) {
+  return {
+    id: d.id, firstName: d.first_name, lastName: d.last_name,
+    bankAccounts: d.bank_accounts, product: d.product, amount: d.amount,
+    transferDate: d.transfer_date, sellerPage: d.seller_page, province: d.province,
+    detail: String(d.detail || '').slice(0, 600),
+    chatImageIds: d.chat_image_ids, slipImageIds: d.slip_image_ids,
+    sourceName: d.source_name, status: d.status, createdAt: d.created_at,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const db = getAdminClient();
+    const reportId = (req.nextUrl.searchParams.get('report') || req.nextUrl.searchParams.get('id') || '').trim();
+    if (reportId) {
+      const { data } = await db
+        .from('scam_reports')
+        .select('*')
+        .eq('id', reportId)
+        .neq('status', 'rejected')
+        .maybeSingle();
+      if (!data) return NextResponse.json({ error: 'ไม่พบรายงานนี้' }, { status: 404 });
+      const mapped = mapPublicScamReport(data as Record<string, unknown>);
+      return NextResponse.json({ results: [mapped], total: 1 });
+    }
+
     const q = (req.nextUrl.searchParams.get('q') || '').trim().toLowerCase();
     if (!q || q.length < 3) return NextResponse.json({ error: 'กรุณาพิมพ์คำค้นอย่างน้อย 3 ตัวอักษร' }, { status: 400 });
 
@@ -28,14 +52,7 @@ export async function GET(req: NextRequest) {
     }).slice(0, 30);
 
     // ส่งเฉพาะ field ที่ควรเปิดเผย — ไม่ส่งข้อมูลติดต่อกลับของผู้รายงาน
-    const results = hits.map((d) => ({
-      id: d.id, firstName: d.first_name, lastName: d.last_name,
-      bankAccounts: d.bank_accounts, product: d.product, amount: d.amount,
-      transferDate: d.transfer_date, sellerPage: d.seller_page, province: d.province,
-      detail: String(d.detail || '').slice(0, 600),
-      chatImageIds: d.chat_image_ids, slipImageIds: d.slip_image_ids,
-      sourceName: d.source_name, status: d.status, createdAt: d.created_at,
-    }));
+    const results = hits.map((d) => mapPublicScamReport(d as Record<string, unknown>));
     return NextResponse.json({ results, total: results.length });
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

@@ -1,8 +1,10 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Icon } from './Icon';
 import { fileViewUrl, REPORT_BUCKET } from '@/lib/supabase';
+import { copyScamReportShare } from '@/lib/scamReportShare';
 
 const fileUrl = (id: string) => fileViewUrl(REPORT_BUCKET, id);
 
@@ -13,12 +15,41 @@ interface Hit {
   sourceName: string; status: string; createdAt: string;
 }
 
-export function ScamDbSearch() {
+type Props = {
+  initialReportId?: string | null;
+};
+
+export function ScamDbSearch({ initialReportId }: Props) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Hit[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState('');
+  const [shareCopiedId, setShareCopiedId] = useState('');
+
+  const loadReport = useCallback(async (reportId: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const r = await fetch(`/api/scam-reports?report=${encodeURIComponent(reportId)}`);
+      const d = await r.json();
+      if (!r.ok) { setError(d.error || 'โหลดรายงานไม่สำเร็จ'); setResults([]); return; }
+      const hits = d.results || [];
+      setResults(hits);
+      if (hits[0]) {
+        setExpanded(hits[0].id);
+        setQ(`${hits[0].firstName} ${hits[0].lastName || ''}`.trim());
+      }
+    } catch {
+      setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (initialReportId) void loadReport(initialReportId);
+  }, [initialReportId, loadReport]);
 
   async function search() {
     const query = q.trim();
@@ -31,6 +62,14 @@ export function ScamDbSearch() {
       setResults(d.results || []);
     } catch { setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง'); }
     finally { setLoading(false); }
+  }
+
+  async function onShare(hit: Hit) {
+    const ok = await copyScamReportShare(hit);
+    if (ok) {
+      setShareCopiedId(hit.id);
+      window.setTimeout(() => setShareCopiedId(''), 2500);
+    }
   }
 
   return (
@@ -61,6 +100,7 @@ export function ScamDbSearch() {
               const accts = h.bankAccounts || [];
               const imgs = [...(h.slipImageIds || []), ...(h.chatImageIds || [])].slice(0, 6);
               const open = expanded === h.id;
+              const shareCopied = shareCopiedId === h.id;
               return (
                 <div key={h.id} className="csr-card csr-hit">
                   <div className="csr-hit-head">
@@ -88,9 +128,22 @@ export function ScamDbSearch() {
                       ))}
                     </div>
                   )}
-                  <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={() => setExpanded(open ? '' : h.id)}>
-                    {open ? 'ย่อรายละเอียด' : `ดูรายละเอียด + หลักฐาน (${imgs.length} รูป)`} <Icon name="chevronDown" size={14} style={{ transform: open ? 'rotate(180deg)' : 'none' }} />
-                  </button>
+                  <div className="csr-hit-actions">
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setExpanded(open ? '' : h.id)}>
+                      {open ? 'ย่อรายละเอียด' : `ดูรายละเอียด + หลักฐาน (${imgs.length} รูป)`}
+                      <Icon name="chevronDown" size={14} style={{ transform: open ? 'rotate(180deg)' : 'none' }} />
+                    </button>
+                    <button
+                      type="button"
+                      className={`csr-hit-share${shareCopied ? ' is-copied' : ''}`}
+                      onClick={() => void onShare(h)}
+                    >
+                      {shareCopied ? '✓ คัดลอกแล้ว — วางในกลุ่มได้เลย' : '🔗 แชร์ลิงก์ลงกลุ่ม'}
+                    </button>
+                    <Link href={`/check-scam/appeal?report=${h.id}`} className="csr-hit-appeal">
+                      📝 อุธรณ์ / คำชี้แจง
+                    </Link>
+                  </div>
                 </div>
               );
             })}
