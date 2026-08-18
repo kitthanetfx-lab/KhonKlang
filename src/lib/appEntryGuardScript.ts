@@ -26,7 +26,15 @@ export const APP_ENTRY_GUARD_SCRIPT = `
     }catch(e){}
     return false;
   }
-  if(/^\\/(login|privacy|terms)(\\/|$)/.test(path))return;
+  if(/^\\/(login|privacy|terms)(\\/|$)/.test(path)){
+    if(/^\\/login(\\/|$)/.test(path)&&hasSession()){
+      var rt=location.search.match(/[?&]returnTo=([^&]+)/);
+      var dest=rt?decodeURIComponent(rt[1]):'/';
+      if(dest.charAt(0)!=='/')dest='/';
+      location.replace(dest);
+    }
+    return;
+  }
   if(/^\\/auth\\//.test(path)){
     if(document.cookie.indexOf('line_session_pending=')!==-1)return;
     if(location.hash&&location.hash.indexOf('access_token')!==-1)return;

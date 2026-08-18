@@ -3,11 +3,12 @@
 import { supabase } from '@/lib/supabase';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Suspense } from 'react';
+import { Suspense, useLayoutEffect } from 'react';
 import { InAppBanner } from '@/components/InAppBanner';
 import { detectInApp } from '@/lib/inApp';
 import { isGlanghubApp, nativeGoogleIdToken, isUserCancelled } from '@/lib/nativeAuth';
 import { APP_LOGIN_HINT } from '@/lib/appAuthHandoff';
+import { hasSupabaseSessionSync } from '@/lib/appDeepLinkNav';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -22,9 +23,24 @@ function LoginForm() {
   };
 
   const returnTo = searchParams.get('returnTo') || '/';
+  const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
+
+  // ล็อกอินแล้ว — ไม่ควรอยู่หน้านี้
+  useLayoutEffect(() => {
+    if (!hasSupabaseSessionSync()) return;
+    window.location.replace(safeReturn);
+  }, [safeReturn]);
+
+  useLayoutEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active || !data.session) return;
+      window.location.replace(safeReturn);
+    });
+    return () => { active = false; };
+  }, [safeReturn]);
 
   const handleLogin = async (provider: 'google') => {
-    const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
     // แอปมือถือกลางฮับ: Google ห้าม OAuth ใน WebView → ใช้ Native Google Sign-In (จบในแอป)
     if (isGlanghubApp()) {
       try {

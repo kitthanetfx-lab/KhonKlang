@@ -11,6 +11,12 @@ export function isAuthCallbackPath(path: string): boolean {
   return AUTH_CALLBACK_PREFIXES.some(p => path === p || path.startsWith(p));
 }
 
+/** หน้า login/register — ไม่แสดง header หลัก */
+export function isAuthOnlyPage(path: string): boolean {
+  const p = path.split('?')[0];
+  return p === '/login' || p.startsWith('/register') || p.startsWith('/auth/');
+}
+
 /** เปิดในแอp กลางฮับ และ path เป็น callback จากเบราว์เซอร์ */
 export function isAppBrowserHandoff(pathname: string): boolean {
   return isGlanghubApp() && isAuthCallbackPath(pathname);
