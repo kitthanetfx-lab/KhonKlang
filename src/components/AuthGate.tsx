@@ -132,7 +132,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       if (session && !isPublicPath(pathname) && !gateVerifiedRef.current) {
         void check();
       }
-      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+      if (session && event === 'SIGNED_IN') {
         gateVerifiedRef.current = false;
       }
     });

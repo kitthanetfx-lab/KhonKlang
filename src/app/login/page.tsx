@@ -7,6 +7,7 @@ import { Suspense } from 'react';
 import { InAppBanner } from '@/components/InAppBanner';
 import { detectInApp } from '@/lib/inApp';
 import { isGlanghubApp, nativeGoogleIdToken, isUserCancelled } from '@/lib/nativeAuth';
+import { APP_LOGIN_HINT } from '@/lib/appAuthHandoff';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -17,6 +18,7 @@ function LoginForm() {
     line_cancelled: 'ยกเลิกการเข้าสู่ระบบด้วย LINE',
     line_failed: `LINE login ล้มเหลว${msg ? ': ' + decodeURIComponent(msg) : ''}`,
     oauth_failed: `เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่${msg ? ' (' + decodeURIComponent(msg) + ')' : ''}`,
+    app_handoff: msg ? decodeURIComponent(msg) : APP_LOGIN_HINT,
   };
 
   const returnTo = searchParams.get('returnTo') || '/';
@@ -58,6 +60,11 @@ function LoginForm() {
   return (
     <>
     <InAppBanner />
+    {isGlanghubApp() && !error && (
+      <div className="iab-banner" role="status" style={{ position: 'relative', zIndex: 2 }}>
+        <span className="iab-tx">📱 {APP_LOGIN_HINT}</span>
+      </div>
+    )}
     <main className="login-page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div className="login-card">
         <div style={{ position: 'relative', zIndex: 1 }}>

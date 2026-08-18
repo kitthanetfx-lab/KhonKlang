@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { isGlanghubApp } from '@/lib/nativeAuth';
+import { APP_HANDOFF_FAIL_MSG } from '@/lib/appAuthHandoff';
 
 function LineCompleteInner() {
   const searchParams = useSearchParams();
@@ -26,7 +28,11 @@ function LineCompleteInner() {
           if (!data.session) throw new Error('no_session');
           await routeAfterLogin();
         } catch {
-          window.location.replace(`/login?error=line_failed&msg=no_session&returnTo=${encodeURIComponent(returnTo)}`);
+          const err = isGlanghubApp() ? 'app_handoff' : 'line_failed';
+          const msg = isGlanghubApp()
+            ? encodeURIComponent(APP_HANDOFF_FAIL_MSG)
+            : 'no_session';
+          window.location.replace(`/login?error=${err}&msg=${msg}&returnTo=${encodeURIComponent(returnTo)}`);
         }
         return;
       }
@@ -42,7 +48,11 @@ function LineCompleteInner() {
       } catch (err: unknown) {
         console.error('LINE complete error:', err);
         const message = err instanceof Error ? err.message : 'session_invalid';
-        window.location.replace(`/login?error=line_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
+        const errCode = isGlanghubApp() ? 'app_handoff' : 'line_failed';
+        const msgParam = isGlanghubApp()
+          ? encodeURIComponent(APP_HANDOFF_FAIL_MSG)
+          : encodeURIComponent(message);
+        window.location.replace(`/login?error=${errCode}&msg=${msgParam}&returnTo=${encodeURIComponent(returnTo)}`);
       }
     }
 

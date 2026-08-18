@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { isGlanghubApp } from '@/lib/nativeAuth';
+import { APP_HANDOFF_FAIL_MSG } from '@/lib/appAuthHandoff';
 
 /**
  * หน้ารับ callback จาก Google/Facebook OAuth.
@@ -32,7 +34,11 @@ function OAuthCompleteInner() {
       done = true;
       console.error('OAuth complete error:', err);
       const message = err instanceof Error ? err.message : 'session_invalid';
-      window.location.replace(`/login?error=oauth_failed&msg=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`);
+      const errorCode = isGlanghubApp() ? 'app_handoff' : 'oauth_failed';
+      const msgParam = isGlanghubApp()
+        ? encodeURIComponent(APP_HANDOFF_FAIL_MSG)
+        : encodeURIComponent(message);
+      window.location.replace(`/login?error=${errorCode}&msg=${msgParam}&returnTo=${encodeURIComponent(returnTo)}`);
     }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
