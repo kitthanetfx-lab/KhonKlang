@@ -175,10 +175,11 @@ export function useUser() {
 
   const logout = async () => {
     try {
+      sessionStorage.removeItem('kk.psync');
       await supabase.auth.signOut();
     } finally {
       setUser(null);
-      window.location.href = '/';
+      window.location.replace('/login');
     }
   };
 

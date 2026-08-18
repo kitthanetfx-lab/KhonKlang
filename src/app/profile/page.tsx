@@ -280,8 +280,9 @@ function ProfilePage() {
   };
 
   const logout = async () => {
+    sessionStorage.removeItem('kk.psync');
     await supabase.auth.signOut().catch(() => null);
-    router.push('/');
+    window.location.replace('/login');
   };
 
   if (loading) return (

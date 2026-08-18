@@ -58,11 +58,13 @@ export function useProfileGate() {
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname() || '/';
-  const [checked, setChecked] = useState(false);
-  const [authed, setAuthed] = useState(false);
+  const isPublic = isPublicPath(pathname);
+  // หน้า public (เช่น /login) ไม่ต้องรอ effect — กัน flash "กำลังตรวจสอบสิทธิ์..." ตอน logout
+  const [checked, setChecked] = useState(isPublic);
+  const [authed, setAuthed] = useState(isPublic);
   const [profileComplete, setProfileComplete] = useState(true);
-  const checkedRef = useRef(false);
-  const authedRef = useRef(false);
+  const checkedRef = useRef(isPublic);
+  const authedRef = useRef(isPublic);
   const profileCompleteRef = useRef(true);
 
   useEffect(() => {
@@ -123,9 +125,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       if (!session && !isPublicPath(pathname)) {
         authedRef.current = false;
         checkedRef.current = false;
-        setAuthed(false);
-        setChecked(false);
-        router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
+        // ไม่ reset checked/authed ก่อน redirect — จะทำให้หน้ากระพริบ loading
+        window.location.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
       }
     });
 
