@@ -7,7 +7,7 @@ import {
   dealMatchesStatusTab,
   type AdminDealSnapshot,
 } from '../../_lib/adminDealQueue';
-import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
+import { maybeNotifyAdminLineQueues, maybeNotifyAdminInAppQueues } from '../../_lib/adminLineNotifyHook';
 import {
   dealMatchesCategory,
   isBareListing,
@@ -428,9 +428,10 @@ export async function PATCH(req: NextRequest) {
             content: `🔄 แอดมินสั่งตรวจสลิปเงินประกัน${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}อัตโนมัติอีกครั้ง`,
           });
           const { data: updated } = await db.from('deals').select('*').eq('id', id).maybeSingle();
-          if (updated) await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated, {
-            skipSteps: autoResult.skipConfirmPayLine ? ['confirm_pay'] : [],
-          });
+          if (updated) {
+            await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated);
+            await maybeNotifyAdminInAppQueues(db, beforeSnapshot, updated, { onlySteps: ['confirm_pay', 'pay_seller'] });
+          }
           return NextResponse.json({ deal: autoResult.deal || updated });
         }
 
@@ -458,9 +459,10 @@ export async function PATCH(req: NextRequest) {
           content: `🔄 แอดมินสั่งตรวจสลิป${side === 'buyer' ? 'ผู้ซื้อ' : 'ผู้ขาย'}อัตโนมัติอีกครั้ง`,
         });
         const { data: updated } = await db.from('deals').select('*').eq('id', id).maybeSingle();
-        if (updated) await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated, {
-          skipSteps: autoResult.skipConfirmPayLine ? ['confirm_pay'] : [],
-        });
+        if (updated) {
+          await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated);
+          await maybeNotifyAdminInAppQueues(db, beforeSnapshot, updated, { onlySteps: ['confirm_pay', 'pay_seller'] });
+        }
         return NextResponse.json({ deal: autoResult.deal || updated });
       }
       case 'delete_deal': {
@@ -506,7 +508,10 @@ export async function PATCH(req: NextRequest) {
     }
 
     const { data: updated } = await db.from('deals').select('*').eq('id', id).maybeSingle();
-    if (updated) await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated);
+    if (updated) {
+      await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated);
+      await maybeNotifyAdminInAppQueues(db, beforeSnapshot, updated, { onlySteps: ['confirm_pay', 'pay_seller'] });
+    }
     return NextResponse.json({ deal: updated });
   } catch (err: unknown) {
     const status = err instanceof HttpError ? err.status : 500;

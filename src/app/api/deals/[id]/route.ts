@@ -4,7 +4,7 @@ import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { notifyUsers } from '../../_lib/notify';
 import { syncDealLedger, readFeesConfig } from '../../_lib/financeLedger';
 import { loadAdminDealSnapshot } from '../../_lib/adminDealQueue';
-import { maybeNotifyAdminLineQueues } from '../../_lib/adminLineNotifyHook';
+import { maybeNotifyAdminLineQueues, maybeNotifyAdminInAppQueues } from '../../_lib/adminLineNotifyHook';
 import { runAutoSlipVerification, runAutoMeetupSlipVerification } from '../../_lib/slipAutoVerify';
 import { getTierCreditLimit } from '@/lib/financeLedger';
 import { computeDealFees, FEE_DEFAULTS, computeSimpleDealShare, simpleCreatorSide, computeMarketplaceGp } from '@/lib/fees';
@@ -18,6 +18,7 @@ import {
   isMarketplaceSold,
 } from '@/lib/marketplaceOrder';
 import { finalizeAuction } from '../../_lib/auctionSync';
+import { adminDealsPagePath, getDealCategory } from '@/lib/adminDealCategory';
 import { rowToAuctionPublic, computeAuctionEndsAt, type AuctionRow, type AuctionDurationInput } from '@/lib/auction';
 import { settleAuctionCancel, releaseAuctionDepositOnPaid } from '../../_lib/userWallet';
 
@@ -1228,29 +1229,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         });
       }
 
-      // แจ้งเตือนแอดมินเมื่อมีเงินเข้า/ข้อพิพาท
-      if (action === 'upload_payment' || action === 'dispute') {
+      // แจ้งเตือนแอดมินเมื่อมีข้อพิพาท (ดีล & ข้อพิพาท — ไม่ใช่หน้าการเงิน)
+      if (action === 'dispute') {
         const admins = await getAdminIds(db);
         if (admins.length) {
-          const isPay = action === 'upload_payment';
+          const category = getDealCategory(updated);
           await notifyUsers(db, admins, {
-            title: isPay ? `💰 มีการโอนเงินรอตรวจสอบ: ${updated.title || 'ดีล'}` : `⚠️ มีข้อพิพาท: ${updated.title || 'ดีล'}`,
-            body: isPay
-              ? `ผู้ซื้อโอนเงิน ฿${Number(updated.price || 0).toLocaleString()} แล้ว — เข้าไปตรวจสอบและอนุมัติที่หน้าการเงิน`
-              : `${systemMsg} — เข้าไปจัดการที่หน้าดีล & ข้อพิพาท`,
-            link: isPay ? '/admin/finance' : '/admin/deals',
+            title: `⚠️ มีข้อพิพาท: ${updated.title || 'ดีล'}`,
+            body: `${systemMsg} — เข้าไปจัดการที่ดีล & ข้อพิพาท`,
+            link: adminDealsPagePath(category, 'disputed'),
           });
         }
       }
     }
 
-    let skipConfirmPayLine = false;
+    const postActionSnapshot = await loadAdminDealSnapshot(db, updated);
+
     if (action === 'upload_payment' || action === 'upload_middleman_fee' || action === 'seller_fee_paid') {
       try {
         const trigger = action === 'upload_payment' ? 'buyer' : 'seller';
         const autoResult = await runAutoSlipVerification(db, id, trigger);
+        const autoResult = await runAutoSlipVerification(db, id, trigger);
         updated = autoResult.deal as typeof updated;
-        skipConfirmPayLine = autoResult.skipConfirmPayLine;
       } catch (err) {
         console.error('[slipAutoVerify]', err);
       }
@@ -1260,16 +1260,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const trigger = isBuyer ? 'buyer' : 'seller';
         const autoResult = await runAutoMeetupSlipVerification(db, id, trigger);
         updated = autoResult.deal as typeof updated;
-        skipConfirmPayLine = autoResult.skipConfirmPayLine;
       } catch (err) {
         console.error('[slipAutoVerify meetup]', err);
       }
     }
 
     await syncDealLedger(db, updated as Record<string, unknown>).catch(() => {});
-    await maybeNotifyAdminLineQueues(db, beforeSnapshot, updated, {
-      skipSteps: skipConfirmPayLine ? ['confirm_pay'] : [],
-    });
+    // แจ้ง LINE + กระดิ่ง 2 ช่วง: หลัง action หลัก (confirm_pay) แล้วหลังตรวจสลิป (pay_seller ฯลฯ)
+    await maybeNotifyAdminLineQueues(db, beforeSnapshot, postActionSnapshot.deal);
+    await maybeNotifyAdminInAppQueues(db, beforeSnapshot, postActionSnapshot.deal, { onlySteps: ['confirm_pay', 'pay_seller'] });
+    await maybeNotifyAdminLineQueues(db, postActionSnapshot, updated);
+    await maybeNotifyAdminInAppQueues(db, postActionSnapshot, updated, { onlySteps: ['confirm_pay', 'pay_seller'] });
     // คืน evidence list ล่าสุดด้วย — กัน frontend re-fetch ทับ optimistic update จนภาพหาย
     let latestEvidence: unknown[] | undefined;
     if (evidenceInsert || action === 'delete_evidence') {
