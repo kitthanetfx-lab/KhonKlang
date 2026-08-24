@@ -1249,7 +1249,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       try {
         const trigger = action === 'upload_payment' ? 'buyer' : 'seller';
         const autoResult = await runAutoSlipVerification(db, id, trigger);
-        const autoResult = await runAutoSlipVerification(db, id, trigger);
         updated = autoResult.deal as typeof updated;
       } catch (err) {
         console.error('[slipAutoVerify]', err);
