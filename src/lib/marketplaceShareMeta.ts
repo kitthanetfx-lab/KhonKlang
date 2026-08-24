@@ -46,7 +46,7 @@ export function formatShareTimeRemaining(endsAt: string, endedAt: string | null,
 
 function buildDescription(meta: Omit<MarketplaceShareMeta, 'description'>) {
   const parts = [
-    meta.isAuction ? '🔨 สินค้าประมูล' : '🛒 ขายสินค้า',
+    meta.isAuction ? 'สินค้าประมูล' : 'ขายสินค้า',
     meta.condition,
     meta.category,
     meta.shortDescription,

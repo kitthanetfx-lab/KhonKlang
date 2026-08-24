@@ -21,11 +21,12 @@ export async function generateMetadata({
 
   const pageTitle = `${meta.title} | ${meta.isAuction ? 'ประมูล' : 'ตลาด'} กลางฮับ`;
   const url = `${SITE}/marketplace/${meta.id}`;
-  // og:image ต้องเป็น URL รูปจริงที่ Facebook โหลดได้ทันที — ไม่ใช้ API สร้างรูป (ไม่เสถียร)
-  const productImage = meta.imageUrls[0] || '';
-  const shareImage = productImage || `${SITE}/og-tag.webp`;
-  const shareImageMeta = productImage
-    ? { url: shareImage, alt: meta.title }
+  // og:image ต้องอยู่โดเมน glanghub.com — Facebook มักไม่ดึงรูปจาก Supabase ตรงๆ
+  const shareImage = meta.imageUrls[0]
+    ? `${SITE}/api/og/product/${meta.id}`
+    : `${SITE}/og-tag.webp`;
+  const shareImageMeta = meta.imageUrls[0]
+    ? { url: shareImage, width: 1200, height: 630, alt: meta.title }
     : { url: shareImage, width: 1200, height: 630, alt: meta.title };
 
   return {

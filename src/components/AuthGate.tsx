@@ -25,6 +25,8 @@ const PUBLIC_PATHS = [
   '/auth/line/complete',
   '/privacy',
   '/terms',
+  '/marketplace',
+  '/check-scam',
 ];
 
 const PROFILE_REQUIRED_PATHS = [
