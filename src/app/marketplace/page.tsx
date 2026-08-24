@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase, authHeaders, fileViewUrl, DEAL_BUCKET } from '@/lib/supabase';
 import Link from 'next/link';
@@ -68,6 +68,25 @@ const CARD_BG = ['#0d1b3e','#2f6bf0','#10a566','#6841d9','#e89211','#0d9aa6'];
 const AUCTION_CARD_BG = ['#4c1d95','#7c3aed','#6d28d9','#5b21b6','#9333ea','#8b5cf6'];
 
 export default function Marketplace() {
+  return (
+    <Suspense fallback={<MarketplaceFallback />}>
+      <MarketplaceContent />
+    </Suspense>
+  );
+}
+
+function MarketplaceFallback() {
+  return (
+    <>
+      <Nav active="market" />
+      <div className="container mkt-container" style={{ padding: '48px 16px', textAlign: 'center', color: 'var(--muted)' }}>
+        กำลังโหลดตลาด...
+      </div>
+    </>
+  );
+}
+
+function MarketplaceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const zone: Zone = searchParams.get('zone') === 'auction' ? 'auction' : 'listing';
