@@ -72,6 +72,7 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
   const [myAutoBidMax, setMyAutoBidMax] = useState<number | null>(null);
   const [myAutoBidStep, setMyAutoBidStep] = useState<number | null>(null);
   const [bidding, setBidding] = useState(false);
+  const [buyingNow, setBuyingNow] = useState(false);
   const [bidError, setBidError] = useState('');
   const [walletAvail, setWalletAvail] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -246,6 +247,38 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
     }
   }
 
+  async function buyNowAuction() {
+    if (!listing || !auction?.buyNowPrice) return;
+    if (!myId) {
+      router.push(`/login?returnTo=${encodeURIComponent(`/marketplace/${listing.id}`)}`);
+      return;
+    }
+    const providers = listing.shipping_providers || [];
+    if (providers.length > 0 && !selectedShipping) {
+      setBidError('กรุณาเลือกขนส่งก่อนซื้อทันที');
+      return;
+    }
+    setBuyingNow(true);
+    setBidError('');
+    try {
+      const headers = Object.keys(hdrs).length ? hdrs : await authHeaders();
+      const res = await fetch(`/api/auctions/${listing.id}/buy-now`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(selectedShipping ? { shippingProvider: selectedShipping } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'ซื้อทันทีไม่สำเร็จ');
+      router.push(`/cart/checkout/${listing.id}`);
+    } catch (err: unknown) {
+      setBidError(err instanceof Error ? err.message : 'ซื้อทันทีไม่สำเร็จ');
+    } finally {
+      setBuyingNow(false);
+    }
+  }
+
   async function copyShareLink() {
     if (!listing) return;
     const url = `${window.location.origin}/marketplace/${listing.id}`;
@@ -318,6 +351,8 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
     setBidAmount,
     bidding,
     bidError,
+    buyingNow,
+    buyNowAuction,
     walletAvail,
     myId,
     joining,
@@ -399,6 +434,8 @@ type DetailPanelProps = {
   setBidAmount: (v: string) => void;
   bidding: boolean;
   bidError: string;
+  buyingNow: boolean;
+  buyNowAuction: () => void;
   walletAvail: number | null;
   myId: string;
   joining: boolean;
@@ -439,6 +476,8 @@ function MarketplaceDetailPanel({
   setBidAmount,
   bidding,
   bidError,
+  buyingNow,
+  buyNowAuction,
   walletAvail,
   myId,
   joining,
@@ -454,6 +493,8 @@ function MarketplaceDetailPanel({
   const walletLoading = !!myId && needsDeposit && walletAvail === null;
   const walletInsufficient = needsDeposit && walletAvail != null && walletAvail < (auction?.bidDeposit ?? 0);
   const canShowBidForm = !walletLoading && !walletInsufficient;
+  const canBuyNow = !!(auction?.buyNowPrice && auction.phase === 'live'
+    && (auction.currentBid == null || auction.currentBid < auction.buyNowPrice));
 
   return (
     <div className="pd-panel">
@@ -531,6 +572,43 @@ function MarketplaceDetailPanel({
                 <strong className="pd-auction-val">฿{auction.bidDeposit.toLocaleString()}</strong>
               </div>
             )}
+            {auction.buyNowPrice != null && auction.buyNowPrice > 0 && (
+              <div className="pd-auction-cell pd-auction-cell--bin">
+                <span className="pd-auction-lbl">ซื้อทันที</span>
+                <strong className="pd-auction-val">฿{auction.buyNowPrice.toLocaleString()}</strong>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isAuction && auction && !isOwner && auction.phase === 'live' && canBuyNow && (
+          <div className="pd-bin">
+            {shippingProviders.length > 0 && (
+              <div className="pd-ship">
+                <span className="pd-ship-lbl">ขนส่ง *</span>
+                <div className="pd-ship-opts">
+                  {shippingProviders.map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`pd-ship-opt${selectedShipping === p ? ' is-on' : ''}`}
+                      onClick={() => setSelectedShipping(p)}
+                    >
+                      {getLogisticsProviderLabel(p)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              className="btn btn-green btn-lg pd-bin-btn"
+              onClick={buyNowAuction}
+              disabled={buyingNow}
+            >
+              {buyingNow ? '...' : `⚡ ซื้อทันที ฿${auction.buyNowPrice!.toLocaleString()}`}
+            </button>
+            <p className="pd-bid-hint">จบประมูลทันทีในราคานี้ — ไปชำระเงินหลังกดยืนยัน</p>
           </div>
         )}
 

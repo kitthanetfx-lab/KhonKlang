@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { supabase, authHeaders } from '@/lib/supabase';
 import { Nav } from '@/components/Site';
 import { Icon } from '@/components/Icon';
+import { ChatMarketplacePreview } from '@/components/chat/ChatMarketplacePreview';
+import { extractMarketplaceId } from '@/lib/marketplaceLinkPreview';
 
 interface Thread { threadId: string; otherId: string; otherName: string; lastContent: string; lastAt: string; fromMe: boolean; unread: number }
 interface Dm { id: string; from_id: string; from_name: string; to_id: string; to_name: string; content: string; created_at: string }
@@ -203,7 +205,12 @@ function MessagesInner() {
                           className={`dm-row ${mine ? 'mine' : ''}${sameAsPrev ? ' dm-row--cont' : ''}${sameAsNext ? ' dm-row--has-next' : ''}`}
                         >
                           {showSender && <span className="dm-sender">{m.from_name || active.name}</span>}
-                          <div className={`dm-bubble ${mine ? 'mine' : ''}`}>{m.content}</div>
+                          <div className={`dm-bubble ${mine ? 'mine' : ''}`}>
+                            {m.content}
+                            {extractMarketplaceId(m.content) && (
+                              <ChatMarketplacePreview listingId={extractMarketplaceId(m.content)!} />
+                            )}
+                          </div>
                         </div>
                       );
                     })}

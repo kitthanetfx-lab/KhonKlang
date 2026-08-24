@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { autoBidStepAmount, rowToAuctionPublic, type AuctionAutoBidRow, type AuctionRow } from '@/lib/auction';
+import { autoBidStepAmount, rowToAuctionPublic, resolveAuctionDurationMinutes, type AuctionAutoBidRow, type AuctionRow } from '@/lib/auction';
 import { computeAuctionGp } from '@/lib/fees';
 import { readFeesConfig } from './financeLedger';
 import { notifyUsers } from './notify';
@@ -31,7 +31,7 @@ export async function syncExpiredAuctions(db: SupabaseClient, limit = 30) {
   }
 }
 
-/** ปิดประมูลรายการเดียว — มอบผู้ชนะเข้าดีล */
+/** ปิดประมูลรายการเดียว — มอบผู้ชนะเข้าดีล · ไม่มี bid วนเวลาใหม่ */
 export async function finalizeAuction(db: SupabaseClient, dealId: string) {
   const { data: auction } = await db.from('deal_auction').select('*').eq('deal_id', dealId).maybeSingle();
   if (!auction || auction.ended_at) return auction;
@@ -39,13 +39,36 @@ export async function finalizeAuction(db: SupabaseClient, dealId: string) {
   const now = new Date();
   if (new Date(auction.ends_at).getTime() > now.getTime()) return auction;
 
+  const bidCount = Number(auction.bid_count) || 0;
+  const hasWinner = !!(auction.current_bidder_id && auction.current_bid != null);
+
+  if (!hasWinner && bidCount === 0) {
+    const durationMinutes = resolveAuctionDurationMinutes(auction, 72 * 60);
+    const newEndsAt = new Date(now.getTime() + durationMinutes * 60 * 1000).toISOString();
+    await db.from('deal_auction').update({
+      ends_at: newEndsAt,
+      duration_minutes: durationMinutes,
+    }).eq('deal_id', dealId);
+
+    const { data: deal } = await db.from('deals').select('seller_id, title').eq('id', dealId).maybeSingle();
+    if (deal?.seller_id) {
+      await notifyUsers(db, [deal.seller_id as string], {
+        title: '🔁 ประมูลเปิดรอบใหม่',
+        body: `"${deal.title || 'ประมูล'}" หมดเวลาโดยไม่มีผู้ bid — ระบบต่อเวลาอีก ${durationMinutes >= 1440 ? `${Math.round(durationMinutes / 1440)} วัน` : durationMinutes >= 60 ? `${Math.round(durationMinutes / 60)} ชม.` : `${durationMinutes} นาที`}`,
+        link: `/marketplace/${dealId}`,
+      }).catch(() => {});
+    }
+
+    return { ...auction, ends_at: newEndsAt, duration_minutes: durationMinutes };
+  }
+
   const endedAt = now.toISOString();
   await db.from('deal_auction').update({ ended_at: endedAt }).eq('deal_id', dealId);
 
   const { data: deal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
   if (!deal || deal.status !== 'posted') return auction;
 
-  if (auction.current_bidder_id && auction.current_bid != null) {
+  if (hasWinner) {
     const winningBid = Math.round(Number(auction.current_bid));
     const fees = await readFeesConfig(db);
     const gp = computeAuctionGp(fees, winningBid);
@@ -320,6 +343,85 @@ export async function placeAuctionBid(
 
   const { data: updated } = await db.from('deal_auction').select('*').eq('deal_id', dealId).single();
   return rowToAuctionPublic(updated as AuctionRow);
+}
+
+/** ซื้อทันทีในรายการประมูล — ปิดประมูลและมอบให้ผู้ซื้อ */
+export async function executeAuctionBuyNow(
+  db: SupabaseClient,
+  dealId: string,
+  buyerId: string,
+  buyerName: string,
+  shippingProvider?: string | null,
+) {
+  const { data: deal } = await db.from('deals').select('*').eq('id', dealId).maybeSingle();
+  if (!deal || deal.deal_type !== 'auction') throw new Error('ไม่ใช่รายการประมูล');
+  if (deal.status !== 'posted') throw new Error('สินค้านี้ไม่พร้อมขายแล้ว');
+  if (deal.seller_id === buyerId) throw new Error('ไม่สามารถซื้อสินค้าของตัวเองได้');
+  if (deal.buyer_id && deal.buyer_id !== buyerId) throw new Error('มีผู้ซื้อแล้ว');
+
+  const { data: auction } = await db.from('deal_auction').select('*').eq('deal_id', dealId).maybeSingle();
+  if (!auction || auction.ended_at) throw new Error('ประมูลปิดแล้ว');
+  if (new Date(auction.ends_at).getTime() <= Date.now()) {
+    await finalizeAuction(db, dealId);
+    throw new Error('ประมูลหมดเวลาแล้ว');
+  }
+
+  const buyNow = auction.buy_now_price != null ? Math.round(Number(auction.buy_now_price)) : null;
+  if (!buyNow || buyNow <= 0) throw new Error('รายการนี้ไม่มีราคาซื้อทันที');
+
+  const currentBid = auction.current_bid != null ? Math.round(Number(auction.current_bid)) : null;
+  if (currentBid != null && currentBid >= buyNow) {
+    throw new Error('ราคาประมูลถึงระดับที่ไม่สามารถซื้อทันทีได้แล้ว');
+  }
+
+  const { sanitizeShippingProviders } = await import('@/lib/logistics');
+  const allowedProviders = sanitizeShippingProviders(deal.shipping_providers);
+  let buyerShippingProvider: string | null = null;
+  if (allowedProviders.length > 0) {
+    const chosen = String(shippingProvider || '').trim();
+    if (!chosen || !allowedProviders.includes(chosen)) throw new Error('กรุณาเลือกขนส่ง');
+    buyerShippingProvider = chosen;
+  }
+
+  const now = new Date().toISOString();
+  await db.from('deal_auction').update({ ended_at: now }).eq('deal_id', dealId);
+
+  const fees = await readFeesConfig(db);
+  const gp = computeAuctionGp(fees, buyNow);
+
+  await db.from('deals').update({
+    buyer_id: buyerId,
+    buyer_name: buyerName,
+    price: buyNow,
+    list_gross_price: buyNow,
+    status: 'posted',
+    seller_accepted_terms: true,
+    buyer_accepted_terms: true,
+    fee_payer: deal.fee_payer || 'buyer',
+    ...(buyerShippingProvider ? { buyer_shipping_provider: buyerShippingProvider } : {}),
+  }).eq('id', dealId);
+
+  await releaseLosingAuctionDeposits(db, {
+    dealId,
+    winnerId: buyerId,
+    title: String(deal.title || 'ประมูล'),
+  }).catch(() => {});
+
+  await notifyUsers(db, [buyerId], {
+    title: '⚡ ซื้อทันทีสำเร็จ!',
+    body: `"${deal.title}" — ฿${buyNow.toLocaleString()} กรุณาชำระเงิน`,
+    link: `/cart/checkout/${dealId}`,
+  });
+  if (deal.seller_id) {
+    await notifyUsers(db, [deal.seller_id as string], {
+      title: '⚡ มีคนซื้อทันที!',
+      body: `"${deal.title}" ขายได้ ฿${buyNow.toLocaleString()} (สุทธิ ~฿${gp.sellerReceive.toLocaleString()}) โดย ${buyerName}`,
+      link: `/dashboard/seller`,
+    });
+  }
+
+  const { data: updated } = await db.from('deal_auction').select('*').eq('deal_id', dealId).single();
+  return { auction: rowToAuctionPublic(updated as AuctionRow), dealId };
 }
 
 /** deal_id ที่ user เคย bid หรือตั้ง auto-bid */

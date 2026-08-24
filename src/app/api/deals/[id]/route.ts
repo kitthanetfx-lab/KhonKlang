@@ -19,7 +19,7 @@ import {
 } from '@/lib/marketplaceOrder';
 import { finalizeAuction } from '../../_lib/auctionSync';
 import { adminDealsPagePath, getDealCategory } from '@/lib/adminDealCategory';
-import { rowToAuctionPublic, computeAuctionEndsAt, type AuctionRow, type AuctionDurationInput } from '@/lib/auction';
+import { rowToAuctionPublic, computeAuctionEndsAt, resolveAuctionDurationMinutes, type AuctionRow, type AuctionDurationInput } from '@/lib/auction';
 import { settleAuctionCancel, releaseAuctionDepositOnPaid } from '../../_lib/userWallet';
 
 // หา user id ของแอดมินทั้งหมด เพื่อแจ้งเตือนเรื่องเงิน/ข้อพิพาท
@@ -1091,6 +1091,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             || ad.durationHours != null;
           if (hasDuration) {
             auctionPatch.ends_at = computeAuctionEndsAt(ad as AuctionDurationInput);
+            auctionPatch.duration_minutes = resolveAuctionDurationMinutes(ad as AuctionDurationInput);
+          }
+          if (ad.buyNowPrice !== undefined) {
+            const { data: liveAuction } = await db.from('deal_auction').select('bid_count, display_start_price').eq('deal_id', id).maybeSingle();
+            if (Number(liveAuction?.bid_count || 0) > 0) {
+              return NextResponse.json({ error: 'มีคนบิดแล้ว เปลี่ยนราคาซื้อทันทีไม่ได้' }, { status: 400 });
+            }
+            const startPrice = nextPrice ?? Number(liveAuction?.display_start_price) ?? 0;
+            if (ad.buyNowPrice === null || ad.buyNowPrice === '') {
+              auctionPatch.buy_now_price = null;
+            } else {
+              const bin = Math.round(Number(ad.buyNowPrice));
+              if (!Number.isFinite(bin) || bin <= startPrice) {
+                return NextResponse.json({ error: 'ราคาซื้อทันทีต้องสูงกว่าราคาเริ่มต้น' }, { status: 400 });
+              }
+              auctionPatch.buy_now_price = bin;
+            }
           }
           if (body.price != null) auctionPatch.display_start_price = nextPrice;
           if (Object.keys(auctionPatch).length) {

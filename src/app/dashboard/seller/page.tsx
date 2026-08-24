@@ -107,6 +107,7 @@ export default function SellerDashboard() {
   const [postDone, setPostDone] = useState(false);
   const [bidIncrement, setBidIncrement] = useState('10');
   const [bidDeposit, setBidDeposit] = useState('300');
+  const [buyNowPrice, setBuyNowPrice] = useState('');
   const [durationDays, setDurationDays] = useState('3');
   const [durationHoursPart, setDurationHoursPart] = useState('0');
   const [durationMinutesPart, setDurationMinutesPart] = useState('0');
@@ -117,7 +118,7 @@ export default function SellerDashboard() {
 
   function resetListingForm() {
     setTitle(''); setDescription(''); setPrice(''); setCategory(''); setCondition(''); setLocation('');
-    setImages([]); setPostError(''); setBidIncrement('10'); setBidDeposit('300');
+    setImages([]); setPostError(''); setBidIncrement('10'); setBidDeposit('300'); setBuyNowPrice('');
     setDurationDays('3'); setDurationHoursPart('0'); setDurationMinutesPart('0');
     setShippingCost('0'); setShippingProviders([]); setEditDealId('');
   }
@@ -310,6 +311,10 @@ export default function SellerDashboard() {
     if (dep < 1) { setPostError('กรุณาตั้งมัดจำสิทธิประมูล'); return; }
     if (editDealId) { await handleUpdateListing(); return; }
     const inc = Math.max(1, Math.round(Number(bidIncrement) || 10));
+    const bin = buyNowPrice.trim() ? Math.round(Number(buyNowPrice)) : null;
+    if (bin != null && (!Number.isFinite(bin) || bin <= Number(price))) {
+      setPostError('ราคาซื้อทันทีต้องสูงกว่าราคาเริ่มต้น'); return;
+    }
     setPosting(true); setPostError('');
     try {
       const headers = await authHeaders();
@@ -321,7 +326,12 @@ export default function SellerDashboard() {
           category, condition, location, creatorRole: 'seller', source: 'listing',
           shippingCost: Number(shippingCost) || 0, shippingProviders,
           dealType: 'auction', imageFileIds: images.map(i => i.fileId),
-          auctionData: { bidIncrement: inc, bidDeposit: Math.round(Number(bidDeposit) || 0), ...buildAuctionDurationPayload() },
+          auctionData: {
+            bidIncrement: inc,
+            bidDeposit: Math.round(Number(bidDeposit) || 0),
+            buyNowPrice: bin,
+            ...buildAuctionDurationPayload(),
+          },
         }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'เกิดข้อผิดพลาด'); return; }
@@ -351,6 +361,7 @@ export default function SellerDashboard() {
     if (deal.deal_type === 'auction' && deal.auction) {
       setBidIncrement(String(deal.auction.bidIncrement || 10));
       setBidDeposit(String(deal.auction.bidDeposit || 300));
+      setBuyNowPrice(deal.auction.buyNowPrice ? String(deal.auction.buyNowPrice) : '');
     }
   }
 
@@ -360,6 +371,10 @@ export default function SellerDashboard() {
     try {
       const headers = await authHeaders();
       const inc = Math.max(1, Math.round(Number(bidIncrement) || 10));
+      const bin = buyNowPrice.trim() ? Math.round(Number(buyNowPrice)) : null;
+      if (postModal === 'auction' && bin != null && (!Number.isFinite(bin) || bin <= Number(price))) {
+        setPostError('ราคาซื้อทันทีต้องสูงกว่าราคาเริ่มต้น'); return;
+      }
       const res = await fetch(`/api/deals/${editDealId}`, {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
@@ -368,7 +383,14 @@ export default function SellerDashboard() {
           title, description, price: Number(price), category, condition, location,
           shippingCost: Number(shippingCost) || 0, shippingProviders,
           imageFileIds: images.map(i => i.fileId),
-          ...(postModal === 'auction' ? { auctionData: { bidIncrement: inc, bidDeposit: Math.round(Number(bidDeposit) || 0), ...buildAuctionDurationPayload() } } : {}),
+          ...(postModal === 'auction' ? {
+            auctionData: {
+              bidIncrement: inc,
+              bidDeposit: Math.round(Number(bidDeposit) || 0),
+              buyNowPrice: bin,
+              ...buildAuctionDurationPayload(),
+            },
+          } : {}),
         }),
       });
       if (!res.ok) { const d = await res.json(); setPostError(d.error || 'บันทึกไม่สำเร็จ'); return; }
@@ -858,6 +880,18 @@ export default function SellerDashboard() {
                             aria-label="บิดครั้งละ"
                           />
                         </div>
+                      </div>
+                      <div className="form-field" style={{ margin: '12px 0 0' }}>
+                        <label>ราคาซื้อทันที (บาท) <span style={{ color: '#65676b', fontWeight: 400 }}>— ไม่บังคับ</span></label>
+                        <input
+                          type="number"
+                          value={buyNowPrice}
+                          onChange={e => setBuyNowPrice(e.target.value)}
+                          placeholder="เช่น 3500"
+                          min="0"
+                          aria-label="ราคาซื้อทันที"
+                        />
+                        <p className="auction-duration-hint">ถ้ากรอก ผู้ซื้อสามารถกดซื้อเลยโดยไม่ต้องรอประมูล — ต้องสูงกว่าราคาเริ่มต้น</p>
                       </div>
                       <div className="mkt-yahoo-cats seller-auction-duration-section">
                         <span className="mkt-yahoo-cats-title">ระยะเวลาประมูล *</span>

@@ -5,7 +5,7 @@ import { readServiceControlsConfig } from '../_lib/appConfig';
 import { syncDealLedger, readFeesConfig } from '../_lib/financeLedger';
 import { computeMarketplaceGp } from '@/lib/fees';
 import { sanitizeShippingProviders } from '@/lib/logistics';
-import { computeAuctionEndsAt, type AuctionDurationInput } from '@/lib/auction';
+import { computeAuctionEndsAt, resolveAuctionDurationMinutes, type AuctionDurationInput } from '@/lib/auction';
 import { attachAuctions, syncExpiredAuctions } from '../_lib/auctionSync';
 
 // แนบ images: string[] (file_id เรียงตาม position) ให้แต่ละดีล — แทน imageFileIds JSON blob เดิมบน deals row
@@ -175,16 +175,26 @@ export async function POST(req: NextRequest) {
     }
 
     if (isAuction && source === 'listing') {
-      const ad = (auctionData || {}) as AuctionDurationInput & { bidIncrement?: number; bidDeposit?: number };
+      const ad = (auctionData || {}) as AuctionDurationInput & { bidIncrement?: number; bidDeposit?: number; buyNowPrice?: number | null };
       const bidIncrement = Math.max(1, Math.round(Number(ad.bidIncrement) || 10));
       const bidDeposit = Math.round(Number(ad.bidDeposit) || 0);
       if (bidDeposit < 1) throw new Error('กรุณาตั้งมัดจำสิทธิประมูล (อย่างน้อย ฿1)');
+      const durationMinutes = resolveAuctionDurationMinutes(ad);
       const endsAt = computeAuctionEndsAt(ad);
+      let buyNowPrice: number | null = null;
+      if (ad.buyNowPrice != null && ad.buyNowPrice !== '') {
+        buyNowPrice = Math.round(Number(ad.buyNowPrice));
+        if (!Number.isFinite(buyNowPrice) || buyNowPrice <= dealPrice) {
+          throw new Error('ราคาซื้อทันทีต้องสูงกว่าราคาเริ่มต้น');
+        }
+      }
       const { error: aErr } = await db.from('deal_auction').insert({
         deal_id: doc.id,
         display_start_price: dealPrice,
         bid_increment: bidIncrement,
         bid_deposit: bidDeposit,
+        buy_now_price: buyNowPrice,
+        duration_minutes: durationMinutes,
         ends_at: endsAt,
       });
       if (aErr) throw new Error(aErr.message);

@@ -2014,6 +2014,19 @@ html[data-theme='dark'] .hero-logo-dark { display: block; }
 .pd-actions > .btn-primary { width: 100%; }
 .pd-actions:empty { display: none; }
 
+.pd-bin {
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, #ecfdf5 0%, #f0fdf4 100%);
+  border: 1px solid #86efac;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.pd-bin-btn { width: 100%; }
+.pd-auction-cell--bin .pd-auction-val { color: #15803d; }
+
 .pd-bid {
   padding: 12px;
   border-radius: var(--r-md);
@@ -7034,6 +7047,32 @@ body.in-call .dr-floatbar { display: flex; }
   white-space: pre-wrap; word-break: break-word;
 }
 .dm-bubble.mine { background: #0084ff; color: #fff; }
+.dm-link-card {
+  display: flex; gap: 10px; margin-top: 8px; padding: 8px;
+  background: #fff; border-radius: 12px; border: 1px solid #e4e6eb;
+  text-decoration: none; color: inherit; max-width: 280px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+.dm-bubble.mine .dm-link-card { background: rgba(255,255,255,.95); color: #050505; }
+.dm-link-card--loading, .dm-link-card--fallback {
+  display: block; padding: 10px 12px; font-size: 13px; color: #65676b;
+}
+.dm-link-card-img {
+  width: 72px; height: 72px; object-fit: cover; border-radius: 8px; flex-shrink: 0;
+}
+.dm-link-card-img--empty {
+  display: grid; place-items: center; background: #f0f2f5; font-size: 24px;
+}
+.dm-link-card-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dm-link-card-site { font-size: 10px; color: #65676b; text-transform: uppercase; letter-spacing: .03em; }
+.dm-link-card-title { font-size: 13px; font-weight: 600; line-height: 1.25; color: #050505; }
+.dm-link-card-price { font-size: 13px; font-weight: 700; color: #15803d; }
+.dm-bubble.mine .dm-link-card-price { color: #15803d; }
+.dm-link-card-meta { font-size: 11px; color: #7c3aed; }
+.dm-link-card-desc {
+  font-size: 11px; color: #65676b; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .dm-bar { padding: 8px 16px 12px; background: #fff; border-top: 1px solid #e4e6eb; }
 .dm-composer {
   display: flex; align-items: center; gap: 4px;

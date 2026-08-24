@@ -7,6 +7,8 @@ export interface AuctionRow {
   display_start_price: number;
   bid_increment: number;
   bid_deposit?: number;
+  buy_now_price?: number | null;
+  duration_minutes?: number | null;
   ends_at: string;
   current_bid: number | null;
   current_bidder_id: string | null;
@@ -21,6 +23,7 @@ export interface AuctionPublic {
   displayStartPrice: number;
   bidIncrement: number;
   bidDeposit: number;
+  buyNowPrice: number | null;
   endsAt: string;
   currentBid: number | null;
   currentBidderId: string | null;
@@ -65,6 +68,7 @@ export function rowToAuctionPublic(row: AuctionRow, now = Date.now()): AuctionPu
     displayStartPrice: Number(row.display_start_price) || 0,
     bidIncrement: Number(row.bid_increment) || 1,
     bidDeposit: Math.max(0, Math.round(Number(row.bid_deposit) || 0)),
+    buyNowPrice: row.buy_now_price != null ? Math.round(Number(row.buy_now_price)) : null,
     endsAt: row.ends_at,
     currentBid: row.current_bid != null ? Number(row.current_bid) : null,
     currentBidderId: row.current_bidder_id || null,
@@ -154,6 +158,14 @@ export function resolveAuctionDurationMs(input: AuctionDurationInput): number {
 
 export function computeAuctionEndsAt(input: AuctionDurationInput, from = Date.now()): string {
   return new Date(from + resolveAuctionDurationMs(input)).toISOString();
+}
+
+/** ระยะเวลาประมูลเป็นนาที — ใช้เปิดรอบใหม่เมื่อไม่มีผู้ bid */
+export function resolveAuctionDurationMinutes(input: AuctionDurationInput | { duration_minutes?: number | null }, fallbackMinutes = 72 * 60): number {
+  if ('duration_minutes' in input && input.duration_minutes != null && Number(input.duration_minutes) >= 1) {
+    return Math.round(Number(input.duration_minutes));
+  }
+  return Math.max(1, Math.round(resolveAuctionDurationMs(input as AuctionDurationInput) / 60000)) || fallbackMinutes;
 }
 
 export function formatDurationPartsLabel(days: number, hours: number, minutes: number): string {
