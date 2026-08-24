@@ -31,6 +31,16 @@ function cleanText(input: string, max = 160) {
   return String(input || '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+/** ชื่อสำหรับ og:title — Facebook แสดงบรรทัดนี้ใต้รูป preview */
+export function formatMarketplaceShareTitle(meta: Pick<MarketplaceShareMeta, 'title' | 'displayPrice' | 'isAuction' | 'auction'>): string {
+  const price = `฿${meta.displayPrice.toLocaleString('th-TH')}`;
+  if (meta.isAuction) {
+    const hasBids = (meta.auction?.bidCount ?? 0) > 0;
+    return `${meta.title} · ${hasBids ? 'ราคาปัจจุบัน' : 'เริ่มต้น'} ${price}`;
+  }
+  return `${meta.title} · ${price}`;
+}
+
 export function formatShareTimeRemaining(endsAt: string, endedAt: string | null, now = Date.now()): string {
   if (endedAt) return 'ปิดประมูลแล้ว';
   const endMs = new Date(endsAt).getTime();

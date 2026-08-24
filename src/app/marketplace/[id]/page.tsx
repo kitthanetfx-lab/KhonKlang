@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getMarketplaceListingShareMeta } from '@/lib/marketplaceShareMeta';
+import { getMarketplaceListingShareMeta, formatMarketplaceShareTitle } from '@/lib/marketplaceShareMeta';
 import { MarketplaceDetailClient } from './MarketplaceDetailClient';
 
 const SITE = 'https://www.glanghub.com';
@@ -20,14 +20,18 @@ export async function generateMetadata({
   }
 
   const pageTitle = `${meta.title} | ${meta.isAuction ? 'ประมูล' : 'ตลาด'} กลางฮับ`;
+  const shareTitle = formatMarketplaceShareTitle(meta);
   const url = `${SITE}/marketplace/${meta.id}`;
   // og:image ต้องอยู่โดเมน glanghub.com — Facebook มักไม่ดึงรูปจาก Supabase ตรงๆ
   const shareImage = meta.imageUrls[0]
     ? `${SITE}/api/og/product/${meta.id}`
     : `${SITE}/og-tag.webp`;
-  const shareImageMeta = meta.imageUrls[0]
-    ? { url: shareImage, width: 1200, height: 630, alt: meta.title }
-    : { url: shareImage, width: 1200, height: 630, alt: meta.title };
+  const shareImageMeta = {
+    url: shareImage,
+    width: 1200,
+    height: 630,
+    alt: shareTitle,
+  };
 
   return {
     title: pageTitle,
@@ -36,7 +40,7 @@ export async function generateMetadata({
     openGraph: {
       type: 'website',
       url,
-      title: meta.title,
+      title: shareTitle,
       description: meta.description,
       siteName: 'กลางฮับ',
       locale: 'th_TH',
@@ -44,7 +48,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: 'summary_large_image',
-      title: meta.title,
+      title: shareTitle,
       description: meta.description,
       images: [shareImage],
     },
