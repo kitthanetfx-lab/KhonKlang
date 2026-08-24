@@ -21,7 +21,13 @@ export async function generateMetadata({
 
   const pageTitle = `${meta.title} | ${meta.isAuction ? 'ประมูล' : 'ตลาด'} กลางฮับ`;
   const url = `${SITE}/marketplace/${meta.id}`;
-  const ogImage = `${SITE}/api/og/marketplace/${meta.id}`;
+  // ใช้รูปสินค้าจริงก่อน — Facebook/LINE โหลดได้เสถียรกว่า dynamic OG ที่พังบน Vercel
+  const productImage = meta.imageUrls[0] || '';
+  const dynamicOg = `${SITE}/api/og/marketplace/${meta.id}`;
+  const shareImage = productImage || dynamicOg;
+  const shareImageMeta = productImage
+    ? { url: shareImage, alt: meta.title }
+    : { url: shareImage, width: 1200, height: 630, alt: meta.title };
 
   return {
     title: pageTitle,
@@ -34,20 +40,13 @@ export async function generateMetadata({
       description: meta.description,
       siteName: 'กลางฮับ',
       locale: 'th_TH',
-      images: [
-        {
-          url: ogImage,
-          width: 1200,
-          height: 630,
-          alt: meta.title,
-        },
-      ],
+      images: [shareImageMeta],
     },
     twitter: {
       card: 'summary_large_image',
       title: meta.title,
       description: meta.description,
-      images: [ogImage],
+      images: [shareImage],
     },
   };
 }

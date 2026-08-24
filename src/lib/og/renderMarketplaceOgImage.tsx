@@ -2,12 +2,20 @@ import { ImageResponse } from 'next/og';
 import type { MarketplaceShareMeta } from '@/lib/marketplaceShareMeta';
 
 export const OG_SIZE = { width: 1200, height: 630 };
+const FONT_FAMILY = 'TH';
 
 async function loadFonts() {
-  const bold = await fetch(
-    'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/ibmplexsansthai/IBMPlexSansThai-Bold.ttf',
-  ).then(r => r.arrayBuffer());
-  return [{ name: 'TH', data: bold, weight: 700 as const, style: 'normal' as const }];
+  try {
+    const res = await fetch(
+      'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/ibmplexsansthai/IBMPlexSansThai-Bold.ttf',
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (!res.ok) return [];
+    const bold = await res.arrayBuffer();
+    return [{ name: FONT_FAMILY, data: bold, weight: 700 as const, style: 'normal' as const }];
+  } catch {
+    return [];
+  }
 }
 
 /** ดึงรูปจาก URL แล้ว embed เป็น data URL — Satori บน Vercel โหลด external URL ไม่เสถียร */
@@ -57,7 +65,8 @@ function ImageSlot({ src, label }: { src?: string; label: string }) {
         justifyContent: 'center',
         background: 'linear-gradient(135deg, #eef4ff 0%, #dbeafe 100%)',
         color: '#64748b',
-        fontSize: 42,
+        fontSize: 28,
+        fontWeight: 700,
       }}
     >
       {label}
@@ -65,8 +74,14 @@ function ImageSlot({ src, label }: { src?: string; label: string }) {
   );
 }
 
+function truncate(text: string, max: number) {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 3)}...`;
+}
+
 export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null) {
   const fonts = await loadFonts();
+  const fontFamily = fonts.length ? FONT_FAMILY : 'sans-serif';
 
   if (!meta) {
     return new ImageResponse(
@@ -80,7 +95,7 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
             justifyContent: 'center',
             background: '#f4f6fb',
             color: '#64748b',
-            fontFamily: 'TH',
+            fontFamily,
             fontSize: 40,
             fontWeight: 700,
           }}
@@ -88,7 +103,7 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
           ไม่พบสินค้า · กลางฮับ
         </div>
       ),
-      { ...OG_SIZE, fonts },
+      { ...OG_SIZE, fonts: fonts.length ? fonts : undefined },
     );
   }
 
@@ -102,6 +117,7 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
   const priceLabel = meta.isAuction
     ? ((meta.auction?.bidCount ?? 0) > 0 ? 'ราคาปัจจุบัน' : 'ราคาเริ่ม')
     : 'ราคา';
+  const modeLabel = meta.isAuction ? 'ประมูล' : 'ขายสินค้า';
 
   return new ImageResponse(
     (
@@ -112,7 +128,7 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
           display: 'flex',
           flexDirection: 'column',
           background: '#ffffff',
-          fontFamily: 'TH',
+          fontFamily,
         }}
       >
         <div
@@ -159,7 +175,7 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
               fontWeight: 700,
             }}
           >
-            {meta.isAuction ? '🔨 ประมูล' : '🛒 ขายสินค้า'}
+            {modeLabel}
           </div>
         </div>
 
@@ -167,14 +183,14 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
           <div style={{ width: 420, display: 'flex', flexDirection: 'column', gap: 12, flexShrink: 0 }}>
             <div style={{ display: 'flex', gap: 12, height: 196 }}>
               <div style={{ flex: 1, borderRadius: 16, overflow: 'hidden', border: '2px solid #e2e8f0' }}>
-                <ImageSlot src={imgs[0]} label="📦" />
+                <ImageSlot src={imgs[0]} label="รูป 1" />
               </div>
               <div style={{ flex: 1, borderRadius: 16, overflow: 'hidden', border: '2px solid #e2e8f0' }}>
-                <ImageSlot src={imgs[1]} label="📦" />
+                <ImageSlot src={imgs[1]} label="รูป 2" />
               </div>
             </div>
             <div style={{ height: 196, borderRadius: 16, overflow: 'hidden', border: '2px solid #e2e8f0' }}>
-              <ImageSlot src={imgs[2]} label="📦" />
+              <ImageSlot src={imgs[2]} label="รูป 3" />
             </div>
           </div>
 
@@ -201,11 +217,11 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
                 )}
               </div>
               <div style={{ fontSize: 34, fontWeight: 700, color: '#0f172a', lineHeight: 1.25, maxHeight: 90, overflow: 'hidden' }}>
-                {meta.title.length > 70 ? `${meta.title.slice(0, 68)}…` : meta.title}
+                {truncate(meta.title, 70)}
               </div>
               {meta.shortDescription && (
                 <div style={{ fontSize: 20, color: '#475569', lineHeight: 1.45, maxHeight: 60, overflow: 'hidden' }}>
-                  {meta.shortDescription.length > 100 ? `${meta.shortDescription.slice(0, 98)}…` : meta.shortDescription}
+                  {truncate(meta.shortDescription, 100)}
                 </div>
               )}
             </div>
@@ -214,10 +230,10 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
               {meta.isAuction && meta.auction && (
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <span style={{ padding: '8px 14px', borderRadius: 12, background: accentSoft, color: accent, fontSize: 18, fontWeight: 700 }}>
-                    ⏱ {meta.auction.timeRemainingLabel}
+                    {meta.auction.timeRemainingLabel}
                   </span>
                   <span style={{ padding: '8px 14px', borderRadius: 12, background: '#f8fafc', color: '#334155', fontSize: 18, fontWeight: 700 }}>
-                    👥 {meta.auction.uniqueBidderCount} คนบิด · {meta.auction.bidCount} bid
+                    {meta.auction.uniqueBidderCount} คนบิด · {meta.auction.bidCount} bid
                   </span>
                 </div>
               )}
@@ -242,6 +258,6 @@ export async function renderMarketplaceOgImage(meta: MarketplaceShareMeta | null
         </div>
       </div>
     ),
-    { ...OG_SIZE, fonts },
+    { ...OG_SIZE, fonts: fonts.length ? fonts : undefined },
   );
 }
