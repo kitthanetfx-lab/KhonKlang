@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabaseServer';
 import { syncExpiredAuctions } from '../../_lib/auctionSync';
 
-/** ปิด/ต่อเวลาประมูลที่หมดเวลา — เรียกจาก Vercel Cron ทุก 5 นาที */
+/** ปิด/ต่อเวลาประมูลที่หมดเวลา — Vercel Hobby ใช้ cron ได้วันละครั้ง (สำรอง; หน้ารายการก็ sync อยู่แล้ว) */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
