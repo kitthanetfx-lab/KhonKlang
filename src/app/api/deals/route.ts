@@ -175,14 +175,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (isAuction && source === 'listing') {
-      const ad = (auctionData || {}) as AuctionDurationInput & { bidIncrement?: number; bidDeposit?: number; buyNowPrice?: number | null };
+      const ad = (auctionData || {}) as AuctionDurationInput & { bidIncrement?: number; bidDeposit?: number; buyNowPrice?: number | string | null };
       const bidIncrement = Math.max(1, Math.round(Number(ad.bidIncrement) || 10));
       const bidDeposit = Math.round(Number(ad.bidDeposit) || 0);
       if (bidDeposit < 1) throw new Error('กรุณาตั้งมัดจำสิทธิประมูล (อย่างน้อย ฿1)');
       const durationMinutes = resolveAuctionDurationMinutes(ad);
       const endsAt = computeAuctionEndsAt(ad);
       let buyNowPrice: number | null = null;
-      if (ad.buyNowPrice != null && ad.buyNowPrice !== '') {
+      if (ad.buyNowPrice != null && String(ad.buyNowPrice).trim() !== '') {
         buyNowPrice = Math.round(Number(ad.buyNowPrice));
         if (!Number.isFinite(buyNowPrice) || buyNowPrice <= dealPrice) {
           throw new Error('ราคาซื้อทันทีต้องสูงกว่าราคาเริ่มต้น');
