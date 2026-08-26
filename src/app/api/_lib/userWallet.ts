@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { WalletApplyResult, WalletLedgerType } from '@/lib/userWallet';
+import type { AuctionDepositLock, WalletApplyResult, WalletLedgerType } from '@/lib/userWallet';
 import { notifyUsers } from './notify';
 
 export class WalletInsufficientError extends Error {
@@ -106,12 +106,56 @@ export async function creditApprovedWalletTopup(
   });
 }
 
+export async function getAuctionDepositLock(
+  db: SupabaseClient,
+  dealId: string,
+  bidderId: string,
+  fallbackAmount = 0,
+): Promise<AuctionDepositLock> {
+  const { data: hold } = await db
+    .from('auction_deposit_holds')
+    .select('amount, status')
+    .eq('deal_id', dealId)
+    .eq('bidder_id', bidderId)
+    .maybeSingle();
+
+  const holdAmount = Math.round(Number(hold?.amount) || 0);
+  const holdStatus = (hold?.status as AuctionDepositLock['status']) || null;
+
+  if (holdStatus === 'held' || holdStatus === 'forfeited') {
+    return {
+      locked: holdStatus === 'held',
+      amount: holdAmount || Math.round(fallbackAmount) || 0,
+      status: holdStatus,
+    };
+  }
+
+  const { data: prior } = await db
+    .from('auction_bids')
+    .select('id')
+    .eq('deal_id', dealId)
+    .eq('bidder_id', bidderId)
+    .limit(1);
+  if (prior?.length) {
+    return {
+      locked: true,
+      amount: holdAmount || Math.round(fallbackAmount) || 0,
+      status: holdStatus === 'released' ? 'released' : 'held',
+    };
+  }
+
+  return { locked: false, amount: 0, status: holdStatus };
+}
+
 export async function holdAuctionDeposit(
   db: SupabaseClient,
   opts: { dealId: string; bidderId: string; amount: number; title: string },
 ) {
   const amount = Math.round(opts.amount);
   if (amount <= 0) return null;
+
+  const lock = await getAuctionDepositLock(db, opts.dealId, opts.bidderId, amount);
+  if (lock.locked) return lock;
 
   const { data: existing } = await db
     .from('auction_deposit_holds')

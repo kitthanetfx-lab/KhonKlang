@@ -22,6 +22,13 @@ export interface WalletApplyResult {
   idempotent?: boolean;
 }
 
+/** สถานะมัดจำประมูลของฉันในรายการนั้น — ล็อกครั้งเดียวตอนบิทแรก */
+export interface AuctionDepositLock {
+  locked: boolean;
+  amount: number;
+  status: 'held' | 'released' | 'forfeited' | null;
+}
+
 export const AUCTION_DEPOSIT_PRESETS = [100, 300, 500, 1000] as const;
 export const WALLET_TOPUP_PRESETS = [100, 300, 500, 1000, 2000] as const;
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient, verifyUser, HttpError } from '@/lib/supabaseServer';
 import { placeAuctionBid } from '../../../_lib/auctionSync';
-import { WalletInsufficientError } from '../../../_lib/userWallet';
+import { getAuctionDepositLock, WalletInsufficientError } from '../../../_lib/userWallet';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,7 +21,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const name = profile?.display_name || me.email || 'สมาชิก';
 
     const auction = await placeAuctionBid(db, id, me.id, name, amount, { maxBid, stepAmount, clearAutoBid });
-    return NextResponse.json({ ok: true, auction });
+    const myDepositHold = await getAuctionDepositLock(db, id, me.id, auction.bidDeposit);
+    return NextResponse.json({ ok: true, auction, myDepositHold });
   } catch (err: unknown) {
     if (err instanceof WalletInsufficientError) {
       return NextResponse.json({

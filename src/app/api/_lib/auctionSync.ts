@@ -4,7 +4,7 @@ import { computeAuctionGp } from '@/lib/fees';
 import { readFeesConfig } from './financeLedger';
 import { notifyUsers } from './notify';
 import { notifyUserLineOverbid, notifySellerLineNewBid } from '@/lib/lineUserNotify';
-import { holdAuctionDeposit, releaseLosingAuctionDeposits } from './userWallet';
+import { getAuctionDepositLock, holdAuctionDeposit, releaseLosingAuctionDeposits } from './userWallet';
 
 /** แนบข้อมูลประมูลให้รายการ deals */
 export async function attachAuctions<T extends { id: string; deal_type?: string }>(
@@ -314,12 +314,15 @@ export async function placeAuctionBid(
 
   const bidDeposit = Math.max(0, Math.round(Number(auction.bid_deposit) || 0));
   if (bidDeposit > 0) {
-    await holdAuctionDeposit(db, {
-      dealId,
-      bidderId,
-      amount: bidDeposit,
-      title: String(deal.title || 'ประมูล'),
-    });
+    const alreadyLocked = await getAuctionDepositLock(db, dealId, bidderId, bidDeposit);
+    if (!alreadyLocked.locked) {
+      await holdAuctionDeposit(db, {
+        dealId,
+        bidderId,
+        amount: bidDeposit,
+        title: String(deal.title || 'ประมูล'),
+      });
+    }
   }
 
   if (!options?.clearAutoBid && maxBid != null) {

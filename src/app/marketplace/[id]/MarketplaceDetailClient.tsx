@@ -16,6 +16,7 @@ import { marketplaceListingBuyState } from '@/lib/marketplaceOrder';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { LineOaConnect } from '@/components/LineOaConnect';
 import type { AuctionPublic } from '@/lib/auction';
+import type { AuctionDepositLock } from '@/lib/userWallet';
 
 interface ListingDetail {
   id: string;
@@ -75,6 +76,7 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
   const [buyingNow, setBuyingNow] = useState(false);
   const [bidError, setBidError] = useState('');
   const [walletAvail, setWalletAvail] = useState<number | null>(null);
+  const [myDepositHold, setMyDepositHold] = useState<AuctionDepositLock | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
   async function loadListing(authOverride?: Record<string, string>) {
@@ -94,6 +96,7 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
     const autoStep = data.myAutoBidStep != null ? Number(data.myAutoBidStep) : null;
     setMyAutoBidMax(autoMax);
     setMyAutoBidStep(autoStep && autoStep > 0 ? autoStep : null);
+    setMyDepositHold(prev => data.myDepositHold ?? prev);
     if (autoMax != null) {
       setMaxBidAmount(String(autoMax));
       setAutoBidOn(true);
@@ -233,6 +236,15 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
         setAuction(data.auction);
         setBidAmount(String(data.auction.minNextBid));
       }
+      if (data.myDepositHold) {
+        setMyDepositHold(data.myDepositHold);
+      } else {
+        setMyDepositHold({
+          locked: true,
+          amount: auction.bidDeposit,
+          status: 'held',
+        });
+      }
       if (!autoBidOn) {
         setMyAutoBidMax(null);
         setMyAutoBidStep(null);
@@ -354,6 +366,7 @@ export function MarketplaceDetailClient({ listingId }: { listingId: string }) {
     buyingNow,
     buyNowAuction,
     walletAvail,
+    myDepositHold,
     myId,
     joining,
     auctionBids,
@@ -437,6 +450,7 @@ type DetailPanelProps = {
   buyingNow: boolean;
   buyNowAuction: () => void;
   walletAvail: number | null;
+  myDepositHold: AuctionDepositLock | null;
   myId: string;
   joining: boolean;
   auctionBids: AuctionBid[];
@@ -479,6 +493,7 @@ function MarketplaceDetailPanel({
   buyingNow,
   buyNowAuction,
   walletAvail,
+  myDepositHold,
   myId,
   joining,
   auctionBids,
@@ -490,8 +505,10 @@ function MarketplaceDetailPanel({
   bidIdSuffix,
 }: DetailPanelProps) {
   const needsDeposit = !!(isAuction && auction && auction.bidDeposit > 0);
-  const walletLoading = !!myId && needsDeposit && walletAvail === null;
-  const walletInsufficient = needsDeposit && walletAvail != null && walletAvail < (auction?.bidDeposit ?? 0);
+  const depositLocked = !!myDepositHold?.locked;
+  const lockedAmount = myDepositHold?.amount || auction?.bidDeposit || 0;
+  const walletLoading = !!myId && needsDeposit && !depositLocked && walletAvail === null;
+  const walletInsufficient = needsDeposit && !depositLocked && walletAvail != null && walletAvail < (auction?.bidDeposit ?? 0);
   const canShowBidForm = !walletLoading && !walletInsufficient;
   const canBuyNow = !!(auction?.buyNowPrice && auction.phase === 'live'
     && (auction.currentBid == null || auction.currentBid < auction.buyNowPrice));
@@ -615,10 +632,18 @@ function MarketplaceDetailPanel({
         {isAuction && auction && !isOwner && auction.phase === 'live' && (
           <div className="pd-bid">
             {auction.bidDeposit > 0 && (
-              <div className="pd-deposit-note">
+              <div className={`pd-deposit-note${depositLocked ? ' pd-deposit-note--locked' : ''}`}>
                 <div>
-                  มัดจำสิทธิประมูล <b>฿{auction.bidDeposit.toLocaleString()}</b> จะถูกล็อกจากกระเป๋าตอน Bid
-                  {walletAvail != null && <> · ยอดว่าง <b>฿{walletAvail.toLocaleString()}</b></>}
+                  {depositLocked ? (
+                    <>
+                      ล็อกมัดจำแล้ว <b>฿{lockedAmount.toLocaleString()}</b> — บิทต่อได้โดยไม่ล็อกซ้ำ
+                    </>
+                  ) : (
+                    <>
+                      มัดจำสิทธิประมูล <b>฿{auction.bidDeposit.toLocaleString()}</b> จะถูกล็อกจากกระเป๋าตอน Bid ครั้งแรก
+                      {walletAvail != null && <> · ยอดว่าง <b>฿{walletAvail.toLocaleString()}</b></>}
+                    </>
+                  )}
                 </div>
                 {walletInsufficient && (
                   <Link href="/wallet" className="btn btn-green btn-sm" style={{ marginTop: 8 }}>

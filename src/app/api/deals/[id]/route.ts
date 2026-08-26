@@ -190,6 +190,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let myAutoBidMax: number | null = null;
     let myAutoBidStep: number | null = null;
     let myAuctionStatus: string | null = null;
+    let myDepositHold: { locked: boolean; amount: number; status: string | null } | null = null;
     let viewerId: string | null = null;
     let hasLineNotify = false;
     try {
@@ -235,10 +236,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (auction && viewerId) {
         const { getMyAutoBid } = await import('../../_lib/auctionSync');
         const { computeMyAuctionStatus } = await import('@/lib/auction');
+        const { getAuctionDepositLock } = await import('../../_lib/userWallet');
         const mine = await getMyAutoBid(db, id, viewerId);
         myAutoBidMax = mine?.maxAmount ?? null;
         myAutoBidStep = mine?.stepAmount ? mine.stepAmount : null;
         myAuctionStatus = computeMyAuctionStatus(auction, viewerId, current.buyer_id);
+        myDepositHold = await getAuctionDepositLock(db, id, viewerId, auction.bidDeposit);
       }
     }
 
@@ -256,6 +259,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       myAutoBidMax,
       myAutoBidStep,
       myAuctionStatus,
+      myDepositHold,
       hasLineNotify,
       lineOaUrl: process.env.NEXT_PUBLIC_LINE_OA_ADD_FRIEND_URL || process.env.NEXT_PUBLIC_LINE_OA_URL || '',
     });
