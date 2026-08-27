@@ -590,6 +590,7 @@ create table fee_config (
   platform_cut_percent    numeric(5,2) not null default 20,
   simple_fee_percent      numeric(5,2) not null default 2,
   simple_fee_min          integer not null default 20,
+  simple_fee_min_under_1000 integer not null default 20,
   simple_middleman_share_percent numeric(5,2) not null default 18,  -- legacy; ใช้ simple_share_tier* แทน
   simple_share_tier1_multiplier numeric(8,2) not null default 1,
   simple_share_tier1_percent numeric(5,2) not null default 30,

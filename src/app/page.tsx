@@ -110,7 +110,7 @@ function Hero({ stats, locale }: { stats: SiteStats | null; locale: 'th' | 'en' 
                 <span className="gradient-text">{locale === 'th' ? 'ได้ของชัวร์ ไม่โดนโกง' : 'Get the real item, avoid scams'}</span>
               </h1>
               <div className="hero-cta reveal" style={{ ['--d' as string]: '120ms' }}>
-                <Link className="btn btn-lg hero-cta-btn" href="/deal-all" style={{ background: 'var(--accent)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Link className="btn btn-lg hero-cta-btn" href="/service/simple" style={{ background: 'var(--accent)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   {locale === 'th' ? 'เริ่ม Deal' : 'Start a Deal'} <Icon name="arrowRight" size={23} />
                 </Link>
               </div>

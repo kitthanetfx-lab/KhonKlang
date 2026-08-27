@@ -288,11 +288,12 @@ export default function SettingsPage() {
             <AdminCard
               title="ดีลแบบง่าย"
               icon={<Zap size={18} className="text-orange-600" />}
-              hint="ดีลที่ไม่ผ่านคนกลางเต็มรูปแบบ — คิดค่าธรรมเนียมแบบรวม"
+              hint="ราคาสินค้าต่ำกว่า ฿1,000 ใช้ขั้นต่ำช่องแยก — ฿1,000 ขึ้นไปใช้ขั้นต่ำทั่วไป"
             >
               <AdminFieldGrid>
                 {numField('simpleFeePercent', 'ค่าธรรมเนียม', '%')}
                 {numField('simpleFeeMin', 'ขั้นต่ำ', 'บาท')}
+                {numField('simpleFeeMinUnder1000', 'ขั้นต่ำถ้าราคาต่ำกว่า ฿1,000', 'บาท')}
               </AdminFieldGrid>
             </AdminCard>
           </div>

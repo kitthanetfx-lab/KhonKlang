@@ -5,6 +5,8 @@ export interface FeeConfig {
   escrowFeePercent: number; escrowFeeMin: number;
   middlemanFeePercent: number; middlemanFeeMin: number; platformCutPercent: number;
   simpleFeePercent: number; simpleFeeMin: number;
+  /** ขั้นต่ำค่าธรรมเนียมดีลแบบง่าย เมื่อราคาสินค้าต่ำกว่า ฿1,000 */
+  simpleFeeMinUnder1000: number;
   /** @deprecated ใช้ simpleShareTier* แทน — เก็บไว้ backward compat */
   simpleMiddlemanSharePercent: number;
   simpleShareTier1Multiplier: number; simpleShareTier1Percent: number;
@@ -38,7 +40,7 @@ export interface FeeConfig {
 export const FEE_DEFAULTS: FeeConfig = {
   escrowFeePercent: 2.5, escrowFeeMin: 20,
   middlemanFeePercent: 1.5, middlemanFeeMin: 30, platformCutPercent: 20,
-  simpleFeePercent: 2, simpleFeeMin: 20, simpleMiddlemanSharePercent: 18,
+  simpleFeePercent: 2, simpleFeeMin: 20, simpleFeeMinUnder1000: 20, simpleMiddlemanSharePercent: 18,
   simpleShareTier1Multiplier: 1, simpleShareTier1Percent: 30,
   simpleShareTier2Multiplier: 2, simpleShareTier2Percent: 40,
   simpleShareTier3Multiplier: 4, simpleShareTier3Percent: 50,
@@ -151,12 +153,24 @@ export interface FeeBreakdown { lines: FeeLine[]; total: number; note?: string; 
 
 const pct = (price: number, percent: number, min: number) => Math.max(Math.round((price * percent) / 100), Math.round(min));
 
+export const SIMPLE_LOW_PRICE_THRESHOLD = 1000;
+
+/** ขั้นต่ำค่าธรรมเนียมดีลแบบง่ายตามราคาสินค้า */
+export function simpleFeeMinForPrice(c: FeeConfig, price: number): number {
+  const p = Number(price) || 0;
+  if (p > 0 && p < SIMPLE_LOW_PRICE_THRESHOLD) {
+    const low = Math.round(Number(c.simpleFeeMinUnder1000) || 0);
+    return low > 0 ? low : Math.round(Number(c.simpleFeeMin) || 0);
+  }
+  return Math.round(Number(c.simpleFeeMin) || 0);
+}
+
 /** คำนวณค่าบริการของดีลตามประเภท เพื่อแสดงให้ผู้ใช้รับรู้ตั้งแต่ต้น */
 export function computeDealFees(c: FeeConfig, price: number, dealType?: string): FeeBreakdown {
   const p = Number(price) || 0;
   const lines: FeeLine[] = [];
   if (dealType === 'simple') {
-    lines.push({ label: 'ค่าธรรมเนียมระบบ', amount: pct(p, c.simpleFeePercent, c.simpleFeeMin) });
+    lines.push({ label: 'ค่าธรรมเนียมระบบ', amount: pct(p, c.simpleFeePercent, simpleFeeMinForPrice(c, p)) });
   } else if (dealType === 'meetup') {
     lines.push({ label: 'ค่าบริการรับประกันเดินทาง', amount: pct(p, c.meetupFeePercent, c.meetupFeeMin) });
   } else {

@@ -80,6 +80,7 @@ export function AdminSettingsApp({
               <div className="admin-app-form-card">
                 <NumField label="ค่าธรรมเนียม" unit="%" value={fees.simpleFeePercent} onChange={v => setField('simpleFeePercent', v)} />
                 <NumField label="ขั้นต่ำ" unit="บาท" value={fees.simpleFeeMin} onChange={v => setField('simpleFeeMin', v)} />
+                <NumField label="ขั้นต่ำถ้าราคาต่ำกว่า ฿1,000" unit="บาท" value={fees.simpleFeeMinUnder1000} onChange={v => setField('simpleFeeMinUnder1000', v)} />
               </div>
             </AdminAppSection>
             <AdminAppSection title="GP ตลาด">

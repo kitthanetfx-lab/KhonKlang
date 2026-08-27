@@ -67,6 +67,7 @@ export async function readFeesConfig(db: SupabaseClient): Promise<FeeConfig> {
     platformCutPercent: Number(data.platform_cut_percent) || FEE_DEFAULTS.platformCutPercent,
     simpleFeePercent: Number(data.simple_fee_percent) || FEE_DEFAULTS.simpleFeePercent,
     simpleFeeMin: Number(data.simple_fee_min) || FEE_DEFAULTS.simpleFeeMin,
+    simpleFeeMinUnder1000: Number(data.simple_fee_min_under_1000) || FEE_DEFAULTS.simpleFeeMinUnder1000,
     simpleMiddlemanSharePercent: Number(data.simple_middleman_share_percent) || FEE_DEFAULTS.simpleMiddlemanSharePercent,
     simpleShareTier1Multiplier: Number(data.simple_share_tier1_multiplier) || FEE_DEFAULTS.simpleShareTier1Multiplier,
     simpleShareTier1Percent: Number(data.simple_share_tier1_percent) ?? FEE_DEFAULTS.simpleShareTier1Percent,
