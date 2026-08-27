@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabaseServer';
+import { isListingStoreOrder } from '@/lib/marketplaceOrder';
 import { deleteDealById } from '../../_lib/deleteDeal';
 
-/** ลบดีลที่อีกฝ่ายยังไม่เข้าร่วมเกิน 2 วัน — เรียกจาก Vercel Cron ทุกวัน */
+/** ลบดีลส่วนตัวที่อีกฝ่ายยังไม่เข้าร่วมเกิน 2 วัน — ยกเว้นตลาดและประมูล */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
@@ -18,15 +19,21 @@ export async function GET(req: NextRequest) {
     const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
     const { data: stale, error } = await db
       .from('deals')
-      .select('id, deal_number, status, created_at')
+      .select('id, deal_number, status, created_at, source, deal_type')
       .in('status', ['posted', 'waiting_seller', 'waiting_buyer'])
+      .neq('source', 'listing')
       .lt('created_at', cutoff)
       .limit(200);
     if (error) throw new Error(error.message);
 
+    const candidates = (stale || []).filter(row =>
+      row.deal_type !== 'auction' && !isListingStoreOrder(row),
+    );
+    const skipped = (stale?.length || 0) - candidates.length;
+
     const deleted: string[] = [];
     const failed: { id: string; error: string }[] = [];
-    for (const row of stale || []) {
+    for (const row of candidates) {
       try {
         const ok = await deleteDealById(db, row.id);
         if (ok) deleted.push(row.id);
@@ -39,6 +46,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       cutoff,
       scanned: stale?.length || 0,
+      skipped,
       deleted: deleted.length,
       deletedIds: deleted,
       failed,
