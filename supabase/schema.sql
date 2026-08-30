@@ -238,6 +238,7 @@ create table deal_price_state (
   seller_fee_slip       text,
   seller_fee_slip_verified_at timestamptz,
   payout_sent_at        timestamptz,
+  payout_requested_at   timestamptz,
   payout_slip_file_id   text,
   payout_note           text,
   refund_sent_at        timestamptz,

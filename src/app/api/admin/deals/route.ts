@@ -5,6 +5,7 @@ import {
   getAdminDealCounts,
   loadAdminDealSnapshot,
   dealMatchesStatusTab,
+  isInPaySellerQueue,
   type AdminDealSnapshot,
 } from '../../_lib/adminDealQueue';
 import { maybeNotifyAdminLineQueues, maybeNotifyAdminInAppQueues } from '../../_lib/adminLineNotifyHook';
@@ -152,7 +153,7 @@ export async function GET(req: NextRequest) {
     documents = await attachDealImages(db, documents);
 
     // กรองเพิ่มฝั่ง JS เพราะต้องเช็คฟิลด์ที่อยู่ใน deal_price_state/deal_meetup (join แล้วถึงรู้)
-    if (filter === 'pay_seller') documents = documents.filter(d => !d.priceState?.payout_slip_file_id);
+    if (filter === 'pay_seller') documents = documents.filter(d => isInPaySellerQueue(d, d.priceState));
     else if (filter === 'refund_pending') documents = documents.filter(d => !!d.payment_slip_file_id && !d.priceState?.refund_slip_file_id);
     else if (filter === 'middleman_fee') documents = documents.filter(d => !d.priceState?.middleman_fee_sent_at);
     else if (filter === 'meetup_refund') documents = documents.filter(d => !d.meetup?.refund_outcome);

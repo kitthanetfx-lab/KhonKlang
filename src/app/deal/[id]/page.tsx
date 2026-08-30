@@ -298,6 +298,7 @@ interface DealPriceState {
   chat_done_seller?: boolean; chat_done_buyer?: boolean; chat_done_middleman?: boolean;
   chat_back_req_seller?: boolean; chat_back_req_buyer?: boolean; chat_back_req_middleman?: boolean;
   seller_fee_slip?: string;
+  payout_requested_at?: string;
   payout_slip_file_id?: string; refund_slip_file_id?: string;
   // ค่าบริการที่คนกลางเสนอเอง
   proposed_mm_fee?: number; proposed_inspection_fee?: number;
@@ -758,6 +759,7 @@ export default function DealRoom() {
     deal?.fee_payer,
     priceState?.agreed,
     priceState?.seller_fee_slip,
+    priceState?.payout_requested_at,
     priceState?.payout_slip_file_id,
     priceState?.refund_slip_file_id,
     feeConfig,
@@ -797,6 +799,7 @@ export default function DealRoom() {
     priceState?.evidence_done_seller,
     priceState?.evidence_done_middleman,
     priceState?.seller_fee_slip,
+    priceState?.payout_requested_at,
     priceState?.payout_slip_file_id,
     priceState?.refund_slip_file_id,
     chatReviewReady,
@@ -2281,9 +2284,60 @@ export default function DealRoom() {
 
   function renderCompletionReviewBlock(isCancelled: boolean, opts?: { simple?: boolean }) {
     const simple = opts?.simple ?? false;
-    const completionBtnLabel = myRole === 'seller' ? 'ยืนยัน-รับเงินค่าสินค้า' : 'บันทึกหลักฐาน-จบดีล';
+    const pd: DealPriceState = priceState || {};
+    const payoutRequested = !!pd.payout_requested_at;
+    const isSellerSimple = simple && myRole === 'seller';
     const isNotParty = myRole === 'guest' || myRole === '';
-    const alreadyDone = completionReviewed || isCancelled || isNotParty;
+    const reviewDone = completionReviewed || isCancelled || isNotParty;
+    const goHomeBtn = (
+      <button type="button" className="btn btn-soft btn-block btn-lg simple-deal-final-cta" onClick={() => router.push('/')}>
+        🏠 เสร็จสิ้น-กลับหน้าหลัก
+      </button>
+    );
+    const reviewSubmitBtn = (
+      <AsyncButton
+        type="button"
+        className="btn btn-green btn-block btn-lg simple-deal-final-cta"
+        disabled={!completionAllRated}
+        loading={completionSending}
+        onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
+      >
+        {isSellerSimple ? '💾 บันทึกรีวิว' : myRole === 'seller' ? '💾 ยืนยัน-รับเงินค่าสินค้า' : '💾 บันทึกหลักฐาน-จบดีล'}
+      </AsyncButton>
+    );
+
+    let cta = goHomeBtn;
+    if (!isCancelled && !isNotParty) {
+      if (isSellerSimple) {
+        if (!completionReviewed) cta = reviewSubmitBtn;
+        else if (!payoutRequested) {
+          cta = (
+            <>
+              <AsyncButton
+                type="button"
+                className="btn btn-green btn-block btn-lg simple-deal-final-cta"
+                loading={completionSending || acting}
+                onClick={async () => {
+                  setCompletionSending(true);
+                  try {
+                    await doAction('request_payout');
+                  } finally {
+                    setCompletionSending(false);
+                  }
+                }}
+              >
+                💰 ขอรับเงินค่าสินค้า
+              </AsyncButton>
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.55, marginTop: 4 }}>
+                ทีมงานจะได้รับแจ้งให้โอนเงินหลังคุณกดปุ่มนี้
+              </p>
+            </>
+          );
+        }
+      } else if (!reviewDone) {
+        cta = reviewSubmitBtn;
+      }
+    }
 
     return (
       <div className={`simple-deal-final-review${simple ? ' simple-deal-final-review--simple' : ''}`}>
@@ -2299,21 +2353,7 @@ export default function DealRoom() {
             externalSubmitTrigger={completionSubmitTrigger}
           />
         )}
-        {alreadyDone ? (
-          <button type="button" className="btn btn-soft btn-block btn-lg simple-deal-final-cta" onClick={() => router.push('/')}>
-            🏠 เสร็จสิ้น-กลับหน้าหลัก
-          </button>
-        ) : (
-          <AsyncButton
-            type="button"
-            className="btn btn-green btn-block btn-lg simple-deal-final-cta"
-            disabled={!completionAllRated}
-            loading={completionSending}
-            onClick={() => { setCompletionSending(true); setCompletionSubmitTrigger(t => t + 1); }}
-          >
-            {`💾 ${completionBtnLabel}`}
-          </AsyncButton>
-        )}
+        {cta}
         {simple && !isCancelled && (
           <DealOthersReviewsSummary dealId={deal!.id} headers={authHdrs} />
         )}
@@ -3865,6 +3905,7 @@ export default function DealRoom() {
     if (outcome === 'disputed') return renderWizardStep7('disputed');
     const pd: DealPriceState = priceState || {};
     const hasPayout = !!pd.payout_slip_file_id;
+    const payoutRequested = !!pd.payout_requested_at;
     const isCancelled = outcome === 'cancelled';
 
     let doneTitle: string;
@@ -3877,6 +3918,20 @@ export default function DealRoom() {
       doneSub = pd.refund_slip_file_id
         ? 'ศูนย์กลางโอนเงินคืนผู้ซื้อเรียบร้อยแล้ว'
         : 'ทีมงานกำลังดำเนินการคืนเงินให้ผู้ซื้อ';
+    } else if (myRole === 'seller') {
+      if (hasPayout) {
+        doneEmoji = '🎉';
+        doneTitle = 'รับเงินค่าสินค้าแล้ว';
+        doneSub = 'ศูนย์กลางโอนเงินให้คุณเรียบร้อยแล้ว';
+      } else if (payoutRequested) {
+        doneEmoji = '💸';
+        doneTitle = 'ขอรับเงินแล้ว';
+        doneSub = 'ทีมงานกำลังโอนเงินค่าสินค้าให้คุณ';
+      } else {
+        doneEmoji = '⭐';
+        doneTitle = 'ผู้ซื้อยืนยันรับสินค้าแล้ว';
+        doneSub = 'ให้คะแนนรีวิว แล้วกดขอรับเงินค่าสินค้า — ทีมงานจะโอนหลังจากนั้น';
+      }
     } else {
       doneEmoji = '🎉';
       doneTitle = 'ดีลเสร็จสมบูรณ์!';
@@ -3898,6 +3953,7 @@ export default function DealRoom() {
 
     const sellerOk = isCancelled ? true : hasPayout;
     const buyerOk = true;
+    const sellerWaitText = payoutRequested ? '⏳ รอทีมงานโอนเงิน' : '⏳ รอผู้ขายรีวิวและขอรับเงิน';
 
     return (
       <div className="simple-deal-final">
@@ -3932,8 +3988,8 @@ export default function DealRoom() {
               roleLabel: 'ผู้ขาย',
               name: deal!.seller_name || '-',
               ok: sellerOk,
-              doneText: isCancelled ? '✅ ดีลยกเลิกแล้ว' : hasPayout ? '✅ รับเงินแล้ว' : '⏳ รอทีมงานโอนเงิน',
-              waitText: '⏳ รอทีมงานโอนเงิน',
+              doneText: isCancelled ? '✅ ดีลยกเลิกแล้ว' : hasPayout ? '✅ รับเงินแล้ว' : sellerWaitText,
+              waitText: sellerWaitText,
             },
             {
               roleLabel: 'ผู้ซื้อ',

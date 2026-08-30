@@ -28,7 +28,8 @@ interface DealMeetup {
 }
 interface DealPriceState {
   proposed_fee_payer?: 'buyer' | 'seller' | 'split';
-  seller_fee_slip?: string; seller_fee_slip_verified_at?: string; payout_slip_file_id?: string; refund_slip_file_id?: string;
+  seller_fee_slip?: string; seller_fee_slip_verified_at?: string;
+  payout_requested_at?: string; payout_slip_file_id?: string; refund_slip_file_id?: string;
   middleman_fee_sent_at?: string; middleman_fee_slip_file_id?: string;
 }
 interface BankInfo { bankName: string; bankAcct: string; bankOwner: string; }
@@ -440,6 +441,9 @@ function AdminDealsInner() {
     if (d.status === 'completed' && d.deal_type === 'meetup' && !d.meetup?.refund_outcome) {
       return { label: '⏳ รอตัดสินคืนเงินประกัน', cls: 'bg-amber-100 text-amber-700' };
     }
+    if (d.status === 'completed' && d.deal_type === 'simple' && !d.priceState?.payout_slip_file_id && !d.priceState?.payout_requested_at) {
+      return { label: '⏳ รอผู้ขายขอรับเงิน', cls: 'bg-slate-100 text-slate-700' };
+    }
     if (d.status === 'completed' && d.deal_type !== 'meetup' && !d.priceState?.payout_slip_file_id) {
       return { label: '⏳ รอโอนเงินให้ผู้ขาย', cls: 'bg-amber-100 text-amber-700' };
     }
@@ -767,7 +771,10 @@ function AdminDealsInner() {
                       : <p className="text-red-600">⚠️ ผู้ขายยังไม่ผูกบัญชีธนาคาร</p>}
                   </div>
                 )}
-                {d.deal_type !== 'meetup' && (d.status === 'completed' || d.status === 'disputed') && !d.priceState?.payout_slip_file_id && (
+                {d.deal_type === 'simple' && d.status === 'completed' && !d.priceState?.payout_slip_file_id && !d.priceState?.payout_requested_at && (
+                  <p className="text-xs mt-2 text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 inline-block">รอผู้ขายรีวิวแล้วกดขอรับเงิน</p>
+                )}
+                {d.deal_type !== 'meetup' && (d.status === 'completed' || d.status === 'disputed') && !d.priceState?.payout_slip_file_id && (d.deal_type !== 'simple' || !!d.priceState?.payout_requested_at) && (
                   d.sellerBank?.bankAcct
                     ? <p className="text-xs mt-2 text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 inline-block">🏦 โอนให้ผู้ขาย: {d.sellerBank.bankName} {d.sellerBank.bankAcct}</p>
                     : <p className="text-xs mt-2 text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1 inline-block">⚠️ ผู้ขายยังไม่ผูกบัญชีธนาคาร</p>
@@ -1057,7 +1064,7 @@ function AdminDealsInner() {
                     ✅ {refund.outcomeLabel}{refund.refundedAt ? '' : ' (อายัด — ยังไม่คืน)'}
                   </span>
                 )}
-                {d.status === 'completed' && d.deal_type !== 'meetup' && !d.priceState?.payout_slip_file_id && (
+                {d.status === 'completed' && d.deal_type !== 'meetup' && !d.priceState?.payout_slip_file_id && (d.deal_type !== 'simple' || !!d.priceState?.payout_requested_at) && (
                   <button onClick={() => markMoneySent(d.id, 'mark_payout_sent')} disabled={!!acting}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 disabled:opacity-50">
                     {acting === d.id ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} โอนเงินให้ผู้ขายแล้ว — แนบสลิป

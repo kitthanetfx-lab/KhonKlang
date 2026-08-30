@@ -43,6 +43,7 @@ export type AdminPriceStateRow = {
   deal_id?: string;
   proposed_fee_payer?: string | null;
   payout_slip_file_id?: string | null;
+  payout_requested_at?: string | null;
   refund_slip_file_id?: string | null;
   middleman_fee_sent_at?: string | null;
   seller_fee_slip?: string | null;
@@ -67,7 +68,10 @@ export function middlemanNetFeeAmount(fees: FeeConfig, deal: AdminDealRow): numb
 }
 
 export function isInPaySellerQueue(deal: AdminDealRow, ps?: AdminPriceStateRow | null) {
-  return deal.status === 'completed' && deal.deal_type !== 'meetup' && !ps?.payout_slip_file_id;
+  if (deal.status !== 'completed' || deal.deal_type === 'meetup' || !!ps?.payout_slip_file_id) return false;
+  // ดีลแบบง่าย: รอผู้ขายรีวิวแล้วกดขอรับเงิน ก่อนเข้าคิวโอน
+  if (deal.deal_type === 'simple') return !!ps?.payout_requested_at;
+  return true;
 }
 
 export function isInRefundPendingQueue(deal: AdminDealRow, ps?: AdminPriceStateRow | null) {

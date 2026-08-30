@@ -387,7 +387,7 @@ export async function syncDealLedger(db: SupabaseClient, deal: Record<string, un
       }));
     }
 
-    if (status === 'completed') {
+    if (status === 'completed' && (dealType !== 'simple' || !!pd.payout_requested_at)) {
       const sellerPayoutAmount = Math.max(price, 0) + shippingCost;
       await push(buildEntry({
         entry_key: `deal:${dealId}:seller_payout`, reference_type: 'deal', reference_id: dealId, deal_id: dealId, deal_number: dealNumber,

@@ -296,7 +296,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let writeChatMsg = true; // บางเหตุการณ์ (เช่น เข้ามาดูห้อง) แจ้งเตือนอย่างเดียว ไม่ลงแชท
 
     // โหลด deal_price_state / deal_meetup ตามต้องการ (เฉพาะ action ที่ใช้)
-    const needsPriceState = ['select_fee_payer', 'accept_terms', 'confirm_payment', 'price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back', 'request_evidence'].includes(action);
+    const needsPriceState = ['select_fee_payer', 'accept_terms', 'confirm_payment', 'price_propose', 'price_agree', 'evidence_done', 'seller_fee_paid', 'propose_mm_fees', 'accept_mm_fees', 'request_chat_back', 'request_evidence', 'request_payout'].includes(action);
     const needsMeetup = action.startsWith('meetup_');
     const [pdRow, mdRow] = await Promise.all([
       needsPriceState ? db.from('deal_price_state').select('*').eq('deal_id', id).maybeSingle().then(r => r.data) : Promise.resolve(null),
@@ -1026,6 +1026,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!body.fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
         priceUpdates = { seller_fee_slip: String(body.fileId), seller_fee_slip_verified_at: null };
         systemMsg = 'ผู้ขายโอนค่าบริการส่วนของตนแล้ว — รอศูนย์กลางตรวจสอบ';
+        break;
+      }
+      case 'request_payout': {
+        if (!isSeller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (deal.deal_type !== 'simple') return NextResponse.json({ error: 'ขอรับเงินแบบนี้ใช้กับดีลผ่านกลางแบบง่ายเท่านั้น' }, { status: 400 });
+        if (deal.status !== 'completed') return NextResponse.json({ error: 'ขอรับเงินได้เมื่อผู้ซื้อยืนยันรับสินค้าแล้ว' }, { status: 400 });
+        if (pd.payout_requested_at) {
+          writeChatMsg = false;
+          break;
+        }
+        const { count: reviewCount } = await db.from('reviews').select('id', { count: 'exact', head: true })
+          .eq('deal_id', id).eq('reviewer_id', me.id);
+        if ((reviewCount || 0) === 0) {
+          return NextResponse.json({ error: 'กรุณารีวิวดิลก่อนขอรับเงินค่าสินค้า' }, { status: 400 });
+        }
+        priceUpdates = { payout_requested_at: new Date().toISOString() };
+        systemMsg = 'ผู้ขายรีวิวแล้วและขอรับเงินค่าสินค้า — รอศูนย์กลางโอนเงิน';
         break;
       }
       case 'update_listing': {

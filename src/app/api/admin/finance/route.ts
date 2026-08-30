@@ -536,6 +536,12 @@ export async function PATCH(req: NextRequest) {
       if (action === 'mark_payout_sent' && deal.status !== 'completed') {
         return NextResponse.json({ error: 'ดีลนี้ยังไม่ปิด — ยังจ่ายคืนผู้ขายไม่ได้' }, { status: 400 });
       }
+      if (action === 'mark_payout_sent' && deal.deal_type === 'simple') {
+        const { data: payoutState } = await db.from('deal_price_state').select('payout_requested_at').eq('deal_id', id).maybeSingle();
+        if (!payoutState?.payout_requested_at) {
+          return NextResponse.json({ error: 'รอผู้ขายรีวิวและขอรับเงินก่อนโอนค่าสินค้า' }, { status: 400 });
+        }
+      }
       if (action === 'mark_refund_sent' && deal.status !== 'cancelled') {
         return NextResponse.json({ error: 'ดีลนี้ไม่ได้ถูกยกเลิก' }, { status: 400 });
       }
