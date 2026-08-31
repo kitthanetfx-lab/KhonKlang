@@ -9,8 +9,9 @@ import { SubPageHeader } from '@/components/mobile/SubPageHeader';
 import { ProfileConsentModal } from '@/components/ProfileConsentModal';
 import { Icon } from '@/components/Icon';
 import { THAI_BANKS } from '@/lib/banks';
-import { isProfileComplete } from '@/lib/profileComplete';
+import { isProfileComplete, resumePathAfterProfile, safeReturnTo } from '@/lib/profileComplete';
 import { LineOaConnect } from '@/components/LineOaConnect';
+import { useProfileGate } from '@/components/AuthGate';
 
 const qrUrl = (id: string) => fileViewUrl(DEAL_BUCKET, id);
 
@@ -84,6 +85,7 @@ function StatusBadge({ status }: { status: string }) {
 function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { markProfileComplete } = useProfileGate();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [prefs, setPrefs] = useState<Record<string, string>>({});
@@ -204,6 +206,16 @@ function ProfilePage() {
   // ข้อมูลบังคับยังไม่ครบ — ต้องล็อกหน้าไว้ในโหมดกรอกข้อมูล ซ่อนทางออกทั้งหมดจนกว่าจะบันทึกสำเร็จ
   const locked = !isProfileComplete(prefs);
 
+  useEffect(() => {
+    if (loading || editing || locked) return;
+    const raw = searchParams.get('returnTo');
+    if (!raw) return;
+    const dest = resumePathAfterProfile(raw);
+    if (dest === '/profile' || dest.startsWith('/profile?')) return;
+    markProfileComplete();
+    router.replace(dest);
+  }, [loading, editing, locked, searchParams, router, markProfileComplete]);
+
   async function uploadBankQr(file: File) {
     setQrUploading(true);
     try {
@@ -269,10 +281,9 @@ function ProfilePage() {
       const newPrefs = { ...prefs, first_name: editFirst, last_name: editLast, phone: editPhone, address, display_name: `${editFirst} ${editLast}`.trim(), bank_name: editBankName, bank_acct: editBankAcct, bank_owner: editBankOwner, bank_qr_file_id: editBankQr };
       setPrefs(newPrefs); setDisplayName(`${editFirst} ${editLast}`.trim()); setSaveOk(true);
       if (wasLocked) {
-        // กรอกข้อมูลบังคับครบแล้วเป็นครั้งแรก — ไปหน้าที่ตั้งใจไว้ หรือหน้าหลักถ้าไม่มี
-        const returnTo = searchParams.get('returnTo');
-        const dest = (returnTo && returnTo.startsWith('/')) ? returnTo : '/';
-        setTimeout(() => { router.replace(dest); }, 1200);
+        markProfileComplete();
+        const dest = resumePathAfterProfile(safeReturnTo(searchParams.get('returnTo')));
+        setTimeout(() => { router.replace(dest); }, 800);
       } else {
         setTimeout(() => { setEditing(false); setSaveOk(false); }, 1200);
       }
@@ -440,7 +451,11 @@ function ProfilePage() {
                 </div>
               </div>
               {error && <div style={{ color: '#b22441', fontSize: 13, background: '#fdeef1', border: '1px solid #fbd5dd', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>⚠️ {error}</div>}
-              {saveOk && <div style={{ color: 'var(--green-700)', fontSize: 13, background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>✅ บันทึกสำเร็จ!</div>}
+              {saveOk && (
+                <div style={{ color: 'var(--green-700)', fontSize: 13, background: 'var(--green-50)', border: '1px solid var(--green-100)', borderRadius: 'var(--r-sm)', padding: '9px 14px' }}>
+                  {searchParams.get('returnTo') ? '✅ บันทึกสำเร็จ — กำลังกลับไปทำรายการ' : '✅ บันทึกสำเร็จ!'}
+                </div>
+              )}
             </div>
           ) : (
             [['ชื่อ-นามสกุล', `${firstName} ${lastName}`.trim() || '—'], ['อีเมล', email || '—'], ['เบอร์โทร', phone || '—'], ['ที่อยู่', address || '—']].map(([l, v]) => (

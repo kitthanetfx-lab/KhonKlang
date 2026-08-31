@@ -1,9 +1,14 @@
 'use client';
 
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { isProfileComplete, REQUIRED_PROFILE_FIELDS } from '@/lib/profileComplete';
+import {
+  currentAppPath,
+  isProfileComplete,
+  profileIncompleteRedirectUrl,
+  REQUIRED_PROFILE_FIELDS,
+} from '@/lib/profileComplete';
 import { appLoginUrl, redirectAppEntrySync } from '@/lib/appDeepLinkNav';
 import { isGlanghubApp } from '@/lib/nativeAuth';
 
@@ -53,8 +58,12 @@ function isProfileRequiredPath(path: string) {
 
 interface GateState {
   profileComplete: boolean;
+  markProfileComplete: () => void;
 }
-const ProfileGateContext = createContext<GateState>({ profileComplete: true });
+const ProfileGateContext = createContext<GateState>({
+  profileComplete: true,
+  markProfileComplete: () => {},
+});
 export function useProfileGate() {
   return useContext(ProfileGateContext);
 }
@@ -70,6 +79,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   /** ผ่านการยืนยัน session บนหน้าที่ต้องล็อกอินแล้ว (ไม่ใช่แค่เคยอยู่หน้า public) */
   const gateVerifiedRef = useRef(false);
   const profileCompleteRef = useRef(true);
+  const markProfileComplete = useCallback(() => {
+    profileCompleteRef.current = true;
+    setProfileComplete(true);
+  }, []);
 
   // แอpp + ยังไม่ login → redirect ก่อน paint (สำรอง entry guard)
   useLayoutEffect(() => {
@@ -96,7 +109,22 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           && isProfileRequiredPath(pathname)
           && !pathname.startsWith('/profile')
         ) {
-          router.replace(`/profile?returnTo=${encodeURIComponent(pathname)}`);
+          // อาจกรอกโปรไฟล์ครบแล้วในหน้านี้ แต่ ref ยังค้าง — เช็ค DB ก่อนเด้งกลับ
+          const { data: live } = await supabase.auth.getSession();
+          if (!active) return;
+          if (live.session) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select(REQUIRED_PROFILE_FIELDS.join(','))
+              .eq('id', live.session.user.id)
+              .maybeSingle();
+            if (!active) return;
+            const complete = isProfileComplete(profile as Record<string, unknown> | null);
+            setProfileComplete(complete);
+            profileCompleteRef.current = complete;
+            if (complete) return;
+          }
+          router.replace(profileIncompleteRedirectUrl(currentAppPath()));
         }
         return;
       }
@@ -127,7 +155,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       profileCompleteRef.current = complete;
 
       if (!complete && isProfileRequiredPath(pathname) && !pathname.startsWith('/profile')) {
-        router.replace(`/profile?returnTo=${encodeURIComponent(pathname)}`);
+        router.replace(profileIncompleteRedirectUrl(currentAppPath()));
       }
 
       gateVerifiedRef.current = true;
@@ -169,7 +197,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   if (!authed) return null;
 
   return (
-    <ProfileGateContext.Provider value={{ profileComplete }}>
+    <ProfileGateContext.Provider value={{ profileComplete, markProfileComplete }}>
       {children}
     </ProfileGateContext.Provider>
   );
