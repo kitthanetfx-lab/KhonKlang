@@ -23,6 +23,7 @@ import { TH_LOGISTICS_PROVIDERS, buildTrackingUrl, getLogisticsProviderLabel } f
 import { MarketplacePaymentSection } from '@/components/marketplace/MarketplacePaymentSection';
 import { isDirectShipOrder, isMarketplaceOrder, isListingCheckoutOrder, isMarketplaceCheckoutActive } from '@/lib/marketplaceOrder';
 import { useUser } from '@/lib/useUser';
+import { dealJoinReturnPath } from '@/lib/profileComplete';
 import DealVideoCall from '@/components/DealVideoCall';
 import { DealProductGallery } from '@/components/deal/DealProductGallery';
 import { DealPackingEvidenceStrip } from '@/components/deal/DealPackingEvidenceStrip';
@@ -441,6 +442,7 @@ export default function DealRoom() {
   const [showTrackingRequired, setShowTrackingRequired] = useState(false);
   const trackingInputRef = useRef<HTMLInputElement>(null);
   const trackingProviderRef = useRef<HTMLSelectElement>(null);
+  const joinIntentRef = useRef(false);
   // ─── State machine การโทร (ครอบคลุมทุกสถานะ: idle/outgoing/incoming/connecting/active/ended) ───
   // เปลี่ยนจาก state กระจัดกระจาย → state เดียวเพื่อ flow ที่ถูกต้อง (ต้องรอรับสายก่อนถึงจะ active)
   type CallStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'active' | 'ended';
@@ -1068,6 +1070,26 @@ export default function DealRoom() {
     } finally { setActing(false); }
   }
 
+  useEffect(() => {
+    const joinRole = searchParams.get('join');
+    if (joinRole !== 'buyer' && joinRole !== 'seller') return;
+    if (!deal || !myId || loading || acting || joinIntentRef.current) return;
+    const alreadyParty = deal.seller_id === myId || deal.buyer_id === myId || deal.middleman_id === myId;
+    if (alreadyParty) {
+      router.replace(`/deal/${dealId}`);
+      return;
+    }
+    if (joinRole === 'buyer' && deal.buyer_id) return;
+    if (joinRole === 'seller' && deal.seller_id) return;
+    joinIntentRef.current = true;
+    void doAction(joinRole === 'buyer' ? 'join_as_buyer' : 'join_as_seller').then(next => {
+      if (next) router.replace(`/deal/${dealId}`);
+      else joinIntentRef.current = false;
+    });
+    // doAction อ่านค่าล่าสุดจาก closure ของรอบนี้ — กันยิงซ้ำด้วย joinIntentRef
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal, myId, loading, acting, searchParams, dealId, router]);
+
   async function sendMsg(text: string, type = 'text', fileId = '', fileName = '') {
     if (!text && !fileId) return;
     if (!isDealParty(deal, myId) || !chatIsOpen()) return;
@@ -1503,9 +1525,8 @@ export default function DealRoom() {
   // ─── Guest / not-logged-in join panel (regular/meetup — simple ใช้ shell ร่วมกับผู้สร้าง) ───
   if ((myRole === 'guest' || myRole === '') && !isSimple) {
     const canBeBuyer = !deal.buyer_id, canBeSeller = !deal.seller_id, notLoggedIn = !myId;
-    const dealUrl = typeof window !== 'undefined' ? window.location.href : '';
     function handleJoin(role: 'buyer' | 'seller') {
-      if (notLoggedIn) router.push(`/login?returnTo=${encodeURIComponent(dealUrl || `/deal/${dealId}`)}`);
+      if (notLoggedIn) router.push(`/login?returnTo=${encodeURIComponent(dealJoinReturnPath(dealId, role))}`);
       else doAction(role === 'buyer' ? 'join_as_buyer' : 'join_as_seller');
     }
     return (
@@ -5576,8 +5597,7 @@ export default function DealRoom() {
 
   function handleSimpleJoin(role: 'buyer' | 'seller') {
     const notLoggedIn = !myId;
-    const dealUrl = typeof window !== 'undefined' ? window.location.href : '';
-    if (notLoggedIn) router.push(`/login?returnTo=${encodeURIComponent(dealUrl || `/deal/${dealId}`)}`);
+    if (notLoggedIn) router.push(`/login?returnTo=${encodeURIComponent(dealJoinReturnPath(dealId, role))}`);
     else doAction(role === 'buyer' ? 'join_as_buyer' : 'join_as_seller');
   }
 

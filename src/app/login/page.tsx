@@ -10,6 +10,7 @@ import { detectInApp } from '@/lib/inApp';
 import { isGlanghubApp, nativeGoogleIdToken, isUserCancelled } from '@/lib/nativeAuth';
 import { APP_LOGIN_HINT } from '@/lib/appAuthHandoff';
 import { hasSupabaseSessionSync } from '@/lib/appDeepLinkNav';
+import { safeReturnTo } from '@/lib/profileComplete';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -24,7 +25,7 @@ function LoginForm() {
   };
 
   const returnTo = searchParams.get('returnTo') || '/';
-  const safeReturn = returnTo.startsWith('/') ? returnTo : '/';
+  const safeReturn = safeReturnTo(returnTo);
 
   // ล็อกอินแล้ว — ไม่ควรอยู่หน้านี้
   useLayoutEffect(() => {

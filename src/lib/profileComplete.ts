@@ -17,11 +17,32 @@ export function isProfileComplete(p: Record<string, unknown> | null | undefined)
   return REQUIRED_PROFILE_FIELDS.every(f => typeof p[f] === 'string' && (p[f] as string).trim().length > 0);
 }
 
-/** path ภายในเว็บเท่านั้น — เก็บ query ไว้ด้วย (เช่น /deal/create?type=simple) */
+/** path ภายในเว็บเท่านั้น — เก็บ query ไว้ด้วย และแปลง URL เต็มของโดเมนเดียวกันเป็น path */
 export function safeReturnTo(path: string | null | undefined): string {
-  const raw = String(path || '').split('#')[0];
+  const raw = String(path || '').split('#')[0].trim();
+  if (!raw) return '/';
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    try {
+      const u = new URL(raw);
+      if (typeof window !== 'undefined' && u.origin !== window.location.origin) return '/';
+      return safeReturnTo(`${u.pathname}${u.search}`);
+    } catch {
+      return '/';
+    }
+  }
   if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
   return raw;
+}
+
+export function isDealRoomPath(path: string): boolean {
+  const p = safeReturnTo(path).split('?')[0];
+  return p.startsWith('/deal/') && p !== '/deal/create';
+}
+
+export function dealJoinReturnPath(dealId: string, role?: 'buyer' | 'seller'): string {
+  const id = String(dealId || '').trim();
+  if (!id) return '/';
+  return role ? `/deal/${id}?join=${role}` : `/deal/${id}`;
 }
 
 export function currentAppPath(): string {
@@ -29,10 +50,14 @@ export function currentAppPath(): string {
   return safeReturnTo(`${window.location.pathname}${window.location.search}`);
 }
 
-/** หลังกรอกโปรไฟล์ครบ ถ้ามาจากหน้าแนะนำบริการ ให้เข้าขั้นสร้างดีลเลย */
+/** หลังกรอกโปรไฟล์ครบ — แยกคนสร้างดีล กับคนเข้าจากลิงก์ดีล */
 export function resumePathAfterProfile(returnTo: string | null | undefined): string {
   const dest = safeReturnTo(returnTo);
   const path = dest.split('?')[0];
+  // ผู้เข้าร่วมจากลิงก์ดีล — กลับเข้าห้องดีลนั้นเท่านั้น ห้ามไปหน้าสร้าง
+  if (isDealRoomPath(dest)) return dest;
+  // คนสร้างดีล — จากหน้าสร้างหรือหน้าแนะนำบริการ
+  if (path === '/deal/create') return dest;
   if (path === '/service/simple') return '/deal/create?type=simple';
   if (path === '/service/trade/online') return '/deal/create';
   return dest;
