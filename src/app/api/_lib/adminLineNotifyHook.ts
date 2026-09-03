@@ -18,7 +18,7 @@ const INAPP_DEAL_STEP_NOTIFY: Partial<Record<AdminQueueStep, { prefix: string; b
   },
   pay_seller: {
     prefix: '💰 โอนเงินค่าสินค้า',
-    body: 'ดีลเสร็จแล้ว — เข้าไปโอนเงินค่าสินค้าให้ผู้ขายที่ดีล & ข้อพิพาท',
+    body: 'เข้าไปโอนเงินค่าสินค้าให้ผู้ขายที่ดีล & ข้อพิพาท',
   },
 };
 

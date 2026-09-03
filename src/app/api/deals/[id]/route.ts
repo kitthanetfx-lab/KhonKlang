@@ -684,7 +684,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'buyer_received': {
         if (!isBuyer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         updates = { status: 'completed' };
-        systemMsg = 'ผู้ซื้อรับสินค้าแล้ว — ดีลเสร็จสมบูรณ์ 🎉';
+        systemMsg = deal.deal_type === 'simple'
+          ? 'ผู้ซื้อรับสินค้าแล้ว — รอผู้ขายรีวิวและขอรับเงินค่าสินค้า'
+          : 'ผู้ซื้อรับสินค้าแล้ว — รอศูนย์กลางโอนเงินให้ผู้ขาย';
         break;
       }
       case 'cancel': {

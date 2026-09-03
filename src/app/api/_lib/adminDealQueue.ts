@@ -74,6 +74,17 @@ export function isInPaySellerQueue(deal: AdminDealRow, ps?: AdminPriceStateRow |
   return true;
 }
 
+/** แท็บสำเร็จ — แอดมินโอนเงินปลายทางครบแล้วเท่านั้น */
+export function isInCompletedQueue(
+  deal: AdminDealRow,
+  ps?: AdminPriceStateRow | null,
+  meetup?: AdminMeetupRow | null,
+) {
+  if (deal.status !== 'completed') return false;
+  if (deal.deal_type === 'meetup') return !!meetup?.refund_outcome;
+  return !!ps?.payout_slip_file_id;
+}
+
 export function isInRefundPendingQueue(deal: AdminDealRow, ps?: AdminPriceStateRow | null) {
   return deal.status === 'cancelled'
     && deal.deal_type !== 'meetup'
@@ -148,7 +159,7 @@ export function dealMatchesStatusTab(
     case 'disputed':
       return d.status === 'disputed';
     case 'completed':
-      return d.status === 'completed';
+      return isInCompletedQueue(d, snap.priceState, snap.meetup);
     case 'confirm_pay':
       return d.status === 'payment_uploaded';
     case 'pay_seller':
@@ -194,7 +205,7 @@ export async function getAdminDealCounts(db: SupabaseClient, categoryRaw?: strin
 
   const [{ data: allDeals }, { data: priceStates }, { data: meetups }] = await Promise.all([
     db.from('deals').select('id, status, deal_type, source, payment_slip_file_id, middleman_id, price').order('created_at', { ascending: false }).limit(500),
-    db.from('deal_price_state').select('deal_id, payout_slip_file_id, refund_slip_file_id, middleman_fee_sent_at'),
+    db.from('deal_price_state').select('deal_id, payout_slip_file_id, refund_slip_file_id, middleman_fee_sent_at, payout_requested_at'),
     db.from('deal_meetup').select('deal_id, refund_outcome'),
   ]);
 

@@ -2392,7 +2392,7 @@ export default function DealRoom() {
     const buyerShare = fb.total - sellerShare;
     const shipCost = Math.max(0, Math.round(Number(deal!.shipping_cost) || 0));
     const sellerNet = Math.max(deal!.price, 0) + shipCost;
-    const finished = deal!.status === 'completed';
+    const finished = deal!.status === 'completed' && (isMt || !!pd.payout_slip_file_id);
 
     const rows: { who: string; bank?: BankInfo | null; note: string }[] = [
       { who: 'ผู้ขาย', bank: sellerBank, note: isMt
@@ -2462,7 +2462,7 @@ export default function DealRoom() {
         return doAction('middleman_ship_to_buyer', payload);
       }
     });
-    if (s === 'shipped_to_buyer' && myRole === 'buyer') btns.push({ label: '🎉 ได้รับสินค้าแล้ว — ดีลเสร็จสมบูรณ์', cls: 'btn-green', fn: () => doAction('buyer_received') });
+    if (s === 'shipped_to_buyer' && myRole === 'buyer') btns.push({ label: '🎉 ได้รับสินค้าแล้ว', cls: 'btn-green', fn: () => doAction('buyer_received') });
     if (myRole === 'buyer' && s === 'buyer_joined' && !deal!.middleman_id && !isMeetup && !isSimple) btns.push({ label: showSelectMM ? 'ซ่อนการเลือกคนกลาง' : '🔎 เลือกคนกลาง', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
     if (myRole === 'buyer' && !isSimple && deal!.middleman_id && ['terms_pending', 'payment_pending'].includes(s)) btns.push({ label: showSelectMM ? 'ซ่อนรายการคนกลาง' : '🔄 เลือกคนกลางใหม่', cls: 'btn-ghost', fn: () => setShowSelectMM(v => !v) });
     if (!isFinished && myRole !== 'guest') btns.push({ label: '❌ ยกเลิก', cls: 'btn-danger', fn: () => { const r = prompt('เหตุผล'); return doAction('cancel', { reason: r || '' }); } });
@@ -2579,11 +2579,11 @@ export default function DealRoom() {
   // Wizard ขั้นตอนดีล — เฉพาะ "ซื้อขายผ่านกลางแบบง่าย" (deal_type === 'simple')
   // โฟกัสทีละขั้นตอน (การ์ดเดียว) แทนการแสดงทุกการ์ดพร้อมกันแบบเดิม — ลดความสับสน
   // ═══════════════════════════════════════════════════════════════════════
-  // flow ใหม่ (simple 5 ขั้น): รูปสินค้าตอนสร้างดีล · ไม่มียืนยันเงื่อนไข/อัปหลักฐานก่อนโอน
-  // 1=โอนเงิน, 2=รอทีมงานยืนยัน, 3=แพ็ค+จัดส่ง, 4=รับสินค้า, 5=จบ (ตัดขั้นรอโอนเงินออก — ไปจบเลยหลังยืนยันรับ)
+  // flow ใหม่ (simple 6 ขั้น): รูปสินค้าตอนสร้างดีล · ไม่มียืนยันเงื่อนไข/อัปหลักฐานก่อนโอน
+  // 1=โอนเงิน, 2=รอทีมงานยืนยัน, 3=แพ็ค+จัดส่ง, 4=รับสินค้า, 5=โอนเงินให้ผู้ขาย, 6=เสร็จสมบูรณ์หลังแอดมินโอน
   const WIZARD_STEP_TITLES = [
     'โอนเงิน', 'รอทีมงานยืนยัน',
-    'แพ็ค+จัดส่ง', 'รับสินค้า', 'เสร็จสมบูรณ์',
+    'แพ็ค+จัดส่ง', 'รับสินค้า', 'โอนเงินให้ผู้ขาย', 'เสร็จสมบูรณ์',
   ];
   const WZ_TOTAL = WIZARD_STEP_TITLES.length;
 
@@ -2621,8 +2621,11 @@ export default function DealRoom() {
     }
     if (s === 'packing') return { step: 3 };
     if (s === 'shipped_to_buyer') return { step: 4 };
-    if (s === 'completed') return { step: 5, outcome: 'success' };
-    if (s === 'cancelled') return { step: 5, outcome: 'cancelled' };
+    if (s === 'completed') {
+      if (pd.payout_slip_file_id) return { step: 6, outcome: 'success' };
+      return { step: 5 };
+    }
+    if (s === 'cancelled') return { step: pd.refund_slip_file_id ? 6 : 5, outcome: 'cancelled' };
     if (s === 'disputed') return { step: 5, outcome: 'disputed' };
     return { step: 0 };
   }
@@ -3848,7 +3851,7 @@ export default function DealRoom() {
               return doAction('buyer_received');
             }}
           >
-            🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์
+            🎉 ยืนยันรับสินค้าแล้ว
           </AsyncButton>
           <AsyncButton
             className="btn btn-ghost btn-block btn-sm pack-receive-dispute"
@@ -3914,14 +3917,14 @@ export default function DealRoom() {
             { roleLabel: 'ผู้ขาย', name: deal!.seller_name || '-', ok: !!deal!.tracking_to_buyer, doneText: '✅ ส่งสินค้าแล้ว', waitText: '⏳ รอจัดส่ง' },
             { roleLabel: 'ผู้ซื้อ', name: deal!.buyer_name || '-', ok: buyerReceived, doneText: '✅ ยืนยันรับแล้ว', waitText: '⏳ รอยืนยันรับ' },
           ], { marginBottom: 4 })}
-          <AsyncButton className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => { if (!hasUnboxEvidenceFull && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return; return doAction('buyer_received'); }}>🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์</AsyncButton>
+          <AsyncButton className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => { if (!hasUnboxEvidenceFull && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return; return doAction('buyer_received'); }}>🎉 ยืนยันรับสินค้าแล้ว</AsyncButton>
           <AsyncButton className="btn btn-ghost btn-block" disabled={acting} onClick={() => { const r = prompt('อธิบายปัญหาที่พบ (เช่น สินค้าไม่ตรงปก/ชำรุด/ไม่ได้รับสินค้า):'); if (r === null || !r.trim()) return; return doAction('dispute', { reason: r.trim() }); }} style={{ color: '#b22441' }}>⚠️ แจ้งปัญหากับสินค้า</AsyncButton>
         </div>
       </div>
     );
   }
 
-  // ─── ขั้นสุดท้าย simple: จบดีล (ตัดขั้นรอโอนเงิน — buyer/seller มาที่นี่เลยหลังยืนยันรับ) ─
+  // ─── ขั้น 5–6 simple: รอโอนเงินให้ผู้ขาย แล้วจึงเสร็จสมบูรณ์ ─
   function renderSimpleWizardFinal(outcome?: 'success' | 'cancelled' | 'disputed') {
     if (outcome === 'disputed') return renderWizardStep7('disputed');
     const pd: DealPriceState = priceState || {};
@@ -3947,16 +3950,20 @@ export default function DealRoom() {
       } else if (payoutRequested) {
         doneEmoji = '💸';
         doneTitle = 'ขอรับเงินแล้ว';
-        doneSub = 'ทีมงานกำลังโอนเงินค่าสินค้าให้คุณ';
+        doneSub = 'ทีมงานกำลังโอนเงินค่าสินค้าให้คุณ — ยังไม่เสร็จจนกว่าแอดมินจะโอน';
       } else {
         doneEmoji = '⭐';
         doneTitle = 'ผู้ซื้อยืนยันรับสินค้าแล้ว';
         doneSub = 'ให้คะแนนรีวิว แล้วกดขอรับเงินค่าสินค้า — ทีมงานจะโอนหลังจากนั้น';
       }
-    } else {
+    } else if (hasPayout) {
       doneEmoji = '🎉';
       doneTitle = 'ดีลเสร็จสมบูรณ์!';
       doneSub = 'คุณยืนยันรับสินค้าแล้ว — ขอบคุณที่ใช้บริการ';
+    } else {
+      doneEmoji = '✅';
+      doneTitle = 'ยืนยันรับสินค้าแล้ว';
+      doneSub = 'ศูนย์กลางจะโอนเงินค่าสินค้าให้ผู้ขายในขั้นตอนถัดไป';
     }
 
     const allSlips: { label: string; fileId: string }[] = [];
@@ -4728,7 +4735,7 @@ export default function DealRoom() {
               <AsyncButton className="btn btn-green btn-block btn-lg" disabled={acting} onClick={() => {
                 if (!unboxEvidence.length && !confirm('ยังไม่ได้อัปโหลดวิดีโอก่อนแกะกล่อง — ยืนยันรับสินค้าต่อไหม?')) return;
                 return doAction('buyer_received');
-              }}>🎉 ยืนยันรับสินค้า — ดีลเสร็จสมบูรณ์</AsyncButton>
+              }}>🎉 ยืนยันรับสินค้าแล้ว</AsyncButton>
               <AsyncButton className="btn btn-ghost btn-block" disabled={acting} onClick={() => {
                 const r = prompt('อธิบายปัญหาที่พบ:'); if (!r?.trim()) return; return doAction('dispute', { reason: r.trim() });
               }} style={{ color: '#b22441' }}>⚠️ แจ้งปัญหากับสินค้า</AsyncButton>
@@ -5649,7 +5656,7 @@ export default function DealRoom() {
     }
     if (step === 0) return renderSimplePreJoinView();
     const stepPayFocus = step === 1;
-    const stepFocus = (step >= 3 && step < WZ_TOTAL) || stepPayFocus;
+    const stepFocus = (step >= 3 && step <= 4) || stepPayFocus;
     const showDealMedia = step < 3 && !stepPayFocus;
 
     const reviewBanner = isReviewing ? (
@@ -5695,7 +5702,7 @@ export default function DealRoom() {
           {step === 2 && renderWizardStep4()}
           {step === 3 && renderWizardStep5()}
           {step === 4 && renderWizardStep6()}
-          {step === 5 && renderSimpleWizardFinal(outcome)}
+          {step >= 5 && renderSimpleWizardFinal(outcome)}
         </div>
       </SimpleDealShell>
     );
